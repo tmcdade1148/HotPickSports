@@ -1,24 +1,55 @@
-import React, {useState} from 'react';
+import React from 'react';
 import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
 import type {TournamentConfig} from '@shared/types/templates';
 import type {DbTournamentMatch} from '@shared/types/database';
 import {colors, spacing, borderRadius} from '@shared/theme';
+import {useTournamentStore} from '../stores/tournamentStore';
 
 interface MatchPickCardProps {
   match: DbTournamentMatch;
   config: TournamentConfig;
+  userId: string;
 }
 
 /**
  * MatchPickCard — One match pick with HotPick toggle.
  * Never references a specific sport.
  */
-export function MatchPickCard({match, config}: MatchPickCardProps) {
-  const [pickedTeam, setPickedTeam] = useState<string | null>(null);
-  const [isHotPick, setIsHotPick] = useState(false);
+export function MatchPickCard({
+  match,
+  config,
+  userId,
+}: MatchPickCardProps) {
+  const existingPick = useTournamentStore(s => s.getMatchPick(match.id));
+  const saveMatchPick = useTournamentStore(s => s.saveMatchPick);
+  const isSaving = useTournamentStore(s => s.isSaving);
+
+  const pickedTeam = existingPick?.picked_team_code ?? null;
+  const isHotPick = existingPick?.is_hot_pick ?? false;
 
   const roundConfig = config.knockoutRounds.find(r => r.key === match.round);
   const kickoffDate = new Date(match.kickoff_time);
+
+  const selectTeam = (teamCode: string) => {
+    saveMatchPick({
+      userId,
+      matchId: match.id,
+      teamCode,
+      isHotPick,
+    });
+  };
+
+  const toggleHotPick = () => {
+    if (!pickedTeam) {
+      return;
+    }
+    saveMatchPick({
+      userId,
+      matchId: match.id,
+      teamCode: pickedTeam,
+      isHotPick: !isHotPick,
+    });
+  };
 
   return (
     <View style={styles.card}>
@@ -35,7 +66,8 @@ export function MatchPickCard({match, config}: MatchPickCardProps) {
             styles.teamButton,
             pickedTeam === match.home_team_code && styles.teamButtonSelected,
           ]}
-          onPress={() => setPickedTeam(match.home_team_code)}>
+          onPress={() => selectTeam(match.home_team_code)}
+          disabled={isSaving}>
           <Text
             style={[
               styles.teamText,
@@ -52,7 +84,8 @@ export function MatchPickCard({match, config}: MatchPickCardProps) {
             styles.teamButton,
             pickedTeam === match.away_team_code && styles.teamButtonSelected,
           ]}
-          onPress={() => setPickedTeam(match.away_team_code)}>
+          onPress={() => selectTeam(match.away_team_code)}
+          disabled={isSaving}>
           <Text
             style={[
               styles.teamText,
@@ -66,7 +99,8 @@ export function MatchPickCard({match, config}: MatchPickCardProps) {
       {pickedTeam && (
         <TouchableOpacity
           style={[styles.hotPickToggle, isHotPick && styles.hotPickActive]}
-          onPress={() => setIsHotPick(!isHotPick)}>
+          onPress={toggleHotPick}
+          disabled={isSaving}>
           <Text
             style={[
               styles.hotPickText,

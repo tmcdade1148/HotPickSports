@@ -1,7 +1,8 @@
-import React from 'react';
-import {View, Text, FlatList, StyleSheet} from 'react-native';
+import React, {useEffect} from 'react';
+import {View, Text, FlatList, ActivityIndicator, StyleSheet} from 'react-native';
 import {useTournamentStore} from '../stores/tournamentStore';
 import {MatchPickCard} from '../components/MatchPickCard';
+import {useAuth} from '@shared/hooks/useAuth';
 import {colors, spacing} from '@shared/theme';
 
 /**
@@ -12,9 +13,28 @@ import {colors, spacing} from '@shared/theme';
 export function MatchPicksScreen() {
   const config = useTournamentStore(s => s.config);
   const matches = useTournamentStore(s => s.matches);
+  const isLoading = useTournamentStore(s => s.isLoading);
+  const fetchMatches = useTournamentStore(s => s.fetchMatches);
+  const fetchUserPicks = useTournamentStore(s => s.fetchUserPicks);
+  const {user} = useAuth();
+
+  useEffect(() => {
+    fetchMatches();
+    if (user?.id) {
+      fetchUserPicks(user.id);
+    }
+  }, [user?.id, fetchMatches, fetchUserPicks]);
 
   if (!config) {
     return null;
+  }
+
+  if (isLoading) {
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator size="large" color={config.color} />
+      </View>
+    );
   }
 
   const knockoutMatches = matches.filter(m => m.group_name === null);
@@ -34,7 +54,11 @@ export function MatchPicksScreen() {
           data={knockoutMatches}
           keyExtractor={item => item.id}
           renderItem={({item}) => (
-            <MatchPickCard match={item} config={config} />
+            <MatchPickCard
+              match={item}
+              config={config}
+              userId={user?.id ?? ''}
+            />
           )}
           contentContainerStyle={styles.list}
         />
@@ -46,6 +70,12 @@ export function MatchPicksScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.background,
+  },
+  loading: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: colors.background,
   },
   list: {

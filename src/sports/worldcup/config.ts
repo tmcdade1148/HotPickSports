@@ -92,8 +92,43 @@ export const worldCup2026: TournamentConfig = {
         {code: 'KOR', name: 'South Korea', shortName: 'KOR'},
       ],
     },
-    // TODO: Add groups I through L when 2026 draw is finalized
-    // World Cup 2026 will have 12 groups of 4 teams (48 teams total)
+    // Placeholder teams for groups I-L — replace with actual draw when finalized
+    {
+      name: 'I',
+      teams: [
+        {code: 'I1', name: 'Group I Team 1', shortName: 'I1'},
+        {code: 'I2', name: 'Group I Team 2', shortName: 'I2'},
+        {code: 'I3', name: 'Group I Team 3', shortName: 'I3'},
+        {code: 'I4', name: 'Group I Team 4', shortName: 'I4'},
+      ],
+    },
+    {
+      name: 'J',
+      teams: [
+        {code: 'J1', name: 'Group J Team 1', shortName: 'J1'},
+        {code: 'J2', name: 'Group J Team 2', shortName: 'J2'},
+        {code: 'J3', name: 'Group J Team 3', shortName: 'J3'},
+        {code: 'J4', name: 'Group J Team 4', shortName: 'J4'},
+      ],
+    },
+    {
+      name: 'K',
+      teams: [
+        {code: 'K1', name: 'Group K Team 1', shortName: 'K1'},
+        {code: 'K2', name: 'Group K Team 2', shortName: 'K2'},
+        {code: 'K3', name: 'Group K Team 3', shortName: 'K3'},
+        {code: 'K4', name: 'Group K Team 4', shortName: 'K4'},
+      ],
+    },
+    {
+      name: 'L',
+      teams: [
+        {code: 'L1', name: 'Group L Team 1', shortName: 'L1'},
+        {code: 'L2', name: 'Group L Team 2', shortName: 'L2'},
+        {code: 'L3', name: 'Group L Team 3', shortName: 'L3'},
+        {code: 'L4', name: 'Group L Team 4', shortName: 'L4'},
+      ],
+    },
   ],
   advancingPerGroup: 2,
   groupPicksRequired: true,
@@ -107,10 +142,12 @@ export const worldCup2026: TournamentConfig = {
     {key: 'final', label: 'Final', rank: 10, matchCount: 1, isMegaPick: true},
   ],
 
-  // Scoring
+  // Scoring — 12 groups × 2 advancing × 2 pts = 48 group pts
+  // Knockout: 16+8+4+2+1 = 31 matches at 1 pt each = 31 knockout pts
+  // maxTotalPoints = 48 + 31 = 79 (regular picks, no HotPick bonus)
   groupCorrectAdvancementPoints: 2,
-  maxGroupPoints: 68,
-  maxTotalPoints: 139,
+  maxGroupPoints: 48,
+  maxTotalPoints: 79,
 
   // Data source
   espnLeagueSlug: 'soccer/fifa.world',

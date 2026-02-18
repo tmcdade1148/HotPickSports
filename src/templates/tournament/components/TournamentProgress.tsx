@@ -2,18 +2,23 @@ import React from 'react';
 import {View, Text, StyleSheet} from 'react-native';
 import type {TournamentConfig} from '@shared/types/templates';
 import {colors, spacing, borderRadius} from '@shared/theme';
+import {useTournamentStore} from '../stores/tournamentStore';
 
 interface TournamentProgressProps {
   config: TournamentConfig;
+  userId: string;
 }
 
 /**
  * TournamentProgress — Points/progress summary bar.
- * Shows max available points from config, current earned points.
+ * Shows max available points from config, current earned points from store.
  */
-export function TournamentProgress({config}: TournamentProgressProps) {
-  // TODO: Read actual score from store
-  const currentPoints = 0;
+export function TournamentProgress({config, userId}: TournamentProgressProps) {
+  const score = useTournamentStore(s => s.getUserScore(userId));
+
+  const groupPoints = score?.group_points ?? 0;
+  const knockoutPoints = score?.knockout_points ?? 0;
+  const currentPoints = score?.total_points ?? 0;
   const progress =
     config.maxTotalPoints > 0 ? currentPoints / config.maxTotalPoints : 0;
 
@@ -35,10 +40,11 @@ export function TournamentProgress({config}: TournamentProgressProps) {
       </View>
       <View style={styles.breakdown}>
         <Text style={styles.breakdownText}>
-          Groups: {config.maxGroupPoints} pts max
+          Groups: {groupPoints} / {config.maxGroupPoints} pts
         </Text>
         <Text style={styles.breakdownText}>
-          Knockout: {config.maxTotalPoints - config.maxGroupPoints} pts max
+          Knockout: {knockoutPoints} /{' '}
+          {config.maxTotalPoints - config.maxGroupPoints} pts
         </Text>
       </View>
     </View>

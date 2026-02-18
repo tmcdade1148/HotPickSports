@@ -12,10 +12,17 @@ import type {TournamentConfig, SeasonConfig, SeriesConfig} from '@shared/types/t
  * This is the key architectural junction: the Shell reads the active sport's
  * templateType and renders the matching template. Templates never know which
  * sport they're rendering.
+ *
+ * Pool gate: If no activePoolId is set, navigation will redirect to
+ * PoolSelection before this screen is rendered. The poolId and pool-switcher
+ * props are passed down so templates never import from the shell layer.
  */
-export function HomeScreen() {
+export function HomeScreen({navigation}: any) {
   const activeSport = useGlobalStore(s => s.activeSport);
   const setActiveSport = useGlobalStore(s => s.setActiveSport);
+  const activePoolId = useGlobalStore(s => s.activePoolId);
+  const userPools = useGlobalStore(s => s.userPools);
+  const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
 
   useEffect(() => {
     if (!activeSport) {
@@ -23,18 +30,53 @@ export function HomeScreen() {
     }
   }, [activeSport, setActiveSport]);
 
-  if (!activeSport) {
+  // Pool gate — redirect to PoolSelection if no pool is active
+  useEffect(() => {
+    if (activeSport && !activePoolId) {
+      navigation.replace('PoolSelection');
+    }
+  }, [activeSport, activePoolId, navigation]);
+
+  if (!activeSport || !activePoolId) {
     return null;
   }
+
+  // Find the active pool name to display in the header
+  const activePool = userPools.find(p => p.id === activePoolId);
 
   switch (activeSport.templateType) {
     case 'tournament':
       return (
-        <TournamentTabNavigator config={activeSport as TournamentConfig} />
+        <TournamentTabNavigator
+          config={activeSport as TournamentConfig}
+          poolId={activePoolId}
+          poolName={activePool?.name}
+          userPools={userPools}
+          onSwitchPool={setActivePoolId}
+          onOpenProfile={() => navigation.navigate('Profile')}
+        />
       );
     case 'season':
-      return <SeasonTabNavigator config={activeSport as SeasonConfig} />;
+      return (
+        <SeasonTabNavigator
+          config={activeSport as SeasonConfig}
+          poolId={activePoolId}
+          poolName={activePool?.name}
+          userPools={userPools}
+          onSwitchPool={setActivePoolId}
+          onOpenProfile={() => navigation.navigate('Profile')}
+        />
+      );
     case 'series':
-      return <SeriesTabNavigator config={activeSport as SeriesConfig} />;
+      return (
+        <SeriesTabNavigator
+          config={activeSport as SeriesConfig}
+          poolId={activePoolId}
+          poolName={activePool?.name}
+          userPools={userPools}
+          onSwitchPool={setActivePoolId}
+          onOpenProfile={() => navigation.navigate('Profile')}
+        />
+      );
   }
 }

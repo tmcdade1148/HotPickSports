@@ -1,30 +1,44 @@
-import React, {useState} from 'react';
+import React from 'react';
 import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
 import type {GroupConfig, TeamConfig} from '@shared/types/templates';
 import {colors, spacing, borderRadius} from '@shared/theme';
+import {useTournamentStore} from '../stores/tournamentStore';
 
 interface GroupCardProps {
   group: GroupConfig;
   advancingCount: number;
   accentColor: string;
+  userId: string;
 }
 
 /**
  * GroupCard — Renders one group's teams with advancement pick toggles.
  * Parameterized by group config — never references a specific sport.
  */
-export function GroupCard({group, advancingCount, accentColor}: GroupCardProps) {
-  const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
+export function GroupCard({
+  group,
+  advancingCount,
+  accentColor,
+  userId,
+}: GroupCardProps) {
+  const selectedTeams = useTournamentStore(s =>
+    s.getGroupPickCodes(group.name),
+  );
+  const saveGroupPick = useTournamentStore(s => s.saveGroupPick);
+  const isSaving = useTournamentStore(s => s.isSaving);
 
   const toggleTeam = (teamCode: string) => {
-    setSelectedTeams(prev => {
-      if (prev.includes(teamCode)) {
-        return prev.filter(c => c !== teamCode);
-      }
-      if (prev.length >= advancingCount) {
-        return prev;
-      }
-      return [...prev, teamCode];
+    const isCurrentlySelected = selectedTeams.includes(teamCode);
+
+    if (!isCurrentlySelected && selectedTeams.length >= advancingCount) {
+      return;
+    }
+
+    saveGroupPick({
+      userId,
+      groupName: group.name,
+      teamCode,
+      selected: !isCurrentlySelected,
     });
   };
 
@@ -42,7 +56,8 @@ export function GroupCard({group, advancingCount, accentColor}: GroupCardProps) 
           <TouchableOpacity
             key={team.code}
             style={[styles.teamRow, isSelected && styles.teamRowSelected]}
-            onPress={() => toggleTeam(team.code)}>
+            onPress={() => toggleTeam(team.code)}
+            disabled={isSaving}>
             <Text style={styles.teamCode}>{team.shortName}</Text>
             <Text style={styles.teamName}>{team.name}</Text>
             {isSelected && (

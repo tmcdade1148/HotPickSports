@@ -7,12 +7,19 @@ import {colors, spacing} from '@shared/theme';
 export function LoadingScreen({navigation}: any) {
   const setUser = useGlobalStore(s => s.setUser);
   const setAuthLoading = useGlobalStore(s => s.setAuthLoading);
+  const loadPersistedPoolId = useGlobalStore(s => s.loadPersistedPoolId);
+  const fetchProfile = useGlobalStore(s => s.fetchProfile);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({data: {session}}) => {
+    // Load persisted pool ID before checking auth
+    loadPersistedPoolId();
+
+    supabase.auth.getSession().then(async ({data: {session}}) => {
       setAuthLoading(false);
       if (session) {
         setUser(session.user);
+        // Fetch profile data (display name) in background
+        fetchProfile(session.user.id);
         navigation.replace('Home');
       } else {
         navigation.replace('SignIn');

@@ -1,25 +1,23 @@
 import React, {useEffect} from 'react';
 import {View, Text, ScrollView, ActivityIndicator, StyleSheet} from 'react-native';
-import {useTournamentStore} from '../stores/tournamentStore';
-import {TournamentProgress} from '../components/TournamentProgress';
-import {KnockoutBracket} from '../components/KnockoutBracket';
+import {useSeasonStore} from '../stores/seasonStore';
+import {SeasonProgress} from '../components/SeasonProgress';
 import {useAuth} from '@shared/hooks/useAuth';
 import {colors, spacing, borderRadius} from '@shared/theme';
-import type {DbTournamentScore} from '@shared/types/database';
+import type {DbSeasonScore} from '@shared/types/database';
 
 /**
- * TournamentBoardScreen — Leaderboard showing pool standings.
+ * SeasonBoardScreen — Standings showing pool leaderboard.
+ * SeasonProgress at top, ranked player list below.
  * Never references a specific sport.
  */
-export function TournamentBoardScreen() {
-  const config = useTournamentStore(s => s.config);
-  const leaderboard = useTournamentStore(s => s.leaderboard);
-  const userNames = useTournamentStore(s => s.userNames);
-  const isLoading = useTournamentStore(s => s.isLoading);
-  const fetchLeaderboard = useTournamentStore(s => s.fetchLeaderboard);
-  const fetchMatches = useTournamentStore(s => s.fetchMatches);
-  const fetchUserPicks = useTournamentStore(s => s.fetchUserPicks);
-  const calculateMyScore = useTournamentStore(s => s.calculateMyScore);
+export function SeasonBoardScreen() {
+  const config = useSeasonStore(s => s.config);
+  const leaderboard = useSeasonStore(s => s.leaderboard);
+  const userNames = useSeasonStore(s => s.userNames);
+  const isLoading = useSeasonStore(s => s.isLoading);
+  const fetchLeaderboard = useSeasonStore(s => s.fetchLeaderboard);
+  const calculateMyScore = useSeasonStore(s => s.calculateMyScore);
   const {user} = useAuth();
 
   useEffect(() => {
@@ -27,12 +25,10 @@ export function TournamentBoardScreen() {
       return;
     }
     const load = async () => {
-      await fetchMatches();
-      await fetchUserPicks(user.id);
       await calculateMyScore(user.id);
     };
     load();
-  }, [user?.id, fetchMatches, fetchUserPicks, calculateMyScore, fetchLeaderboard]);
+  }, [user?.id, calculateMyScore]);
 
   if (!config) {
     return null;
@@ -46,9 +42,17 @@ export function TournamentBoardScreen() {
     );
   }
 
-  const renderRow = ({item, index}: {item: DbTournamentScore; index: number}) => {
+  const renderRow = ({item, index}: {item: DbSeasonScore; index: number}) => {
     const isMe = item.user_id === user?.id;
     const rank = index + 1;
+
+    // Get most recent week's points for the breakdown column
+    const breakdown = item.weekly_breakdown ?? {};
+    const weekKeys = Object.keys(breakdown)
+      .map(Number)
+      .sort((a, b) => b - a);
+    const latestWeek = weekKeys[0];
+    const latestPoints = latestWeek != null ? breakdown[String(latestWeek)] : null;
 
     return (
       <View key={item.id} style={[styles.row, isMe && styles.rowHighlight]}>
@@ -59,9 +63,11 @@ export function TournamentBoardScreen() {
             numberOfLines={1}>
             {isMe ? 'You' : (userNames[item.user_id] ?? `Player ${rank}`)}
           </Text>
-          <Text style={styles.breakdown}>
-            G: {item.group_points} | K: {item.knockout_points}
-          </Text>
+          {latestPoints != null && (
+            <Text style={styles.breakdown}>
+              Wk {latestWeek}: {latestPoints} pts
+            </Text>
+          )}
         </View>
         <Text style={[styles.totalPoints, isMe && styles.textHighlight]}>
           {item.total_points} pts
@@ -72,16 +78,14 @@ export function TournamentBoardScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      <TournamentProgress config={config} userId={user?.id ?? ''} />
-
-      <KnockoutBracket config={config} />
+      <SeasonProgress config={config} userId={user?.id ?? ''} />
 
       <View style={styles.leaderboard}>
-        <Text style={styles.sectionTitle}>Leaderboard</Text>
+        <Text style={styles.sectionTitle}>Standings</Text>
         {leaderboard.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>
-              Scores will appear here once matches are played.
+              Scores will appear here once matches are completed.
             </Text>
           </View>
         ) : (
