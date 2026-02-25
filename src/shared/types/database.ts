@@ -114,7 +114,6 @@ export interface DbSeasonPick {
   id: string;
   user_id: string;
   event_id: string;
-  pool_id: string;
   match_id: string;
   picked_outcome: string; // 'home', 'away', 'draw'
   is_hot_pick: boolean;
@@ -125,7 +124,6 @@ export interface DbSeasonScore {
   id: string;
   user_id: string;
   event_id: string;
-  pool_id: string;
   total_points: number;
   weekly_breakdown: Record<string, number>;
   rank: number;

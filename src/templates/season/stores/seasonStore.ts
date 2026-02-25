@@ -106,7 +106,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
   },
 
   fetchUserPicks: async (userId: string, week: number) => {
-    const {config, poolId, matches} = get();
+    const {config, matches} = get();
     if (!config) {
       return;
     }
@@ -123,14 +123,13 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       .select('*')
       .eq('user_id', userId)
       .eq('event_id', config.eventId)
-      .eq('pool_id', poolId)
       .in('match_id', matchIds);
 
     set({weekPicks: (data as DbSeasonPick[]) ?? []});
   },
 
   savePick: async ({userId, matchId, pickedOutcome, isHotPick}) => {
-    const {config, poolId, weekPicks} = get();
+    const {config, weekPicks} = get();
     if (!config) {
       return;
     }
@@ -153,7 +152,6 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       id: matchId,
       user_id: userId,
       event_id: config.eventId,
-      pool_id: poolId,
       match_id: matchId,
       picked_outcome: pickedOutcome,
       is_hot_pick: isHotPick,
@@ -170,12 +168,11 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       {
         user_id: userId,
         event_id: config.eventId,
-        pool_id: poolId,
         match_id: matchId,
         picked_outcome: pickedOutcome,
         is_hot_pick: isHotPick,
       },
-      {onConflict: 'user_id,event_id,pool_id,match_id'},
+      {onConflict: 'user_id,event_id,match_id'},
     );
 
     if (error) {
@@ -192,17 +189,25 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
     }
 
     set({isLoading: true});
+
+    // Pool-independent: scores have no pool_id.
+    // Leaderboard is built by joining season_scores with pool_members
+    // so any pool created mid-season immediately shows all members' scores.
     const {data} = await supabase
       .from('season_scores')
-      .select('*')
+      .select('*, pool_members!inner(user_id)')
       .eq('event_id', config.eventId)
-      .eq('pool_id', poolId)
+      .eq('pool_members.pool_id', poolId)
       .order('total_points', {ascending: false});
 
-    const scores = (data as DbSeasonScore[]) ?? [];
+    const scores = (data as (DbSeasonScore & {pool_members: unknown})[]) ?? [];
+    // Strip the join artifact before storing
+    const cleanScores: DbSeasonScore[] = scores.map(
+      ({pool_members: _pm, ...rest}) => rest,
+    );
 
     // Fetch display names for all users on the leaderboard
-    const userIds = scores.map(s => s.user_id);
+    const userIds = cleanScores.map(s => s.user_id);
     let names: Record<string, string> = {};
     if (userIds.length > 0) {
       const {data: users} = await supabase
@@ -220,25 +225,24 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
     }
 
     set({
-      leaderboard: scores,
+      leaderboard: cleanScores,
       userNames: names,
       isLoading: false,
     });
   },
 
   calculateMyScore: async (userId: string) => {
-    const {config, poolId} = get();
+    const {config} = get();
     if (!config) {
       return;
     }
 
-    // Fetch ALL picks for this user/event/pool
+    // Fetch ALL picks for this user/event (pool-independent)
     const {data: allPicks} = await supabase
       .from('season_picks')
       .select('*')
       .eq('user_id', userId)
-      .eq('event_id', config.eventId)
-      .eq('pool_id', poolId);
+      .eq('event_id', config.eventId);
 
     const picks = (allPicks as DbSeasonPick[]) ?? [];
 
@@ -287,13 +291,12 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       {
         user_id: userId,
         event_id: config.eventId,
-        pool_id: poolId,
         total_points: totalPoints,
         weekly_breakdown: weeklyBreakdown,
         rank,
         last_calculated: new Date().toISOString(),
       },
-      {onConflict: 'user_id,event_id,pool_id'},
+      {onConflict: 'user_id,event_id'},
     );
 
     // Re-fetch leaderboard to get updated data
