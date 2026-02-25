@@ -6,7 +6,7 @@ export const nfl2026: SeasonConfig = {
   sport: 'football',
   name: 'NFL 2026-27 Season',
   shortName: 'NFL',
-  status: 'upcoming',
+  status: 'active',
   startDate: '2026-09-10',
   endDate: '2027-02-08',
   picksOpenDate: '2026-09-07',
