@@ -12,7 +12,7 @@ import {
 import {supabase} from '@shared/config/supabase';
 import {useAuth} from '@shared/hooks/useAuth';
 import {colors, spacing, borderRadius} from '@shared/theme';
-import type {DbSmackTalk} from '@shared/types/database';
+import type {DbSmackMessage} from '@shared/types/database';
 
 interface SmackTalkScreenProps {
   poolId: string;
@@ -24,52 +24,23 @@ interface SmackTalkScreenProps {
  * Subscribes to Supabase Realtime for instant message delivery.
  */
 export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
-  const [messages, setMessages] = useState<DbSmackTalk[]>([]);
+  const [messages, setMessages] = useState<DbSmackMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
-  const [userNames, setUserNames] = useState<Record<string, string>>({});
   const {user} = useAuth();
-  const flatListRef = useRef<FlatList<DbSmackTalk>>(null);
-
-  /** Fetch display names for a set of user IDs (skips already-known names). */
-  const fetchNames = async (userIds: string[]) => {
-    const unknown = userIds.filter(id => id !== user?.id && !userNames[id]);
-    if (unknown.length === 0) {
-      return;
-    }
-    const {data} = await supabase
-      .from('users')
-      .select('id, display_name')
-      .in('id', unknown);
-
-    if (data) {
-      setUserNames(prev => {
-        const next = {...prev};
-        for (const u of data) {
-          if (u.display_name) {
-            next[u.id] = u.display_name;
-          }
-        }
-        return next;
-      });
-    }
-  };
+  const flatListRef = useRef<FlatList<DbSmackMessage>>(null);
 
   useEffect(() => {
     // Fetch existing messages
     const fetchMessages = async () => {
       const {data} = await supabase
-        .from('smack_talk')
+        .from('smack_messages')
         .select('*')
         .eq('pool_id', poolId)
         .order('created_at', {ascending: true});
 
       if (data) {
-        const msgs = data as DbSmackTalk[];
-        setMessages(msgs);
-        // Batch-fetch display names for all senders
-        const senderIds = [...new Set(msgs.map(m => m.user_id))];
-        fetchNames(senderIds);
+        setMessages(data as DbSmackMessage[]);
       }
     };
 
@@ -83,14 +54,12 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'smack_talk',
+          table: 'smack_messages',
           filter: `pool_id=eq.${poolId}`,
         },
         payload => {
-          const msg = payload.new as DbSmackTalk;
+          const msg = payload.new as DbSmackMessage;
           setMessages(prev => [...prev, msg]);
-          // Fetch name for new sender if unknown
-          fetchNames([msg.user_id]);
         },
       )
       .subscribe();
@@ -108,16 +77,17 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
     setSending(true);
     setNewMessage('');
 
-    await supabase.from('smack_talk').insert({
+    await supabase.from('smack_messages').insert({
       pool_id: poolId,
       user_id: user.id,
-      message: newMessage.trim(),
+      author_name: 'Player', // TODO: pass display name from profile
+      text: newMessage.trim(),
     });
 
     setSending(false);
   };
 
-  const renderMessage = ({item}: {item: DbSmackTalk}) => {
+  const renderMessage = ({item}: {item: DbSmackMessage}) => {
     const isMe = item.user_id === user?.id;
     const time = new Date(item.created_at).toLocaleTimeString([], {
       hour: '2-digit',
@@ -128,11 +98,11 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
       <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem]}>
         {!isMe && (
           <Text style={styles.sender}>
-            {userNames[item.user_id] ?? 'Player'}
+            {item.author_name}
           </Text>
         )}
         <Text style={[styles.messageText, isMe && styles.messageTextMe]}>
-          {item.message}
+          {item.text}
         </Text>
         <Text style={[styles.time, isMe && styles.timeMe]}>{time}</Text>
       </View>

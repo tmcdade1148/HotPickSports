@@ -84,7 +84,7 @@ export function SeriesPicksScreen() {
       ) : (
         <FlatList
           data={matchups}
-          keyExtractor={item => item.id}
+          keyExtractor={item => item.series_id}
           renderItem={renderMatchup}
           contentContainerStyle={styles.list}
         />

@@ -6,7 +6,7 @@ import {nhlPlayoffs2027} from './nhl/config';
 const ALL_EVENTS: AnyEventConfig[] = [worldCup2026, nfl2026, nhlPlayoffs2027];
 
 export function getEventById(id: string): AnyEventConfig | undefined {
-  return ALL_EVENTS.find(e => e.eventId === id);
+  return ALL_EVENTS.find(e => e.competition === id);
 }
 
 export function getEventsByPriority(): AnyEventConfig[] {

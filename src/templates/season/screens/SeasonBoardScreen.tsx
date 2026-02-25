@@ -1,10 +1,10 @@
 import React, {useEffect} from 'react';
 import {View, Text, ScrollView, ActivityIndicator, StyleSheet} from 'react-native';
 import {useSeasonStore} from '../stores/seasonStore';
+import type {SeasonLeaderboardEntry} from '../stores/seasonStore';
 import {SeasonProgress} from '../components/SeasonProgress';
 import {useAuth} from '@shared/hooks/useAuth';
 import {colors, spacing, borderRadius} from '@shared/theme';
-import type {DbSeasonScore} from '@shared/types/database';
 
 /**
  * SeasonBoardScreen — Standings showing pool leaderboard.
@@ -17,18 +17,11 @@ export function SeasonBoardScreen() {
   const userNames = useSeasonStore(s => s.userNames);
   const isLoading = useSeasonStore(s => s.isLoading);
   const fetchLeaderboard = useSeasonStore(s => s.fetchLeaderboard);
-  const calculateMyScore = useSeasonStore(s => s.calculateMyScore);
   const {user} = useAuth();
 
   useEffect(() => {
-    if (!user?.id) {
-      return;
-    }
-    const load = async () => {
-      await calculateMyScore(user.id);
-    };
-    load();
-  }, [user?.id, calculateMyScore]);
+    fetchLeaderboard();
+  }, [fetchLeaderboard]);
 
   if (!config) {
     return null;
@@ -42,20 +35,19 @@ export function SeasonBoardScreen() {
     );
   }
 
-  const renderRow = ({item, index}: {item: DbSeasonScore; index: number}) => {
+  const renderRow = ({item, index}: {item: SeasonLeaderboardEntry; index: number}) => {
     const isMe = item.user_id === user?.id;
     const rank = index + 1;
 
     // Get most recent week's points for the breakdown column
-    const breakdown = item.weekly_breakdown ?? {};
-    const weekKeys = Object.keys(breakdown)
+    const weekKeys = Object.keys(item.weekly_breakdown)
       .map(Number)
       .sort((a, b) => b - a);
     const latestWeek = weekKeys[0];
-    const latestPoints = latestWeek != null ? breakdown[String(latestWeek)] : null;
+    const latestPoints = latestWeek != null ? item.weekly_breakdown[latestWeek] : null;
 
     return (
-      <View key={item.id} style={[styles.row, isMe && styles.rowHighlight]}>
+      <View key={item.user_id} style={[styles.row, isMe && styles.rowHighlight]}>
         <Text style={[styles.rank, isMe && styles.textHighlight]}>{rank}</Text>
         <View style={styles.userInfo}>
           <Text
@@ -85,7 +77,7 @@ export function SeasonBoardScreen() {
         {leaderboard.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>
-              Scores will appear here once matches are completed.
+              Scores will appear here once games are completed.
             </Text>
           </View>
         ) : (

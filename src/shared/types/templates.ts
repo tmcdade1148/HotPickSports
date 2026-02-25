@@ -22,7 +22,7 @@ export interface TabConfig {
 }
 
 export interface BaseEventConfig {
-  eventId: string; // 'wc-2026', 'nfl-2026', 'nhl-playoffs-2027'
+  competition: string; // 'world_cup_2026', 'nfl_2026', 'nhl_playoffs_2027'
   templateType: TemplateType;
   sport: string; // 'soccer', 'football', 'hockey'
   name: string; // 'FIFA World Cup 2026'

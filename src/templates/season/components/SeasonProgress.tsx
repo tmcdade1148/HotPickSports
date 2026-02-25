@@ -16,10 +16,16 @@ interface SeasonProgressProps {
  */
 export function SeasonProgress({config, userId}: SeasonProgressProps) {
   const score = useSeasonStore(s => s.getUserScore(userId));
+  const leaderboard = useSeasonStore(s => s.leaderboard);
   const currentWeek = useSeasonStore(s => s.currentWeek);
 
   const totalPoints = score?.total_points ?? 0;
-  const rank = score?.rank ?? 0;
+
+  // Determine rank from leaderboard position
+  const rank = score
+    ? leaderboard.findIndex(e => e.user_id === userId) + 1
+    : 0;
+
   const weeklyBreakdown = score?.weekly_breakdown ?? {};
 
   const seasonProgress =

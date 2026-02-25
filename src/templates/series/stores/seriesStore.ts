@@ -4,9 +4,8 @@ import type {SeriesConfig} from '@shared/types/templates';
 import type {
   DbSeriesMatchup,
   DbSeriesPick,
-  DbSeriesScore,
+  DbSeriesUserTotal,
 } from '@shared/types/database';
-import {calculateRoundPoints, calculateSeriesTotalScore} from '../services/seriesScoring';
 
 interface SeriesState {
   config: SeriesConfig | null;
@@ -15,7 +14,7 @@ interface SeriesState {
   matchups: DbSeriesMatchup[];
   allRoundMatchups: Record<string, DbSeriesMatchup[]>;
   roundPicks: DbSeriesPick[];
-  leaderboard: DbSeriesScore[];
+  leaderboard: DbSeriesUserTotal[];
   /** Map of user_id -> display_name for leaderboard display */
   userNames: Record<string, string>;
   isLoading: boolean;
@@ -28,17 +27,16 @@ interface SeriesState {
   fetchUserPicks: (userId: string, roundKey: string) => Promise<void>;
   savePick: (params: {
     userId: string;
-    matchupId: string;
-    pickedTeamCode: string;
-    predictedGames: number;
+    seriesId: string;
+    pickedWinner: string;
+    pickedSeriesLength: number;
     isHotPick: boolean;
   }) => Promise<void>;
   fetchLeaderboard: () => Promise<void>;
-  calculateMyScore: (userId: string) => Promise<void>;
 
   // Selectors
-  getPickForMatchup: (matchupId: string) => DbSeriesPick | undefined;
-  getUserScore: (userId: string) => DbSeriesScore | undefined;
+  getPickForMatchup: (seriesId: string) => DbSeriesPick | undefined;
+  getUserScore: (userId: string) => DbSeriesUserTotal | undefined;
 }
 
 export const useSeriesStore = create<SeriesState>((set, get) => ({
@@ -97,7 +95,7 @@ export const useSeriesStore = create<SeriesState>((set, get) => ({
     const {data} = await supabase
       .from('series_matchups')
       .select('*')
-      .eq('event_id', config.eventId)
+      .eq('competition', config.competition)
       .eq('round', roundKey);
 
     const matchups = (data as DbSeriesMatchup[]) ?? [];
@@ -115,8 +113,8 @@ export const useSeriesStore = create<SeriesState>((set, get) => ({
       return;
     }
 
-    const matchupIds = matchups.map(m => m.id);
-    if (matchupIds.length === 0) {
+    const seriesIds = matchups.map(m => m.series_id);
+    if (seriesIds.length === 0) {
       set({roundPicks: []});
       return;
     }
@@ -125,35 +123,42 @@ export const useSeriesStore = create<SeriesState>((set, get) => ({
       .from('series_picks')
       .select('*')
       .eq('user_id', userId)
-      .eq('event_id', config.eventId)
-      .in('matchup_id', matchupIds);
+      .eq('competition', config.competition)
+      .in('series_id', seriesIds);
 
     set({roundPicks: (data as DbSeriesPick[]) ?? []});
   },
 
-  savePick: async ({userId, matchupId, pickedTeamCode, predictedGames, isHotPick}) => {
-    const {config, roundPicks} = get();
+  savePick: async ({userId, seriesId, pickedWinner, pickedSeriesLength, isHotPick}) => {
+    const {config, roundPicks, currentRound} = get();
     if (!config) {
       return;
     }
 
+    const roundKey = config.rounds[currentRound]?.key ?? '';
     const prevRoundPicks = roundPicks;
 
-    // Optimistic: replace existing pick for this matchup or add new
+    // Optimistic: replace existing pick for this series or add new
     const optimisticPick: DbSeriesPick = {
-      id: matchupId,
+      id: seriesId,
       user_id: userId,
-      event_id: config.eventId,
-      matchup_id: matchupId,
-      picked_team_code: pickedTeamCode,
-      predicted_games: predictedGames,
+      series_id: seriesId,
+      competition: config.competition,
+      round: roundKey,
+      picked_winner: pickedWinner,
+      picked_series_length: pickedSeriesLength,
       is_hot_pick: isHotPick,
+      is_winner_correct: null,
+      is_length_correct: null,
+      points: null,
+      power_up: null,
       created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
 
-    const updated = prevRoundPicks.some(p => p.matchup_id === matchupId)
+    const updated = prevRoundPicks.some(p => p.series_id === seriesId)
       ? prevRoundPicks.map(p =>
-          p.matchup_id === matchupId ? optimisticPick : p,
+          p.series_id === seriesId ? optimisticPick : p,
         )
       : [...prevRoundPicks, optimisticPick];
 
@@ -162,13 +167,14 @@ export const useSeriesStore = create<SeriesState>((set, get) => ({
     const {error} = await supabase.from('series_picks').upsert(
       {
         user_id: userId,
-        event_id: config.eventId,
-        matchup_id: matchupId,
-        picked_team_code: pickedTeamCode,
-        predicted_games: predictedGames,
+        series_id: seriesId,
+        competition: config.competition,
+        round: roundKey,
+        picked_winner: pickedWinner,
+        picked_series_length: pickedSeriesLength,
         is_hot_pick: isHotPick,
       },
-      {onConflict: 'user_id,event_id,matchup_id'},
+      {onConflict: 'user_id,series_id'},
     );
 
     if (error) {
@@ -187,123 +193,62 @@ export const useSeriesStore = create<SeriesState>((set, get) => ({
     set({isLoading: true});
 
     // Pool-independent: scores have no pool_id.
-    // Leaderboard is built by joining series_scores with pool_members
+    // Leaderboard is built by joining series_user_totals with pool_members
     // so any pool created mid-playoffs immediately shows all members' scores.
+    //
+    // series_user_totals has one row per user per round. We fetch all rows
+    // and then derive the latest cumulative_points per user client-side.
     const {data} = await supabase
-      .from('series_scores')
+      .from('series_user_totals')
       .select('*, pool_members!inner(user_id)')
-      .eq('event_id', config.eventId)
+      .eq('competition', config.competition)
       .eq('pool_members.pool_id', poolId)
-      .order('total_points', {ascending: false});
+      .order('cumulative_points', {ascending: false});
 
-    const scores = (data as (DbSeriesScore & {pool_members: unknown})[]) ?? [];
-    // Strip the join artifact before storing
-    const cleanScores: DbSeriesScore[] = scores.map(
-      ({pool_members: _pm, ...rest}) => rest,
+    const rows = (data as (DbSeriesUserTotal & {pool_members: unknown})[]) ?? [];
+
+    // Strip the join artifact and deduplicate to latest round per user.
+    // The latest round row has the highest cumulative_points for a given user.
+    const latestByUser = new Map<string, DbSeriesUserTotal>();
+    for (const {pool_members: _pm, ...row} of rows) {
+      const existing = latestByUser.get(row.user_id);
+      if (!existing || row.cumulative_points > existing.cumulative_points) {
+        latestByUser.set(row.user_id, row);
+      }
+    }
+
+    const leaderboard = Array.from(latestByUser.values()).sort(
+      (a, b) => b.cumulative_points - a.cumulative_points,
     );
 
     // Fetch display names for all users on the leaderboard
-    const userIds = cleanScores.map(s => s.user_id);
+    const userIds = leaderboard.map(s => s.user_id);
     let names: Record<string, string> = {};
     if (userIds.length > 0) {
-      const {data: users} = await supabase
-        .from('users')
+      const {data: profiles} = await supabase
+        .from('profiles')
         .select('id, display_name')
         .in('id', userIds);
 
-      if (users) {
-        for (const u of users) {
-          if (u.display_name) {
-            names[u.id] = u.display_name;
+      if (profiles) {
+        for (const p of profiles) {
+          if (p.display_name) {
+            names[p.id] = p.display_name;
           }
         }
       }
     }
 
     set({
-      leaderboard: cleanScores,
+      leaderboard,
       userNames: names,
       isLoading: false,
     });
   },
 
-  calculateMyScore: async (userId: string) => {
-    const {config} = get();
-    if (!config) {
-      return;
-    }
-
-    // Fetch ALL picks for this user/event (pool-independent)
-    const {data: allPicks} = await supabase
-      .from('series_picks')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('event_id', config.eventId);
-
-    const picks = (allPicks as DbSeriesPick[]) ?? [];
-
-    // Fetch ALL matchups for this event
-    const {data: allMatchups} = await supabase
-      .from('series_matchups')
-      .select('*')
-      .eq('event_id', config.eventId);
-
-    const matchups = (allMatchups as DbSeriesMatchup[]) ?? [];
-
-    // Group matchups by round
-    const matchupsByRound: Record<string, DbSeriesMatchup[]> = {};
-    for (const m of matchups) {
-      if (!matchupsByRound[m.round]) {
-        matchupsByRound[m.round] = [];
-      }
-      matchupsByRound[m.round].push(m);
-    }
-
-    // Calculate points per round
-    const roundBreakdown: Record<string, number> = {};
-    for (const roundConfig of config.rounds) {
-      const roundMatchups = matchupsByRound[roundConfig.key] ?? [];
-      const matchupIds = roundMatchups.map(m => m.id);
-      const roundPicks = picks.filter(p =>
-        matchupIds.includes(p.matchup_id),
-      );
-
-      if (roundPicks.length > 0) {
-        roundBreakdown[roundConfig.key] = calculateRoundPoints(
-          roundPicks,
-          roundMatchups,
-          roundConfig,
-          config,
-        );
-      }
-    }
-
-    const totalPoints = calculateSeriesTotalScore(roundBreakdown);
-
-    // Determine rank
-    const {leaderboard} = get();
-    const rank =
-      leaderboard.filter(s => s.total_points > totalPoints).length + 1;
-
-    await supabase.from('series_scores').upsert(
-      {
-        user_id: userId,
-        event_id: config.eventId,
-        total_points: totalPoints,
-        round_breakdown: roundBreakdown,
-        rank,
-        last_calculated: new Date().toISOString(),
-      },
-      {onConflict: 'user_id,event_id'},
-    );
-
-    // Re-fetch leaderboard to get updated data
-    await get().fetchLeaderboard();
-  },
-
-  getPickForMatchup: (matchupId: string) => {
+  getPickForMatchup: (seriesId: string) => {
     const {roundPicks} = get();
-    return roundPicks.find(p => p.matchup_id === matchupId);
+    return roundPicks.find(p => p.series_id === seriesId);
   },
 
   getUserScore: (userId: string) => {

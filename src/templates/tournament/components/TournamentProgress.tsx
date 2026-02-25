@@ -16,7 +16,7 @@ interface TournamentProgressProps {
 export function TournamentProgress({config, userId}: TournamentProgressProps) {
   const score = useTournamentStore(s => s.getUserScore(userId));
 
-  const groupPoints = score?.group_points ?? 0;
+  const groupPoints = score?.group_stage_points ?? 0;
   const knockoutPoints = score?.knockout_points ?? 0;
   const currentPoints = score?.total_points ?? 0;
   const progress =

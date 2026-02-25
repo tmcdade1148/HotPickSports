@@ -20,20 +20,20 @@ export function MatchPickCard({
   config,
   userId,
 }: MatchPickCardProps) {
-  const existingPick = useTournamentStore(s => s.getMatchPick(match.id));
+  const existingPick = useTournamentStore(s => s.getMatchPick(match.match_id));
   const saveMatchPick = useTournamentStore(s => s.saveMatchPick);
   const isSaving = useTournamentStore(s => s.isSaving);
 
-  const pickedTeam = existingPick?.picked_team_code ?? null;
+  const pickedTeam = existingPick?.picked_team ?? null;
   const isHotPick = existingPick?.is_hot_pick ?? false;
 
-  const roundConfig = config.knockoutRounds.find(r => r.key === match.round);
-  const kickoffDate = new Date(match.kickoff_time);
+  const roundConfig = config.knockoutRounds.find(r => r.key === match.stage);
+  const kickoffDate = new Date(match.kickoff_at);
 
   const selectTeam = (teamCode: string) => {
     saveMatchPick({
       userId,
-      matchId: match.id,
+      matchId: match.match_id,
       teamCode,
       isHotPick,
     });
@@ -45,7 +45,7 @@ export function MatchPickCard({
     }
     saveMatchPick({
       userId,
-      matchId: match.id,
+      matchId: match.match_id,
       teamCode: pickedTeam,
       isHotPick: !isHotPick,
     });
@@ -55,7 +55,7 @@ export function MatchPickCard({
     <View style={styles.card}>
       <View style={styles.header}>
         <Text style={styles.roundLabel}>
-          {roundConfig?.label ?? match.round}
+          {roundConfig?.label ?? match.stage}
         </Text>
         <Text style={styles.date}>{kickoffDate.toLocaleDateString()}</Text>
       </View>
@@ -64,16 +64,16 @@ export function MatchPickCard({
         <TouchableOpacity
           style={[
             styles.teamButton,
-            pickedTeam === match.home_team_code && styles.teamButtonSelected,
+            pickedTeam === match.home_team && styles.teamButtonSelected,
           ]}
-          onPress={() => selectTeam(match.home_team_code)}
+          onPress={() => selectTeam(match.home_team)}
           disabled={isSaving}>
           <Text
             style={[
               styles.teamText,
-              pickedTeam === match.home_team_code && styles.teamTextSelected,
+              pickedTeam === match.home_team && styles.teamTextSelected,
             ]}>
-            {match.home_team_code}
+            {match.home_team}
           </Text>
         </TouchableOpacity>
 
@@ -82,16 +82,16 @@ export function MatchPickCard({
         <TouchableOpacity
           style={[
             styles.teamButton,
-            pickedTeam === match.away_team_code && styles.teamButtonSelected,
+            pickedTeam === match.away_team && styles.teamButtonSelected,
           ]}
-          onPress={() => selectTeam(match.away_team_code)}
+          onPress={() => selectTeam(match.away_team)}
           disabled={isSaving}>
           <Text
             style={[
               styles.teamText,
-              pickedTeam === match.away_team_code && styles.teamTextSelected,
+              pickedTeam === match.away_team && styles.teamTextSelected,
             ]}>
-            {match.away_team_code}
+            {match.away_team}
           </Text>
         </TouchableOpacity>
       </View>

@@ -5,7 +5,7 @@ import {TournamentProgress} from '../components/TournamentProgress';
 import {KnockoutBracket} from '../components/KnockoutBracket';
 import {useAuth} from '@shared/hooks/useAuth';
 import {colors, spacing, borderRadius} from '@shared/theme';
-import type {DbTournamentScore} from '@shared/types/database';
+import type {DbTournamentUserTotal} from '@shared/types/database';
 
 /**
  * TournamentBoardScreen — Leaderboard showing pool standings.
@@ -46,7 +46,7 @@ export function TournamentBoardScreen() {
     );
   }
 
-  const renderRow = ({item, index}: {item: DbTournamentScore; index: number}) => {
+  const renderRow = ({item, index}: {item: DbTournamentUserTotal; index: number}) => {
     const isMe = item.user_id === user?.id;
     const rank = index + 1;
 
@@ -60,7 +60,7 @@ export function TournamentBoardScreen() {
             {isMe ? 'You' : (userNames[item.user_id] ?? `Player ${rank}`)}
           </Text>
           <Text style={styles.breakdown}>
-            G: {item.group_points} | K: {item.knockout_points}
+            G: {item.group_stage_points} | K: {item.knockout_points}
           </Text>
         </View>
         <Text style={[styles.totalPoints, isMe && styles.textHighlight]}>

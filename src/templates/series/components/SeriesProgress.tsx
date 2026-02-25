@@ -10,41 +10,42 @@ interface SeriesProgressProps {
 }
 
 /**
- * SeriesProgress — Shows total points, rank, and round breakdown.
+ * SeriesProgress — Shows total points, rank, and current round info.
  * Progress bar shows completed rounds / total rounds.
  * Never references a specific sport.
  */
 export function SeriesProgress({config, userId}: SeriesProgressProps) {
   const score = useSeriesStore(s => s.getUserScore(userId));
+  const leaderboard = useSeriesStore(s => s.leaderboard);
   const currentRound = useSeriesStore(s => s.currentRound);
 
-  const totalPoints = score?.total_points ?? 0;
-  const rank = score?.rank ?? 0;
-  const roundBreakdown = score?.round_breakdown ?? {};
+  const cumulativePoints = score?.cumulative_points ?? 0;
+  const roundPoints = score?.round_points ?? 0;
+  const currentRoundKey = score?.round;
 
-  // Calculate progress: how many rounds have been completed vs total rounds
-  const completedRounds = Object.keys(roundBreakdown).length;
+  // Derive rank from leaderboard position
+  const rank = score
+    ? leaderboard.findIndex(s => s.user_id === userId) + 1
+    : 0;
+
+  // Determine how far along the playoffs are based on the latest scored round
+  const latestRoundIndex = currentRoundKey
+    ? config.rounds.findIndex(rc => rc.key === currentRoundKey)
+    : -1;
+  const completedRounds = latestRoundIndex >= 0 ? latestRoundIndex + 1 : 0;
   const totalRounds = config.rounds.length;
   const seriesProgress = totalRounds > 0 ? completedRounds / totalRounds : 0;
 
-  // Build round entries sorted by config order
-  const roundEntries = config.rounds
-    .map(rc => ({
-      key: rc.key,
-      label: rc.label,
-      points: roundBreakdown[rc.key] ?? null,
-    }))
-    .filter(entry => entry.points !== null) as {
-    key: string;
-    label: string;
-    points: number;
-  }[];
+  // Show latest round label and points
+  const latestRoundLabel = currentRoundKey
+    ? config.rounds.find(rc => rc.key === currentRoundKey)?.label
+    : null;
 
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
         <Text style={styles.title}>{config.shortName} Progress</Text>
-        <Text style={styles.totalPoints}>{totalPoints} pts</Text>
+        <Text style={styles.totalPoints}>{cumulativePoints} pts</Text>
       </View>
 
       {rank > 0 && (
@@ -69,15 +70,13 @@ export function SeriesProgress({config, userId}: SeriesProgressProps) {
         Round {currentRound + 1} of {totalRounds}
       </Text>
 
-      {/* Round breakdown */}
-      {roundEntries.length > 0 && (
+      {/* Latest round info */}
+      {latestRoundLabel != null && (
         <View style={styles.breakdown}>
-          {roundEntries.map(({key, label, points}) => (
-            <View key={key} style={styles.roundChip}>
-              <Text style={styles.roundLabel}>{label}</Text>
-              <Text style={styles.roundPoints}>{points}</Text>
-            </View>
-          ))}
+          <View style={styles.roundChip}>
+            <Text style={styles.roundLabel}>{latestRoundLabel}</Text>
+            <Text style={styles.roundPoints}>{roundPoints}</Text>
+          </View>
         </View>
       )}
     </View>

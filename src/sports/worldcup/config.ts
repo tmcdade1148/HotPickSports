@@ -1,7 +1,7 @@
 import type {TournamentConfig} from '@shared/types/templates';
 
 export const worldCup2026: TournamentConfig = {
-  eventId: 'wc-2026',
+  competition: 'world_cup_2026',
   templateType: 'tournament',
   sport: 'soccer',
   name: 'FIFA World Cup 2026',

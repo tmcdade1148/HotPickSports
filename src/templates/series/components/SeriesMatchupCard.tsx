@@ -22,13 +22,13 @@ export function SeriesMatchupCard({
   config,
   userId,
 }: SeriesMatchupCardProps) {
-  const existingPick = useSeriesStore(s => s.getPickForMatchup(matchup.id));
+  const existingPick = useSeriesStore(s => s.getPickForMatchup(matchup.series_id));
   const savePick = useSeriesStore(s => s.savePick);
   const isSaving = useSeriesStore(s => s.isSaving);
   const currentRound = useSeriesStore(s => s.currentRound);
 
-  const pickedTeam = existingPick?.picked_team_code ?? null;
-  const predictedGames = existingPick?.predicted_games ?? 0;
+  const pickedTeam = existingPick?.picked_winner ?? null;
+  const pickedSeriesLength = existingPick?.picked_series_length ?? 0;
   const isHotPick = existingPick?.is_hot_pick ?? false;
   const isCompleted = matchup.status === 'completed';
   const winner = getSeriesWinner(matchup);
@@ -45,10 +45,10 @@ export function SeriesMatchupCard({
   );
 
   const higherTeam = config.teams.find(
-    t => t.code === matchup.higher_seed_code,
+    t => t.code === matchup.higher_seed_team,
   );
   const lowerTeam = config.teams.find(
-    t => t.code === matchup.lower_seed_code,
+    t => t.code === matchup.lower_seed_team,
   );
 
   // Compute points earned for completed matchup
@@ -56,7 +56,7 @@ export function SeriesMatchupCard({
   if (isCompleted && pickedTeam && winner && roundConfig) {
     if (pickedTeam === winner) {
       let pts = isHotPick ? roundConfig.rank * 2 : roundConfig.rank;
-      if (predictedGames === actualLength) {
+      if (pickedSeriesLength === actualLength) {
         pts += config.seriesLengthBonusPoints;
       }
       pointsEarned = pts;
@@ -69,7 +69,7 @@ export function SeriesMatchupCard({
   const statusText = (() => {
     if (isCompleted) {
       const winnerName =
-        winner === matchup.higher_seed_code
+        winner === matchup.higher_seed_team
           ? higherTeam?.shortName
           : lowerTeam?.shortName;
       return `${winnerName} wins in ${actualLength}`;
@@ -92,9 +92,9 @@ export function SeriesMatchupCard({
   const selectTeam = (teamCode: string) => {
     savePick({
       userId,
-      matchupId: matchup.id,
-      pickedTeamCode: teamCode,
-      predictedGames: predictedGames || winsNeeded, // default to sweep
+      seriesId: matchup.series_id,
+      pickedWinner: teamCode,
+      pickedSeriesLength: pickedSeriesLength || winsNeeded, // default to sweep
       isHotPick,
     });
   };
@@ -105,9 +105,9 @@ export function SeriesMatchupCard({
     }
     savePick({
       userId,
-      matchupId: matchup.id,
-      pickedTeamCode: pickedTeam,
-      predictedGames: games,
+      seriesId: matchup.series_id,
+      pickedWinner: pickedTeam,
+      pickedSeriesLength: games,
       isHotPick,
     });
   };
@@ -118,9 +118,9 @@ export function SeriesMatchupCard({
     }
     savePick({
       userId,
-      matchupId: matchup.id,
-      pickedTeamCode: pickedTeam,
-      predictedGames: predictedGames || winsNeeded,
+      seriesId: matchup.series_id,
+      pickedWinner: pickedTeam,
+      pickedSeriesLength: pickedSeriesLength || winsNeeded,
       isHotPick: !isHotPick,
     });
   };
@@ -145,20 +145,20 @@ export function SeriesMatchupCard({
         <TouchableOpacity
           style={[
             styles.teamButton,
-            pickedTeam === matchup.higher_seed_code && styles.teamSelected,
+            pickedTeam === matchup.higher_seed_team && styles.teamSelected,
             isCompleted &&
-              winner === matchup.higher_seed_code &&
+              winner === matchup.higher_seed_team &&
               styles.teamCorrect,
           ]}
-          onPress={() => selectTeam(matchup.higher_seed_code)}
+          onPress={() => selectTeam(matchup.higher_seed_team)}
           disabled={isCompleted || isSaving}>
           <Text
             style={[
               styles.teamText,
-              pickedTeam === matchup.higher_seed_code &&
+              pickedTeam === matchup.higher_seed_team &&
                 styles.teamTextSelected,
             ]}>
-            {higherTeam?.shortName ?? matchup.higher_seed_code}
+            {higherTeam?.shortName ?? matchup.higher_seed_team}
           </Text>
           <Text style={styles.seedLabel}>(1)</Text>
         </TouchableOpacity>
@@ -168,20 +168,20 @@ export function SeriesMatchupCard({
         <TouchableOpacity
           style={[
             styles.teamButton,
-            pickedTeam === matchup.lower_seed_code && styles.teamSelected,
+            pickedTeam === matchup.lower_seed_team && styles.teamSelected,
             isCompleted &&
-              winner === matchup.lower_seed_code &&
+              winner === matchup.lower_seed_team &&
               styles.teamCorrect,
           ]}
-          onPress={() => selectTeam(matchup.lower_seed_code)}
+          onPress={() => selectTeam(matchup.lower_seed_team)}
           disabled={isCompleted || isSaving}>
           <Text
             style={[
               styles.teamText,
-              pickedTeam === matchup.lower_seed_code &&
+              pickedTeam === matchup.lower_seed_team &&
                 styles.teamTextSelected,
             ]}>
-            {lowerTeam?.shortName ?? matchup.lower_seed_code}
+            {lowerTeam?.shortName ?? matchup.lower_seed_team}
           </Text>
           <Text style={styles.seedLabel}>(2)</Text>
         </TouchableOpacity>
@@ -197,14 +197,14 @@ export function SeriesMatchupCard({
                 key={games}
                 style={[
                   styles.gameChip,
-                  predictedGames === games && styles.gameChipSelected,
+                  pickedSeriesLength === games && styles.gameChipSelected,
                 ]}
                 onPress={() => selectGames(games)}
                 disabled={isSaving}>
                 <Text
                   style={[
                     styles.gameChipText,
-                    predictedGames === games && styles.gameChipTextSelected,
+                    pickedSeriesLength === games && styles.gameChipTextSelected,
                   ]}>
                   {games}
                 </Text>
@@ -218,8 +218,8 @@ export function SeriesMatchupCard({
       {isCompleted && pickedTeam && (
         <View style={styles.gamesSection}>
           <Text style={styles.gamesLabel}>
-            Predicted: {predictedGames} games
-            {predictedGames === actualLength
+            Predicted: {pickedSeriesLength} games
+            {pickedSeriesLength === actualLength
               ? ` (+${config.seriesLengthBonusPoints} bonus!)`
               : ` (Actual: ${actualLength})`}
           </Text>

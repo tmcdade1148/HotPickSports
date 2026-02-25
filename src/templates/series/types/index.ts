@@ -7,6 +7,7 @@ export type {
 
 export type {
   DbSeriesMatchup,
+  DbSeriesGame,
   DbSeriesPick,
-  DbSeriesScore,
+  DbSeriesUserTotal,
 } from '@shared/types/database';

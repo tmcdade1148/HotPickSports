@@ -1,7 +1,7 @@
 import type {SeriesConfig} from '@shared/types/templates';
 
 export const nhlPlayoffs2027: SeriesConfig = {
-  eventId: 'nhl-playoffs-2027',
+  competition: 'nhl_playoffs_2027',
   templateType: 'series',
   sport: 'hockey',
   name: 'NHL 2027 Playoffs',

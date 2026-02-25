@@ -37,7 +37,7 @@ export function MatchPicksScreen() {
     );
   }
 
-  const knockoutMatches = matches.filter(m => m.group_name === null);
+  const knockoutMatches = matches.filter(m => m.group_letter === null);
 
   return (
     <View style={styles.container}>
@@ -52,7 +52,7 @@ export function MatchPicksScreen() {
       ) : (
         <FlatList
           data={knockoutMatches}
-          keyExtractor={item => item.id}
+          keyExtractor={item => item.match_id}
           renderItem={({item}) => (
             <MatchPickCard
               match={item}

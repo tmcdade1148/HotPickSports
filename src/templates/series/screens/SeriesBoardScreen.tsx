@@ -4,7 +4,7 @@ import {useSeriesStore} from '../stores/seriesStore';
 import {SeriesProgress} from '../components/SeriesProgress';
 import {useAuth} from '@shared/hooks/useAuth';
 import {colors, spacing, borderRadius} from '@shared/theme';
-import type {DbSeriesScore} from '@shared/types/database';
+import type {DbSeriesUserTotal} from '@shared/types/database';
 
 /**
  * SeriesBoardScreen — Standings showing pool leaderboard.
@@ -16,7 +16,7 @@ export function SeriesBoardScreen() {
   const leaderboard = useSeriesStore(s => s.leaderboard);
   const userNames = useSeriesStore(s => s.userNames);
   const isLoading = useSeriesStore(s => s.isLoading);
-  const calculateMyScore = useSeriesStore(s => s.calculateMyScore);
+  const fetchLeaderboard = useSeriesStore(s => s.fetchLeaderboard);
   const {user} = useAuth();
 
   useEffect(() => {
@@ -24,10 +24,10 @@ export function SeriesBoardScreen() {
       return;
     }
     const load = async () => {
-      await calculateMyScore(user.id);
+      await fetchLeaderboard();
     };
     load();
-  }, [user?.id, calculateMyScore]);
+  }, [user?.id, fetchLeaderboard]);
 
   if (!config) {
     return null;
@@ -41,21 +41,12 @@ export function SeriesBoardScreen() {
     );
   }
 
-  const renderRow = ({item, index}: {item: DbSeriesScore; index: number}) => {
+  const renderRow = ({item, index}: {item: DbSeriesUserTotal; index: number}) => {
     const isMe = item.user_id === user?.id;
     const rank = index + 1;
 
-    // Get most recent round's points for the breakdown column
-    const breakdown = item.round_breakdown ?? {};
-    const roundKeys = Object.keys(breakdown);
-    // Use config order to find the latest round with points
-    const latestRoundConfig = [...config.rounds]
-      .reverse()
-      .find(rc => roundKeys.includes(rc.key));
-    const latestLabel = latestRoundConfig?.label;
-    const latestPoints = latestRoundConfig
-      ? breakdown[latestRoundConfig.key]
-      : null;
+    // Show the round this score is from and the round-specific points
+    const roundLabel = config.rounds.find(rc => rc.key === item.round)?.label;
 
     return (
       <View key={item.id} style={[styles.row, isMe && styles.rowHighlight]}>
@@ -66,14 +57,14 @@ export function SeriesBoardScreen() {
             numberOfLines={1}>
             {isMe ? 'You' : (userNames[item.user_id] ?? `Player ${rank}`)}
           </Text>
-          {latestLabel != null && latestPoints != null && (
+          {roundLabel != null && (
             <Text style={styles.breakdown}>
-              {latestLabel}: {latestPoints} pts
+              {roundLabel}: {item.round_points} pts
             </Text>
           )}
         </View>
         <Text style={[styles.totalPoints, isMe && styles.textHighlight]}>
-          {item.total_points} pts
+          {item.cumulative_points} pts
         </Text>
       </View>
     );

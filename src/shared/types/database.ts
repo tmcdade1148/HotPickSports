@@ -1,165 +1,338 @@
 /**
- * Supabase table types — template-scoped tables, distinguished by event_id.
+ * Supabase table types — aligned to live DB schema (project mzqtrpdiqhopjmxjccwy).
  *
- * Tournament: tournament_matches, tournament_picks, tournament_scores
- * Season:     season_matches, season_picks, season_scores
- * Series:     series_matchups, series_picks, series_scores
- * Shared:     users, pools, pool_members, smack_talk, analytics_events
+ * Tournament: tournament_matches, tournament_picks, tournament_user_totals,
+ *             tournament_group_picks, tournament_group_results
+ * Season:     season_games, season_picks, season_user_totals
+ * Series:     series_matchups, series_games, series_picks, series_user_totals
+ * Shared:     profiles, pools, pool_members, smack_messages, competition_config
  */
 
 // ---------------------------------------------------------------------------
 // Shared tables
 // ---------------------------------------------------------------------------
 
-export interface DbUser {
+/** Table: profiles */
+export interface DbProfile {
   id: string;
-  email: string;
+  username: string | null;
   display_name: string | null;
+  real_name: string | null;
+  email: string | null;
   avatar_url: string | null;
+  avatar_key: string | null;
+  default_pool_id: string | null;
+  timezone: string | null;
   created_at: string;
+  updated_at: string;
 }
 
+/** Table: pools */
 export interface DbPool {
   id: string;
   name: string;
-  event_id: string;
+  competition: string;
   created_by: string;
-  invite_code: string;
+  invite_code: string | null;
   is_public: boolean;
+  member_limit: number;
+  status: string;
+  name_display: string | null;
   created_at: string;
+  updated_at: string;
 }
 
+/** Table: pool_members (composite PK: pool_id, user_id) */
 export interface DbPoolMember {
-  id: string;
   pool_id: string;
   user_id: string;
+  role: string;
+  is_admin: boolean;
   joined_at: string;
+  created_at: string;
 }
 
-export interface DbSmackTalk {
+/** Table: smack_messages */
+export interface DbSmackMessage {
   id: string;
   pool_id: string;
   user_id: string;
-  message: string;
+  author_name: string;
+  text: string;
+  reply_to: string | null;
+  avatar_key: string | null;
   created_at: string;
 }
 
-export interface DbAnalyticsEvent {
-  id: string;
-  user_id: string;
-  event_name: string;
-  properties: Record<string, unknown>;
-  created_at: string;
+/** Table: competition_config */
+export interface DbCompetitionConfig {
+  id: number;
+  competition: string;
+  key: string;
+  value: unknown;
+  updated_at: string;
 }
 
 // ---------------------------------------------------------------------------
 // Tournament tables
 // ---------------------------------------------------------------------------
 
+/** Table: tournament_matches */
 export interface DbTournamentMatch {
-  id: string;
-  event_id: string;
-  round: string;
-  group_name: string | null;
-  home_team_code: string;
-  away_team_code: string;
+  match_id: string;
+  competition: string;
+  stage: string;
+  group_letter: string | null;
+  match_day: number | null;
+  home_team: string;
+  away_team: string;
+  kickoff_at: string;
   home_score: number | null;
   away_score: number | null;
-  kickoff_time: string;
-  status: 'scheduled' | 'live' | 'completed';
+  status: string;
+  winner_team: string | null;
+  is_draw: boolean;
+  is_penalty_result: boolean;
+  rank: number | null;
+  frozen_rank: number | null;
+  home_moneyline: number | null;
+  away_moneyline: number | null;
+  competitive_index: number | null;
+  is_finalized: boolean;
+  current_period: number | null;
+  game_clock: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
+/** Table: tournament_picks */
 export interface DbTournamentPick {
   id: string;
   user_id: string;
-  event_id: string;
   match_id: string;
-  pick_type: 'group_advancement' | 'match_winner';
-  picked_team_code: string;
+  competition: string;
+  stage: string;
+  picked_team: string;
   is_hot_pick: boolean;
+  is_correct: boolean | null;
+  points: number | null;
+  power_up: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Table: tournament_group_picks */
+export interface DbTournamentGroupPick {
+  id: string;
+  user_id: string;
+  competition: string;
+  group_letter: string;
+  first_place_team: string;
+  second_place_team: string;
+  is_locked: boolean;
+  locked_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Table: tournament_group_results */
+export interface DbTournamentGroupResult {
+  id: string;
+  competition: string;
+  group_letter: string;
+  first_place_team: string;
+  second_place_team: string;
+  is_finalized: boolean;
+  finalized_at: string | null;
   created_at: string;
 }
 
-export interface DbTournamentScore {
+/** Table: tournament_user_totals */
+export interface DbTournamentUserTotal {
   id: string;
   user_id: string;
-  event_id: string;
-  group_points: number;
+  competition: string;
+  group_stage_points: number;
   knockout_points: number;
+  advancement_bonus_points: number;
   total_points: number;
-  rank: number;
-  last_calculated: string;
+  correct_picks: number;
+  total_picks: number;
+  hot_picks_correct: number;
+  hot_picks_total: number;
+  groups_correct: number;
+  groups_total: number;
+  scored_at: string;
+  power_up_used: string | null;
+  power_up_delta: number | null;
+  double_down_used: boolean | null;
+  double_down_delta: number | null;
+  mulligan_used: boolean | null;
 }
 
 // ---------------------------------------------------------------------------
 // Season tables
 // ---------------------------------------------------------------------------
 
-export interface DbSeasonMatch {
-  id: string;
-  event_id: string;
+/** Table: season_games */
+export interface DbSeasonGame {
+  game_id: string;
+  competition: string;
+  season_year: number;
   week: number;
-  home_team_code: string;
-  away_team_code: string;
+  phase: string;
+  home_team: string;
+  away_team: string;
+  kickoff_at: string;
   home_score: number | null;
   away_score: number | null;
-  kickoff_time: string;
-  rank: number;
-  status: 'scheduled' | 'live' | 'completed';
+  status: string;
+  winner_team: string | null;
+  spread: number | null;
+  home_moneyline: number | null;
+  away_moneyline: number | null;
+  over_under: number | null;
+  competitive_index: number | null;
+  rank: number | null;
+  frozen_rank: number | null;
+  is_finalized: boolean;
+  home_record: string | null;
+  away_record: string | null;
+  current_period: number | null;
+  game_clock: string | null;
+  q1_home_score: number | null;
+  q1_away_score: number | null;
+  q2_home_score: number | null;
+  q2_away_score: number | null;
+  q3_home_score: number | null;
+  q3_away_score: number | null;
+  created_at: string;
+  updated_at: string;
 }
 
+/** Table: season_picks */
 export interface DbSeasonPick {
   id: string;
   user_id: string;
-  event_id: string;
-  match_id: string;
-  picked_outcome: string; // 'home', 'away', 'draw'
+  game_id: string;
+  competition: string;
+  season_year: number;
+  week: number;
+  picked_team: string;
   is_hot_pick: boolean;
+  is_correct: boolean | null;
+  points: number | null;
+  sb_q1_leader: string | null;
+  sb_q2_leader: string | null;
+  sb_q3_leader: string | null;
+  sb_margin_tier: string | null;
+  power_up: string | null;
   created_at: string;
+  updated_at: string;
 }
 
-export interface DbSeasonScore {
+/** Table: season_user_totals (one row per user per week) */
+export interface DbSeasonUserTotal {
   id: string;
   user_id: string;
-  event_id: string;
-  total_points: number;
-  weekly_breakdown: Record<string, number>;
-  rank: number;
-  last_calculated: string;
+  competition: string;
+  season_year: number;
+  week: number;
+  phase: string;
+  week_points: number;
+  playoff_points: number | null;
+  correct_picks: number;
+  total_picks: number;
+  is_hot_pick_correct: boolean | null;
+  hot_pick_rank: number | null;
+  is_no_show: boolean;
+  scored_at: string;
+  power_up_used: string | null;
+  power_up_delta: number | null;
+  double_down_used: boolean | null;
+  double_down_delta: number | null;
+  mulligan_used: boolean | null;
 }
 
 // ---------------------------------------------------------------------------
 // Series tables
 // ---------------------------------------------------------------------------
 
+/** Table: series_matchups */
 export interface DbSeriesMatchup {
-  id: string;
-  event_id: string;
+  series_id: string;
+  competition: string;
   round: string;
-  higher_seed_code: string;
-  lower_seed_code: string;
+  series_format: number;
+  higher_seed_team: string;
+  lower_seed_team: string;
   higher_seed_wins: number;
   lower_seed_wins: number;
-  status: 'upcoming' | 'active' | 'completed';
+  status: string;
+  winner_team: string | null;
+  series_length: number | null;
+  rank: number | null;
+  frozen_rank: number | null;
+  created_at: string;
+  updated_at: string;
 }
 
+/** Table: series_games */
+export interface DbSeriesGame {
+  game_id: string;
+  series_id: string;
+  competition: string;
+  game_number: number;
+  home_team: string;
+  away_team: string;
+  start_at: string;
+  home_score: number | null;
+  away_score: number | null;
+  status: string;
+  winner_team: string | null;
+  is_overtime: boolean;
+  overtime_periods: number;
+  current_period: number | null;
+  game_clock: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Table: series_picks */
 export interface DbSeriesPick {
   id: string;
   user_id: string;
-  event_id: string;
-  matchup_id: string;
-  picked_team_code: string;
-  predicted_games: number; // e.g., 4, 5, 6, 7
+  series_id: string;
+  competition: string;
+  round: string;
+  picked_winner: string;
+  picked_series_length: number;
   is_hot_pick: boolean;
+  is_winner_correct: boolean | null;
+  is_length_correct: boolean | null;
+  points: number | null;
+  power_up: string | null;
   created_at: string;
+  updated_at: string;
 }
 
-export interface DbSeriesScore {
+/** Table: series_user_totals (one row per user per round) */
+export interface DbSeriesUserTotal {
   id: string;
   user_id: string;
-  event_id: string;
-  total_points: number;
-  round_breakdown: Record<string, number>;
-  rank: number;
-  last_calculated: string;
+  competition: string;
+  round: string;
+  round_points: number;
+  cumulative_points: number;
+  correct_winners: number;
+  correct_lengths: number;
+  total_picks: number;
+  is_hot_pick_correct: boolean | null;
+  hot_pick_rank: number | null;
+  scored_at: string;
+  power_up_used: string | null;
+  power_up_delta: number | null;
+  double_down_used: boolean | null;
+  double_down_delta: number | null;
+  mulligan_used: boolean | null;
 }

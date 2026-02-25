@@ -2,20 +2,32 @@ import {create} from 'zustand';
 import {supabase} from '@shared/config/supabase';
 import type {SeasonConfig} from '@shared/types/templates';
 import type {
-  DbSeasonMatch,
+  DbSeasonGame,
   DbSeasonPick,
-  DbSeasonScore,
+  DbSeasonUserTotal,
 } from '@shared/types/database';
-import {calculateWeekPoints, calculateSeasonTotal} from '../services/seasonScoring';
+
+/**
+ * Aggregated leaderboard entry — computed client-side by summing
+ * per-week rows from season_user_totals.
+ */
+export interface SeasonLeaderboardEntry {
+  user_id: string;
+  total_points: number;
+  correct_picks: number;
+  total_picks: number;
+  /** Per-week breakdown: week number -> week_points */
+  weekly_breakdown: Record<number, number>;
+}
 
 interface SeasonState {
   config: SeasonConfig | null;
   poolId: string;
   currentWeek: number;
-  matches: DbSeasonMatch[];
-  allWeekMatches: Record<number, DbSeasonMatch[]>;
+  games: DbSeasonGame[];
+  allWeekGames: Record<number, DbSeasonGame[]>;
   weekPicks: DbSeasonPick[];
-  leaderboard: DbSeasonScore[];
+  leaderboard: SeasonLeaderboardEntry[];
   /** Map of user_id -> display_name for leaderboard display */
   userNames: Record<string, string>;
   isLoading: boolean;
@@ -24,29 +36,28 @@ interface SeasonState {
 
   initialize: (config: SeasonConfig, poolId: string) => void;
   setCurrentWeek: (week: number) => void;
-  fetchWeekMatches: (week: number) => Promise<void>;
+  fetchWeekGames: (week: number) => Promise<void>;
   fetchUserPicks: (userId: string, week: number) => Promise<void>;
   savePick: (params: {
     userId: string;
-    matchId: string;
-    pickedOutcome: string;
+    gameId: string;
+    pickedTeam: string;
     isHotPick: boolean;
   }) => Promise<void>;
   fetchLeaderboard: () => Promise<void>;
-  calculateMyScore: (userId: string) => Promise<void>;
 
   // Selectors
-  getPickForMatch: (matchId: string) => DbSeasonPick | undefined;
+  getPickForGame: (gameId: string) => DbSeasonPick | undefined;
   getHotPickCount: () => number;
-  getUserScore: (userId: string) => DbSeasonScore | undefined;
+  getUserScore: (userId: string) => SeasonLeaderboardEntry | undefined;
 }
 
 export const useSeasonStore = create<SeasonState>((set, get) => ({
   config: null,
   poolId: '',
   currentWeek: 1,
-  matches: [],
-  allWeekMatches: {},
+  games: [],
+  allWeekGames: {},
   weekPicks: [],
   leaderboard: [],
   userNames: {},
@@ -59,8 +70,8 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       config,
       poolId,
       currentWeek: 1,
-      matches: [],
-      allWeekMatches: {},
+      games: [],
+      allWeekGames: {},
       weekPicks: [],
       leaderboard: [],
       userNames: {},
@@ -69,52 +80,45 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
   setCurrentWeek: (week: number) => {
     set({currentWeek: week});
     // Check cache first
-    const cached = get().allWeekMatches[week];
+    const cached = get().allWeekGames[week];
     if (cached) {
-      set({matches: cached});
+      set({games: cached});
     }
   },
 
-  fetchWeekMatches: async (week: number) => {
+  fetchWeekGames: async (week: number) => {
     const {config} = get();
     if (!config) {
       return;
     }
 
     // Return cached if available
-    const cached = get().allWeekMatches[week];
+    const cached = get().allWeekGames[week];
     if (cached) {
-      set({matches: cached});
+      set({games: cached});
       return;
     }
 
     set({isLoading: true});
     const {data} = await supabase
-      .from('season_matches')
+      .from('season_games')
       .select('*')
-      .eq('event_id', config.eventId)
+      .eq('competition', config.competition)
       .eq('week', week)
       .order('rank', {ascending: false});
 
-    const matches = (data as DbSeasonMatch[]) ?? [];
+    const games = (data as DbSeasonGame[]) ?? [];
 
     set(state => ({
-      matches,
-      allWeekMatches: {...state.allWeekMatches, [week]: matches},
+      games,
+      allWeekGames: {...state.allWeekGames, [week]: games},
       isLoading: false,
     }));
   },
 
   fetchUserPicks: async (userId: string, week: number) => {
-    const {config, matches} = get();
+    const {config} = get();
     if (!config) {
-      return;
-    }
-
-    // Get match IDs for this week to filter picks
-    const matchIds = matches.map(m => m.id);
-    if (matchIds.length === 0) {
-      set({weekPicks: []});
       return;
     }
 
@@ -122,14 +126,14 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       .from('season_picks')
       .select('*')
       .eq('user_id', userId)
-      .eq('event_id', config.eventId)
-      .in('match_id', matchIds);
+      .eq('competition', config.competition)
+      .eq('week', week);
 
     set({weekPicks: (data as DbSeasonPick[]) ?? []});
   },
 
-  savePick: async ({userId, matchId, pickedOutcome, isHotPick}) => {
-    const {config, weekPicks} = get();
+  savePick: async ({userId, gameId, pickedTeam, isHotPick}) => {
+    const {config, weekPicks, currentWeek} = get();
     if (!config) {
       return;
     }
@@ -138,7 +142,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
     if (isHotPick) {
       const currentHotPicks = weekPicks.filter(p => p.is_hot_pick);
       const isAlreadyHotPick = currentHotPicks.some(
-        p => p.match_id === matchId,
+        p => p.game_id === gameId,
       );
       if (!isAlreadyHotPick && currentHotPicks.length >= config.hotPicksPerWeek) {
         return; // At limit — reject
@@ -147,19 +151,29 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
 
     const prevWeekPicks = weekPicks;
 
-    // Optimistic: replace existing pick for this match or add new
+    // Optimistic: replace existing pick for this game or add new
     const optimisticPick: DbSeasonPick = {
-      id: matchId,
+      id: gameId,
       user_id: userId,
-      event_id: config.eventId,
-      match_id: matchId,
-      picked_outcome: pickedOutcome,
+      game_id: gameId,
+      competition: config.competition,
+      season_year: new Date().getFullYear(),
+      week: currentWeek,
+      picked_team: pickedTeam,
       is_hot_pick: isHotPick,
+      is_correct: null,
+      points: null,
+      sb_q1_leader: null,
+      sb_q2_leader: null,
+      sb_q3_leader: null,
+      sb_margin_tier: null,
+      power_up: null,
       created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
 
-    const updated = prevWeekPicks.some(p => p.match_id === matchId)
-      ? prevWeekPicks.map(p => (p.match_id === matchId ? optimisticPick : p))
+    const updated = prevWeekPicks.some(p => p.game_id === gameId)
+      ? prevWeekPicks.map(p => (p.game_id === gameId ? optimisticPick : p))
       : [...prevWeekPicks, optimisticPick];
 
     set({weekPicks: updated, isSaving: true, saveError: null});
@@ -167,12 +181,13 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
     const {error} = await supabase.from('season_picks').upsert(
       {
         user_id: userId,
-        event_id: config.eventId,
-        match_id: matchId,
-        picked_outcome: pickedOutcome,
+        competition: config.competition,
+        game_id: gameId,
+        week: currentWeek,
+        picked_team: pickedTeam,
         is_hot_pick: isHotPick,
       },
-      {onConflict: 'user_id,event_id,match_id'},
+      {onConflict: 'user_id,competition,game_id'},
     );
 
     if (error) {
@@ -191,121 +206,83 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
     set({isLoading: true});
 
     // Pool-independent: scores have no pool_id.
-    // Leaderboard is built by joining season_scores with pool_members
-    // so any pool created mid-season immediately shows all members' scores.
-    const {data} = await supabase
-      .from('season_scores')
-      .select('*, pool_members!inner(user_id)')
-      .eq('event_id', config.eventId)
-      .eq('pool_members.pool_id', poolId)
-      .order('total_points', {ascending: false});
+    // season_user_totals has one row per user per week.
+    // We fetch all rows for the competition, then aggregate per user,
+    // filtering to only pool members.
 
-    const scores = (data as (DbSeasonScore & {pool_members: unknown})[]) ?? [];
-    // Strip the join artifact before storing
-    const cleanScores: DbSeasonScore[] = scores.map(
-      ({pool_members: _pm, ...rest}) => rest,
+    // Step 1: Get pool member user IDs
+    const {data: members} = await supabase
+      .from('pool_members')
+      .select('user_id')
+      .eq('pool_id', poolId);
+
+    const memberIds = (members ?? []).map(m => m.user_id);
+    if (memberIds.length === 0) {
+      set({leaderboard: [], userNames: {}, isLoading: false});
+      return;
+    }
+
+    // Step 2: Fetch all per-week totals for these users in this competition
+    const {data: totals} = await supabase
+      .from('season_user_totals')
+      .select('*')
+      .eq('competition', config.competition)
+      .in('user_id', memberIds);
+
+    const rows = (totals as DbSeasonUserTotal[]) ?? [];
+
+    // Step 3: Aggregate per user — sum week_points across all week rows
+    const byUser: Record<string, SeasonLeaderboardEntry> = {};
+    for (const row of rows) {
+      if (!byUser[row.user_id]) {
+        byUser[row.user_id] = {
+          user_id: row.user_id,
+          total_points: 0,
+          correct_picks: 0,
+          total_picks: 0,
+          weekly_breakdown: {},
+        };
+      }
+      const entry = byUser[row.user_id];
+      entry.total_points += row.week_points;
+      entry.correct_picks += row.correct_picks;
+      entry.total_picks += row.total_picks;
+      entry.weekly_breakdown[row.week] = row.week_points;
+    }
+
+    // Sort descending by total_points
+    const leaderboard = Object.values(byUser).sort(
+      (a, b) => b.total_points - a.total_points,
     );
 
-    // Fetch display names for all users on the leaderboard
-    const userIds = cleanScores.map(s => s.user_id);
+    // Step 4: Fetch display names for all users on the leaderboard
+    const userIds = leaderboard.map(s => s.user_id);
     let names: Record<string, string> = {};
     if (userIds.length > 0) {
-      const {data: users} = await supabase
-        .from('users')
+      const {data: profiles} = await supabase
+        .from('profiles')
         .select('id, display_name')
         .in('id', userIds);
 
-      if (users) {
-        for (const u of users) {
-          if (u.display_name) {
-            names[u.id] = u.display_name;
+      if (profiles) {
+        for (const p of profiles) {
+          if (p.display_name) {
+            names[p.id] = p.display_name;
           }
         }
       }
     }
 
     set({
-      leaderboard: cleanScores,
+      leaderboard,
       userNames: names,
       isLoading: false,
     });
   },
 
-  calculateMyScore: async (userId: string) => {
-    const {config} = get();
-    if (!config) {
-      return;
-    }
-
-    // Fetch ALL picks for this user/event (pool-independent)
-    const {data: allPicks} = await supabase
-      .from('season_picks')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('event_id', config.eventId);
-
-    const picks = (allPicks as DbSeasonPick[]) ?? [];
-
-    // Fetch ALL matches for this event
-    const {data: allMatches} = await supabase
-      .from('season_matches')
-      .select('*')
-      .eq('event_id', config.eventId);
-
-    const matches = (allMatches as DbSeasonMatch[]) ?? [];
-
-    // Group matches by week
-    const matchesByWeek: Record<number, DbSeasonMatch[]> = {};
-    for (const m of matches) {
-      if (!matchesByWeek[m.week]) {
-        matchesByWeek[m.week] = [];
-      }
-      matchesByWeek[m.week].push(m);
-    }
-
-    // Calculate points per week
-    const weeklyBreakdown: Record<string, number> = {};
-    for (const weekStr of Object.keys(matchesByWeek)) {
-      const week = Number(weekStr);
-      const weekMatches = matchesByWeek[week];
-      const weekMatchIds = weekMatches.map(m => m.id);
-      const weekPicks = picks.filter(p => weekMatchIds.includes(p.match_id));
-
-      if (weekPicks.length > 0) {
-        weeklyBreakdown[weekStr] = calculateWeekPoints(
-          weekPicks,
-          weekMatches,
-          config,
-        );
-      }
-    }
-
-    const totalPoints = calculateSeasonTotal(weeklyBreakdown);
-
-    // Determine rank
-    const {leaderboard} = get();
-    const rank =
-      leaderboard.filter(s => s.total_points > totalPoints).length + 1;
-
-    await supabase.from('season_scores').upsert(
-      {
-        user_id: userId,
-        event_id: config.eventId,
-        total_points: totalPoints,
-        weekly_breakdown: weeklyBreakdown,
-        rank,
-        last_calculated: new Date().toISOString(),
-      },
-      {onConflict: 'user_id,event_id'},
-    );
-
-    // Re-fetch leaderboard to get updated data
-    await get().fetchLeaderboard();
-  },
-
-  getPickForMatch: (matchId: string) => {
+  getPickForGame: (gameId: string) => {
     const {weekPicks} = get();
-    return weekPicks.find(p => p.match_id === matchId);
+    return weekPicks.find(p => p.game_id === gameId);
   },
 
   getHotPickCount: () => {

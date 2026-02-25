@@ -4,7 +4,8 @@ import type {TournamentConfig} from '@shared/types/templates';
 import type {
   DbTournamentMatch,
   DbTournamentPick,
-  DbTournamentScore,
+  DbTournamentGroupPick,
+  DbTournamentUserTotal,
 } from '@shared/types/database';
 import {calculateTotalScore} from '../services/tournamentScoring';
 
@@ -12,9 +13,9 @@ interface TournamentState {
   config: TournamentConfig | null;
   poolId: string;
   matches: DbTournamentMatch[];
-  groupPicks: DbTournamentPick[];
+  groupPicks: DbTournamentGroupPick[];
   matchPicks: DbTournamentPick[];
-  leaderboard: DbTournamentScore[];
+  leaderboard: DbTournamentUserTotal[];
   /** Map of user_id → display_name for leaderboard/chat display */
   userNames: Record<string, string>;
   isLoading: boolean;
@@ -28,9 +29,9 @@ interface TournamentState {
   // Write actions — poolId comes from store state
   saveGroupPick: (params: {
     userId: string;
-    groupName: string;
-    teamCode: string;
-    selected: boolean;
+    groupLetter: string;
+    firstPlaceTeam: string;
+    secondPlaceTeam: string;
   }) => Promise<void>;
 
   saveMatchPick: (params: {
@@ -45,9 +46,10 @@ interface TournamentState {
   calculateMyScore: (userId: string) => Promise<void>;
 
   // Selectors
-  getGroupPickCodes: (groupName: string) => string[];
+  getGroupPick: (groupLetter: string) => DbTournamentGroupPick | undefined;
+  getGroupPickCodes: (groupLetter: string) => string[];
   getMatchPick: (matchId: string) => DbTournamentPick | undefined;
-  getUserScore: (userId: string) => DbTournamentScore | undefined;
+  getUserScore: (userId: string) => DbTournamentUserTotal | undefined;
 }
 
 export const useTournamentStore = create<TournamentState>((set, get) => ({
@@ -75,8 +77,8 @@ export const useTournamentStore = create<TournamentState>((set, get) => ({
     const {data} = await supabase
       .from('tournament_matches')
       .select('*')
-      .eq('event_id', config.eventId)
-      .order('kickoff_time', {ascending: true});
+      .eq('competition', config.competition)
+      .order('kickoff_at', {ascending: true});
 
     set({matches: (data as DbTournamentMatch[]) ?? [], isLoading: false});
   },
@@ -89,87 +91,66 @@ export const useTournamentStore = create<TournamentState>((set, get) => ({
 
     const [{data: groupData}, {data: matchData}] = await Promise.all([
       supabase
-        .from('tournament_picks')
+        .from('tournament_group_picks')
         .select('*')
         .eq('user_id', userId)
-        .eq('event_id', config.eventId)
-        .eq('pick_type', 'group_advancement'),
+        .eq('competition', config.competition),
       supabase
         .from('tournament_picks')
         .select('*')
         .eq('user_id', userId)
-        .eq('event_id', config.eventId)
-        .eq('pick_type', 'match_winner'),
+        .eq('competition', config.competition),
     ]);
 
     set({
-      groupPicks: (groupData as DbTournamentPick[]) ?? [],
+      groupPicks: (groupData as DbTournamentGroupPick[]) ?? [],
       matchPicks: (matchData as DbTournamentPick[]) ?? [],
     });
   },
 
-  // Group picks use match_id convention: "group_{groupName}_{teamCode}"
-  // since the schema has no group_name column on tournament_picks.
-  saveGroupPick: async ({userId, groupName, teamCode, selected}) => {
+  // Group picks use the dedicated tournament_group_picks table.
+  // Each row represents one group: group_letter, first_place_team, second_place_team.
+  saveGroupPick: async ({userId, groupLetter, firstPlaceTeam, secondPlaceTeam}) => {
     const {config} = get();
     if (!config) {
       return;
     }
 
-    const matchId = `group_${groupName}_${teamCode}`;
     const prevGroupPicks = get().groupPicks;
 
-    if (selected) {
-      // Optimistic add
-      const optimisticPick: DbTournamentPick = {
-        id: matchId,
+    // Optimistic update: replace existing pick for this group or add new
+    const optimisticPick: DbTournamentGroupPick = {
+      id: `${userId}_${config.competition}_${groupLetter}`,
+      user_id: userId,
+      competition: config.competition,
+      group_letter: groupLetter,
+      first_place_team: firstPlaceTeam,
+      second_place_team: secondPlaceTeam,
+      is_locked: false,
+      locked_at: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    const updated = prevGroupPicks.some(p => p.group_letter === groupLetter)
+      ? prevGroupPicks.map(p => (p.group_letter === groupLetter ? optimisticPick : p))
+      : [...prevGroupPicks, optimisticPick];
+
+    set({groupPicks: updated, isSaving: true, saveError: null});
+
+    const {error} = await supabase.from('tournament_group_picks').upsert(
+      {
         user_id: userId,
-        event_id: config.eventId,
-        match_id: matchId,
-        pick_type: 'group_advancement',
-        picked_team_code: teamCode,
-        is_hot_pick: false,
-        created_at: new Date().toISOString(),
-      };
-      set({
-        groupPicks: [...prevGroupPicks, optimisticPick],
-        isSaving: true,
-        saveError: null,
-      });
+        competition: config.competition,
+        group_letter: groupLetter,
+        first_place_team: firstPlaceTeam,
+        second_place_team: secondPlaceTeam,
+      },
+      {onConflict: 'user_id,competition,group_letter'},
+    );
 
-      const {error} = await supabase.from('tournament_picks').upsert(
-        {
-          user_id: userId,
-          event_id: config.eventId,
-          match_id: matchId,
-          pick_type: 'group_advancement',
-          picked_team_code: teamCode,
-          is_hot_pick: false,
-        },
-        {onConflict: 'user_id,event_id,match_id'},
-      );
-
-      if (error) {
-        set({groupPicks: prevGroupPicks, saveError: error.message});
-      }
-    } else {
-      // Optimistic remove
-      set({
-        groupPicks: prevGroupPicks.filter(p => p.match_id !== matchId),
-        isSaving: true,
-        saveError: null,
-      });
-
-      const {error} = await supabase
-        .from('tournament_picks')
-        .delete()
-        .eq('user_id', userId)
-        .eq('event_id', config.eventId)
-        .eq('match_id', matchId);
-
-      if (error) {
-        set({groupPicks: prevGroupPicks, saveError: error.message});
-      }
+    if (error) {
+      set({groupPicks: prevGroupPicks, saveError: error.message});
     }
 
     set({isSaving: false});
@@ -181,16 +162,24 @@ export const useTournamentStore = create<TournamentState>((set, get) => ({
       return;
     }
 
+    // Look up the match to get its stage
+    const match = get().matches.find(m => m.match_id === matchId);
+    const stage = match?.stage ?? 'knockout';
+
     const prevMatchPicks = get().matchPicks;
     const optimisticPick: DbTournamentPick = {
-      id: matchId,
+      id: `${userId}_${matchId}`,
       user_id: userId,
-      event_id: config.eventId,
       match_id: matchId,
-      pick_type: 'match_winner',
-      picked_team_code: teamCode,
+      competition: config.competition,
+      stage,
+      picked_team: teamCode,
       is_hot_pick: isHotPick,
+      is_correct: null,
+      points: null,
+      power_up: null,
       created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
 
     // Optimistic: replace existing pick for this match or add new
@@ -203,13 +192,13 @@ export const useTournamentStore = create<TournamentState>((set, get) => ({
     const {error} = await supabase.from('tournament_picks').upsert(
       {
         user_id: userId,
-        event_id: config.eventId,
         match_id: matchId,
-        pick_type: 'match_winner',
-        picked_team_code: teamCode,
+        competition: config.competition,
+        stage,
+        picked_team: teamCode,
         is_hot_pick: isHotPick,
       },
-      {onConflict: 'user_id,event_id,match_id'},
+      {onConflict: 'user_id,competition,match_id'},
     );
 
     if (error) {
@@ -228,18 +217,18 @@ export const useTournamentStore = create<TournamentState>((set, get) => ({
     set({isLoading: true});
 
     // Pool-independent: scores have no pool_id.
-    // Leaderboard is built by joining tournament_scores with pool_members
+    // Leaderboard is built by joining tournament_user_totals with pool_members
     // so any pool created mid-tournament immediately shows all members' scores.
     const {data} = await supabase
-      .from('tournament_scores')
+      .from('tournament_user_totals')
       .select('*, pool_members!inner(user_id)')
-      .eq('event_id', config.eventId)
+      .eq('competition', config.competition)
       .eq('pool_members.pool_id', poolId)
       .order('total_points', {ascending: false});
 
-    const scores = (data as (DbTournamentScore & {pool_members: unknown})[]) ?? [];
+    const scores = (data as (DbTournamentUserTotal & {pool_members: unknown})[]) ?? [];
     // Strip the join artifact before storing
-    const cleanScores: DbTournamentScore[] = scores.map(
+    const cleanScores: DbTournamentUserTotal[] = scores.map(
       ({pool_members: _pm, ...rest}) => rest,
     );
 
@@ -247,15 +236,15 @@ export const useTournamentStore = create<TournamentState>((set, get) => ({
     const userIds = cleanScores.map(s => s.user_id);
     let names: Record<string, string> = {};
     if (userIds.length > 0) {
-      const {data: users} = await supabase
-        .from('users')
+      const {data: profiles} = await supabase
+        .from('profiles')
         .select('id, display_name')
         .in('id', userIds);
 
-      if (users) {
-        for (const u of users) {
-          if (u.display_name) {
-            names[u.id] = u.display_name;
+      if (profiles) {
+        for (const p of profiles) {
+          if (p.display_name) {
+            names[p.id] = p.display_name;
           }
         }
       }
@@ -274,37 +263,43 @@ export const useTournamentStore = create<TournamentState>((set, get) => ({
       return;
     }
 
-    const allPicks = [...groupPicks, ...matchPicks];
-    const result = calculateTotalScore(allPicks, matches, config);
+    const result = calculateTotalScore(matchPicks, matches, config);
 
-    // Determine rank among existing leaderboard entries
-    const {leaderboard} = get();
-    const rank =
-      leaderboard.filter(s => s.total_points > result.total).length + 1;
-
-    await supabase.from('tournament_scores').upsert(
+    await supabase.from('tournament_user_totals').upsert(
       {
         user_id: userId,
-        event_id: config.eventId,
-        group_points: result.groupPoints,
+        competition: config.competition,
+        group_stage_points: result.groupStagePoints,
         knockout_points: result.knockoutPoints,
+        advancement_bonus_points: 0,
         total_points: result.total,
-        rank,
-        last_calculated: new Date().toISOString(),
+        correct_picks: 0,
+        total_picks: matchPicks.length,
+        hot_picks_correct: 0,
+        hot_picks_total: matchPicks.filter(p => p.is_hot_pick).length,
+        groups_correct: 0,
+        groups_total: groupPicks.length,
+        scored_at: new Date().toISOString(),
       },
-      {onConflict: 'user_id,event_id'},
+      {onConflict: 'user_id,competition'},
     );
 
     // Re-fetch leaderboard to get updated data
     await get().fetchLeaderboard();
   },
 
-  getGroupPickCodes: (groupName: string) => {
+  getGroupPick: (groupLetter: string) => {
     const {groupPicks} = get();
-    const prefix = `group_${groupName}_`;
-    return groupPicks
-      .filter(p => p.match_id.startsWith(prefix))
-      .map(p => p.picked_team_code);
+    return groupPicks.find(p => p.group_letter === groupLetter);
+  },
+
+  getGroupPickCodes: (groupLetter: string) => {
+    const {groupPicks} = get();
+    const pick = groupPicks.find(p => p.group_letter === groupLetter);
+    if (!pick) {
+      return [];
+    }
+    return [pick.first_place_team, pick.second_place_team].filter(Boolean);
   },
 
   getMatchPick: (matchId: string) => {

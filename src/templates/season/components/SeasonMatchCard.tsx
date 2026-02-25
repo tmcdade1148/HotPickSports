@@ -1,71 +1,73 @@
 import React from 'react';
 import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
 import type {SeasonConfig} from '@shared/types/templates';
-import type {DbSeasonMatch} from '@shared/types/database';
+import type {DbSeasonGame} from '@shared/types/database';
 import {colors, spacing, borderRadius} from '@shared/theme';
 import {useSeasonStore} from '../stores/seasonStore';
-import {determineOutcome} from '../services/seasonScoring';
+import {isPickCorrect} from '../services/seasonScoring';
 
 interface SeasonMatchCardProps {
-  match: DbSeasonMatch;
+  game: DbSeasonGame;
   config: SeasonConfig;
   userId: string;
 }
 
 /**
- * SeasonMatchCard — Card for a single weekly match.
- * Shows home vs away, outcome buttons from config.possibleOutcomes,
- * HotPick toggle, and completed-match results.
+ * SeasonMatchCard — Card for a single weekly game.
+ * Shows home vs away, team pick buttons from config.possibleOutcomes,
+ * HotPick toggle, and completed-game results.
  * Never references a specific sport.
  */
 export function SeasonMatchCard({
-  match,
+  game,
   config,
   userId,
 }: SeasonMatchCardProps) {
-  const existingPick = useSeasonStore(s => s.getPickForMatch(match.id));
+  const existingPick = useSeasonStore(s => s.getPickForGame(game.game_id));
   const hotPickCount = useSeasonStore(s => s.getHotPickCount());
   const savePick = useSeasonStore(s => s.savePick);
   const isSaving = useSeasonStore(s => s.isSaving);
 
-  const pickedOutcome = existingPick?.picked_outcome ?? null;
+  const pickedTeam = existingPick?.picked_team ?? null;
   const isHotPick = existingPick?.is_hot_pick ?? false;
-  const isCompleted = match.status === 'completed';
-  const isLive = match.status === 'live';
+  const isCompleted = game.status === 'completed';
+  const isLive = game.status === 'live';
   const isLocked = isCompleted || isLive;
-  const actualOutcome = determineOutcome(match);
 
-  const kickoffDate = new Date(match.kickoff_time);
-  const homeTeam = config.teams.find(t => t.code === match.home_team_code);
-  const awayTeam = config.teams.find(t => t.code === match.away_team_code);
+  const kickoffDate = new Date(game.kickoff_at);
+  const homeTeam = config.teams.find(t => t.code === game.home_team);
+  const awayTeam = config.teams.find(t => t.code === game.away_team);
 
-  // Compute points earned for completed match
+  // Compute points earned for completed game
   let pointsEarned: number | null = null;
-  if (isCompleted && pickedOutcome && actualOutcome) {
-    if (pickedOutcome === actualOutcome) {
-      pointsEarned = isHotPick ? match.rank : 1;
-    } else {
-      pointsEarned = 0;
+  if (isCompleted && existingPick && game.winner_team) {
+    const correct = isPickCorrect(existingPick, game);
+    if (correct !== null) {
+      if (correct) {
+        pointsEarned = isHotPick ? (game.rank ?? 1) : 1;
+      } else {
+        pointsEarned = 0;
+      }
     }
   }
 
-  const selectOutcome = (outcome: string) => {
+  const selectTeam = (team: string) => {
     savePick({
       userId,
-      matchId: match.id,
-      pickedOutcome: outcome,
+      gameId: game.game_id,
+      pickedTeam: team,
       isHotPick,
     });
   };
 
   const toggleHotPick = () => {
-    if (!pickedOutcome) {
+    if (!pickedTeam) {
       return;
     }
     savePick({
       userId,
-      matchId: match.id,
-      pickedOutcome,
+      gameId: game.game_id,
+      pickedTeam,
       isHotPick: !isHotPick,
     });
   };
@@ -79,7 +81,7 @@ export function SeasonMatchCard({
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={[styles.rankBadge, {backgroundColor: config.color}]}>
-            <Text style={styles.rankText}>#{match.rank}</Text>
+            <Text style={styles.rankText}>#{game.rank}</Text>
           </View>
           {isLive && <View style={styles.liveDot} />}
           {isLive && <Text style={styles.liveText}>LIVE</Text>}
@@ -96,24 +98,32 @@ export function SeasonMatchCard({
       {/* Teams row */}
       <View style={styles.teamsRow}>
         <Text style={styles.teamName} numberOfLines={1}>
-          {homeTeam?.shortName ?? match.home_team_code}
+          {homeTeam?.shortName ?? game.home_team}
         </Text>
         {isCompleted && (
           <Text style={styles.score}>
-            {match.home_score} - {match.away_score}
+            {game.home_score} - {game.away_score}
           </Text>
         )}
         {!isCompleted && <Text style={styles.vs}>vs</Text>}
         <Text style={styles.teamName} numberOfLines={1}>
-          {awayTeam?.shortName ?? match.away_team_code}
+          {awayTeam?.shortName ?? game.away_team}
         </Text>
       </View>
 
       {/* Outcome buttons — dynamic from config.possibleOutcomes */}
       <View style={styles.outcomes}>
         {config.possibleOutcomes.map(outcome => {
-          const isSelected = pickedOutcome === outcome;
-          const isCorrect = isCompleted && outcome === actualOutcome;
+          // Map outcome keys to team codes for comparison with picked_team
+          const teamCode =
+            outcome === 'home'
+              ? game.home_team
+              : outcome === 'away'
+                ? game.away_team
+                : null;
+
+          const isSelected = pickedTeam != null && teamCode != null && pickedTeam === teamCode;
+          const isCorrect = isCompleted && game.winner_team != null && teamCode === game.winner_team;
 
           // Map outcome keys to display labels
           const label =
@@ -131,8 +141,8 @@ export function SeasonMatchCard({
                 isSelected && styles.outcomeSelected,
                 isCorrect && styles.outcomeCorrect,
               ]}
-              onPress={() => selectOutcome(outcome)}
-              disabled={isLocked || isSaving}>
+              onPress={() => teamCode && selectTeam(teamCode)}
+              disabled={isLocked || isSaving || !teamCode}>
               <Text
                 style={[
                   styles.outcomeText,
@@ -147,7 +157,7 @@ export function SeasonMatchCard({
       </View>
 
       {/* HotPick toggle — only visible after pick is made */}
-      {pickedOutcome && !isLocked && (
+      {pickedTeam && !isLocked && (
         <TouchableOpacity
           style={[styles.hotPickToggle, isHotPick && styles.hotPickActive]}
           onPress={toggleHotPick}
@@ -158,12 +168,12 @@ export function SeasonMatchCard({
               isHotPick && styles.hotPickTextActive,
               !canToggleHotPick && !isHotPick && styles.hotPickDisabled,
             ]}>
-            {'🔥'} HotPick ({match.rank}x pts)
+            {'🔥'} HotPick ({game.rank}x pts)
           </Text>
         </TouchableOpacity>
       )}
 
-      {/* Points earned — shown for completed matches */}
+      {/* Points earned — shown for completed games */}
       {pointsEarned !== null && (
         <View style={styles.pointsRow}>
           <Text

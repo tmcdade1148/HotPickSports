@@ -37,7 +37,7 @@ export function CreatePoolScreen({navigation}: any) {
       setError('Pool name must be 30 characters or less.');
       return;
     }
-    if (!user?.id || !activeSport?.eventId) {
+    if (!user?.id || !activeSport?.competition) {
       return;
     }
 
@@ -46,7 +46,7 @@ export function CreatePoolScreen({navigation}: any) {
 
     const pool = await createPool({
       userId: user.id,
-      eventId: activeSport.eventId,
+      competition: activeSport.competition,
       name: trimmed,
       isPublic,
     });

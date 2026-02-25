@@ -24,10 +24,10 @@ export function SportSwitcher() {
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.container}>
       {events.map(event => {
-        const isActive = event.eventId === activeSport?.eventId;
+        const isActive = event.competition === activeSport?.competition;
         return (
           <TouchableOpacity
-            key={event.eventId}
+            key={event.competition}
             style={[
               styles.chip,
               {borderColor: event.color},

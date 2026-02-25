@@ -39,10 +39,10 @@ interface GlobalState {
   userPools: DbPool[];
   isLoadingPools: boolean;
   setActivePoolId: (poolId: string | null) => void;
-  fetchUserPools: (userId: string, eventId: string) => Promise<void>;
+  fetchUserPools: (userId: string, competition: string) => Promise<void>;
   createPool: (params: {
     userId: string;
-    eventId: string;
+    competition: string;
     name: string;
     isPublic: boolean;
   }) => Promise<DbPool | null>;
@@ -72,7 +72,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
 
   fetchProfile: async userId => {
     const {data} = await supabase
-      .from('users')
+      .from('profiles')
       .select('display_name')
       .eq('id', userId)
       .single();
@@ -85,7 +85,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   updateDisplayName: async (userId, name) => {
     const trimmed = name.trim();
 
-    const {error} = await supabase.from('users').upsert(
+    const {error} = await supabase.from('profiles').upsert(
       {
         id: userId,
         display_name: trimmed,
@@ -107,7 +107,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   activeSport: null,
   setActiveSport: sport => {
     const current = get().activeSport;
-    if (current?.eventId !== sport.eventId) {
+    if (current?.competition !== sport.competition) {
       // Event changed — clear pool state so user must re-select
       AsyncStorage.removeItem(POOL_STORAGE_KEY);
       set({activeSport: sport, activePoolId: null, userPools: []});
@@ -132,21 +132,21 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     }
   },
 
-  fetchUserPools: async (userId, eventId) => {
+  fetchUserPools: async (userId, competition) => {
     set({isLoadingPools: true});
     // Join pools with pool_members to get pools this user belongs to
     const {data} = await supabase
       .from('pool_members')
       .select('pool_id, pools!inner(*)')
       .eq('user_id', userId)
-      .eq('pools.event_id', eventId);
+      .eq('pools.competition', competition);
 
     const pools: DbPool[] =
       data?.map((row: any) => row.pools as DbPool) ?? [];
     set({userPools: pools, isLoadingPools: false});
   },
 
-  createPool: async ({userId, eventId, name, isPublic}) => {
+  createPool: async ({userId, competition, name, isPublic}) => {
     const inviteCode = generateInviteCode();
 
     // Insert the pool
@@ -154,7 +154,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       .from('pools')
       .insert({
         name,
-        event_id: eventId,
+        competition,
         created_by: userId,
         invite_code: inviteCode,
         is_public: isPublic,
@@ -199,7 +199,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     // Check if already a member
     const {data: existing} = await supabase
       .from('pool_members')
-      .select('id')
+      .select('pool_id')
       .eq('pool_id', pool.id)
       .eq('user_id', userId)
       .single();

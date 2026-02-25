@@ -24,10 +24,10 @@ export function PoolSelectionScreen({navigation}: any) {
   const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
 
   useEffect(() => {
-    if (user?.id && activeSport?.eventId) {
-      fetchUserPools(user.id, activeSport.eventId);
+    if (user?.id && activeSport?.competition) {
+      fetchUserPools(user.id, activeSport.competition);
     }
-  }, [user?.id, activeSport?.eventId, fetchUserPools]);
+  }, [user?.id, activeSport?.competition, fetchUserPools]);
 
   const selectPool = (pool: DbPool) => {
     setActivePoolId(pool.id);

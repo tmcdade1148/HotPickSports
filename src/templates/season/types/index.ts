@@ -5,7 +5,7 @@ export type {
 } from '@shared/types/templates';
 
 export type {
-  DbSeasonMatch,
+  DbSeasonGame,
   DbSeasonPick,
-  DbSeasonScore,
+  DbSeasonUserTotal,
 } from '@shared/types/database';

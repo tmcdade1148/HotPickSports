@@ -9,16 +9,25 @@ export function getSeriesWinner(matchup: DbSeriesMatchup): string | null {
   if (matchup.status !== 'completed') {
     return null;
   }
-  if (matchup.higher_seed_wins > matchup.lower_seed_wins) {
-    return matchup.higher_seed_code;
+  // Use the canonical winner_team column if available
+  if (matchup.winner_team) {
+    return matchup.winner_team;
   }
-  return matchup.lower_seed_code;
+  // Fallback to win counts
+  if (matchup.higher_seed_wins > matchup.lower_seed_wins) {
+    return matchup.higher_seed_team;
+  }
+  return matchup.lower_seed_team;
 }
 
 /**
  * Total games played in a series.
+ * Prefers the canonical series_length column; falls back to summing wins.
  */
 export function getSeriesLength(matchup: DbSeriesMatchup): number {
+  if (matchup.series_length != null) {
+    return matchup.series_length;
+  }
   return matchup.higher_seed_wins + matchup.lower_seed_wins;
 }
 
@@ -28,7 +37,7 @@ export function getSeriesLength(matchup: DbSeriesMatchup): number {
  * Scoring:
  * - Correct winner: roundConfig.rank points (base)
  * - Correct winner + HotPick: 2x roundConfig.rank points
- * - Correct series length (predicted_games matches actual): +config.seriesLengthBonusPoints
+ * - Correct series length (picked_series_length matches actual): +config.seriesLengthBonusPoints
  * - Incorrect: 0
  *
  * Config is passed for future extensibility (never hardcode sport rules).
@@ -42,7 +51,7 @@ export function calculateRoundPoints(
   let points = 0;
 
   for (const pick of picks) {
-    const matchup = matchups.find(m => m.id === pick.matchup_id);
+    const matchup = matchups.find(m => m.series_id === pick.series_id);
     if (!matchup) {
       continue;
     }
@@ -53,13 +62,13 @@ export function calculateRoundPoints(
     }
 
     // Check if winner pick is correct
-    if (pick.picked_team_code === winner) {
+    if (pick.picked_winner === winner) {
       // Base points (doubled for HotPick)
       points += pick.is_hot_pick ? roundConfig.rank * 2 : roundConfig.rank;
 
       // Series length bonus
       const actualLength = getSeriesLength(matchup);
-      if (pick.predicted_games === actualLength) {
+      if (pick.picked_series_length === actualLength) {
         points += config.seriesLengthBonusPoints;
       }
     }

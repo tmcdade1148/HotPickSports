@@ -24,15 +24,15 @@ export function KnockoutBracket({config}: KnockoutBracketProps) {
   const matches = useTournamentStore(s => s.matches);
   const matchPicks = useTournamentStore(s => s.matchPicks);
 
-  const knockoutMatches = matches.filter(m => m.group_name === null);
+  const knockoutMatches = matches.filter(m => m.group_letter === null);
 
-  // Group matches by round key
+  // Group matches by stage key
   const matchesByRound: Record<string, DbTournamentMatch[]> = {};
   for (const m of knockoutMatches) {
-    if (!matchesByRound[m.round]) {
-      matchesByRound[m.round] = [];
+    if (!matchesByRound[m.stage]) {
+      matchesByRound[m.stage] = [];
     }
-    matchesByRound[m.round].push(m);
+    matchesByRound[m.stage].push(m);
   }
 
   // Build slots for each round
@@ -68,14 +68,14 @@ export function KnockoutBracket({config}: KnockoutBracketProps) {
               <View style={styles.matchesColumn}>
                 {slots.map((slot, slotIndex) => {
                   const pick = slot.match
-                    ? matchPicks.find(p => p.match_id === slot.match!.id)
+                    ? matchPicks.find(p => p.match_id === slot.match!.match_id)
                     : undefined;
 
                   return (
                     <MatchSlotView
-                      key={slot.match?.id ?? `${roundConfig.key}_${slotIndex}`}
+                      key={slot.match?.match_id ?? `${roundConfig.key}_${slotIndex}`}
                       slot={slot}
-                      pick={pick?.picked_team_code}
+                      pick={pick?.picked_team}
                       isHotPick={pick?.is_hot_pick}
                       accentColor={config.color}
                       isFinal={isFinal}
@@ -111,8 +111,8 @@ function MatchSlotView({
   isFinal,
 }: MatchSlotViewProps) {
   const {match} = slot;
-  const homeCode = match?.home_team_code ?? 'TBD';
-  const awayCode = match?.away_team_code ?? 'TBD';
+  const homeCode = match?.home_team ?? 'TBD';
+  const awayCode = match?.away_team ?? 'TBD';
   const isCompleted = match?.status === 'completed';
 
   return (

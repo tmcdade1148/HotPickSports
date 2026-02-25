@@ -5,7 +5,7 @@ import {WeekSelector} from '../components/WeekSelector';
 import {SeasonMatchCard} from '../components/SeasonMatchCard';
 import {useAuth} from '@shared/hooks/useAuth';
 import {colors, spacing} from '@shared/theme';
-import type {DbSeasonMatch} from '@shared/types/database';
+import type {DbSeasonGame} from '@shared/types/database';
 
 /**
  * SeasonPicksScreen — Main weekly picks screen.
@@ -14,32 +14,32 @@ import type {DbSeasonMatch} from '@shared/types/database';
  */
 export function SeasonPicksScreen() {
   const config = useSeasonStore(s => s.config);
-  const matches = useSeasonStore(s => s.matches);
+  const games = useSeasonStore(s => s.games);
   const currentWeek = useSeasonStore(s => s.currentWeek);
   const isLoading = useSeasonStore(s => s.isLoading);
   const hotPickCount = useSeasonStore(s => s.getHotPickCount());
   const setCurrentWeek = useSeasonStore(s => s.setCurrentWeek);
-  const fetchWeekMatches = useSeasonStore(s => s.fetchWeekMatches);
+  const fetchWeekGames = useSeasonStore(s => s.fetchWeekGames);
   const fetchUserPicks = useSeasonStore(s => s.fetchUserPicks);
   const {user} = useAuth();
 
   useEffect(() => {
     const load = async () => {
-      await fetchWeekMatches(currentWeek);
+      await fetchWeekGames(currentWeek);
       if (user?.id) {
         await fetchUserPicks(user.id, currentWeek);
       }
     };
     load();
-  }, [currentWeek, user?.id, fetchWeekMatches, fetchUserPicks]);
+  }, [currentWeek, user?.id, fetchWeekGames, fetchUserPicks]);
 
   if (!config) {
     return null;
   }
 
-  const renderMatch = ({item}: {item: DbSeasonMatch}) => (
+  const renderGame = ({item}: {item: DbSeasonGame}) => (
     <SeasonMatchCard
-      match={item}
+      game={item}
       config={config}
       userId={user?.id ?? ''}
     />
@@ -66,18 +66,18 @@ export function SeasonPicksScreen() {
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={config.color} />
         </View>
-      ) : matches.length === 0 ? (
+      ) : games.length === 0 ? (
         <View style={styles.centered}>
-          <Text style={styles.emptyTitle}>No Matches</Text>
+          <Text style={styles.emptyTitle}>No Games</Text>
           <Text style={styles.emptyText}>
-            No matches scheduled for Week {currentWeek} yet.
+            No games scheduled for Week {currentWeek} yet.
           </Text>
         </View>
       ) : (
         <FlatList
-          data={matches}
-          keyExtractor={item => item.id}
-          renderItem={renderMatch}
+          data={games}
+          keyExtractor={item => item.game_id}
+          renderItem={renderGame}
           contentContainerStyle={styles.list}
         />
       )}

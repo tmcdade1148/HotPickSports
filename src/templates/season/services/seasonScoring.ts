@@ -1,25 +1,19 @@
 import type {SeasonConfig} from '@shared/types/templates';
-import type {DbSeasonMatch, DbSeasonPick} from '@shared/types/database';
+import type {DbSeasonGame, DbSeasonPick} from '@shared/types/database';
 
 /**
- * Determine the actual outcome of a completed match.
- * Returns 'home', 'away', 'draw', or null if not yet completed.
+ * Check whether a pick is correct for a completed game.
+ * Compares pick.picked_team against game.winner_team.
+ * Returns null if the game is not yet completed/finalized.
  */
-export function determineOutcome(match: DbSeasonMatch): string | null {
-  if (
-    match.status !== 'completed' ||
-    match.home_score === null ||
-    match.away_score === null
-  ) {
+export function isPickCorrect(
+  pick: DbSeasonPick,
+  game: DbSeasonGame,
+): boolean | null {
+  if (game.status !== 'completed' || !game.winner_team) {
     return null;
   }
-  if (match.home_score > match.away_score) {
-    return 'home';
-  }
-  if (match.away_score > match.home_score) {
-    return 'away';
-  }
-  return 'draw';
+  return pick.picked_team === game.winner_team;
 }
 
 /**
@@ -27,31 +21,31 @@ export function determineOutcome(match: DbSeasonMatch): string | null {
  *
  * Scoring:
  * - Correct pick: 1 base point
- * - Correct HotPick: match.rank points (from the rank field on DbSeasonMatch)
+ * - Correct HotPick: game.rank points (from the rank field on DbSeasonGame)
  * - Incorrect pick (hot or not): 0 points
  *
  * Config is passed through for future extensibility (never hardcode sport rules).
  */
 export function calculateWeekPoints(
   picks: DbSeasonPick[],
-  matches: DbSeasonMatch[],
+  games: DbSeasonGame[],
   _config: SeasonConfig,
 ): number {
   let points = 0;
 
   for (const pick of picks) {
-    const match = matches.find(m => m.id === pick.match_id);
-    if (!match) {
+    const game = games.find(g => g.game_id === pick.game_id);
+    if (!game) {
       continue;
     }
 
-    const outcome = determineOutcome(match);
-    if (outcome === null) {
+    const correct = isPickCorrect(pick, game);
+    if (correct === null) {
       continue;
     }
 
-    if (pick.picked_outcome === outcome) {
-      points += pick.is_hot_pick ? match.rank : 1;
+    if (correct) {
+      points += pick.is_hot_pick ? (game.rank ?? 1) : 1;
     }
   }
 
