@@ -73,7 +73,6 @@ export interface DbTournamentPick {
   id: string;
   user_id: string;
   event_id: string;
-  pool_id: string;
   match_id: string;
   pick_type: 'group_advancement' | 'match_winner';
   picked_team_code: string;
@@ -85,7 +84,6 @@ export interface DbTournamentScore {
   id: string;
   user_id: string;
   event_id: string;
-  pool_id: string;
   group_points: number;
   knockout_points: number;
   total_points: number;
@@ -149,7 +147,6 @@ export interface DbSeriesPick {
   id: string;
   user_id: string;
   event_id: string;
-  pool_id: string;
   matchup_id: string;
   picked_team_code: string;
   predicted_games: number; // e.g., 4, 5, 6, 7
@@ -161,7 +158,6 @@ export interface DbSeriesScore {
   id: string;
   user_id: string;
   event_id: string;
-  pool_id: string;
   total_points: number;
   round_breakdown: Record<string, number>;
   rank: number;

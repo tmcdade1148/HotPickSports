@@ -40,7 +40,7 @@ interface TournamentState {
     isHotPick: boolean;
   }) => Promise<void>;
 
-  // Leaderboard + scoring — poolId comes from store state
+  // Leaderboard + scoring — poolId scopes the leaderboard view
   fetchLeaderboard: () => Promise<void>;
   calculateMyScore: (userId: string) => Promise<void>;
 
@@ -111,7 +111,7 @@ export const useTournamentStore = create<TournamentState>((set, get) => ({
   // Group picks use match_id convention: "group_{groupName}_{teamCode}"
   // since the schema has no group_name column on tournament_picks.
   saveGroupPick: async ({userId, groupName, teamCode, selected}) => {
-    const {config, poolId} = get();
+    const {config} = get();
     if (!config) {
       return;
     }
@@ -125,7 +125,6 @@ export const useTournamentStore = create<TournamentState>((set, get) => ({
         id: matchId,
         user_id: userId,
         event_id: config.eventId,
-        pool_id: poolId,
         match_id: matchId,
         pick_type: 'group_advancement',
         picked_team_code: teamCode,
@@ -142,13 +141,12 @@ export const useTournamentStore = create<TournamentState>((set, get) => ({
         {
           user_id: userId,
           event_id: config.eventId,
-          pool_id: poolId,
           match_id: matchId,
           pick_type: 'group_advancement',
           picked_team_code: teamCode,
           is_hot_pick: false,
         },
-        {onConflict: 'user_id,event_id,pool_id,match_id'},
+        {onConflict: 'user_id,event_id,match_id'},
       );
 
       if (error) {
@@ -167,7 +165,6 @@ export const useTournamentStore = create<TournamentState>((set, get) => ({
         .delete()
         .eq('user_id', userId)
         .eq('event_id', config.eventId)
-        .eq('pool_id', poolId)
         .eq('match_id', matchId);
 
       if (error) {
@@ -179,7 +176,7 @@ export const useTournamentStore = create<TournamentState>((set, get) => ({
   },
 
   saveMatchPick: async ({userId, matchId, teamCode, isHotPick}) => {
-    const {config, poolId} = get();
+    const {config} = get();
     if (!config) {
       return;
     }
@@ -189,7 +186,6 @@ export const useTournamentStore = create<TournamentState>((set, get) => ({
       id: matchId,
       user_id: userId,
       event_id: config.eventId,
-      pool_id: poolId,
       match_id: matchId,
       pick_type: 'match_winner',
       picked_team_code: teamCode,
@@ -208,13 +204,12 @@ export const useTournamentStore = create<TournamentState>((set, get) => ({
       {
         user_id: userId,
         event_id: config.eventId,
-        pool_id: poolId,
         match_id: matchId,
         pick_type: 'match_winner',
         picked_team_code: teamCode,
         is_hot_pick: isHotPick,
       },
-      {onConflict: 'user_id,event_id,pool_id,match_id'},
+      {onConflict: 'user_id,event_id,match_id'},
     );
 
     if (error) {
@@ -231,17 +226,25 @@ export const useTournamentStore = create<TournamentState>((set, get) => ({
     }
 
     set({isLoading: true});
+
+    // Pool-independent: scores have no pool_id.
+    // Leaderboard is built by joining tournament_scores with pool_members
+    // so any pool created mid-tournament immediately shows all members' scores.
     const {data} = await supabase
       .from('tournament_scores')
-      .select('*')
+      .select('*, pool_members!inner(user_id)')
       .eq('event_id', config.eventId)
-      .eq('pool_id', poolId)
+      .eq('pool_members.pool_id', poolId)
       .order('total_points', {ascending: false});
 
-    const scores = (data as DbTournamentScore[]) ?? [];
+    const scores = (data as (DbTournamentScore & {pool_members: unknown})[]) ?? [];
+    // Strip the join artifact before storing
+    const cleanScores: DbTournamentScore[] = scores.map(
+      ({pool_members: _pm, ...rest}) => rest,
+    );
 
     // Fetch display names for all users on the leaderboard
-    const userIds = scores.map(s => s.user_id);
+    const userIds = cleanScores.map(s => s.user_id);
     let names: Record<string, string> = {};
     if (userIds.length > 0) {
       const {data: users} = await supabase
@@ -259,14 +262,14 @@ export const useTournamentStore = create<TournamentState>((set, get) => ({
     }
 
     set({
-      leaderboard: scores,
+      leaderboard: cleanScores,
       userNames: names,
       isLoading: false,
     });
   },
 
   calculateMyScore: async (userId: string) => {
-    const {config, poolId, matches, groupPicks, matchPicks} = get();
+    const {config, matches, groupPicks, matchPicks} = get();
     if (!config) {
       return;
     }
@@ -283,14 +286,13 @@ export const useTournamentStore = create<TournamentState>((set, get) => ({
       {
         user_id: userId,
         event_id: config.eventId,
-        pool_id: poolId,
         group_points: result.groupPoints,
         knockout_points: result.knockoutPoints,
         total_points: result.total,
         rank,
         last_calculated: new Date().toISOString(),
       },
-      {onConflict: 'user_id,event_id,pool_id'},
+      {onConflict: 'user_id,event_id'},
     );
 
     // Re-fetch leaderboard to get updated data

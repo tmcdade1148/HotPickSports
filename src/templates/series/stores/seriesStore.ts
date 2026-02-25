@@ -110,7 +110,7 @@ export const useSeriesStore = create<SeriesState>((set, get) => ({
   },
 
   fetchUserPicks: async (userId: string, roundKey: string) => {
-    const {config, poolId, matchups} = get();
+    const {config, matchups} = get();
     if (!config) {
       return;
     }
@@ -126,14 +126,13 @@ export const useSeriesStore = create<SeriesState>((set, get) => ({
       .select('*')
       .eq('user_id', userId)
       .eq('event_id', config.eventId)
-      .eq('pool_id', poolId)
       .in('matchup_id', matchupIds);
 
     set({roundPicks: (data as DbSeriesPick[]) ?? []});
   },
 
   savePick: async ({userId, matchupId, pickedTeamCode, predictedGames, isHotPick}) => {
-    const {config, poolId, roundPicks} = get();
+    const {config, roundPicks} = get();
     if (!config) {
       return;
     }
@@ -145,7 +144,6 @@ export const useSeriesStore = create<SeriesState>((set, get) => ({
       id: matchupId,
       user_id: userId,
       event_id: config.eventId,
-      pool_id: poolId,
       matchup_id: matchupId,
       picked_team_code: pickedTeamCode,
       predicted_games: predictedGames,
@@ -165,13 +163,12 @@ export const useSeriesStore = create<SeriesState>((set, get) => ({
       {
         user_id: userId,
         event_id: config.eventId,
-        pool_id: poolId,
         matchup_id: matchupId,
         picked_team_code: pickedTeamCode,
         predicted_games: predictedGames,
         is_hot_pick: isHotPick,
       },
-      {onConflict: 'user_id,event_id,pool_id,matchup_id'},
+      {onConflict: 'user_id,event_id,matchup_id'},
     );
 
     if (error) {
@@ -188,17 +185,25 @@ export const useSeriesStore = create<SeriesState>((set, get) => ({
     }
 
     set({isLoading: true});
+
+    // Pool-independent: scores have no pool_id.
+    // Leaderboard is built by joining series_scores with pool_members
+    // so any pool created mid-playoffs immediately shows all members' scores.
     const {data} = await supabase
       .from('series_scores')
-      .select('*')
+      .select('*, pool_members!inner(user_id)')
       .eq('event_id', config.eventId)
-      .eq('pool_id', poolId)
+      .eq('pool_members.pool_id', poolId)
       .order('total_points', {ascending: false});
 
-    const scores = (data as DbSeriesScore[]) ?? [];
+    const scores = (data as (DbSeriesScore & {pool_members: unknown})[]) ?? [];
+    // Strip the join artifact before storing
+    const cleanScores: DbSeriesScore[] = scores.map(
+      ({pool_members: _pm, ...rest}) => rest,
+    );
 
     // Fetch display names for all users on the leaderboard
-    const userIds = scores.map(s => s.user_id);
+    const userIds = cleanScores.map(s => s.user_id);
     let names: Record<string, string> = {};
     if (userIds.length > 0) {
       const {data: users} = await supabase
@@ -216,25 +221,24 @@ export const useSeriesStore = create<SeriesState>((set, get) => ({
     }
 
     set({
-      leaderboard: scores,
+      leaderboard: cleanScores,
       userNames: names,
       isLoading: false,
     });
   },
 
   calculateMyScore: async (userId: string) => {
-    const {config, poolId} = get();
+    const {config} = get();
     if (!config) {
       return;
     }
 
-    // Fetch ALL picks for this user/event/pool
+    // Fetch ALL picks for this user/event (pool-independent)
     const {data: allPicks} = await supabase
       .from('series_picks')
       .select('*')
       .eq('user_id', userId)
-      .eq('event_id', config.eventId)
-      .eq('pool_id', poolId);
+      .eq('event_id', config.eventId);
 
     const picks = (allPicks as DbSeriesPick[]) ?? [];
 
@@ -285,13 +289,12 @@ export const useSeriesStore = create<SeriesState>((set, get) => ({
       {
         user_id: userId,
         event_id: config.eventId,
-        pool_id: poolId,
         total_points: totalPoints,
         round_breakdown: roundBreakdown,
         rank,
         last_calculated: new Date().toISOString(),
       },
-      {onConflict: 'user_id,event_id,pool_id'},
+      {onConflict: 'user_id,event_id'},
     );
 
     // Re-fetch leaderboard to get updated data
