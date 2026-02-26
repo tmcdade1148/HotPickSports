@@ -21,8 +21,11 @@ export function SeasonBoardScreen() {
   const {user} = useAuth();
 
   useEffect(() => {
+    if (!config) {
+      return;
+    }
     fetchLeaderboard();
-  }, [fetchLeaderboard]);
+  }, [config, fetchLeaderboard]);
 
   const styles = useMemo(() => StyleSheet.create({
     container: {

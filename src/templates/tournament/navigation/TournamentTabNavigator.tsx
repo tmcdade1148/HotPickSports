@@ -20,6 +20,7 @@ import {
 import type {TournamentConfig, TabConfig} from '@shared/types/templates';
 import type {DbPool} from '@shared/types/database';
 import {useTheme} from '@shell/theme';
+import {useGlobalStore} from '@shell/stores/globalStore';
 import {useTournamentStore} from '../stores/tournamentStore';
 import {TournamentPicksHub} from '../screens/TournamentPicksHub';
 import {GroupPicksScreen} from '../screens/GroupPicksScreen';
@@ -84,6 +85,7 @@ interface PoolSwitcherHeaderProps {
   onSwitchPool: (poolId: string) => void;
   activePoolId: string;
   accentColor: string;
+  displayName: string | null;
   onOpenProfile?: () => void;
 }
 
@@ -93,6 +95,7 @@ function PoolSwitcherHeader({
   onSwitchPool,
   activePoolId,
   accentColor,
+  displayName,
   onOpenProfile,
 }: PoolSwitcherHeaderProps) {
   const {colors, spacing, borderRadius} = useTheme();
@@ -170,10 +173,18 @@ function PoolSwitcherHeader({
       fontSize: 16,
       color: colors.text,
     },
+    greeting: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      marginBottom: spacing.xs,
+    },
   }), [colors, spacing, borderRadius]);
 
   return (
     <View style={headerStyles.container}>
+      {displayName && (
+        <Text style={headerStyles.greeting}>Hey, {displayName}</Text>
+      )}
       <View style={headerStyles.row}>
         {/* Spacer to balance profile icon — keeps pool name centered */}
         <View style={headerStyles.iconSpacer} />
@@ -265,6 +276,7 @@ export function TournamentTabNavigator({
   onOpenProfile,
 }: TournamentTabNavigatorProps) {
   const {colors} = useTheme();
+  const displayName = useGlobalStore(s => s.displayName);
   const initialize = useTournamentStore(s => s.initialize);
 
   useEffect(() => {
@@ -280,6 +292,7 @@ export function TournamentTabNavigator({
           onSwitchPool={onSwitchPool}
           activePoolId={poolId}
           accentColor={config.color}
+          displayName={displayName}
           onOpenProfile={onOpenProfile}
         />
       )}

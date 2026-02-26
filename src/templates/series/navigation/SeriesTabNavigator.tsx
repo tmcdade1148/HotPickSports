@@ -18,6 +18,7 @@ import {
 import type {SeriesConfig, TabConfig} from '@shared/types/templates';
 import type {DbPool} from '@shared/types/database';
 import {useTheme} from '@shell/theme';
+import {useGlobalStore} from '@shell/stores/globalStore';
 import {useSeriesStore} from '../stores/seriesStore';
 import {SeriesPicksScreen} from '../screens/SeriesPicksScreen';
 import {SeriesBoardScreen} from '../screens/SeriesBoardScreen';
@@ -62,6 +63,7 @@ interface PoolSwitcherHeaderProps {
   onSwitchPool: (poolId: string) => void;
   activePoolId: string;
   accentColor: string;
+  displayName: string | null;
   onOpenProfile?: () => void;
 }
 
@@ -71,6 +73,7 @@ function PoolSwitcherHeader({
   onSwitchPool,
   activePoolId,
   accentColor,
+  displayName,
   onOpenProfile,
 }: PoolSwitcherHeaderProps) {
   const {colors, spacing, borderRadius} = useTheme();
@@ -148,10 +151,18 @@ function PoolSwitcherHeader({
       fontSize: 16,
       color: colors.text,
     },
+    greeting: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      marginBottom: spacing.xs,
+    },
   }), [colors, spacing, borderRadius]);
 
   return (
     <View style={headerStyles.container}>
+      {displayName && (
+        <Text style={headerStyles.greeting}>Hey, {displayName}</Text>
+      )}
       <View style={headerStyles.row}>
         {/* Spacer to balance profile icon — keeps pool name centered */}
         <View style={headerStyles.iconSpacer} />
@@ -243,6 +254,7 @@ export function SeriesTabNavigator({
   onOpenProfile,
 }: SeriesTabNavigatorProps) {
   const {colors} = useTheme();
+  const displayName = useGlobalStore(s => s.displayName);
   const initialize = useSeriesStore(s => s.initialize);
 
   useEffect(() => {
@@ -258,6 +270,7 @@ export function SeriesTabNavigator({
           onSwitchPool={onSwitchPool}
           activePoolId={poolId}
           accentColor={config.color}
+          displayName={displayName}
           onOpenProfile={onOpenProfile}
         />
       )}
