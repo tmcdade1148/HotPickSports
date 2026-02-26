@@ -1,10 +1,10 @@
-import React, {useEffect} from 'react';
+import React, {useEffect, useMemo} from 'react';
 import {View, Text, FlatList, ActivityIndicator, StyleSheet} from 'react-native';
 import {useSeriesStore} from '../stores/seriesStore';
 import {RoundSelector} from '../components/RoundSelector';
 import {SeriesMatchupCard} from '../components/SeriesMatchupCard';
 import {useAuth} from '@shared/hooks/useAuth';
-import {colors, spacing} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 import type {DbSeriesMatchup} from '@shared/types/database';
 
 /**
@@ -13,6 +13,7 @@ import type {DbSeriesMatchup} from '@shared/types/database';
  * Never references a specific sport.
  */
 export function SeriesPicksScreen() {
+  const {colors, spacing} = useTheme();
   const config = useSeriesStore(s => s.config);
   const matchups = useSeriesStore(s => s.matchups);
   const currentRound = useSeriesStore(s => s.currentRound);
@@ -38,6 +39,51 @@ export function SeriesPicksScreen() {
     };
     load();
   }, [currentRound, config, user?.id, fetchRoundMatchups, fetchUserPicks]);
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    roundHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: spacing.md,
+      paddingBottom: spacing.sm,
+    },
+    roundTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    bestOfInfo: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    list: {
+      padding: spacing.md,
+      paddingTop: 0,
+    },
+    centered: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: spacing.xl,
+    },
+    emptyTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: spacing.sm,
+    },
+    emptyText: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      textAlign: 'center',
+    },
+  }), [colors, spacing]);
 
   if (!config) {
     return null;
@@ -92,48 +138,3 @@ export function SeriesPicksScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  roundHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.sm,
-  },
-  roundTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  bestOfInfo: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  list: {
-    padding: spacing.md,
-    paddingTop: 0,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.xl,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: spacing.sm,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-});

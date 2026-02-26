@@ -6,6 +6,7 @@
  * Season:     season_games, season_picks, season_user_totals
  * Series:     series_matchups, series_games, series_picks, series_user_totals
  * Shared:     profiles, pools, pool_members, smack_messages, competition_config
+ * Admin:      pool_events, member_engagement, organizer_notifications, pool_pulse
  */
 
 // ---------------------------------------------------------------------------
@@ -38,6 +39,12 @@ export interface DbPool {
   member_limit: number;
   status: string;
   name_display: string | null;
+  organizer_id: string | null;
+  brand_config: Record<string, unknown> | null;
+  member_approval_required: boolean;
+  max_members: number | null;
+  is_archived: boolean;
+  archived_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -335,4 +342,92 @@ export interface DbSeriesUserTotal {
   double_down_used: boolean | null;
   double_down_delta: number | null;
   mulligan_used: boolean | null;
+}
+
+// ---------------------------------------------------------------------------
+// Admin / organizer infrastructure tables
+// ---------------------------------------------------------------------------
+
+/** Valid event_type values for pool_events — never use freeform strings */
+export type PoolEventType =
+  | 'MEMBER_JOINED'
+  | 'MEMBER_LEFT'
+  | 'MEMBER_REMOVED'
+  | 'PICK_SUBMITTED'
+  | 'PICKS_COMPLETE'
+  | 'HOTPICK_DESIGNATED'
+  | 'SCORE_UPDATED'
+  | 'STREAK_ACHIEVED'
+  | 'MILESTONE_REACHED'
+  | 'LEADERBOARD_CHANGE'
+  | 'SMACKTALK_SENT'
+  | 'SMACKTALK_FLAGGED'
+  | 'SMACKTALK_REMOVED'
+  | 'ORGANIZER_BROADCAST'
+  | 'ORGANIZER_NUDGE'
+  | 'POOL_CREATED'
+  | 'POOL_ARCHIVED'
+  | 'ROUND_OPENED'
+  | 'ROUND_CLOSED'
+  | 'ROUND_SCORED';
+
+/** Table: pool_events — event log for pool intelligence */
+export interface DbPoolEvent {
+  id: string;
+  pool_id: string;
+  competition: string;
+  user_id: string | null;
+  event_type: PoolEventType;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+/** Table: member_engagement — computed snapshot per member per pool */
+export interface DbMemberEngagement {
+  id: string;
+  pool_id: string;
+  user_id: string;
+  competition: string;
+  last_active_at: string | null;
+  last_pick_submitted_at: string | null;
+  rounds_participated: number;
+  rounds_possible: number;
+  participation_rate: number;
+  current_correct_streak: number;
+  longest_correct_streak: number;
+  current_hotpick_streak: number;
+  smacktalk_messages_sent: number;
+  times_nudged: number;
+  last_nudged_at: string | null;
+  engagement_status: 'active' | 'at_risk' | 'dormant';
+  updated_at: string;
+}
+
+/** Table: organizer_notifications — broadcast/nudge history with rate limiting */
+export interface DbOrganizerNotification {
+  id: string;
+  pool_id: string;
+  organizer_id: string;
+  competition: string;
+  notification_type: 'broadcast' | 'nudge' | 'system';
+  message: string | null;
+  recipient_count: number;
+  recipient_user_ids: string[] | null;
+  sent_at: string;
+  push_delivered: number;
+  push_failed: number;
+}
+
+/** Table: pool_pulse — current intelligence digest per pool */
+export interface DbPoolPulse {
+  pool_id: string;
+  competition: string;
+  items: Array<{
+    message: string;
+    priority: number;
+    action_type?: string | null;
+    action_payload?: Record<string, unknown> | null;
+    expires_at: string;
+  }>;
+  generated_at: string;
 }

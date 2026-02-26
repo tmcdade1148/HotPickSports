@@ -1,6 +1,6 @@
-import React, {useRef, useEffect} from 'react';
+import React, {useRef, useEffect, useMemo} from 'react';
 import {ScrollView, TouchableOpacity, Text, StyleSheet} from 'react-native';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 
 interface WeekSelectorProps {
   totalWeeks: number;
@@ -11,7 +11,6 @@ interface WeekSelectorProps {
 }
 
 const CHIP_WIDTH = 52;
-const CHIP_GAP = spacing.xs;
 
 /**
  * WeekSelector — Horizontal scrollable week picker.
@@ -25,7 +24,10 @@ export function WeekSelector({
   accentColor,
   playoffStartWeek,
 }: WeekSelectorProps) {
+  const {colors, spacing, borderRadius} = useTheme();
   const scrollRef = useRef<ScrollView>(null);
+
+  const CHIP_GAP = spacing.xs;
 
   // Auto-scroll to current week on mount
   useEffect(() => {
@@ -34,6 +36,32 @@ export function WeekSelector({
   }, []);
 
   const weeks = Array.from({length: totalWeeks}, (_, i) => i + 1);
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      gap: CHIP_GAP,
+    },
+    chip: {
+      width: CHIP_WIDTH,
+      height: 36,
+      borderRadius: borderRadius.full,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    chipText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    chipTextSelected: {
+      color: colors.textOnPrimary,
+    },
+  }), [colors, spacing, borderRadius]);
 
   return (
     <ScrollView
@@ -69,29 +97,3 @@ export function WeekSelector({
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    gap: CHIP_GAP,
-  },
-  chip: {
-    width: CHIP_WIDTH,
-    height: 36,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  chipText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  chipTextSelected: {
-    color: '#FFFFFF',
-  },
-});

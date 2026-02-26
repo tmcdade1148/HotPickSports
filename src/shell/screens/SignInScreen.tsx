@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useMemo, useState} from 'react';
 import {
   View,
   Text,
@@ -11,9 +11,11 @@ import {
 } from 'react-native';
 import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '../stores/globalStore';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {useTheme, useBrand} from '@shell/theme';
 
 export function SignInScreen({navigation}: any) {
+  const {colors, spacing, borderRadius} = useTheme();
+  const brand = useBrand();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -46,12 +48,77 @@ export function SignInScreen({navigation}: any) {
     }
   };
 
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: spacing.lg,
+          backgroundColor: colors.background,
+        },
+        title: {
+          fontSize: 36,
+          fontWeight: '700',
+          color: colors.primary,
+          marginBottom: spacing.xs,
+        },
+        subtitle: {
+          fontSize: 16,
+          color: colors.textSecondary,
+          marginBottom: spacing.xxl,
+        },
+        input: {
+          width: '100%',
+          borderWidth: 1,
+          borderColor: colors.border,
+          borderRadius: borderRadius.md,
+          padding: spacing.md,
+          fontSize: 16,
+          color: colors.text,
+          backgroundColor: colors.surface,
+          marginBottom: spacing.sm,
+        },
+        error: {
+          color: colors.error,
+          fontSize: 14,
+          marginBottom: spacing.sm,
+          textAlign: 'center',
+        },
+        button: {
+          backgroundColor: colors.primary,
+          paddingHorizontal: spacing.xl,
+          paddingVertical: spacing.md,
+          borderRadius: borderRadius.md,
+          marginBottom: spacing.md,
+          marginTop: spacing.sm,
+          width: '100%',
+          alignItems: 'center',
+        },
+        buttonDisabled: {
+          opacity: 0.7,
+        },
+        buttonText: {
+          color: colors.textOnPrimary,
+          fontSize: 16,
+          fontWeight: '600',
+        },
+        link: {
+          color: colors.primary,
+          fontSize: 14,
+          marginTop: spacing.sm,
+        },
+      }),
+    [colors, spacing, borderRadius],
+  );
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Text style={styles.title}>HotPick Sports</Text>
-      <Text style={styles.subtitle}>Make your picks. Win bragging rights.</Text>
+      <Text style={styles.title}>{brand.app_name}</Text>
+      <Text style={styles.subtitle}>{brand.welcome_message}</Text>
 
       <TextInput
         style={styles.input}
@@ -82,7 +149,7 @@ export function SignInScreen({navigation}: any) {
         onPress={handleSignIn}
         disabled={loading}>
         {loading ? (
-          <ActivityIndicator color="#FFFFFF" />
+          <ActivityIndicator color={colors.textOnPrimary} />
         ) : (
           <Text style={styles.buttonText}>Sign In</Text>
         )}
@@ -96,64 +163,3 @@ export function SignInScreen({navigation}: any) {
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.lg,
-    backgroundColor: colors.background,
-  },
-  title: {
-    fontSize: 36,
-    fontWeight: '700',
-    color: colors.primary,
-    marginBottom: spacing.xs,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: colors.textSecondary,
-    marginBottom: spacing.xxl,
-  },
-  input: {
-    width: '100%',
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    fontSize: 16,
-    color: colors.text,
-    backgroundColor: colors.surface,
-    marginBottom: spacing.sm,
-  },
-  error: {
-    color: colors.error,
-    fontSize: 14,
-    marginBottom: spacing.sm,
-    textAlign: 'center',
-  },
-  button: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.md,
-    marginBottom: spacing.md,
-    marginTop: spacing.sm,
-    width: '100%',
-    alignItems: 'center',
-  },
-  buttonDisabled: {
-    opacity: 0.7,
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  link: {
-    color: colors.primary,
-    fontSize: 14,
-    marginTop: spacing.sm,
-  },
-});

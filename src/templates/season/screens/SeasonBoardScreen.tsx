@@ -1,10 +1,10 @@
-import React, {useEffect} from 'react';
+import React, {useEffect, useMemo} from 'react';
 import {View, Text, ScrollView, ActivityIndicator, StyleSheet} from 'react-native';
 import {useSeasonStore} from '../stores/seasonStore';
 import type {SeasonLeaderboardEntry} from '../stores/seasonStore';
 import {SeasonProgress} from '../components/SeasonProgress';
 import {useAuth} from '@shared/hooks/useAuth';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 
 /**
  * SeasonBoardScreen — Standings showing pool leaderboard.
@@ -12,6 +12,7 @@ import {colors, spacing, borderRadius} from '@shared/theme';
  * Never references a specific sport.
  */
 export function SeasonBoardScreen() {
+  const {colors, spacing, borderRadius} = useTheme();
   const config = useSeasonStore(s => s.config);
   const leaderboard = useSeasonStore(s => s.leaderboard);
   const userNames = useSeasonStore(s => s.userNames);
@@ -22,6 +23,84 @@ export function SeasonBoardScreen() {
   useEffect(() => {
     fetchLeaderboard();
   }, [fetchLeaderboard]);
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    scrollContent: {
+      paddingBottom: spacing.xl,
+    },
+    loading: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+    },
+    leaderboard: {
+      flex: 1,
+      padding: spacing.md,
+    },
+    sectionTitle: {
+      fontSize: 20,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: spacing.md,
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: spacing.md,
+      backgroundColor: colors.surface,
+      borderRadius: borderRadius.md,
+      marginBottom: spacing.sm,
+    },
+    rowHighlight: {
+      backgroundColor: colors.primaryHighlight,
+      borderWidth: 1,
+      borderColor: colors.primary,
+    },
+    rank: {
+      width: 32,
+      fontSize: 16,
+      fontWeight: '700',
+      color: colors.textSecondary,
+      textAlign: 'center',
+    },
+    userInfo: {
+      flex: 1,
+      marginLeft: spacing.sm,
+    },
+    userName: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: colors.text,
+    },
+    breakdown: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      marginTop: 2,
+    },
+    totalPoints: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: colors.text,
+    },
+    textHighlight: {
+      color: colors.primary,
+    },
+    emptyState: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    emptyText: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      textAlign: 'center',
+    },
+  }), [colors, spacing, borderRadius]);
 
   if (!config) {
     return null;
@@ -87,81 +166,3 @@ export function SeasonBoardScreen() {
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  scrollContent: {
-    paddingBottom: spacing.xl,
-  },
-  loading: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.background,
-  },
-  leaderboard: {
-    flex: 1,
-    padding: spacing.md,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: spacing.md,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    marginBottom: spacing.sm,
-  },
-  rowHighlight: {
-    backgroundColor: 'rgba(255, 107, 53, 0.08)',
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  rank: {
-    width: 32,
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-  userInfo: {
-    flex: 1,
-    marginLeft: spacing.sm,
-  },
-  userName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: colors.text,
-  },
-  breakdown: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  totalPoints: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  textHighlight: {
-    color: colors.primary,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-});

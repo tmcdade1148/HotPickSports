@@ -1,14 +1,51 @@
-import React from 'react';
+import React, {useMemo} from 'react';
 import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
 import {useTournamentStore} from '../stores/tournamentStore';
-import {colors, spacing} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 
 /**
  * TournamentPicksHub — Routes the user to group picks or match picks.
  * Which picks are available depends on the tournament phase.
  */
 export function TournamentPicksHub({navigation}: any) {
+  const {colors, spacing} = useTheme();
   const config = useTournamentStore(s => s.config);
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+      padding: spacing.lg,
+      backgroundColor: colors.background,
+    },
+    title: {
+      fontSize: 28,
+      fontWeight: '700',
+      color: colors.text,
+      marginBottom: spacing.xs,
+    },
+    subtitle: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      marginBottom: spacing.lg,
+    },
+    card: {
+      backgroundColor: colors.surface,
+      padding: spacing.lg,
+      borderRadius: 12,
+      marginBottom: spacing.md,
+      borderLeftWidth: 4,
+    },
+    cardTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: spacing.xs,
+    },
+    cardDescription: {
+      fontSize: 14,
+      color: colors.textSecondary,
+    },
+  }), [colors, spacing]);
 
   if (!config) {
     return null;
@@ -42,39 +79,3 @@ export function TournamentPicksHub({navigation}: any) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: spacing.lg,
-    backgroundColor: colors.background,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: spacing.xs,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginBottom: spacing.lg,
-  },
-  card: {
-    backgroundColor: colors.surface,
-    padding: spacing.lg,
-    borderRadius: 12,
-    marginBottom: spacing.md,
-    borderLeftWidth: 4,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: spacing.xs,
-  },
-  cardDescription: {
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-});

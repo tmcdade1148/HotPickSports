@@ -1,8 +1,8 @@
-import React from 'react';
+import React, {useMemo} from 'react';
 import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
 import type {SeriesConfig} from '@shared/types/templates';
 import type {DbSeriesMatchup} from '@shared/types/database';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 import {useSeriesStore} from '../stores/seriesStore';
 import {getSeriesWinner, getSeriesLength} from '../services/seriesScoring';
 
@@ -22,6 +22,7 @@ export function SeriesMatchupCard({
   config,
   userId,
 }: SeriesMatchupCardProps) {
+  const {colors, spacing, borderRadius} = useTheme();
   const existingPick = useSeriesStore(s => s.getPickForMatchup(matchup.series_id));
   const savePick = useSeriesStore(s => s.savePick);
   const isSaving = useSeriesStore(s => s.isSaving);
@@ -124,6 +125,154 @@ export function SeriesMatchupCard({
       isHotPick: !isHotPick,
     });
   };
+
+  const styles = useMemo(() => StyleSheet.create({
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: borderRadius.lg,
+      padding: spacing.md,
+      marginBottom: spacing.md,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: spacing.xs,
+    },
+    statusText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.textSecondary,
+      textTransform: 'uppercase',
+    },
+    bestOfText: {
+      fontSize: 11,
+      color: colors.textSecondary,
+    },
+    winsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: spacing.sm,
+      gap: spacing.sm,
+    },
+    winsText: {
+      fontSize: 28,
+      fontWeight: '700',
+      color: colors.text,
+    },
+    winsDash: {
+      fontSize: 20,
+      color: colors.textSecondary,
+    },
+    teams: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.md,
+    },
+    teamButton: {
+      flex: 1,
+      padding: spacing.md,
+      borderRadius: borderRadius.md,
+      borderWidth: 2,
+      borderColor: colors.border,
+      alignItems: 'center',
+    },
+    teamSelected: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primaryHighlight,
+    },
+    teamCorrect: {
+      borderColor: colors.success,
+      backgroundColor: colors.successHighlight,
+    },
+    teamText: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    teamTextSelected: {
+      color: colors.primary,
+    },
+    seedLabel: {
+      fontSize: 11,
+      color: colors.textSecondary,
+      marginTop: 2,
+    },
+    vs: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      fontWeight: '500',
+    },
+    gamesSection: {
+      marginTop: spacing.sm,
+    },
+    gamesLabel: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.textSecondary,
+      marginBottom: spacing.xs,
+    },
+    gamesRow: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+    },
+    gameChip: {
+      flex: 1,
+      padding: spacing.sm,
+      borderRadius: borderRadius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: 'center',
+    },
+    gameChipSelected: {
+      borderColor: colors.secondary,
+      backgroundColor: colors.secondaryHighlight,
+    },
+    gameChipText: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    gameChipTextSelected: {
+      color: colors.secondary,
+    },
+    hotPickToggle: {
+      marginTop: spacing.sm,
+      padding: spacing.sm,
+      borderRadius: borderRadius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: 'center',
+    },
+    hotPickActive: {
+      borderColor: colors.warning,
+      backgroundColor: colors.warningHighlight,
+    },
+    hotPickText: {
+      fontSize: 14,
+      color: colors.textSecondary,
+    },
+    hotPickTextActive: {
+      color: colors.warning,
+      fontWeight: '600',
+    },
+    pointsRow: {
+      marginTop: spacing.sm,
+      alignItems: 'flex-end',
+    },
+    pointsText: {
+      fontSize: 14,
+      fontWeight: '700',
+    },
+    pointsPositive: {
+      color: colors.success,
+    },
+    pointsZero: {
+      color: colors.textSecondary,
+    },
+  }), [colors, spacing, borderRadius]);
 
   return (
     <View style={styles.card}>
@@ -257,151 +406,3 @@ export function SeriesMatchupCard({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.textSecondary,
-    textTransform: 'uppercase',
-  },
-  bestOfText: {
-    fontSize: 11,
-    color: colors.textSecondary,
-  },
-  winsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.sm,
-    gap: spacing.sm,
-  },
-  winsText: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  winsDash: {
-    fontSize: 20,
-    color: colors.textSecondary,
-  },
-  teams: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.md,
-  },
-  teamButton: {
-    flex: 1,
-    padding: spacing.md,
-    borderRadius: borderRadius.md,
-    borderWidth: 2,
-    borderColor: colors.border,
-    alignItems: 'center',
-  },
-  teamSelected: {
-    borderColor: colors.primary,
-    backgroundColor: 'rgba(255, 107, 53, 0.08)',
-  },
-  teamCorrect: {
-    borderColor: colors.success,
-    backgroundColor: 'rgba(6, 214, 160, 0.1)',
-  },
-  teamText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  teamTextSelected: {
-    color: colors.primary,
-  },
-  seedLabel: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  vs: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    fontWeight: '500',
-  },
-  gamesSection: {
-    marginTop: spacing.sm,
-  },
-  gamesLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.textSecondary,
-    marginBottom: spacing.xs,
-  },
-  gamesRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  gameChip: {
-    flex: 1,
-    padding: spacing.sm,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-  },
-  gameChipSelected: {
-    borderColor: colors.secondary,
-    backgroundColor: 'rgba(0, 78, 137, 0.08)',
-  },
-  gameChipText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  gameChipTextSelected: {
-    color: colors.secondary,
-  },
-  hotPickToggle: {
-    marginTop: spacing.sm,
-    padding: spacing.sm,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-  },
-  hotPickActive: {
-    borderColor: colors.warning,
-    backgroundColor: 'rgba(255, 209, 102, 0.15)',
-  },
-  hotPickText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  hotPickTextActive: {
-    color: colors.warning,
-    fontWeight: '600',
-  },
-  pointsRow: {
-    marginTop: spacing.sm,
-    alignItems: 'flex-end',
-  },
-  pointsText: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  pointsPositive: {
-    color: colors.success,
-  },
-  pointsZero: {
-    color: colors.textSecondary,
-  },
-});

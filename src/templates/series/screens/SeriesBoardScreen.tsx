@@ -1,9 +1,9 @@
-import React, {useEffect} from 'react';
+import React, {useEffect, useMemo} from 'react';
 import {View, Text, ScrollView, ActivityIndicator, StyleSheet} from 'react-native';
 import {useSeriesStore} from '../stores/seriesStore';
 import {SeriesProgress} from '../components/SeriesProgress';
 import {useAuth} from '@shared/hooks/useAuth';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 import type {DbSeriesUserTotal} from '@shared/types/database';
 
 /**
@@ -12,6 +12,7 @@ import type {DbSeriesUserTotal} from '@shared/types/database';
  * Never references a specific sport.
  */
 export function SeriesBoardScreen() {
+  const {colors, spacing, borderRadius} = useTheme();
   const config = useSeriesStore(s => s.config);
   const leaderboard = useSeriesStore(s => s.leaderboard);
   const userNames = useSeriesStore(s => s.userNames);
@@ -28,6 +29,84 @@ export function SeriesBoardScreen() {
     };
     load();
   }, [user?.id, fetchLeaderboard]);
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    scrollContent: {
+      paddingBottom: spacing.xl,
+    },
+    loading: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+    },
+    leaderboard: {
+      flex: 1,
+      padding: spacing.md,
+    },
+    sectionTitle: {
+      fontSize: 20,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: spacing.md,
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: spacing.md,
+      backgroundColor: colors.surface,
+      borderRadius: borderRadius.md,
+      marginBottom: spacing.sm,
+    },
+    rowHighlight: {
+      backgroundColor: colors.primaryHighlight,
+      borderWidth: 1,
+      borderColor: colors.primary,
+    },
+    rank: {
+      width: 32,
+      fontSize: 16,
+      fontWeight: '700',
+      color: colors.textSecondary,
+      textAlign: 'center',
+    },
+    userInfo: {
+      flex: 1,
+      marginLeft: spacing.sm,
+    },
+    userName: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: colors.text,
+    },
+    breakdown: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      marginTop: 2,
+    },
+    totalPoints: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: colors.text,
+    },
+    textHighlight: {
+      color: colors.primary,
+    },
+    emptyState: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    emptyText: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      textAlign: 'center',
+    },
+  }), [colors, spacing, borderRadius]);
 
   if (!config) {
     return null;
@@ -89,81 +168,3 @@ export function SeriesBoardScreen() {
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  scrollContent: {
-    paddingBottom: spacing.xl,
-  },
-  loading: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.background,
-  },
-  leaderboard: {
-    flex: 1,
-    padding: spacing.md,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: spacing.md,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    marginBottom: spacing.sm,
-  },
-  rowHighlight: {
-    backgroundColor: 'rgba(255, 107, 53, 0.08)',
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  rank: {
-    width: 32,
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-  userInfo: {
-    flex: 1,
-    marginLeft: spacing.sm,
-  },
-  userName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: colors.text,
-  },
-  breakdown: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  totalPoints: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  textHighlight: {
-    color: colors.primary,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-});

@@ -1,8 +1,8 @@
-import React from 'react';
+import React, {useMemo} from 'react';
 import {View, Text, ScrollView, StyleSheet} from 'react-native';
 import type {TournamentConfig, KnockoutRoundConfig} from '@shared/types/templates';
 import type {DbTournamentMatch} from '@shared/types/database';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 import {useTournamentStore} from '../stores/tournamentStore';
 
 interface KnockoutBracketProps {
@@ -21,6 +21,7 @@ interface MatchSlot {
  * Highlights user's picks. Never references a specific sport.
  */
 export function KnockoutBracket({config}: KnockoutBracketProps) {
+  const {colors, spacing, borderRadius} = useTheme();
   const matches = useTournamentStore(s => s.matches);
   const matchPicks = useTournamentStore(s => s.matchPicks);
 
@@ -44,6 +45,105 @@ export function KnockoutBracket({config}: KnockoutBracketProps) {
     // No matches yet — show TBD placeholders
     return Array.from({length: roundConfig.matchCount}, () => ({roundConfig}));
   });
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      padding: spacing.md,
+    },
+    title: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: spacing.md,
+    },
+    bracketScroll: {
+      paddingBottom: spacing.md,
+    },
+    roundColumn: {
+      marginRight: spacing.md,
+      alignItems: 'center',
+    },
+    roundLabel: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: colors.textSecondary,
+      textTransform: 'uppercase',
+      marginBottom: spacing.sm,
+      letterSpacing: 0.5,
+    },
+    matchesColumn: {
+      justifyContent: 'space-around',
+      flex: 1,
+    },
+    matchSlot: {
+      width: SLOT_WIDTH,
+      backgroundColor: colors.surface,
+      borderRadius: borderRadius.md,
+      marginBottom: spacing.sm,
+      borderWidth: 1,
+      borderColor: colors.border,
+      overflow: 'hidden',
+    },
+    matchSlotFinal: {
+      borderWidth: 2,
+    },
+    megaPickBadge: {
+      fontSize: 9,
+      fontWeight: '800',
+      textAlign: 'center',
+      paddingVertical: 2,
+      letterSpacing: 1,
+    },
+    teamRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 6,
+      paddingHorizontal: spacing.sm,
+    },
+    pickIndicator: {
+      width: 3,
+      height: '100%',
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      bottom: 0,
+    },
+    teamCode: {
+      flex: 1,
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    teamCodeTBD: {
+      color: colors.textSecondary,
+      fontWeight: '400',
+      fontStyle: 'italic',
+    },
+    teamCodeWinner: {
+      fontWeight: '800',
+    },
+    teamScore: {
+      fontSize: 13,
+      fontWeight: '500',
+      color: colors.textSecondary,
+      marginLeft: spacing.xs,
+    },
+    teamScoreWinner: {
+      fontWeight: '700',
+      color: colors.text,
+    },
+    divider: {
+      height: 1,
+      backgroundColor: colors.border,
+    },
+    hotPickIndicator: {
+      fontSize: 9,
+      fontWeight: '700',
+      color: colors.warning,
+      textAlign: 'center',
+      paddingBottom: 3,
+    },
+  }), [colors, spacing, borderRadius]);
 
   return (
     <View style={styles.container}>
@@ -79,6 +179,7 @@ export function KnockoutBracket({config}: KnockoutBracketProps) {
                       isHotPick={pick?.is_hot_pick}
                       accentColor={config.color}
                       isFinal={isFinal}
+                      styles={styles}
                     />
                   );
                 })}
@@ -101,6 +202,7 @@ interface MatchSlotViewProps {
   isHotPick?: boolean;
   accentColor: string;
   isFinal: boolean;
+  styles: ReturnType<typeof StyleSheet.create>;
 }
 
 function MatchSlotView({
@@ -109,6 +211,7 @@ function MatchSlotView({
   isHotPick,
   accentColor,
   isFinal,
+  styles,
 }: MatchSlotViewProps) {
   const {match} = slot;
   const homeCode = match?.home_team ?? 'TBD';
@@ -133,6 +236,7 @@ function MatchSlotView({
         isPicked={pick === homeCode}
         isWinner={isCompleted && match?.home_score != null && match?.away_score != null && match.home_score > match.away_score}
         accentColor={accentColor}
+        styles={styles}
       />
       <View style={styles.divider} />
       <TeamRow
@@ -141,6 +245,7 @@ function MatchSlotView({
         isPicked={pick === awayCode}
         isWinner={isCompleted && match?.home_score != null && match?.away_score != null && match.away_score > match.home_score}
         accentColor={accentColor}
+        styles={styles}
       />
       {isHotPick && <Text style={styles.hotPickIndicator}>HotPick</Text>}
     </View>
@@ -157,9 +262,10 @@ interface TeamRowProps {
   isPicked: boolean;
   isWinner: boolean;
   accentColor: string;
+  styles: ReturnType<typeof StyleSheet.create>;
 }
 
-function TeamRow({code, score, isPicked, isWinner, accentColor}: TeamRowProps) {
+function TeamRow({code, score, isPicked, isWinner, accentColor, styles}: TeamRowProps) {
   const isTBD = code === 'TBD';
 
   return (
@@ -194,106 +300,7 @@ function TeamRow({code, score, isPicked, isWinner, accentColor}: TeamRowProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Styles
+// Constants
 // ---------------------------------------------------------------------------
 
 const SLOT_WIDTH = 120;
-
-const styles = StyleSheet.create({
-  container: {
-    padding: spacing.md,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: spacing.md,
-  },
-  bracketScroll: {
-    paddingBottom: spacing.md,
-  },
-  roundColumn: {
-    marginRight: spacing.md,
-    alignItems: 'center',
-  },
-  roundLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.textSecondary,
-    textTransform: 'uppercase',
-    marginBottom: spacing.sm,
-    letterSpacing: 0.5,
-  },
-  matchesColumn: {
-    justifyContent: 'space-around',
-    flex: 1,
-  },
-  matchSlot: {
-    width: SLOT_WIDTH,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
-  },
-  matchSlotFinal: {
-    borderWidth: 2,
-  },
-  megaPickBadge: {
-    fontSize: 9,
-    fontWeight: '800',
-    textAlign: 'center',
-    paddingVertical: 2,
-    letterSpacing: 1,
-  },
-  teamRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: spacing.sm,
-  },
-  pickIndicator: {
-    width: 3,
-    height: '100%',
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-  },
-  teamCode: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  teamCodeTBD: {
-    color: colors.textSecondary,
-    fontWeight: '400',
-    fontStyle: 'italic',
-  },
-  teamCodeWinner: {
-    fontWeight: '800',
-  },
-  teamScore: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: colors.textSecondary,
-    marginLeft: spacing.xs,
-  },
-  teamScoreWinner: {
-    fontWeight: '700',
-    color: colors.text,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: colors.border,
-  },
-  hotPickIndicator: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: colors.warning,
-    textAlign: 'center',
-    paddingBottom: 3,
-  },
-});

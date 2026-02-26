@@ -156,6 +156,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
         name,
         competition,
         created_by: userId,
+        organizer_id: userId,
         invite_code: inviteCode,
         is_public: isPublic,
       })

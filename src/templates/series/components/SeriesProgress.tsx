@@ -1,7 +1,7 @@
-import React from 'react';
+import React, {useMemo} from 'react';
 import {View, Text, StyleSheet} from 'react-native';
 import type {SeriesConfig} from '@shared/types/templates';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 import {useSeriesStore} from '../stores/seriesStore';
 
 interface SeriesProgressProps {
@@ -15,6 +15,7 @@ interface SeriesProgressProps {
  * Never references a specific sport.
  */
 export function SeriesProgress({config, userId}: SeriesProgressProps) {
+  const {colors, spacing, borderRadius} = useTheme();
   const score = useSeriesStore(s => s.getUserScore(userId));
   const leaderboard = useSeriesStore(s => s.leaderboard);
   const currentRound = useSeriesStore(s => s.currentRound);
@@ -40,6 +41,76 @@ export function SeriesProgress({config, userId}: SeriesProgressProps) {
   const latestRoundLabel = currentRoundKey
     ? config.rounds.find(rc => rc.key === currentRoundKey)?.label
     : null;
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      padding: spacing.md,
+      backgroundColor: colors.surface,
+      borderRadius: borderRadius.lg,
+      margin: spacing.md,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    title: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    totalPoints: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: colors.text,
+    },
+    rankText: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      marginTop: 2,
+    },
+    progressBar: {
+      height: 6,
+      backgroundColor: colors.border,
+      borderRadius: 3,
+      marginTop: spacing.sm,
+      overflow: 'hidden',
+    },
+    progressFill: {
+      height: '100%',
+      borderRadius: 3,
+    },
+    progressLabel: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      marginTop: spacing.xs,
+    },
+    breakdown: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.xs,
+      marginTop: spacing.sm,
+    },
+    roundChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: colors.background,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 4,
+      borderRadius: borderRadius.sm,
+    },
+    roundLabel: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    roundPoints: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: colors.text,
+    },
+  }), [colors, spacing, borderRadius]);
 
   return (
     <View style={styles.container}>
@@ -82,73 +153,3 @@ export function SeriesProgress({config, userId}: SeriesProgressProps) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    padding: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    margin: spacing.md,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  totalPoints: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  rankText: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  progressBar: {
-    height: 6,
-    backgroundColor: colors.border,
-    borderRadius: 3,
-    marginTop: spacing.sm,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  progressLabel: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
-  },
-  breakdown: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-    marginTop: spacing.sm,
-  },
-  roundChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.background,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: borderRadius.sm,
-  },
-  roundLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  roundPoints: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.text,
-  },
-});

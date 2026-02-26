@@ -1,7 +1,7 @@
-import React from 'react';
+import React, {useMemo} from 'react';
 import {View, Text, StyleSheet} from 'react-native';
 import type {SeasonConfig} from '@shared/types/templates';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 import {useSeasonStore} from '../stores/seasonStore';
 
 interface SeasonProgressProps {
@@ -15,6 +15,7 @@ interface SeasonProgressProps {
  * Never references a specific sport.
  */
 export function SeasonProgress({config, userId}: SeasonProgressProps) {
+  const {colors, spacing, borderRadius} = useTheme();
   const score = useSeasonStore(s => s.getUserScore(userId));
   const leaderboard = useSeasonStore(s => s.leaderboard);
   const currentWeek = useSeasonStore(s => s.currentWeek);
@@ -35,6 +36,76 @@ export function SeasonProgress({config, userId}: SeasonProgressProps) {
   const weekEntries = Object.entries(weeklyBreakdown)
     .map(([wk, pts]) => ({week: Number(wk), points: pts}))
     .sort((a, b) => a.week - b.week);
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      padding: spacing.md,
+      backgroundColor: colors.surface,
+      borderRadius: borderRadius.lg,
+      margin: spacing.md,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    title: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    totalPoints: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: colors.text,
+    },
+    rankText: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      marginTop: 2,
+    },
+    progressBar: {
+      height: 6,
+      backgroundColor: colors.border,
+      borderRadius: 3,
+      marginTop: spacing.sm,
+      overflow: 'hidden',
+    },
+    progressFill: {
+      height: '100%',
+      borderRadius: 3,
+    },
+    progressLabel: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      marginTop: spacing.xs,
+    },
+    breakdown: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.xs,
+      marginTop: spacing.sm,
+    },
+    weekChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: colors.background,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 4,
+      borderRadius: borderRadius.sm,
+    },
+    weekLabel: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    weekPoints: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: colors.text,
+    },
+  }), [colors, spacing, borderRadius]);
 
   return (
     <View style={styles.container}>
@@ -79,73 +150,3 @@ export function SeasonProgress({config, userId}: SeasonProgressProps) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    padding: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    margin: spacing.md,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  totalPoints: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  rankText: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  progressBar: {
-    height: 6,
-    backgroundColor: colors.border,
-    borderRadius: 3,
-    marginTop: spacing.sm,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  progressLabel: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
-  },
-  breakdown: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-    marginTop: spacing.sm,
-  },
-  weekChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.background,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: borderRadius.sm,
-  },
-  weekLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  weekPoints: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.text,
-  },
-});

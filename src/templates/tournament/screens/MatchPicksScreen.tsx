@@ -1,9 +1,9 @@
-import React, {useEffect} from 'react';
+import React, {useEffect, useMemo} from 'react';
 import {View, Text, FlatList, ActivityIndicator, StyleSheet} from 'react-native';
 import {useTournamentStore} from '../stores/tournamentStore';
 import {MatchPickCard} from '../components/MatchPickCard';
 import {useAuth} from '@shared/hooks/useAuth';
-import {colors, spacing} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 
 /**
  * MatchPicksScreen — Pick winners for knockout round matches.
@@ -11,6 +11,7 @@ import {colors, spacing} from '@shared/theme';
  * Never references a specific sport.
  */
 export function MatchPicksScreen() {
+  const {colors, spacing} = useTheme();
   const config = useTournamentStore(s => s.config);
   const matches = useTournamentStore(s => s.matches);
   const isLoading = useTournamentStore(s => s.isLoading);
@@ -24,6 +25,39 @@ export function MatchPicksScreen() {
       fetchUserPicks(user.id);
     }
   }, [user?.id, fetchMatches, fetchUserPicks]);
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    loading: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+    },
+    list: {
+      padding: spacing.md,
+    },
+    emptyState: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: spacing.xl,
+    },
+    emptyTitle: {
+      fontSize: 20,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: spacing.sm,
+    },
+    emptyText: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      textAlign: 'center',
+    },
+  }), [colors, spacing]);
 
   if (!config) {
     return null;
@@ -66,36 +100,3 @@ export function MatchPicksScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  loading: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.background,
-  },
-  list: {
-    padding: spacing.md,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.xl,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: spacing.sm,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-});

@@ -14,6 +14,17 @@ export const colors = {
   backgroundDark: '#1A1A1A',
   surfaceDark: '#2A2A2A',
   textDark: '#F7F7F7',
+
+  // Semantic tokens — text on colored backgrounds
+  textOnPrimary: '#FFFFFF',
+  textOnPrimaryMuted: 'rgba(255, 255, 255, 0.7)',
+  textOnPrimaryHint: 'rgba(255, 255, 255, 0.8)',
+
+  // Highlight backgrounds — semi-transparent variants
+  primaryHighlight: 'rgba(255, 107, 53, 0.08)',
+  secondaryHighlight: 'rgba(0, 78, 137, 0.08)',
+  successHighlight: 'rgba(6, 214, 160, 0.1)',
+  warningHighlight: 'rgba(255, 209, 102, 0.15)',
 };
 
 export const spacing = {

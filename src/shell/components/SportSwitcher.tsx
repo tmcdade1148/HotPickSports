@@ -1,8 +1,8 @@
-import React from 'react';
+import React, {useMemo} from 'react';
 import {View, Text, TouchableOpacity, StyleSheet, ScrollView} from 'react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {getEventsByPriority} from '@sports/registry';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 import type {AnyEventConfig} from '@shared/types/templates';
 
 /**
@@ -10,6 +10,7 @@ import type {AnyEventConfig} from '@shared/types/templates';
  * Allows the user to switch between active events (World Cup, NFL, etc.).
  */
 export function SportSwitcher() {
+  const {colors, spacing, borderRadius} = useTheme();
   const activeSport = useGlobalStore(s => s.activeSport);
   const setActiveSport = useGlobalStore(s => s.setActiveSport);
   const events = getEventsByPriority();
@@ -17,6 +18,33 @@ export function SportSwitcher() {
   const handlePress = (event: AnyEventConfig) => {
     setActiveSport(event);
   };
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.sm,
+          gap: spacing.sm,
+        },
+        chip: {
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.xs,
+          borderRadius: borderRadius.full,
+          borderWidth: 2,
+          marginRight: spacing.sm,
+        },
+        chipText: {
+          fontSize: 14,
+          fontWeight: '600',
+          color: colors.text,
+        },
+        chipTextActive: {
+          color: colors.textOnPrimary,
+        },
+      }),
+    [colors, spacing, borderRadius],
+  );
 
   return (
     <ScrollView
@@ -44,26 +72,3 @@ export function SportSwitcher() {
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    gap: spacing.sm,
-  },
-  chip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.full,
-    borderWidth: 2,
-    marginRight: spacing.sm,
-  },
-  chipText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  chipTextActive: {
-    color: '#FFFFFF',
-  },
-});

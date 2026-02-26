@@ -1,9 +1,9 @@
-import React, {useEffect} from 'react';
+import React, {useEffect, useMemo} from 'react';
 import {View, Text, FlatList, ActivityIndicator, StyleSheet} from 'react-native';
 import {useTournamentStore} from '../stores/tournamentStore';
 import {GroupCard} from '../components/GroupCard';
 import {useAuth} from '@shared/hooks/useAuth';
-import {colors, spacing} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 
 /**
  * GroupPicksScreen — Pick which teams advance from each group.
@@ -11,6 +11,7 @@ import {colors, spacing} from '@shared/theme';
  * Never references a specific sport.
  */
 export function GroupPicksScreen() {
+  const {colors, spacing} = useTheme();
   const config = useTournamentStore(s => s.config);
   const isLoading = useTournamentStore(s => s.isLoading);
   const fetchUserPicks = useTournamentStore(s => s.fetchUserPicks);
@@ -21,6 +22,29 @@ export function GroupPicksScreen() {
       fetchUserPicks(user.id);
     }
   }, [user?.id, fetchUserPicks]);
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    loading: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+    },
+    header: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      padding: spacing.md,
+      textAlign: 'center',
+    },
+    list: {
+      padding: spacing.md,
+      paddingTop: 0,
+    },
+  }), [colors, spacing]);
 
   if (!config) {
     return null;
@@ -55,26 +79,3 @@ export function GroupPicksScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  loading: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.background,
-  },
-  header: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    padding: spacing.md,
-    textAlign: 'center',
-  },
-  list: {
-    padding: spacing.md,
-    paddingTop: 0,
-  },
-});

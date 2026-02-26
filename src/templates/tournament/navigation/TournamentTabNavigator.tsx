@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {
   View,
   Text,
@@ -19,7 +19,7 @@ import {
 } from 'lucide-react-native';
 import type {TournamentConfig, TabConfig} from '@shared/types/templates';
 import type {DbPool} from '@shared/types/database';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 import {useTournamentStore} from '../stores/tournamentStore';
 import {TournamentPicksHub} from '../screens/TournamentPicksHub';
 import {GroupPicksScreen} from '../screens/GroupPicksScreen';
@@ -95,12 +95,82 @@ function PoolSwitcherHeader({
   accentColor,
   onOpenProfile,
 }: PoolSwitcherHeaderProps) {
+  const {colors, spacing, borderRadius} = useTheme();
   const [modalVisible, setModalVisible] = useState(false);
 
   const switchTo = (poolId: string) => {
     onSwitchPool(poolId);
     setModalVisible(false);
   };
+
+  const headerStyles = useMemo(() => StyleSheet.create({
+    container: {
+      backgroundColor: colors.background,
+      paddingTop: spacing.xxl,
+      paddingHorizontal: spacing.md,
+      paddingBottom: spacing.sm,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    iconSpacer: {
+      width: 36,
+    },
+    profileButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    selector: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+    },
+    poolName: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.text,
+      maxWidth: 200,
+    },
+    overlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.4)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    modal: {
+      backgroundColor: colors.background,
+      borderRadius: borderRadius.lg,
+      padding: spacing.lg,
+      width: '80%',
+      maxHeight: '50%',
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: colors.text,
+      marginBottom: spacing.md,
+    },
+    poolOption: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    poolOptionText: {
+      fontSize: 16,
+      color: colors.text,
+    },
+  }), [colors, spacing, borderRadius]);
 
   return (
     <View style={headerStyles.container}>
@@ -162,75 +232,6 @@ function PoolSwitcherHeader({
   );
 }
 
-const headerStyles = StyleSheet.create({
-  container: {
-    backgroundColor: colors.background,
-    paddingTop: spacing.xxl,
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  iconSpacer: {
-    width: 36,
-  },
-  profileButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  selector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  poolName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-    maxWidth: 200,
-  },
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modal: {
-    backgroundColor: colors.background,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    width: '80%',
-    maxHeight: '50%',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: spacing.md,
-  },
-  poolOption: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  poolOptionText: {
-    fontSize: 16,
-    color: colors.text,
-  },
-});
-
 // ---------------------------------------------------------------------------
 // Tab Navigator — 100% config-driven
 // ---------------------------------------------------------------------------
@@ -263,6 +264,7 @@ export function TournamentTabNavigator({
   onSwitchPool,
   onOpenProfile,
 }: TournamentTabNavigatorProps) {
+  const {colors} = useTheme();
   const initialize = useTournamentStore(s => s.initialize);
 
   useEffect(() => {

@@ -1,7 +1,7 @@
-import React from 'react';
+import React, {useMemo} from 'react';
 import {View, Text, StyleSheet} from 'react-native';
 import type {TournamentConfig} from '@shared/types/templates';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 import {useTournamentStore} from '../stores/tournamentStore';
 
 interface TournamentProgressProps {
@@ -14,6 +14,7 @@ interface TournamentProgressProps {
  * Shows max available points from config, current earned points from store.
  */
 export function TournamentProgress({config, userId}: TournamentProgressProps) {
+  const {colors, spacing, borderRadius} = useTheme();
   const score = useTournamentStore(s => s.getUserScore(userId));
 
   const groupPoints = score?.group_stage_points ?? 0;
@@ -21,6 +22,50 @@ export function TournamentProgress({config, userId}: TournamentProgressProps) {
   const currentPoints = score?.total_points ?? 0;
   const progress =
     config.maxTotalPoints > 0 ? currentPoints / config.maxTotalPoints : 0;
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      padding: spacing.md,
+      backgroundColor: colors.surface,
+      margin: spacing.md,
+      borderRadius: borderRadius.lg,
+    },
+    row: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: spacing.sm,
+    },
+    label: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    points: {
+      fontSize: 14,
+      fontWeight: '500',
+      color: colors.primary,
+    },
+    progressBar: {
+      height: 8,
+      backgroundColor: colors.border,
+      borderRadius: 4,
+      overflow: 'hidden',
+      marginBottom: spacing.sm,
+    },
+    progressFill: {
+      height: '100%',
+      borderRadius: 4,
+    },
+    breakdown: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    breakdownText: {
+      fontSize: 12,
+      color: colors.textSecondary,
+    },
+  }), [colors, spacing, borderRadius]);
 
   return (
     <View style={styles.container}>
@@ -50,47 +95,3 @@ export function TournamentProgress({config, userId}: TournamentProgressProps) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    padding: spacing.md,
-    backgroundColor: colors.surface,
-    margin: spacing.md,
-    borderRadius: borderRadius.lg,
-  },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  points: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: colors.primary,
-  },
-  progressBar: {
-    height: 8,
-    backgroundColor: colors.border,
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: spacing.sm,
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  breakdown: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  breakdownText: {
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-});

@@ -1,7 +1,7 @@
-import React from 'react';
+import React, {useMemo} from 'react';
 import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
 import type {GroupConfig, TeamConfig} from '@shared/types/templates';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 import {useTournamentStore} from '../stores/tournamentStore';
 
 interface GroupCardProps {
@@ -23,6 +23,7 @@ export function GroupCard({
   accentColor,
   userId,
 }: GroupCardProps) {
+  const {colors, spacing, borderRadius} = useTheme();
   const groupPick = useTournamentStore(s => s.getGroupPick(group.name));
   const selectedTeams = useTournamentStore(s =>
     s.getGroupPickCodes(group.name),
@@ -83,6 +84,63 @@ export function GroupCard({
     }
   };
 
+  const styles = useMemo(() => StyleSheet.create({
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: borderRadius.lg,
+      marginBottom: spacing.md,
+      overflow: 'hidden',
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: spacing.md,
+    },
+    headerText: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: colors.textOnPrimary,
+    },
+    headerHint: {
+      fontSize: 12,
+      color: colors.textOnPrimaryHint,
+    },
+    teamRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    teamRowSelected: {
+      backgroundColor: colors.primaryHighlight,
+    },
+    teamCode: {
+      width: 40,
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    teamName: {
+      flex: 1,
+      fontSize: 16,
+      color: colors.text,
+    },
+    checkmark: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    checkmarkText: {
+      color: colors.textOnPrimary,
+      fontSize: 14,
+      fontWeight: '700',
+    },
+  }), [colors, spacing, borderRadius]);
+
   return (
     <View style={styles.card}>
       <View style={[styles.header, {backgroundColor: accentColor}]}>
@@ -115,60 +173,3 @@ export function GroupCard({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    marginBottom: spacing.md,
-    overflow: 'hidden',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: spacing.md,
-  },
-  headerText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  headerHint: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
-  },
-  teamRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  teamRowSelected: {
-    backgroundColor: 'rgba(255, 107, 53, 0.08)',
-  },
-  teamCode: {
-    width: 40,
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  teamName: {
-    flex: 1,
-    fontSize: 16,
-    color: colors.text,
-  },
-  checkmark: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkmarkText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-});

@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useMemo, useState} from 'react';
 import {
   View,
   Text,
@@ -11,13 +11,14 @@ import {
   StyleSheet,
 } from 'react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 
 /**
  * CreatePoolScreen — Form to create a new pool for the active event.
  * Generates an invite code automatically. Sets the new pool as active.
  */
 export function CreatePoolScreen({navigation}: any) {
+  const {colors, spacing, borderRadius} = useTheme();
   const user = useGlobalStore(s => s.user);
   const activeSport = useGlobalStore(s => s.activeSport);
   const createPool = useGlobalStore(s => s.createPool);
@@ -60,6 +61,98 @@ export function CreatePoolScreen({navigation}: any) {
     }
   };
 
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flex: 1,
+          backgroundColor: colors.background,
+        },
+        inner: {
+          flex: 1,
+        },
+        header: {
+          padding: spacing.lg,
+          paddingTop: spacing.xxl,
+        },
+        backButton: {
+          fontSize: 16,
+          color: colors.primary,
+          marginBottom: spacing.md,
+        },
+        title: {
+          fontSize: 28,
+          fontWeight: '700',
+          color: colors.text,
+        },
+        form: {
+          padding: spacing.lg,
+        },
+        label: {
+          fontSize: 14,
+          fontWeight: '600',
+          color: colors.textSecondary,
+          marginBottom: spacing.xs,
+          textTransform: 'uppercase',
+          letterSpacing: 0.5,
+        },
+        input: {
+          backgroundColor: colors.surface,
+          borderRadius: borderRadius.md,
+          padding: spacing.md,
+          fontSize: 16,
+          color: colors.text,
+          borderWidth: 1,
+          borderColor: colors.border,
+          marginBottom: spacing.lg,
+        },
+        switchRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          backgroundColor: colors.surface,
+          borderRadius: borderRadius.md,
+          padding: spacing.md,
+          marginBottom: spacing.lg,
+        },
+        switchInfo: {
+          flex: 1,
+          marginRight: spacing.md,
+        },
+        switchLabel: {
+          fontSize: 16,
+          fontWeight: '500',
+          color: colors.text,
+        },
+        switchHint: {
+          fontSize: 12,
+          color: colors.textSecondary,
+          marginTop: 2,
+        },
+        error: {
+          color: colors.error,
+          fontSize: 14,
+          marginBottom: spacing.md,
+          textAlign: 'center',
+        },
+        createButton: {
+          backgroundColor: colors.primary,
+          padding: spacing.md,
+          borderRadius: borderRadius.lg,
+          alignItems: 'center',
+        },
+        buttonDisabled: {
+          opacity: 0.6,
+        },
+        createButtonText: {
+          color: colors.textOnPrimary,
+          fontSize: 16,
+          fontWeight: '600',
+        },
+      }),
+    [colors, spacing, borderRadius],
+  );
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -95,7 +188,7 @@ export function CreatePoolScreen({navigation}: any) {
               value={isPublic}
               onValueChange={setIsPublic}
               trackColor={{false: colors.border, true: colors.primary}}
-              thumbColor="#FFFFFF"
+              thumbColor={colors.textOnPrimary}
             />
           </View>
 
@@ -106,7 +199,7 @@ export function CreatePoolScreen({navigation}: any) {
             onPress={handleCreate}
             disabled={creating}>
             {creating ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color={colors.textOnPrimary} />
             ) : (
               <Text style={styles.createButtonText}>Create Pool</Text>
             )}
@@ -116,91 +209,3 @@ export function CreatePoolScreen({navigation}: any) {
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  inner: {
-    flex: 1,
-  },
-  header: {
-    padding: spacing.lg,
-    paddingTop: spacing.xxl,
-  },
-  backButton: {
-    fontSize: 16,
-    color: colors.primary,
-    marginBottom: spacing.md,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  form: {
-    padding: spacing.lg,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textSecondary,
-    marginBottom: spacing.xs,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  input: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    fontSize: 16,
-    color: colors.text,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: spacing.lg,
-  },
-  switchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  switchInfo: {
-    flex: 1,
-    marginRight: spacing.md,
-  },
-  switchLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: colors.text,
-  },
-  switchHint: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  error: {
-    color: colors.error,
-    fontSize: 14,
-    marginBottom: spacing.md,
-    textAlign: 'center',
-  },
-  createButton: {
-    backgroundColor: colors.primary,
-    padding: spacing.md,
-    borderRadius: borderRadius.lg,
-    alignItems: 'center',
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  createButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});

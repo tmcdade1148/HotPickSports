@@ -1,10 +1,12 @@
-import React, {useEffect} from 'react';
+import React, {useEffect, useMemo} from 'react';
 import {View, Text, ActivityIndicator, StyleSheet} from 'react-native';
 import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
-import {colors, spacing} from '@shared/theme';
+import {useTheme, useBrand} from '@shell/theme';
 
 export function LoadingScreen({navigation}: any) {
+  const {colors, spacing} = useTheme();
+  const brand = useBrand();
   const setUser = useGlobalStore(s => s.setUser);
   const setAuthLoading = useGlobalStore(s => s.setAuthLoading);
   const loadPersistedPoolId = useGlobalStore(s => s.loadPersistedPoolId);
@@ -35,10 +37,42 @@ export function LoadingScreen({navigation}: any) {
     return () => subscription.unsubscribe();
   }, [navigation, setUser, setAuthLoading]);
 
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: colors.background,
+        },
+        title: {
+          fontSize: 40,
+          fontWeight: '700',
+          color: colors.primary,
+        },
+        subtitle: {
+          fontSize: 20,
+          fontWeight: '300',
+          color: colors.textSecondary,
+          marginBottom: spacing.xl,
+        },
+        spinner: {
+          marginTop: spacing.lg,
+        },
+      }),
+    [colors, spacing],
+  );
+
+  // Split app name for two-line display (e.g. "HotPick" / "Sports")
+  const nameParts = brand.app_name.split(' ');
+  const titleLine = nameParts.slice(0, -1).join(' ') || brand.app_name;
+  const subtitleLine = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>HotPick</Text>
-      <Text style={styles.subtitle}>Sports</Text>
+      <Text style={styles.title}>{titleLine}</Text>
+      {subtitleLine ? <Text style={styles.subtitle}>{subtitleLine}</Text> : null}
       <ActivityIndicator
         size="large"
         color={colors.primary}
@@ -47,26 +81,3 @@ export function LoadingScreen({navigation}: any) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.background,
-  },
-  title: {
-    fontSize: 40,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  subtitle: {
-    fontSize: 20,
-    fontWeight: '300',
-    color: colors.textSecondary,
-    marginBottom: spacing.xl,
-  },
-  spinner: {
-    marginTop: spacing.lg,
-  },
-});

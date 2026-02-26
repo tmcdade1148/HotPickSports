@@ -1,4 +1,4 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import {supabase} from '@shared/config/supabase';
 import {useAuth} from '@shared/hooks/useAuth';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 import type {DbSmackMessage} from '@shared/types/database';
 
 interface SmackTalkScreenProps {
@@ -24,6 +24,7 @@ interface SmackTalkScreenProps {
  * Subscribes to Supabase Realtime for instant message delivery.
  */
 export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
+  const {colors, spacing, borderRadius} = useTheme();
   const [messages, setMessages] = useState<DbSmackMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
@@ -109,6 +110,112 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
     );
   };
 
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flex: 1,
+          backgroundColor: colors.background,
+        },
+        list: {
+          padding: spacing.md,
+          paddingBottom: spacing.sm,
+        },
+        emptyState: {
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: spacing.xl,
+        },
+        emptyTitle: {
+          fontSize: 20,
+          fontWeight: '600',
+          color: colors.text,
+          marginBottom: spacing.sm,
+        },
+        emptyText: {
+          fontSize: 14,
+          color: colors.textSecondary,
+          textAlign: 'center',
+        },
+        bubble: {
+          maxWidth: '80%',
+          padding: spacing.sm,
+          borderRadius: borderRadius.lg,
+          marginBottom: spacing.sm,
+        },
+        bubbleMe: {
+          alignSelf: 'flex-end',
+          backgroundColor: colors.primary,
+        },
+        bubbleThem: {
+          alignSelf: 'flex-start',
+          backgroundColor: colors.surface,
+        },
+        sender: {
+          fontSize: 11,
+          fontWeight: '600',
+          color: colors.textSecondary,
+          marginBottom: 2,
+        },
+        messageText: {
+          fontSize: 15,
+          color: colors.text,
+        },
+        messageTextMe: {
+          color: colors.textOnPrimary,
+        },
+        time: {
+          fontSize: 10,
+          color: colors.textSecondary,
+          marginTop: 4,
+          alignSelf: 'flex-end',
+        },
+        timeMe: {
+          color: colors.textOnPrimaryMuted,
+        },
+        inputRow: {
+          flexDirection: 'row',
+          alignItems: 'flex-end',
+          padding: spacing.sm,
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+          backgroundColor: colors.background,
+        },
+        input: {
+          flex: 1,
+          minHeight: 40,
+          maxHeight: 100,
+          borderWidth: 1,
+          borderColor: colors.border,
+          borderRadius: borderRadius.lg,
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.sm,
+          fontSize: 15,
+          color: colors.text,
+          backgroundColor: colors.surface,
+        },
+        sendButton: {
+          marginLeft: spacing.sm,
+          backgroundColor: colors.primary,
+          borderRadius: borderRadius.lg,
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.sm,
+          justifyContent: 'center',
+          minHeight: 40,
+        },
+        sendButtonDisabled: {
+          opacity: 0.5,
+        },
+        sendText: {
+          color: colors.textOnPrimary,
+          fontSize: 15,
+          fontWeight: '600',
+        },
+      }),
+    [colors, spacing, borderRadius],
+  );
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -158,105 +265,3 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  list: {
-    padding: spacing.md,
-    paddingBottom: spacing.sm,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.xl,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: spacing.sm,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-  bubble: {
-    maxWidth: '80%',
-    padding: spacing.sm,
-    borderRadius: borderRadius.lg,
-    marginBottom: spacing.sm,
-  },
-  bubbleMe: {
-    alignSelf: 'flex-end',
-    backgroundColor: colors.primary,
-  },
-  bubbleThem: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.surface,
-  },
-  sender: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.textSecondary,
-    marginBottom: 2,
-  },
-  messageText: {
-    fontSize: 15,
-    color: colors.text,
-  },
-  messageTextMe: {
-    color: '#FFFFFF',
-  },
-  time: {
-    fontSize: 10,
-    color: colors.textSecondary,
-    marginTop: 4,
-    alignSelf: 'flex-end',
-  },
-  timeMe: {
-    color: 'rgba(255,255,255,0.7)',
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    padding: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    backgroundColor: colors.background,
-  },
-  input: {
-    flex: 1,
-    minHeight: 40,
-    maxHeight: 100,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: borderRadius.lg,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    fontSize: 15,
-    color: colors.text,
-    backgroundColor: colors.surface,
-  },
-  sendButton: {
-    marginLeft: spacing.sm,
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.lg,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    justifyContent: 'center',
-    minHeight: 40,
-  },
-  sendButtonDisabled: {
-    opacity: 0.5,
-  },
-  sendText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-});

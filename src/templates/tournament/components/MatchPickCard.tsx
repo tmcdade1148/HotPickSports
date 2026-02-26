@@ -1,8 +1,8 @@
-import React from 'react';
+import React, {useMemo} from 'react';
 import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
 import type {TournamentConfig} from '@shared/types/templates';
 import type {DbTournamentMatch} from '@shared/types/database';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 import {useTournamentStore} from '../stores/tournamentStore';
 
 interface MatchPickCardProps {
@@ -20,6 +20,7 @@ export function MatchPickCard({
   config,
   userId,
 }: MatchPickCardProps) {
+  const {colors, spacing, borderRadius} = useTheme();
   const existingPick = useTournamentStore(s => s.getMatchPick(match.match_id));
   const saveMatchPick = useTournamentStore(s => s.saveMatchPick);
   const isSaving = useTournamentStore(s => s.isSaving);
@@ -50,6 +51,81 @@ export function MatchPickCard({
       isHotPick: !isHotPick,
     });
   };
+
+  const styles = useMemo(() => StyleSheet.create({
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: borderRadius.lg,
+      padding: spacing.md,
+      marginBottom: spacing.md,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: spacing.sm,
+    },
+    roundLabel: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.textSecondary,
+      textTransform: 'uppercase',
+    },
+    date: {
+      fontSize: 12,
+      color: colors.textSecondary,
+    },
+    teams: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.md,
+    },
+    teamButton: {
+      flex: 1,
+      padding: spacing.md,
+      borderRadius: borderRadius.md,
+      borderWidth: 2,
+      borderColor: colors.border,
+      alignItems: 'center',
+    },
+    teamButtonSelected: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primaryHighlight,
+    },
+    teamText: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    teamTextSelected: {
+      color: colors.primary,
+    },
+    vs: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      fontWeight: '500',
+    },
+    hotPickToggle: {
+      marginTop: spacing.sm,
+      padding: spacing.sm,
+      borderRadius: borderRadius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: 'center',
+    },
+    hotPickActive: {
+      borderColor: colors.warning,
+      backgroundColor: colors.warningHighlight,
+    },
+    hotPickText: {
+      fontSize: 14,
+      color: colors.textSecondary,
+    },
+    hotPickTextActive: {
+      color: colors.warning,
+      fontWeight: '600',
+    },
+  }), [colors, spacing, borderRadius]);
 
   return (
     <View style={styles.card}>
@@ -113,78 +189,3 @@ export function MatchPickCard({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm,
-  },
-  roundLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.textSecondary,
-    textTransform: 'uppercase',
-  },
-  date: {
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-  teams: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.md,
-  },
-  teamButton: {
-    flex: 1,
-    padding: spacing.md,
-    borderRadius: borderRadius.md,
-    borderWidth: 2,
-    borderColor: colors.border,
-    alignItems: 'center',
-  },
-  teamButtonSelected: {
-    borderColor: colors.primary,
-    backgroundColor: 'rgba(255, 107, 53, 0.08)',
-  },
-  teamText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  teamTextSelected: {
-    color: colors.primary,
-  },
-  vs: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    fontWeight: '500',
-  },
-  hotPickToggle: {
-    marginTop: spacing.sm,
-    padding: spacing.sm,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-  },
-  hotPickActive: {
-    borderColor: colors.warning,
-    backgroundColor: 'rgba(255, 209, 102, 0.15)',
-  },
-  hotPickText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  hotPickTextActive: {
-    color: colors.warning,
-    fontWeight: '600',
-  },
-});
