@@ -1,15 +1,15 @@
 import type {SeasonConfig} from '@shared/types/templates';
 
-export const nfl2026: SeasonConfig = {
-  competition: 'nfl_2026',
+export const nfl2025: SeasonConfig = {
+  competition: 'nfl_2025',
   templateType: 'season',
   sport: 'football',
-  name: 'NFL 2026-27 Season',
+  name: 'NFL 2025-26 Season',
   shortName: 'NFL',
   status: 'active',
-  startDate: '2026-09-10',
-  endDate: '2027-02-08',
-  picksOpenDate: '2026-09-07',
+  startDate: '2025-09-04',
+  endDate: '2026-02-09',
+  picksOpenDate: '2025-09-01',
   color: '#013369',
 
   tabs: [
