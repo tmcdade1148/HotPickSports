@@ -20,14 +20,14 @@ export function SeriesBoardScreen() {
   const {user} = useAuth();
 
   useEffect(() => {
-    if (!user?.id) {
+    if (!config || !user?.id) {
       return;
     }
     const load = async () => {
       await fetchLeaderboard();
     };
     load();
-  }, [user?.id, fetchLeaderboard]);
+  }, [config, user?.id, fetchLeaderboard]);
 
   if (!config) {
     return null;

@@ -20,17 +20,16 @@ export function SeasonBoardScreen() {
   const {user} = useAuth();
 
   useEffect(() => {
+    if (!config) {
+      return;
+    }
     fetchLeaderboard();
-  }, [fetchLeaderboard]);
+  }, [config, fetchLeaderboard]);
 
-  if (!config) {
-    return null;
-  }
-
-  if (isLoading) {
+  if (!config || isLoading) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator size="large" color={config.color} />
+        <ActivityIndicator size="large" color={config?.color ?? colors.primary} />
       </View>
     );
   }

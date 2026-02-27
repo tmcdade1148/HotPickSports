@@ -13,6 +13,7 @@ import {
   BarChart2,
   MessageCircle,
   ChevronDown,
+  ChevronLeft,
   User,
 } from 'lucide-react-native';
 import type {SeriesConfig, TabConfig} from '@shared/types/templates';
@@ -63,6 +64,7 @@ interface PoolSwitcherHeaderProps {
   activePoolId: string;
   accentColor: string;
   onOpenProfile?: () => void;
+  onGoHome?: () => void;
 }
 
 function PoolSwitcherHeader({
@@ -72,6 +74,7 @@ function PoolSwitcherHeader({
   activePoolId,
   accentColor,
   onOpenProfile,
+  onGoHome,
 }: PoolSwitcherHeaderProps) {
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -83,8 +86,15 @@ function PoolSwitcherHeader({
   return (
     <View style={headerStyles.container}>
       <View style={headerStyles.row}>
-        {/* Spacer to balance profile icon — keeps pool name centered */}
-        <View style={headerStyles.iconSpacer} />
+        {onGoHome ? (
+          <TouchableOpacity
+            style={headerStyles.backButton}
+            onPress={onGoHome}>
+            <ChevronLeft size={22} color={colors.textSecondary} />
+          </TouchableOpacity>
+        ) : (
+          <View style={headerStyles.iconSpacer} />
+        )}
 
         <TouchableOpacity
           style={headerStyles.selector}
@@ -157,6 +167,14 @@ const headerStyles = StyleSheet.create({
   iconSpacer: {
     width: 36,
   },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   profileButton: {
     width: 36,
     height: 36,
@@ -226,6 +244,8 @@ interface SeriesTabNavigatorProps {
   onSwitchPool?: (poolId: string) => void;
   /** Callback to open the profile screen (provided by shell). */
   onOpenProfile?: () => void;
+  /** Callback to navigate back to the Home Screen. */
+  onGoHome?: () => void;
 }
 
 /**
@@ -240,6 +260,7 @@ export function SeriesTabNavigator({
   userPools,
   onSwitchPool,
   onOpenProfile,
+  onGoHome,
 }: SeriesTabNavigatorProps) {
   const initialize = useSeriesStore(s => s.initialize);
 
@@ -257,6 +278,7 @@ export function SeriesTabNavigator({
           activePoolId={poolId}
           accentColor={config.color}
           onOpenProfile={onOpenProfile}
+          onGoHome={onGoHome}
         />
       )}
       <Tab.Navigator

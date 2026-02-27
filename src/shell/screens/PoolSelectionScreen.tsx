@@ -8,6 +8,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
+import {getDefaultEvent} from '@sports/registry';
 import {colors, spacing, borderRadius} from '@shared/theme';
 import type {DbPool} from '@shared/types/database';
 
@@ -18,10 +19,17 @@ import type {DbPool} from '@shared/types/database';
 export function PoolSelectionScreen({navigation}: any) {
   const user = useGlobalStore(s => s.user);
   const activeSport = useGlobalStore(s => s.activeSport);
+  const setActiveSport = useGlobalStore(s => s.setActiveSport);
   const userPools = useGlobalStore(s => s.userPools);
   const isLoadingPools = useGlobalStore(s => s.isLoadingPools);
   const fetchUserPools = useGlobalStore(s => s.fetchUserPools);
   const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
+
+  useEffect(() => {
+    if (!activeSport) {
+      setActiveSport(getDefaultEvent());
+    }
+  }, [activeSport, setActiveSport]);
 
   useEffect(() => {
     if (user?.id && activeSport?.competition) {

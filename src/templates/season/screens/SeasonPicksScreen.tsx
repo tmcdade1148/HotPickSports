@@ -24,6 +24,9 @@ export function SeasonPicksScreen() {
   const {user} = useAuth();
 
   useEffect(() => {
+    if (!config) {
+      return;
+    }
     const load = async () => {
       await fetchWeekGames(currentWeek);
       if (user?.id) {
@@ -31,10 +34,14 @@ export function SeasonPicksScreen() {
       }
     };
     load();
-  }, [currentWeek, user?.id, fetchWeekGames, fetchUserPicks]);
+  }, [config, currentWeek, user?.id, fetchWeekGames, fetchUserPicks]);
 
   if (!config) {
-    return null;
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
   }
 
   const renderGame = ({item}: {item: DbSeasonGame}) => (

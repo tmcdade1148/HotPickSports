@@ -23,7 +23,7 @@ export function TournamentBoardScreen() {
   const {user} = useAuth();
 
   useEffect(() => {
-    if (!user?.id) {
+    if (!config || !user?.id) {
       return;
     }
     const load = async () => {
@@ -32,7 +32,7 @@ export function TournamentBoardScreen() {
       await calculateMyScore(user.id);
     };
     load();
-  }, [user?.id, fetchMatches, fetchUserPicks, calculateMyScore, fetchLeaderboard]);
+  }, [config, user?.id, fetchMatches, fetchUserPicks, calculateMyScore, fetchLeaderboard]);
 
   if (!config) {
     return null;

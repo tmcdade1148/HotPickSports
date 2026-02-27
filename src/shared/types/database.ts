@@ -5,7 +5,8 @@
  *             tournament_group_picks, tournament_group_results
  * Season:     season_games, season_picks, season_user_totals
  * Series:     series_matchups, series_games, series_picks, series_user_totals
- * Shared:     profiles, pools, pool_members, smack_messages, competition_config
+ * Shared:     profiles, pools, pool_members, smack_messages, smack_reactions,
+ *             smack_read_state, competition_config
  */
 
 // ---------------------------------------------------------------------------
@@ -46,10 +47,14 @@ export interface DbPool {
 export interface DbPoolMember {
   pool_id: string;
   user_id: string;
-  role: string;
-  is_admin: boolean;
+  role: 'member' | 'admin' | 'organizer';
+  status: 'active' | 'pending' | 'removed' | 'left';
+  invited_by: string | null;
+  invite_code_used: string | null;
   joined_at: string;
-  created_at: string;
+  left_at: string | null;
+  last_active_at: string | null;
+  notification_override: Record<string, unknown> | null;
 }
 
 /** Table: smack_messages */
@@ -62,6 +67,22 @@ export interface DbSmackMessage {
   reply_to: string | null;
   avatar_key: string | null;
   created_at: string;
+}
+
+/** Table: smack_reactions */
+export interface DbSmackReaction {
+  id: string;
+  message_id: string;
+  user_id: string;
+  reaction: string;
+  created_at: string;
+}
+
+/** Table: smack_read_state (composite PK: user_id, pool_id) */
+export interface DbSmackReadState {
+  user_id: string;
+  pool_id: string;
+  last_read_at: string;
 }
 
 /** Table: competition_config */

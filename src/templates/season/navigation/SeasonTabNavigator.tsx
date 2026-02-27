@@ -4,7 +4,7 @@ import {
   Text,
   TouchableOpacity,
   Modal,
-  FlatList,
+  ScrollView,
   StyleSheet,
 } from 'react-native';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
@@ -13,6 +13,7 @@ import {
   BarChart2,
   MessageCircle,
   ChevronDown,
+  ChevronLeft,
   User,
 } from 'lucide-react-native';
 import type {SeasonConfig, TabConfig} from '@shared/types/templates';
@@ -63,6 +64,7 @@ interface PoolSwitcherHeaderProps {
   activePoolId: string;
   accentColor: string;
   onOpenProfile?: () => void;
+  onGoHome?: () => void;
 }
 
 function PoolSwitcherHeader({
@@ -72,6 +74,7 @@ function PoolSwitcherHeader({
   activePoolId,
   accentColor,
   onOpenProfile,
+  onGoHome,
 }: PoolSwitcherHeaderProps) {
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -83,8 +86,15 @@ function PoolSwitcherHeader({
   return (
     <View style={headerStyles.container}>
       <View style={headerStyles.row}>
-        {/* Spacer to balance profile icon — keeps pool name centered */}
-        <View style={headerStyles.iconSpacer} />
+        {onGoHome ? (
+          <TouchableOpacity
+            style={headerStyles.backButton}
+            onPress={onGoHome}>
+            <ChevronLeft size={22} color={colors.textSecondary} />
+          </TouchableOpacity>
+        ) : (
+          <View style={headerStyles.iconSpacer} />
+        )}
 
         <TouchableOpacity
           style={headerStyles.selector}
@@ -106,18 +116,25 @@ function PoolSwitcherHeader({
         )}
       </View>
 
-      <Modal visible={modalVisible} transparent animationType="fade">
-        <TouchableOpacity
-          style={headerStyles.overlay}
-          activeOpacity={1}
-          onPress={() => setModalVisible(false)}>
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModalVisible(false)}>
+        <View style={headerStyles.overlay}>
+          {/* Background dismiss — sibling, not parent of modal content */}
+          <TouchableOpacity
+            style={StyleSheet.absoluteFillObject}
+            activeOpacity={1}
+            onPress={() => setModalVisible(false)}
+          />
+          {/* Modal content — completely decoupled from dismiss handler */}
           <View style={headerStyles.modal}>
             <Text style={headerStyles.modalTitle}>Switch Pool</Text>
-            <FlatList
-              data={userPools}
-              keyExtractor={p => p.id}
-              renderItem={({item}) => (
+            <ScrollView bounces={false}>
+              {userPools.map(item => (
                 <TouchableOpacity
+                  key={item.id}
                   style={headerStyles.poolOption}
                   onPress={() => switchTo(item.id)}>
                   <Text
@@ -128,13 +145,13 @@ function PoolSwitcherHeader({
                     {item.name}
                   </Text>
                   {item.id === activePoolId && (
-                    <Text style={{color: accentColor}}>{'checkmark'}</Text>
+                    <Text style={{color: accentColor}}>{'\u2713'}</Text>
                   )}
                 </TouchableOpacity>
-              )}
-            />
+              ))}
+            </ScrollView>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
     </View>
   );
@@ -156,6 +173,14 @@ const headerStyles = StyleSheet.create({
   },
   iconSpacer: {
     width: 36,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   profileButton: {
     width: 36,
@@ -226,12 +251,18 @@ interface SeasonTabNavigatorProps {
   onSwitchPool?: (poolId: string) => void;
   /** Callback to open the profile screen (provided by shell). */
   onOpenProfile?: () => void;
+  /** Callback to navigate back to the Home Screen. */
+  onGoHome?: () => void;
 }
 
 /**
  * SeasonTabNavigator — Bottom tabs driven by config.tabs.
  * Add a tab in the sport config, it appears automatically.
  * Never references a specific sport.
+ *
+ * Deep-linking to a specific tab (e.g. Board or SmackTalk) is handled
+ * by React Navigation's nested screen syntax from the parent:
+ *   navigation.navigate('EventDetail', { screen: 'Season_board' })
  */
 export function SeasonTabNavigator({
   config,
@@ -240,12 +271,15 @@ export function SeasonTabNavigator({
   userPools,
   onSwitchPool,
   onOpenProfile,
+  onGoHome,
 }: SeasonTabNavigatorProps) {
   const initialize = useSeasonStore(s => s.initialize);
 
   useEffect(() => {
     initialize(config, poolId);
   }, [config, poolId, initialize]);
+
+  const initialRouteName = `Season_${config.tabs[0]?.key ?? 'picks'}`;
 
   return (
     <View style={{flex: 1}}>
@@ -257,9 +291,11 @@ export function SeasonTabNavigator({
           activePoolId={poolId}
           accentColor={config.color}
           onOpenProfile={onOpenProfile}
+          onGoHome={onGoHome}
         />
       )}
       <Tab.Navigator
+        initialRouteName={initialRouteName}
         screenOptions={{
           tabBarActiveTintColor: config.color,
           tabBarInactiveTintColor: colors.textSecondary,
