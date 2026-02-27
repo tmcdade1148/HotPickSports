@@ -2,17 +2,23 @@ import React, {useEffect} from 'react';
 import {View, Text, ActivityIndicator, StyleSheet} from 'react-native';
 import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
+import {getDefaultEvent} from '@sports/registry';
 import {colors, spacing} from '@shared/theme';
 
 export function LoadingScreen({navigation}: any) {
   const setUser = useGlobalStore(s => s.setUser);
   const setAuthLoading = useGlobalStore(s => s.setAuthLoading);
   const loadPersistedPoolId = useGlobalStore(s => s.loadPersistedPoolId);
+  const refreshAvailableEvents = useGlobalStore(s => s.refreshAvailableEvents);
   const fetchProfile = useGlobalStore(s => s.fetchProfile);
 
   useEffect(() => {
-    // Load persisted pool ID before checking auth
-    loadPersistedPoolId();
+    // Populate available events from registry
+    refreshAvailableEvents();
+
+    // Load persisted pool ID for the default event
+    const defaultEvent = getDefaultEvent();
+    loadPersistedPoolId(defaultEvent.competition);
 
     supabase.auth.getSession().then(async ({data: {session}}) => {
       setAuthLoading(false);
