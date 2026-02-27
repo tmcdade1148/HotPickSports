@@ -8,6 +8,7 @@ import {PoolSelectionScreen} from '@shell/screens/PoolSelectionScreen';
 import {CreatePoolScreen} from '@shell/screens/CreatePoolScreen';
 import {JoinPoolScreen} from '@shell/screens/JoinPoolScreen';
 import {HomeScreen} from '@shell/screens/HomeScreen';
+import {EventDetailScreen} from '@shell/screens/EventDetailScreen';
 import {ProfileScreen} from '@shell/screens/ProfileScreen';
 
 const Stack = createNativeStackNavigator();
@@ -25,6 +26,7 @@ export function RootNavigator() {
         <Stack.Screen name="CreatePool" component={CreatePoolScreen} />
         <Stack.Screen name="JoinPool" component={JoinPoolScreen} />
         <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="EventDetail" component={EventDetailScreen} />
         <Stack.Screen name="Profile" component={ProfileScreen} />
       </Stack.Navigator>
     </NavigationContainer>
