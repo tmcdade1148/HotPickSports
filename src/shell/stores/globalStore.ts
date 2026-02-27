@@ -155,8 +155,14 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   activeSport: null,
   setActiveSport: sport => {
     const current = get().activeSport;
-    if (current?.competition !== sport.competition) {
-      // Event changed — restore cached pools for this competition
+    if (current === null) {
+      // Initial set (app boot) — just set the sport and cached pools.
+      // Don't clear activePoolId or fire loadPersistedPoolId here;
+      // LoadingScreen handles pool selection after fetching pools.
+      const cached = get().poolsByCompetition[sport.competition] ?? [];
+      set({activeSport: sport, userPools: cached});
+    } else if (current.competition !== sport.competition) {
+      // User switching between sports — clear pool and restore cache
       const cached = get().poolsByCompetition[sport.competition] ?? [];
       set({activeSport: sport, userPools: cached, activePoolId: null});
       // Restore persisted pool selection for this competition

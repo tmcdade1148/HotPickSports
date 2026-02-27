@@ -30,6 +30,7 @@ export function EventDetailScreen({navigation}: any) {
   }
 
   const activePool = userPools.find(p => p.id === activePoolId);
+  const goHome = () => navigation.goBack();
 
   switch (activeSport.templateType) {
     case 'tournament':
@@ -41,6 +42,7 @@ export function EventDetailScreen({navigation}: any) {
           userPools={userPools}
           onSwitchPool={setActivePoolId}
           onOpenProfile={() => navigation.navigate('Profile')}
+          onGoHome={goHome}
         />
       );
     case 'season':
@@ -52,6 +54,7 @@ export function EventDetailScreen({navigation}: any) {
           userPools={userPools}
           onSwitchPool={setActivePoolId}
           onOpenProfile={() => navigation.navigate('Profile')}
+          onGoHome={goHome}
         />
       );
     case 'series':
@@ -63,6 +66,7 @@ export function EventDetailScreen({navigation}: any) {
           userPools={userPools}
           onSwitchPool={setActivePoolId}
           onOpenProfile={() => navigation.navigate('Profile')}
+          onGoHome={goHome}
         />
       );
   }
