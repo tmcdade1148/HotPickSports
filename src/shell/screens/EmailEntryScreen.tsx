@@ -8,42 +8,107 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {supabase} from '@shared/config/supabase';
+import {useGlobalStore} from '@shell/stores/globalStore';
 import {colors, spacing, borderRadius} from '@shared/theme';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MIN_PASSWORD_LENGTH = 8;
+
+type Mode = 'sign_in' | 'sign_up';
 
 export function EmailEntryScreen({navigation}: any) {
+  const [mode, setMode] = useState<Mode>('sign_in');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const setUser = useGlobalStore(s => s.setUser);
+  const fetchProfile = useGlobalStore(s => s.fetchProfile);
+  const acceptTos = useGlobalStore(s => s.acceptTos);
+
   const isValidEmail = EMAIL_REGEX.test(email.trim());
+  const isValidPassword = password.length >= MIN_PASSWORD_LENGTH;
+  const passwordsMatch = password === confirmPassword;
 
-  const handleContinue = async () => {
+  const canSubmit =
+    mode === 'sign_in'
+      ? isValidEmail && isValidPassword
+      : isValidEmail && isValidPassword && passwordsMatch;
+
+  const clearError = () => {
+    if (error) setError('');
+  };
+
+  const handleSubmit = async () => {
+    if (!canSubmit) return;
+
     const trimmedEmail = email.trim().toLowerCase();
-    if (!isValidEmail) {
-      setError('Please enter a valid email address.');
-      return;
-    }
-
     setError('');
     setLoading(true);
 
-    const {error: otpError} = await supabase.auth.signInWithOtp({
-      email: trimmedEmail,
-    });
+    if (mode === 'sign_up') {
+      const {data, error: signUpError} = await supabase.auth.signUp({
+        email: trimmedEmail,
+        password,
+      });
 
-    setLoading(false);
+      setLoading(false);
 
-    if (otpError) {
-      setError(otpError.message);
-      return;
+      if (signUpError) {
+        setError(signUpError.message);
+        return;
+      }
+
+      if (data.user) {
+        setUser(data.user);
+        await acceptTos(data.user.id);
+        navigation.replace('ProfileSetup');
+      }
+    } else {
+      const {data, error: signInError} =
+        await supabase.auth.signInWithPassword({
+          email: trimmedEmail,
+          password,
+        });
+
+      setLoading(false);
+
+      if (signInError) {
+        if (signInError.message === 'Invalid login credentials') {
+          setError('Incorrect email or password.');
+        } else {
+          setError(signInError.message);
+        }
+        return;
+      }
+
+      if (data.user) {
+        setUser(data.user);
+        const profile = await fetchProfile(data.user.id);
+
+        if (!profile || !profile.first_name) {
+          navigation.replace('ProfileSetup');
+        } else {
+          navigation.replace('Home');
+        }
+      }
     }
+  };
 
-    navigation.navigate('MagicLink', {email: trimmedEmail});
+  const toggleMode = () => {
+    setMode(m => (m === 'sign_in' ? 'sign_up' : 'sign_in'));
+    setError('');
+    setConfirmPassword('');
+  };
+
+  const handleForgotPassword = () => {
+    navigation.navigate('ForgotPassword', {email: email.trim().toLowerCase()});
   };
 
   return (
@@ -57,46 +122,123 @@ export function EmailEntryScreen({navigation}: any) {
           <Text style={styles.backText}>Back</Text>
         </TouchableOpacity>
 
-        <View style={styles.content}>
-          <Text style={styles.title}>Enter your email</Text>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled">
+          <Text style={styles.title}>
+            {mode === 'sign_in' ? 'Sign in' : 'Create account'}
+          </Text>
           <Text style={styles.subtitle}>
-            We'll send you a magic link to sign in — no password needed.
+            {mode === 'sign_in'
+              ? 'Welcome back. Enter your email and password.'
+              : 'Enter your email and choose a password.'}
           </Text>
 
           <TextInput
             style={[styles.input, error ? styles.inputError : null]}
-            placeholder="you@example.com"
+            placeholder="Email"
             placeholderTextColor={colors.textSecondary}
             value={email}
             onChangeText={text => {
               setEmail(text);
-              if (error) setError('');
+              clearError();
             }}
             autoCapitalize="none"
             keyboardType="email-address"
             autoCorrect={false}
             autoFocus
             editable={!loading}
-            returnKeyType="go"
-            onSubmitEditing={handleContinue}
+            returnKeyType="next"
+            textContentType="emailAddress"
           />
+
+          <TextInput
+            style={[styles.input, styles.inputSpaced]}
+            placeholder="Password"
+            placeholderTextColor={colors.textSecondary}
+            value={password}
+            onChangeText={text => {
+              setPassword(text);
+              clearError();
+            }}
+            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!loading}
+            returnKeyType={mode === 'sign_up' ? 'next' : 'go'}
+            onSubmitEditing={mode === 'sign_in' ? handleSubmit : undefined}
+            textContentType={
+              mode === 'sign_up' ? 'newPassword' : 'password'
+            }
+          />
+
+          {mode === 'sign_up' && (
+            <TextInput
+              style={[styles.input, styles.inputSpaced]}
+              placeholder="Confirm password"
+              placeholderTextColor={colors.textSecondary}
+              value={confirmPassword}
+              onChangeText={text => {
+                setConfirmPassword(text);
+                clearError();
+              }}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!loading}
+              returnKeyType="go"
+              onSubmitEditing={handleSubmit}
+              textContentType="newPassword"
+            />
+          )}
+
+          {mode === 'sign_up' && password.length > 0 && !isValidPassword && (
+            <Text style={styles.hint}>
+              Password must be at least {MIN_PASSWORD_LENGTH} characters.
+            </Text>
+          )}
+
+          {mode === 'sign_up' &&
+            confirmPassword.length > 0 &&
+            !passwordsMatch && (
+              <Text style={styles.hint}>Passwords do not match.</Text>
+            )}
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
           <TouchableOpacity
             style={[
               styles.button,
-              (!isValidEmail || loading) && styles.buttonDisabled,
+              (!canSubmit || loading) && styles.buttonDisabled,
             ]}
-            onPress={handleContinue}
-            disabled={!isValidEmail || loading}>
+            onPress={handleSubmit}
+            disabled={!canSubmit || loading}>
             {loading ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
-              <Text style={styles.buttonText}>Continue</Text>
+              <Text style={styles.buttonText}>
+                {mode === 'sign_in' ? 'Sign In' : 'Create Account'}
+              </Text>
             )}
           </TouchableOpacity>
-        </View>
+
+          {mode === 'sign_in' && (
+            <TouchableOpacity
+              style={styles.forgotButton}
+              onPress={handleForgotPassword}>
+              <Text style={styles.forgotText}>Forgot password?</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity style={styles.toggleButton} onPress={toggleMode}>
+            <Text style={styles.toggleText}>
+              {mode === 'sign_in'
+                ? "Don't have an account? Sign up"
+                : 'Already have an account? Sign in'}
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -110,6 +252,9 @@ const styles = StyleSheet.create({
   inner: {
     flex: 1,
   },
+  scrollView: {
+    flex: 1,
+  },
   backButton: {
     padding: spacing.lg,
     paddingBottom: spacing.sm,
@@ -119,9 +264,9 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   content: {
-    flex: 1,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xl,
+    paddingBottom: spacing.xxl,
   },
   title: {
     fontSize: 28,
@@ -145,13 +290,21 @@ const styles = StyleSheet.create({
     color: colors.text,
     backgroundColor: colors.surface,
   },
+  inputSpaced: {
+    marginTop: spacing.sm,
+  },
   inputError: {
     borderColor: colors.error,
+  },
+  hint: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    marginTop: spacing.xs,
   },
   error: {
     color: colors.error,
     fontSize: 14,
-    marginTop: spacing.xs,
+    marginTop: spacing.sm,
   },
   button: {
     backgroundColor: colors.primary,
@@ -167,5 +320,21 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  forgotButton: {
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
+  forgotText: {
+    fontSize: 14,
+    color: colors.primary,
+  },
+  toggleButton: {
+    alignItems: 'center',
+    marginTop: spacing.xl,
+  },
+  toggleText: {
+    fontSize: 14,
+    color: colors.textSecondary,
   },
 });
