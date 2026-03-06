@@ -82,7 +82,7 @@ interface NFLState {
 }
 
 export const useNFLStore = create<NFLState>((set, get) => ({
-  competition: 'nfl_2025',
+  competition: 'nfl_2026',
   currentWeek: 1,
   currentPhase: 'REGULAR',
   weekState: 'picks_open',
