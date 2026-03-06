@@ -13,17 +13,28 @@
 // Shared tables
 // ---------------------------------------------------------------------------
 
-/** Table: profiles */
+/** Table: profiles (post-migration: profiles_identity_cleanup + split_full_name + onboarding_futureproof) */
 export interface DbProfile {
   id: string;
-  username: string | null;
-  display_name: string | null;
-  real_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  poolie_name: string | null;
+  display_name_preference: 'first_name' | 'poolie_name';
   email: string | null;
   avatar_url: string | null;
   avatar_key: string | null;
-  default_pool_id: string | null;
+  avatar_type: 'system' | 'uploaded' | 'oauth' | 'generated';
   timezone: string | null;
+  tos_accepted_at: string | null;
+  tos_version: string | null;
+  referral_code: string | null;
+  referred_by: string | null;
+  default_pool_id: string | null;
+  total_career_points: number;
+  career_picks_correct: number;
+  career_picks_total: number;
+  career_hotpick_correct: number;
+  career_hotpick_total: number;
   created_at: string;
   updated_at: string;
 }
