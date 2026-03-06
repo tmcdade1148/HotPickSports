@@ -73,10 +73,17 @@ export function PoolWelcomeScreen({navigation}: any) {
   };
 
   const handleStartPool = () => {
+    // Set activeSport before navigating — CreatePoolScreen needs it for competition
+    const defaultEvent = getDefaultEvent();
+    refreshAvailableEvents();
+    setActiveSport(defaultEvent);
     navigation.replace('CreatePool');
   };
 
   const handleEnterCode = () => {
+    const defaultEvent = getDefaultEvent();
+    refreshAvailableEvents();
+    setActiveSport(defaultEvent);
     navigation.replace('JoinPool');
   };
 
