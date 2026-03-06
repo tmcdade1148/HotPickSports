@@ -4,7 +4,7 @@ import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {LoadingScreen} from '@shell/screens/LoadingScreen';
 import {WelcomeScreen} from '@shell/screens/WelcomeScreen';
 import {EmailEntryScreen} from '@shell/screens/EmailEntryScreen';
-import {MagicLinkScreen} from '@shell/screens/MagicLinkScreen';
+import {ForgotPasswordScreen} from '@shell/screens/ForgotPasswordScreen';
 import {ProfileSetupScreen} from '@shell/screens/ProfileSetupScreen';
 import {PushNotificationScreen} from '@shell/screens/PushNotificationScreen';
 import {PoolWelcomeScreen} from '@shell/screens/PoolWelcomeScreen';
@@ -23,12 +23,8 @@ const Stack = createNativeStackNavigator();
 const linking = {
   prefixes: ['hotpick://', 'https://hotpick.app'],
   config: {
-    screens: {
-      // hotpick://join?code=XXXX → handled via onReady + initial URL
-      // Deep link joining is handled imperatively in LoadingScreen
-    },
+    screens: {},
   },
-  // Parse invite codes from incoming URLs
   getInitialURL: async () => {
     const url = await Linking.getInitialURL();
     if (url) {
@@ -45,21 +41,26 @@ const linking = {
   },
 };
 
-/** Extract invite code from deep link and store in global state. */
+/**
+ * Handle incoming deep links for invite codes.
+ *
+ * Invite link: hotpick://join?code=XXXX
+ * Invite path: https://hotpick.app/join/XXXX
+ */
 function handleDeepLink(url: string) {
-  // hotpick://join?code=XXXX
-  // https://hotpick.app/join/XXXX
   try {
     const parsed = new URL(url);
 
-    // Query param style: ?code=XXXX
-    const codeParam = parsed.searchParams.get('code');
-    if (codeParam) {
-      useGlobalStore.getState().setPendingInviteCode(codeParam.toUpperCase());
+    // Invite code — query param style: hotpick://join?code=XXXX
+    if (parsed.hostname === 'join') {
+      const codeParam = parsed.searchParams.get('code');
+      if (codeParam) {
+        useGlobalStore.getState().setPendingInviteCode(codeParam.toUpperCase());
+      }
       return;
     }
 
-    // Path style: /join/XXXX
+    // Invite code — path style: https://hotpick.app/join/XXXX
     const pathMatch = parsed.pathname.match(/\/join\/([A-Za-z0-9]+)/);
     if (pathMatch) {
       useGlobalStore
@@ -80,10 +81,15 @@ export function RootNavigator() {
         {/* Boot */}
         <Stack.Screen name="Loading" component={LoadingScreen} />
 
-        {/* Onboarding flow */}
+        {/* Auth flow */}
         <Stack.Screen name="Welcome" component={WelcomeScreen} />
         <Stack.Screen name="EmailEntry" component={EmailEntryScreen} />
-        <Stack.Screen name="MagicLink" component={MagicLinkScreen} />
+        <Stack.Screen
+          name="ForgotPassword"
+          component={ForgotPasswordScreen}
+        />
+
+        {/* Onboarding */}
         <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
         <Stack.Screen
           name="PushNotification"
