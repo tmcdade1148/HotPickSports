@@ -1,7 +1,7 @@
 import {create} from 'zustand';
 import type {User} from '@supabase/supabase-js';
 import type {AnyEventConfig} from '@shared/types/templates';
-import type {DbPool} from '@shared/types/database';
+import type {DbPool, DbProfile} from '@shared/types/database';
 import {supabase} from '@shared/config/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {getEventsByPriority} from '@sports/registry';
@@ -41,10 +41,23 @@ interface GlobalState {
   activeSport: AnyEventConfig | null;
   setActiveSport: (sport: AnyEventConfig) => void;
 
-  // Profile
-  displayName: string | null;
-  fetchProfile: (userId: string) => Promise<void>;
-  updateDisplayName: (userId: string, name: string) => Promise<boolean>;
+  // Profile — full profile object
+  userProfile: DbProfile | null;
+  fetchProfile: (userId: string) => Promise<DbProfile | null>;
+  updateProfile: (
+    userId: string,
+    fields: Partial<DbProfile>,
+  ) => Promise<boolean>;
+
+  // Onboarding helpers
+  needsProfileSetup: () => boolean;
+  needsTosAcceptance: () => boolean;
+  acceptTos: (userId: string) => Promise<boolean>;
+
+  // Invite code — stored in memory for deep link flow
+  pendingInviteCode: string | null;
+  setPendingInviteCode: (code: string | null) => void;
+  clearPendingInviteCode: () => void;
 
   // Pool state — global, drives all tabs simultaneously
   activePoolId: string | null;
@@ -100,12 +113,13 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     await supabase.auth.signOut();
     set({
       user: null,
-      displayName: null,
+      userProfile: null,
       activePoolId: null,
       userPools: [],
       poolsByCompetition: {},
       smackUnreadCounts: {},
       showGlobalPool: false,
+      pendingInviteCode: null,
     });
   },
 
@@ -128,38 +142,82 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   // ---------------------------------------------------------------------------
   // Profile
   // ---------------------------------------------------------------------------
-  displayName: null,
+  userProfile: null,
 
   fetchProfile: async userId => {
     const {data} = await supabase
       .from('profiles')
-      .select('display_name')
+      .select('*')
       .eq('id', userId)
       .single();
 
-    if (data?.display_name) {
-      set({displayName: data.display_name});
+    if (data) {
+      set({userProfile: data as DbProfile});
+      return data as DbProfile;
     }
+    return null;
   },
 
-  updateDisplayName: async (userId, name) => {
-    const trimmed = name.trim();
-
-    const {error} = await supabase.from('profiles').upsert(
-      {
-        id: userId,
-        display_name: trimmed,
-      },
-      {onConflict: 'id'},
-    );
+  updateProfile: async (userId, fields) => {
+    const {error} = await supabase
+      .from('profiles')
+      .update(fields)
+      .eq('id', userId);
 
     if (error) {
       return false;
     }
 
-    set({displayName: trimmed});
+    // Merge updated fields into local state
+    set(state => ({
+      userProfile: state.userProfile
+        ? {...state.userProfile, ...fields}
+        : null,
+    }));
     return true;
   },
+
+  // ---------------------------------------------------------------------------
+  // Onboarding helpers
+  // ---------------------------------------------------------------------------
+  needsProfileSetup: () => {
+    const profile = get().userProfile;
+    return !profile || !profile.first_name;
+  },
+
+  needsTosAcceptance: () => {
+    const profile = get().userProfile;
+    return !profile || !profile.tos_accepted_at;
+  },
+
+  acceptTos: async (userId: string) => {
+    const {error} = await supabase.rpc('rpc_accept_tos', {
+      p_tos_version: '1.0',
+    });
+
+    if (error) {
+      return false;
+    }
+
+    // Update local state
+    set(state => ({
+      userProfile: state.userProfile
+        ? {
+            ...state.userProfile,
+            tos_accepted_at: new Date().toISOString(),
+            tos_version: '1.0',
+          }
+        : null,
+    }));
+    return true;
+  },
+
+  // ---------------------------------------------------------------------------
+  // Invite code (deep link flow)
+  // ---------------------------------------------------------------------------
+  pendingInviteCode: null,
+  setPendingInviteCode: code => set({pendingInviteCode: code}),
+  clearPendingInviteCode: () => set({pendingInviteCode: null}),
 
   // ---------------------------------------------------------------------------
   // Active event context
@@ -296,6 +354,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       await supabase.from('pool_members').insert({
         pool_id: pool.id,
         user_id: userId,
+        invite_code_used: inviteCode.toUpperCase(),
       });
     }
 

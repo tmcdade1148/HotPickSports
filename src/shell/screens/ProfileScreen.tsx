@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -8,50 +8,99 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   StyleSheet,
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import {useGlobalStore} from '@shell/stores/globalStore';
+import {AvatarSelector, SYSTEM_AVATARS} from '@shell/components/AvatarSelector';
 import {colors, spacing, borderRadius} from '@shared/theme';
 
 /**
- * ProfileScreen — View/edit display name + sign out.
- * Accessible from the profile icon in the pool switcher header.
+ * ProfileScreen — Full profile settings per onboarding spec.
+ * First name, last name, poolie name, display preference, avatar, email, sign out.
  */
 export function ProfileScreen({navigation}: any) {
   const user = useGlobalStore(s => s.user);
-  const displayName = useGlobalStore(s => s.displayName);
-  const updateDisplayName = useGlobalStore(s => s.updateDisplayName);
+  const userProfile = useGlobalStore(s => s.userProfile);
+  const updateProfile = useGlobalStore(s => s.updateProfile);
   const signOut = useGlobalStore(s => s.signOut);
 
-  const [name, setName] = useState(displayName ?? '');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [poolieName, setPoolieName] = useState('');
+  const [displayPref, setDisplayPref] = useState<'first_name' | 'poolie_name'>(
+    'first_name',
+  );
+  const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  const hasChanges = name.trim() !== (displayName ?? '');
+  // Initialize form fields from profile
+  useEffect(() => {
+    if (userProfile) {
+      setFirstName(userProfile.first_name ?? '');
+      setLastName(userProfile.last_name ?? '');
+      setPoolieName(userProfile.poolie_name ?? '');
+      setDisplayPref(userProfile.display_name_preference ?? 'first_name');
+      setSelectedAvatar(userProfile.avatar_key ?? null);
+    }
+  }, [userProfile]);
+
+  const hasChanges =
+    firstName.trim() !== (userProfile?.first_name ?? '') ||
+    lastName.trim() !== (userProfile?.last_name ?? '') ||
+    poolieName.trim() !== (userProfile?.poolie_name ?? '') ||
+    displayPref !== (userProfile?.display_name_preference ?? 'first_name') ||
+    selectedAvatar !== (userProfile?.avatar_key ?? null);
+
+  const canSave = firstName.trim().length > 0 && hasChanges && !saving;
+
+  const handleAvatarSelect = (avatar: {
+    key: string;
+    color: string;
+    emoji: string;
+  }) => {
+    setSelectedAvatar(avatar.key);
+  };
+
+  const handleUploadPhoto = () => {
+    Alert.alert(
+      'Coming Soon',
+      'Photo upload will be available soon. Choose a system avatar for now!',
+    );
+  };
 
   const handleSave = async () => {
-    if (!user?.id || !hasChanges) {
-      return;
-    }
-    const trimmed = name.trim();
-    if (trimmed.length < 2) {
-      Alert.alert('Too Short', 'Display name must be at least 2 characters.');
-      return;
-    }
-    if (trimmed.length > 24) {
-      Alert.alert('Too Long', 'Display name must be 24 characters or less.');
+    if (!user?.id || !canSave) return;
+
+    const trimmedFirst = firstName.trim();
+    if (!trimmedFirst) {
+      Alert.alert('Required', 'First name is required.');
       return;
     }
 
     setSaving(true);
-    const ok = await updateDisplayName(user.id, trimmed);
+
+    const avatarData = selectedAvatar
+      ? {avatar_key: selectedAvatar, avatar_type: 'system' as const}
+      : {};
+
+    const ok = await updateProfile(user.id, {
+      first_name: trimmedFirst,
+      last_name: lastName.trim() || null,
+      poolie_name: poolieName.trim() || null,
+      display_name_preference: displayPref,
+      ...avatarData,
+    });
+
     setSaving(false);
 
     if (ok) {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } else {
-      Alert.alert('Error', 'Failed to update display name. Please try again.');
+      Alert.alert('Error', 'Failed to save profile. Please try again.');
     }
   };
 
@@ -63,70 +112,169 @@ export function ProfileScreen({navigation}: any) {
         style: 'destructive',
         onPress: async () => {
           await signOut();
-          navigation.reset({index: 0, routes: [{name: 'SignIn'}]});
+          navigation.reset({index: 0, routes: [{name: 'Welcome'}]});
         },
       },
     ]);
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={styles.inner}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={styles.backButton}>{'< Back'}</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>Profile</Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.label}>Email</Text>
-          <View style={styles.readOnlyField}>
-            <Text style={styles.readOnlyText}>{user?.email ?? ''}</Text>
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled">
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => navigation.goBack()}>
+              <Text style={styles.backButton}>{'< Back'}</Text>
+            </TouchableOpacity>
+            <Text style={styles.title}>Profile</Text>
           </View>
-        </View>
 
-        <View style={styles.section}>
-          <Text style={styles.label}>Display Name</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter your name"
-            placeholderTextColor={colors.textSecondary}
-            value={name}
-            onChangeText={setName}
-            maxLength={24}
-            autoCorrect={false}
-          />
-          <Text style={styles.hint}>
-            This name is visible to other players in your pools.
-          </Text>
+          {/* Avatar */}
+          <View style={styles.section}>
+            <Text style={styles.label}>Avatar</Text>
+            <AvatarSelector
+              selectedKey={selectedAvatar}
+              onSelect={handleAvatarSelect}
+              onUploadPress={handleUploadPhoto}
+            />
+          </View>
 
+          {/* First name (required) */}
+          <View style={styles.section}>
+            <Text style={styles.label}>
+              First name <Text style={styles.required}>*</Text>
+            </Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Your first name"
+              placeholderTextColor={colors.textSecondary}
+              value={firstName}
+              onChangeText={setFirstName}
+              autoCapitalize="words"
+              autoCorrect={false}
+              editable={!saving}
+            />
+          </View>
+
+          {/* Last name (optional) */}
+          <View style={styles.section}>
+            <View style={styles.labelRow}>
+              <Text style={styles.label}>Last name</Text>
+              <Text style={styles.optional}>Optional</Text>
+            </View>
+            <TextInput
+              style={styles.input}
+              placeholder="Your last name"
+              placeholderTextColor={colors.textSecondary}
+              value={lastName}
+              onChangeText={setLastName}
+              autoCapitalize="words"
+              autoCorrect={false}
+              editable={!saving}
+            />
+            <Text style={styles.hint}>
+              Shown as "Tom M." — never your full surname.
+            </Text>
+          </View>
+
+          {/* Poolie name (optional) */}
+          <View style={styles.section}>
+            <View style={styles.labelRow}>
+              <Text style={styles.label}>Poolie name</Text>
+              <Text style={styles.optional}>Optional</Text>
+            </View>
+            <TextInput
+              style={styles.input}
+              placeholder={
+                poolieName ? 'Your poolie name' : 'Add your poolie name'
+              }
+              placeholderTextColor={colors.textSecondary}
+              value={poolieName}
+              onChangeText={setPoolieName}
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!saving}
+            />
+            <Text style={styles.hint}>
+              Your persona in the pool. Fun names welcome. Change anytime.
+            </Text>
+          </View>
+
+          {/* Display preference toggle */}
+          {poolieName.trim().length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.label}>Show me as</Text>
+              <View style={styles.toggleRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.toggleOption,
+                    displayPref === 'first_name' && styles.toggleActive,
+                  ]}
+                  onPress={() => setDisplayPref('first_name')}
+                  disabled={saving}>
+                  <Text
+                    style={[
+                      styles.toggleText,
+                      displayPref === 'first_name' && styles.toggleTextActive,
+                    ]}>
+                    {firstName.trim() || 'First name'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.toggleOption,
+                    displayPref === 'poolie_name' && styles.toggleActive,
+                  ]}
+                  onPress={() => setDisplayPref('poolie_name')}
+                  disabled={saving}>
+                  <Text
+                    style={[
+                      styles.toggleText,
+                      displayPref === 'poolie_name' && styles.toggleTextActive,
+                    ]}>
+                    {poolieName.trim() || 'Poolie name'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {/* Email (read-only) */}
+          <View style={styles.section}>
+            <Text style={styles.label}>Email</Text>
+            <View style={styles.readOnlyField}>
+              <Text style={styles.readOnlyText}>{user?.email ?? ''}</Text>
+            </View>
+          </View>
+
+          {/* Save button */}
           <TouchableOpacity
-            style={[
-              styles.saveButton,
-              (!hasChanges || saving) && styles.buttonDisabled,
-            ]}
+            style={[styles.saveButton, !canSave && styles.buttonDisabled]}
             onPress={handleSave}
-            disabled={!hasChanges || saving}>
+            disabled={!canSave}>
             {saving ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : saved ? (
               <Text style={styles.saveButtonText}>Saved!</Text>
             ) : (
-              <Text style={styles.saveButtonText}>Save</Text>
+              <Text style={styles.saveButtonText}>Save changes</Text>
             )}
           </TouchableOpacity>
-        </View>
 
-        <View style={styles.spacer} />
-
-        <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-          <Text style={styles.signOutText}>Sign Out</Text>
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+          {/* Sign out */}
+          <TouchableOpacity
+            style={styles.signOutButton}
+            onPress={handleSignOut}>
+            <Text style={styles.signOutText}>Sign Out</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
@@ -135,12 +283,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  inner: {
+  flex: {
     flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: spacing.xxl,
   },
   header: {
     padding: spacing.lg,
-    paddingTop: spacing.xxl,
+    paddingTop: spacing.md,
   },
   backButton: {
     fontSize: 16,
@@ -153,16 +304,43 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   section: {
-    padding: spacing.lg,
-    paddingTop: 0,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  labelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.textSecondary,
+    color: colors.text,
     marginBottom: spacing.xs,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+  },
+  required: {
+    color: colors.error,
+  },
+  optional: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+    marginBottom: spacing.xs,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    fontSize: 16,
+    color: colors.text,
+    backgroundColor: colors.surface,
+  },
+  hint: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+    lineHeight: 17,
   },
   readOnlyField: {
     backgroundColor: colors.surface,
@@ -175,37 +353,47 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.textSecondary,
   },
-  input: {
-    backgroundColor: colors.surface,
+  toggleRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  toggleOption: {
+    flex: 1,
+    paddingVertical: spacing.sm,
     borderRadius: borderRadius.md,
-    padding: spacing.md,
-    fontSize: 16,
-    color: colors.text,
     borderWidth: 1,
     borderColor: colors.border,
+    alignItems: 'center',
+    backgroundColor: colors.surface,
   },
-  hint: {
-    fontSize: 12,
+  toggleActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary + '15',
+  },
+  toggleText: {
+    fontSize: 14,
+    fontWeight: '500',
     color: colors.textSecondary,
-    marginTop: spacing.xs,
-    marginBottom: spacing.md,
+  },
+  toggleTextActive: {
+    color: colors.primary,
+    fontWeight: '600',
   },
   saveButton: {
     backgroundColor: colors.primary,
-    padding: spacing.sm,
+    paddingVertical: 14,
     borderRadius: borderRadius.md,
     alignItems: 'center',
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.sm,
   },
   buttonDisabled: {
     opacity: 0.4,
   },
   saveButtonText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
-  },
-  spacer: {
-    flex: 1,
   },
   signOutButton: {
     margin: spacing.lg,

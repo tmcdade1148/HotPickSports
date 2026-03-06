@@ -17,6 +17,10 @@ export function LoadingScreen({navigation}: any) {
   const fetchProfile = useGlobalStore(s => s.fetchProfile);
   const fetchUserPools = useGlobalStore(s => s.fetchUserPools);
   const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
+  const subscribeSmackUnread = useGlobalStore(s => s.subscribeSmackUnread);
+  const fetchSmackUnreadCounts = useGlobalStore(
+    s => s.fetchSmackUnreadCounts,
+  );
   const didNavigate = useRef(false);
 
   useEffect(() => {
@@ -25,64 +29,62 @@ export function LoadingScreen({navigation}: any) {
 
     const defaultEvent = getDefaultEvent();
 
-    // Safety timeout — if getSession hangs, go to SignIn after 5s
+    // Safety timeout — if getSession hangs, go to Welcome after 5s
     const timeout = setTimeout(() => {
       if (!didNavigate.current) {
         didNavigate.current = true;
         setAuthLoading(false);
-        navigation.replace('SignIn');
+        navigation.replace('Welcome');
       }
     }, 5000);
 
-    supabase.auth.getSession().then(async ({data: {session}}) => {
-      if (didNavigate.current) return;
-      didNavigate.current = true;
-      clearTimeout(timeout);
-      setAuthLoading(false);
-      if (session) {
-        setUser(session.user);
+    supabase.auth
+      .getSession()
+      .then(async ({data: {session}}) => {
+        if (didNavigate.current) return;
+        didNavigate.current = true;
+        clearTimeout(timeout);
+        setAuthLoading(false);
 
-        // Set the default sport so HomeScreen has it immediately
+        if (!session) {
+          navigation.replace('Welcome');
+          return;
+        }
+
+        setUser(session.user);
         setActiveSport(defaultEvent);
 
-        // Await profile fetch — ensures displayName is loaded before
-        // HomeScreen renders (fixes Android race condition)
-        await fetchProfile(session.user.id);
+        // Fetch full profile to determine onboarding state
+        const profile = await fetchProfile(session.user.id);
 
-        // Fetch pools and auto-select "2025 Public Beta Pool" as default
+        // Beta user migration: first_name null → ProfileSetup
+        if (!profile || !profile.first_name) {
+          navigation.replace('ProfileSetup');
+          return;
+        }
+
+        // Initialize pools and SmackTalk for returning users
         await fetchUserPools(session.user.id, defaultEvent.competition);
         const pools = useGlobalStore.getState().userPools;
-        const betaPool = pools.find(p => p.name === '2025 Public Beta Pool');
-        if (betaPool) {
-          setActivePoolId(betaPool.id);
-        } else if (pools.length > 0) {
-          // Fallback: select the first pool
+
+        if (pools.length > 0) {
           setActivePoolId(pools[0].id);
+          const poolIds = pools.map(p => p.id);
+          await fetchSmackUnreadCounts(session.user.id, poolIds);
         } else {
-          // Try persisted pool ID
           await loadPersistedPoolId(defaultEvent.competition);
         }
 
-        // Fetch SmackTalk unread counts + start Realtime subscription
-        const poolIds = pools.map(p => p.id);
-        if (poolIds.length > 0) {
-          await useGlobalStore
-            .getState()
-            .fetchSmackUnreadCounts(session.user.id, poolIds);
-        }
-        useGlobalStore.getState().subscribeSmackUnread();
-
+        subscribeSmackUnread();
         navigation.replace('Home');
-      } else {
-        navigation.replace('SignIn');
-      }
-    }).catch(() => {
-      if (didNavigate.current) return;
-      didNavigate.current = true;
-      clearTimeout(timeout);
-      setAuthLoading(false);
-      navigation.replace('SignIn');
-    });
+      })
+      .catch(() => {
+        if (didNavigate.current) return;
+        didNavigate.current = true;
+        clearTimeout(timeout);
+        setAuthLoading(false);
+        navigation.replace('Welcome');
+      });
 
     const {
       data: {subscription},

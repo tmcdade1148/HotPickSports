@@ -9,6 +9,7 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {User} from 'lucide-react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
+import {getDisplayName} from '@shared/utils/displayName';
 import {SeasonEventCard} from '@shell/components/home/SeasonEventCard';
 import {TournamentEventCard} from '@shell/components/home/TournamentEventCard';
 import {SeriesEventCard} from '@shell/components/home/SeriesEventCard';
@@ -32,13 +33,13 @@ import type {
  * template tab navigator for that event.
  */
 export function HomeScreen({navigation}: any) {
-  const displayName = useGlobalStore(s => s.displayName);
+  const userProfile = useGlobalStore(s => s.userProfile);
   const activeEventCards = useGlobalStore(s => s.activeEventCards);
   const activeSport = useGlobalStore(s => s.activeSport);
   const setActiveSport = useGlobalStore(s => s.setActiveSport);
 
   const greeting = getGreeting();
-  const firstName = displayName?.split(' ')[0] ?? displayName ?? 'Poolie';
+  const firstName = getDisplayName(userProfile);
 
   const handleCardPress = (config: AnyEventConfig) => {
     // Set as active sport so EventDetail knows which template to render
