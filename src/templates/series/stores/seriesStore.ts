@@ -147,7 +147,7 @@ export const useSeriesStore = create<SeriesState>((set, get) => ({
       round: roundKey,
       picked_winner: pickedWinner,
       picked_series_length: pickedSeriesLength,
-      is_hot_pick: isHotPick,
+      is_hotpick: isHotPick,
       is_winner_correct: null,
       is_length_correct: null,
       points: null,
@@ -172,7 +172,7 @@ export const useSeriesStore = create<SeriesState>((set, get) => ({
         round: roundKey,
         picked_winner: pickedWinner,
         picked_series_length: pickedSeriesLength,
-        is_hot_pick: isHotPick,
+        is_hotpick: isHotPick,
       },
       {onConflict: 'user_id,series_id'},
     );

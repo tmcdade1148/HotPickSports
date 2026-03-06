@@ -29,7 +29,7 @@ export function SeasonMatchCard({
   const isSaving = useSeasonStore(s => s.isSaving);
 
   const pickedTeam = existingPick?.picked_team ?? null;
-  const isHotPick = existingPick?.is_hot_pick ?? false;
+  const isHotPick = existingPick?.is_hotpick ?? false;
   const isCompleted = game.status === 'completed';
   const isLive = game.status === 'live';
   const isLocked = isCompleted || isLive;

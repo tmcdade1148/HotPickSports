@@ -45,7 +45,7 @@ export function calculateWeekPoints(
     }
 
     if (correct) {
-      points += pick.is_hot_pick ? (game.rank ?? 1) : 1;
+      points += pick.is_hotpick ? (game.rank ?? 1) : 1;
     }
   }
 

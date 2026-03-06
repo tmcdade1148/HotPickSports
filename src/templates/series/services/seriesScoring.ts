@@ -64,7 +64,7 @@ export function calculateRoundPoints(
     // Check if winner pick is correct
     if (pick.picked_winner === winner) {
       // Base points (doubled for HotPick)
-      points += pick.is_hot_pick ? roundConfig.rank * 2 : roundConfig.rank;
+      points += pick.is_hotpick ? roundConfig.rank * 2 : roundConfig.rank;
 
       // Series length bonus
       const actualLength = getSeriesLength(matchup);

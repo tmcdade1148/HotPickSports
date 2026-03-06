@@ -184,7 +184,7 @@ export const useNFLStore = create<NFLState>((set, get) => ({
       .eq('user_id', userId)
       .eq('competition', competition)
       .eq('week', currentWeek)
-      .eq('is_hot_pick', true)
+      .eq('is_hotpick', true)
       .limit(1)
       .maybeSingle();
 
@@ -232,7 +232,8 @@ export const useNFLStore = create<NFLState>((set, get) => ({
   },
 
   fetchPoolStandings: async (userId: string, poolId: string) => {
-    const {competition} = get();
+    const {competition, currentPhase} = get();
+    const isPlayoffs = currentPhase !== 'REGULAR';
 
     // 1. Get active pool member user IDs (pool-independent pattern)
     const {data: members} = await supabase
@@ -249,14 +250,23 @@ export const useNFLStore = create<NFLState>((set, get) => ({
       return;
     }
 
-    // 2. Fetch season_user_totals for pool members (no pool_id on scores)
-    const {data: totalsData} = await supabase
+    // 2. Fetch season_user_totals filtered by current season phase
+    //    Regular season and playoffs are separate leaderboards
+    let query = supabase
       .from('season_user_totals')
       .select('user_id, week_points')
       .eq('competition', competition)
       .in('user_id', memberUserIds);
 
-    // 3. Sum week_points per user across all weeks
+    if (isPlayoffs) {
+      query = query.neq('phase', 'REGULAR');
+    } else {
+      query = query.eq('phase', 'REGULAR');
+    }
+
+    const {data: totalsData} = await query;
+
+    // 3. Sum week_points per user for the current season phase
     const pointsByUser: Record<string, number> = {};
     for (const row of totalsData ?? []) {
       pointsByUser[row.user_id] =
@@ -296,16 +306,26 @@ export const useNFLStore = create<NFLState>((set, get) => ({
   },
 
   fetchUserSeasonScore: async (userId: string) => {
-    const {competition, currentWeek} = get();
+    const {competition, currentWeek, currentPhase} = get();
+    const isPlayoffs = currentPhase !== 'REGULAR';
 
-    // Pool-independent: query user's own season_user_totals directly
-    const {data} = await supabase
+    // Pool-independent: query user's own season_user_totals
+    // Filtered to current season phase (regular vs playoffs are separate)
+    let query = supabase
       .from('season_user_totals')
       .select('week, week_points')
       .eq('user_id', userId)
       .eq('competition', competition);
 
-    // Sum all weeks for season total
+    if (isPlayoffs) {
+      query = query.neq('phase', 'REGULAR');
+    } else {
+      query = query.eq('phase', 'REGULAR');
+    }
+
+    const {data} = await query;
+
+    // Sum week_points for the current season phase
     let total = 0;
     let lastWeekPoints: number | null = null;
 
@@ -316,9 +336,14 @@ export const useNFLStore = create<NFLState>((set, get) => ({
       }
     }
 
+    // Determine if this is the first week of the current phase
+    const phaseWeeks = (data ?? []).map(r => r.week).sort((a, b) => a - b);
+    const isFirstWeekOfPhase =
+      phaseWeeks.length === 0 || currentWeek <= (phaseWeeks[0] ?? currentWeek);
+
     set({
       userSeasonTotal: total,
-      lastWeekNet: currentWeek > 1 ? lastWeekPoints : null,
+      lastWeekNet: isFirstWeekOfPhase ? null : lastWeekPoints,
     });
   },
 }));

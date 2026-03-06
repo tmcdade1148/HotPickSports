@@ -77,14 +77,14 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
     if (userId && activePoolId) {
       fetchPoolStandings(userId, activePoolId);
     }
-  }, [userId, activePoolId, fetchPoolStandings]);
+  }, [userId, activePoolId, currentPhase, fetchPoolStandings]);
 
   // ── 2b. Fetch pool-independent season score for ScoreModule ──────────
   useEffect(() => {
     if (userId) {
       fetchUserSeasonScore(userId);
     }
-  }, [userId, fetchUserSeasonScore]);
+  }, [userId, currentPhase, fetchUserSeasonScore]);
 
   // ── 3. Fetch user pick status when picks_open ────────────────────────
   useEffect(() => {

@@ -42,7 +42,7 @@ export function calculateKnockoutPoints(
       const rank = match.frozen_rank ?? roundConfig?.rank ?? 1;
 
       // Hot picks earn the rank value, regular picks earn base points
-      points += pick.is_hot_pick ? rank : 1;
+      points += pick.is_hotpick ? rank : 1;
     }
   }
 

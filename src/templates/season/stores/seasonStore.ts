@@ -34,7 +34,7 @@ interface SeasonState {
   isSaving: boolean;
   saveError: string | null;
 
-  initialize: (config: SeasonConfig, poolId: string) => void;
+  initialize: (config: SeasonConfig, poolId: string) => Promise<void>;
   setCurrentWeek: (week: number) => void;
   fetchWeekGames: (week: number) => Promise<void>;
   fetchUserPicks: (userId: string, week: number) => Promise<void>;
@@ -65,17 +65,29 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
   isSaving: false,
   saveError: null,
 
-  initialize: (config, poolId) =>
+  initialize: async (config, poolId) => {
+    // Read current_week from competition_config (never hardcode)
+    const {data: cfgRow} = await supabase
+      .from('competition_config')
+      .select('value')
+      .eq('competition', config.competition)
+      .eq('key', 'current_week')
+      .maybeSingle();
+
+    const currentWeek =
+      typeof cfgRow?.value === 'number' ? cfgRow.value : 1;
+
     set({
       config,
       poolId,
-      currentWeek: 1,
+      currentWeek,
       games: [],
       allWeekGames: {},
       weekPicks: [],
       leaderboard: [],
       userNames: {},
-    }),
+    });
+  },
 
   setCurrentWeek: (week: number) => {
     set({currentWeek: week});
@@ -140,7 +152,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
 
     // Enforce hotPicksPerWeek limit
     if (isHotPick) {
-      const currentHotPicks = weekPicks.filter(p => p.is_hot_pick);
+      const currentHotPicks = weekPicks.filter(p => p.is_hotpick);
       const isAlreadyHotPick = currentHotPicks.some(
         p => p.game_id === gameId,
       );
@@ -160,7 +172,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       season_year: new Date().getFullYear(),
       week: currentWeek,
       picked_team: pickedTeam,
-      is_hot_pick: isHotPick,
+      is_hotpick: isHotPick,
       is_correct: null,
       points: null,
       sb_q1_leader: null,
@@ -185,7 +197,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
         game_id: gameId,
         week: currentWeek,
         picked_team: pickedTeam,
-        is_hot_pick: isHotPick,
+        is_hotpick: isHotPick,
       },
       {onConflict: 'user_id,competition,game_id'},
     );
@@ -206,9 +218,20 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
     set({isLoading: true});
 
     // Pool-independent: scores have no pool_id.
-    // season_user_totals has one row per user per week.
-    // We fetch all rows for the competition, then aggregate per user,
-    // filtering to only pool members.
+    // Regular season and playoffs are separate leaderboards.
+    // Determine current phase from competition_config.
+
+    // Step 0: Read current_phase from competition_config
+    const {data: cfgRows} = await supabase
+      .from('competition_config')
+      .select('value')
+      .eq('competition', config.competition)
+      .eq('key', 'current_phase')
+      .maybeSingle();
+
+    const currentPhase =
+      typeof cfgRows?.value === 'string' ? cfgRows.value : 'REGULAR';
+    const isPlayoffs = currentPhase !== 'REGULAR';
 
     // Step 1: Get pool member user IDs
     const {data: members} = await supabase
@@ -222,16 +245,23 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       return;
     }
 
-    // Step 2: Fetch all per-week totals for these users in this competition
-    const {data: totals} = await supabase
+    // Step 2: Fetch per-week totals filtered to current season phase
+    let query = supabase
       .from('season_user_totals')
       .select('*')
       .eq('competition', config.competition)
       .in('user_id', memberIds);
 
+    if (isPlayoffs) {
+      query = query.neq('phase', 'REGULAR');
+    } else {
+      query = query.eq('phase', 'REGULAR');
+    }
+
+    const {data: totals} = await query;
     const rows = (totals as DbSeasonUserTotal[]) ?? [];
 
-    // Step 3: Aggregate per user — sum week_points across all week rows
+    // Step 3: Aggregate per user — sum week_points for the current phase
     const byUser: Record<string, SeasonLeaderboardEntry> = {};
     for (const row of rows) {
       if (!byUser[row.user_id]) {
@@ -287,7 +317,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
 
   getHotPickCount: () => {
     const {weekPicks} = get();
-    return weekPicks.filter(p => p.is_hot_pick).length;
+    return weekPicks.filter(p => p.is_hotpick).length;
   },
 
   getUserScore: (userId: string) => {

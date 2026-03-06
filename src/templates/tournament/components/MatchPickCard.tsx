@@ -25,7 +25,7 @@ export function MatchPickCard({
   const isSaving = useTournamentStore(s => s.isSaving);
 
   const pickedTeam = existingPick?.picked_team ?? null;
-  const isHotPick = existingPick?.is_hot_pick ?? false;
+  const isHotPick = existingPick?.is_hotpick ?? false;
 
   const roundConfig = config.knockoutRounds.find(r => r.key === match.stage);
   const kickoffDate = new Date(match.kickoff_at);

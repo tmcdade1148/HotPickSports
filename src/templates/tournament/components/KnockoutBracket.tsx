@@ -76,7 +76,7 @@ export function KnockoutBracket({config}: KnockoutBracketProps) {
                       key={slot.match?.match_id ?? `${roundConfig.key}_${slotIndex}`}
                       slot={slot}
                       pick={pick?.picked_team}
-                      isHotPick={pick?.is_hot_pick}
+                      isHotPick={pick?.is_hotpick}
                       accentColor={config.color}
                       isFinal={isFinal}
                     />

@@ -134,7 +134,7 @@ export interface DbTournamentPick {
   competition: string;
   stage: string;
   picked_team: string;
-  is_hot_pick: boolean;
+  is_hotpick: boolean;
   is_correct: boolean | null;
   points: number | null;
   power_up: string | null;
@@ -179,8 +179,8 @@ export interface DbTournamentUserTotal {
   total_points: number;
   correct_picks: number;
   total_picks: number;
-  hot_picks_correct: number;
-  hot_picks_total: number;
+  hotpick_correct: number;
+  hotpick_total: number;
   groups_correct: number;
   groups_total: number;
   scored_at: string;
@@ -240,7 +240,7 @@ export interface DbSeasonPick {
   season_year: number;
   week: number;
   picked_team: string;
-  is_hot_pick: boolean;
+  is_hotpick: boolean;
   is_correct: boolean | null;
   points: number | null;
   sb_q1_leader: string | null;
@@ -264,8 +264,8 @@ export interface DbSeasonUserTotal {
   playoff_points: number | null;
   correct_picks: number;
   total_picks: number;
-  is_hot_pick_correct: boolean | null;
-  hot_pick_rank: number | null;
+  is_hotpick_correct: boolean | null;
+  hotpick_rank: number | null;
   is_no_show: boolean;
   scored_at: string;
   power_up_used: string | null;
@@ -328,7 +328,7 @@ export interface DbSeriesPick {
   round: string;
   picked_winner: string;
   picked_series_length: number;
-  is_hot_pick: boolean;
+  is_hotpick: boolean;
   is_winner_correct: boolean | null;
   is_length_correct: boolean | null;
   points: number | null;
@@ -348,8 +348,8 @@ export interface DbSeriesUserTotal {
   correct_winners: number;
   correct_lengths: number;
   total_picks: number;
-  is_hot_pick_correct: boolean | null;
-  hot_pick_rank: number | null;
+  is_hotpick_correct: boolean | null;
+  hotpick_rank: number | null;
   scored_at: string;
   power_up_used: string | null;
   power_up_delta: number | null;

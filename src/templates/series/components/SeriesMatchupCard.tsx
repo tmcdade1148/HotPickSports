@@ -29,7 +29,7 @@ export function SeriesMatchupCard({
 
   const pickedTeam = existingPick?.picked_winner ?? null;
   const pickedSeriesLength = existingPick?.picked_series_length ?? 0;
-  const isHotPick = existingPick?.is_hot_pick ?? false;
+  const isHotPick = existingPick?.is_hotpick ?? false;
   const isCompleted = matchup.status === 'completed';
   const winner = getSeriesWinner(matchup);
   const actualLength = isCompleted ? getSeriesLength(matchup) : null;
