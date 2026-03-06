@@ -45,11 +45,15 @@ export interface DbPool {
   name: string;
   competition: string;
   created_by: string;
+  organizer_id: string | null;
   invite_code: string | null;
   is_public: boolean;
-  member_limit: number;
+  is_global: boolean;
+  is_founding_pool: boolean;
+  member_limit: number | null;
   status: string;
   name_display: string | null;
+  pool_start_date: string;
   created_at: string;
   updated_at: string;
 }

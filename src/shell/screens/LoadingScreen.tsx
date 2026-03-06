@@ -3,6 +3,7 @@ import {View, Text, ActivityIndicator, StyleSheet, LogBox} from 'react-native';
 
 // Suppress red screen for Supabase auth retry errors on iOS simulator
 LogBox.ignoreLogs(['AuthRetryableFetchError', 'Network request failed']);
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {getDefaultEvent} from '@sports/registry';
@@ -11,12 +12,14 @@ import {colors, spacing} from '@shared/theme';
 export function LoadingScreen({navigation}: any) {
   const setUser = useGlobalStore(s => s.setUser);
   const setAuthLoading = useGlobalStore(s => s.setAuthLoading);
-  const loadPersistedPoolId = useGlobalStore(s => s.loadPersistedPoolId);
   const refreshAvailableEvents = useGlobalStore(s => s.refreshAvailableEvents);
   const setActiveSport = useGlobalStore(s => s.setActiveSport);
   const fetchProfile = useGlobalStore(s => s.fetchProfile);
   const fetchUserPools = useGlobalStore(s => s.fetchUserPools);
   const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
+  const ensureGlobalPoolMembership = useGlobalStore(
+    s => s.ensureGlobalPoolMembership,
+  );
   const subscribeSmackUnread = useGlobalStore(s => s.subscribeSmackUnread);
   const fetchSmackUnreadCounts = useGlobalStore(
     s => s.fetchSmackUnreadCounts,
@@ -63,16 +66,25 @@ export function LoadingScreen({navigation}: any) {
           return;
         }
 
-        // Initialize pools and SmackTalk for returning users
+        // Ensure user is enrolled in global pools, then load pools
+        await ensureGlobalPoolMembership();
         await fetchUserPools(session.user.id, defaultEvent.competition);
         const pools = useGlobalStore.getState().userPools;
 
         if (pools.length > 0) {
-          setActivePoolId(pools[0].id);
+          // Restore persisted pool selection, or default to global pool, or first pool
+          const persistedId = await AsyncStorage.getItem(
+            `hotpick_active_pool_${defaultEvent.competition}`,
+          );
+          const persistedPool = persistedId
+            ? pools.find(p => p.id === persistedId)
+            : null;
+          const globalPool = pools.find(p => p.is_global);
+          setActivePoolId(
+            persistedPool?.id ?? globalPool?.id ?? pools[0].id,
+          );
           const poolIds = pools.map(p => p.id);
           await fetchSmackUnreadCounts(session.user.id, poolIds);
-        } else {
-          await loadPersistedPoolId(defaultEvent.competition);
         }
 
         subscribeSmackUnread();

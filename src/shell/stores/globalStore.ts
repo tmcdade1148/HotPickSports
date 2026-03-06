@@ -88,6 +88,9 @@ interface GlobalState {
   subscribeSmackUnread: () => void;
   unsubscribeSmackUnread: () => void;
 
+  // Global pool auto-enrollment
+  ensureGlobalPoolMembership: () => Promise<void>;
+
   // Feature flags
   showGlobalPool: boolean;
 }
@@ -526,6 +529,17 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       supabase.removeChannel(channel);
       set({smackRealtimeChannel: null});
     }
+  },
+
+  // ---------------------------------------------------------------------------
+  // Global pool auto-enrollment
+  // ---------------------------------------------------------------------------
+  ensureGlobalPoolMembership: async () => {
+    const userId = get().user?.id;
+    if (!userId) return;
+
+    // Call the SECURITY DEFINER RPC — enrolls user in all active global pools
+    await supabase.rpc('auto_enroll_global_pools');
   },
 
   // ---------------------------------------------------------------------------

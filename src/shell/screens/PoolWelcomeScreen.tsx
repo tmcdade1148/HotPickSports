@@ -98,7 +98,9 @@ export function PoolWelcomeScreen({navigation}: any) {
     const pools = useGlobalStore.getState().userPools;
 
     if (pools.length > 0) {
-      setActivePoolId(pools[0].id);
+      // Default to global pool, or first pool
+      const globalPool = pools.find(p => p.is_global);
+      setActivePoolId(globalPool?.id ?? pools[0].id);
       const poolIds = pools.map(p => p.id);
       await fetchSmackUnreadCounts(user.id, poolIds);
     }
@@ -133,7 +135,8 @@ export function PoolWelcomeScreen({navigation}: any) {
               <Text style={styles.title}>You're in!</Text>
               <Text style={styles.poolName}>{joinedPool.name}</Text>
               <Text style={styles.subtitle}>
-                You're also in the HotPick Global Pool — compete with everyone.
+                You're also in the HotPick NFL 2026 pool — compete with
+                everyone on the platform.
               </Text>
 
               <View style={styles.mechanic}>
@@ -157,15 +160,16 @@ export function PoolWelcomeScreen({navigation}: any) {
     );
   }
 
-  // Organic path — no invite
+  // Organic path — no invite, but user is auto-enrolled in global pool
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.welcomeEmoji}>{'\u{1F44B}'}</Text>
         <Text style={styles.title}>Welcome, {displayName}!</Text>
         <Text style={styles.subtitle}>
-          You're in the HotPick Global Pool — compete with everyone on the
-          platform.
+          You're in the HotPick NFL 2026 pool — compete with everyone on the
+          platform. Want to play with friends? Start your own pool or enter an
+          invite code.
         </Text>
 
         <View style={styles.mechanic}>
@@ -179,20 +183,20 @@ export function PoolWelcomeScreen({navigation}: any) {
         <View style={styles.buttonsContainer}>
           <TouchableOpacity
             style={styles.primaryButton}
-            onPress={handleStartPool}>
-            <Text style={styles.primaryButtonText}>Start a pool</Text>
+            onPress={handleLetsGo}>
+            <Text style={styles.primaryButtonText}>Let's go</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.secondaryButton}
-            onPress={handleEnterCode}>
-            <Text style={styles.secondaryButtonText}>Enter a code</Text>
+            onPress={handleStartPool}>
+            <Text style={styles.secondaryButtonText}>Start a pool</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.skipButton}
-            onPress={handleLetsGo}>
-            <Text style={styles.skipText}>Just explore for now</Text>
+            onPress={handleEnterCode}>
+            <Text style={styles.skipText}>Have an invite code?</Text>
           </TouchableOpacity>
         </View>
       </View>
