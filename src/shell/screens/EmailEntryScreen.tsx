@@ -31,6 +31,9 @@ export function EmailEntryScreen({navigation}: any) {
   const setUser = useGlobalStore(s => s.setUser);
   const fetchProfile = useGlobalStore(s => s.fetchProfile);
   const acceptTos = useGlobalStore(s => s.acceptTos);
+  const ensureGlobalPoolMembership = useGlobalStore(
+    s => s.ensureGlobalPoolMembership,
+  );
 
   const isValidEmail = EMAIL_REGEX.test(email.trim());
   const isValidPassword = password.length >= MIN_PASSWORD_LENGTH;
@@ -68,6 +71,7 @@ export function EmailEntryScreen({navigation}: any) {
       if (data.user) {
         setUser(data.user);
         await acceptTos(data.user.id);
+        await ensureGlobalPoolMembership();
         navigation.replace('ProfileSetup');
       }
     } else {
@@ -90,6 +94,7 @@ export function EmailEntryScreen({navigation}: any) {
 
       if (data.user) {
         setUser(data.user);
+        await ensureGlobalPoolMembership();
         const profile = await fetchProfile(data.user.id);
 
         if (!profile || !profile.first_name) {
