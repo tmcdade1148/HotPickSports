@@ -38,7 +38,7 @@ export function EmailEntryScreen({navigation}: any) {
 
   const canSubmit =
     mode === 'sign_in'
-      ? isValidEmail && isValidPassword
+      ? isValidEmail && password.length > 0
       : isValidEmail && isValidPassword && passwordsMatch;
 
   const clearError = () => {
