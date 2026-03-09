@@ -73,19 +73,12 @@ export function PicksOpenCard({
         </Text>
       )}
 
-      {/* Highest-ranked game preview */}
-      {highestRankedGame && (
-        <View style={styles.gamePreview}>
-          <Text style={styles.gameMatchup}>
-            {highestRankedGame.away_team} vs {highestRankedGame.home_team}
-          </Text>
-          {highestRankedGame.rank != null && (
-            <Text style={styles.gameRank}>
-              {'\uD83D\uDD25'} Rank {highestRankedGame.rank}
-            </Text>
-          )}
-        </View>
-      )}
+      {/* Placeholder — kickoff prompt TBD */}
+      <View style={styles.gamePreview}>
+        <Text style={styles.placeholderText}>
+          Tuesday AM — kickoff prompt here.
+        </Text>
+      </View>
 
       {/* CTA footer */}
       <CardFooter
@@ -142,16 +135,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  gameMatchup: {
-    ...typography.body,
-    color: colors.text,
-    fontWeight: '600',
-    flex: 1,
-  },
-  gameRank: {
+  placeholderText: {
     ...typography.caption,
-    color: colors.primary,
-    fontWeight: '700',
-    marginLeft: spacing.sm,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    flex: 1,
   },
 });
