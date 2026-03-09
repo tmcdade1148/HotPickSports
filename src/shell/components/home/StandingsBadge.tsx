@@ -39,6 +39,7 @@ export function StandingsBadge({onPress}: StandingsBadgeProps) {
 
   const activePoolId = useGlobalStore(s => s.activePoolId);
   const userPools = useGlobalStore(s => s.userPools);
+  const userProfile = useGlobalStore(s => s.userProfile);
 
   // No pool selected — don't render
   if (!activePoolId) {
@@ -73,32 +74,42 @@ export function StandingsBadge({onPress}: StandingsBadgeProps) {
       style={styles.container}
       activeOpacity={0.7}
       onPress={onPress}>
-      {contexts.map(ctx => (
-        <View key={ctx.poolId} style={styles.row}>
-          <View style={styles.content}>
-            {ctx.rank != null ? (
-              <Text style={styles.standingText}>
-                <Text style={styles.pointsValue}>{ctx.userTotal}</Text>
-                <Text style={styles.pointsLabel}> pts</Text>
-                <Text style={styles.separator}> {'\u00B7'} </Text>
-                <Text style={styles.rankValue}>
-                  {ordinal(ctx.rank)}
+      {contexts.map(ctx => {
+        const hasScores = ctx.userTotal > 0 && ctx.rank != null;
+        const displayName =
+          userProfile?.display_name_preference === 'poolie_name' &&
+          userProfile?.poolie_name
+            ? userProfile.poolie_name
+            : userProfile?.first_name ?? 'You';
+
+        return (
+          <View key={ctx.poolId} style={styles.row}>
+            <View style={styles.content}>
+              {hasScores ? (
+                <Text style={styles.standingText}>
+                  <Text style={styles.rankValue}>
+                    {ordinal(ctx.rank!)}
+                  </Text>
+                  <Text style={styles.rankLabel}>
+                    {' '}of {ctx.memberCount}
+                  </Text>
+                  <Text style={styles.separator}> {'\u00B7'} </Text>
+                  <Text style={styles.pointsValue}>{ctx.userTotal}</Text>
+                  <Text style={styles.pointsLabel}> pts</Text>
                 </Text>
-                <Text style={styles.rankLabel}>
-                  {' '}of {ctx.memberCount}
+              ) : (
+                <Text style={styles.standingText}>
+                  <Text style={styles.pointsValue}>Leaderboard</Text>
                 </Text>
+              )}
+              <Text style={styles.poolLabel}>
+                {hasScores ? ctx.poolName : displayName}
               </Text>
-            ) : (
-              <Text style={styles.noPicksText}>
-                {'\u2014'} pts {'\u00B7'} No picks yet {'\u00B7'}{' '}
-                {ctx.memberCount} players
-              </Text>
-            )}
-            <Text style={styles.poolLabel}>{ctx.poolName}</Text>
+            </View>
+            <ChevronRight size={16} color={colors.textSecondary} />
           </View>
-          <ChevronRight size={16} color={colors.textSecondary} />
-        </View>
-      ))}
+        );
+      })}
     </TouchableOpacity>
   );
 }
