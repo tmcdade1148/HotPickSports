@@ -8,6 +8,7 @@ import {
   ScrollView,
   ActivityIndicator,
   StyleSheet,
+  Clipboard,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {
@@ -152,13 +153,14 @@ export function SettingsScreen() {
                   (poolRoles[pool.id] === 'organizer' ||
                     poolRoles[pool.id] === 'admin') && (
                     <TouchableOpacity
-                      onPress={() =>
+                      onPress={() => {
+                        Clipboard.setString(pool.invite_code ?? '');
                         Alert.alert(
-                          'Invite Code',
+                          'Invite Code Copied',
                           pool.invite_code ?? '',
                           [{text: 'OK'}],
-                        )
-                      }
+                        );
+                      }}
                       hitSlop={{top: 6, bottom: 6, left: 6, right: 6}}>
                       <Text style={styles.inviteCode}>
                         {pool.invite_code}
