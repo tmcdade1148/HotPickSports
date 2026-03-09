@@ -3,6 +3,8 @@ import {View, Text, FlatList, ActivityIndicator, StyleSheet} from 'react-native'
 import {useSeasonStore} from '../stores/seasonStore';
 import {WeekSelector} from '../components/WeekSelector';
 import {SeasonMatchCard} from '../components/SeasonMatchCard';
+import {PicksProgressHeader} from '../components/PicksProgressHeader';
+import {SubmitPicksButton} from '../components/SubmitPicksButton';
 import {useAuth} from '@shared/hooks/useAuth';
 import {colors, spacing} from '@shared/theme';
 import type {DbSeasonGame} from '@shared/types/database';
@@ -18,6 +20,9 @@ export function SeasonPicksScreen() {
   const currentWeek = useSeasonStore(s => s.currentWeek);
   const isLoading = useSeasonStore(s => s.isLoading);
   const hotPickCount = useSeasonStore(s => s.getHotPickCount());
+  const pickCount = useSeasonStore(s => s.getPickCount());
+  const isWeekComplete = useSeasonStore(s => s.isWeekComplete);
+  const setWeekComplete = useSeasonStore(s => s.setWeekComplete);
   const setCurrentWeek = useSeasonStore(s => s.setCurrentWeek);
   const fetchWeekGames = useSeasonStore(s => s.fetchWeekGames);
   const fetchUserPicks = useSeasonStore(s => s.fetchUserPicks);
@@ -62,12 +67,14 @@ export function SeasonPicksScreen() {
         playoffStartWeek={config.playoffStartWeek}
       />
 
-      <View style={styles.weekHeader}>
-        <Text style={styles.weekTitle}>Week {currentWeek} Picks</Text>
-        <Text style={styles.hotPickInfo}>
-          {'🔥'} {hotPickCount}/{config.hotPicksPerWeek} HotPicks
-        </Text>
-      </View>
+      <PicksProgressHeader
+        currentWeek={currentWeek}
+        pickCount={pickCount}
+        totalGames={games.length}
+        hotPickCount={hotPickCount}
+        hotPicksRequired={config.hotPicksPerWeek}
+        accentColor={config.color}
+      />
 
       {isLoading ? (
         <View style={styles.centered}>
@@ -88,6 +95,18 @@ export function SeasonPicksScreen() {
           contentContainerStyle={styles.list}
         />
       )}
+
+      {!isLoading && games.length > 0 && (
+        <SubmitPicksButton
+          pickCount={pickCount}
+          totalGames={games.length}
+          hotPickCount={hotPickCount}
+          hotPicksRequired={config.hotPicksPerWeek}
+          isWeekComplete={isWeekComplete}
+          onSubmit={() => setWeekComplete(true)}
+          accentColor={config.color}
+        />
+      )}
     </View>
   );
 }
@@ -97,26 +116,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  weekHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.sm,
-  },
-  weekTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  hotPickInfo: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
   list: {
     paddingTop: 0,
-    paddingBottom: spacing.xl,
+    paddingBottom: 100,
   },
   centered: {
     flex: 1,

@@ -46,8 +46,13 @@ interface SeasonState {
   }) => Promise<void>;
   fetchLeaderboard: () => Promise<void>;
 
+  // Picks completion
+  isWeekComplete: boolean;
+  setWeekComplete: (val: boolean) => void;
+
   // Selectors
   getPickForGame: (gameId: string) => DbSeasonPick | undefined;
+  getPickCount: () => number;
   getHotPickCount: () => number;
   getUserScore: (userId: string) => SeasonLeaderboardEntry | undefined;
 }
@@ -64,6 +69,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
   isLoading: false,
   isSaving: false,
   saveError: null,
+  isWeekComplete: false,
 
   initialize: async (config, poolId) => {
     // Read current_week from competition_config (never hardcode)
@@ -86,17 +92,19 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       weekPicks: [],
       leaderboard: [],
       userNames: {},
-    });
-  },
+      isWeekComplete: false,
+    }),
 
   setCurrentWeek: (week: number) => {
-    set({currentWeek: week});
+    set({currentWeek: week, isWeekComplete: false});
     // Check cache first
     const cached = get().allWeekGames[week];
     if (cached) {
       set({games: cached});
     }
   },
+
+  setWeekComplete: (val: boolean) => set({isWeekComplete: val}),
 
   fetchWeekGames: async (week: number) => {
     const {config} = get();
@@ -313,6 +321,11 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
   getPickForGame: (gameId: string) => {
     const {weekPicks} = get();
     return weekPicks.find(p => p.game_id === gameId);
+  },
+
+  getPickCount: () => {
+    const {weekPicks} = get();
+    return weekPicks.length;
   },
 
   getHotPickCount: () => {
