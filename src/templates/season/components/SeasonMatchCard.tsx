@@ -244,16 +244,16 @@ export function SeasonMatchCard({
           }
           activeOpacity={0.6}>
           <Flame
-            size={26}
-            color={isHotPick ? '#FF8C00' : colors.textSecondary}
+            size={38}
+            color={isHotPick ? '#FF8C00' : colors.text}
             fill={isHotPick ? '#FF8C00' : 'none'}
-            strokeWidth={isHotPick ? 2 : 1.5}
+            strokeWidth={isHotPick ? 2.5 : 1.5}
             opacity={
               !pickedTeam || (isLocked && !isHotPick) || (!isHotPick && !canToggleHotPick)
-                ? 0.25
+                ? 0.15
                 : isHotPick
                   ? 1
-                  : 0.5
+                  : 0.4
             }
           />
         </TouchableOpacity>
@@ -427,7 +427,7 @@ const styles = StyleSheet.create({
 
   // Flame
   flameColumn: {
-    width: 32,
+    width: 40,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
