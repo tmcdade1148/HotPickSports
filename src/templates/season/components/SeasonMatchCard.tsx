@@ -115,8 +115,8 @@ export function SeasonMatchCard({
   userId,
 }: SeasonMatchCardProps) {
   const existingPick = useSeasonStore(s => s.getPickForGame(game.game_id));
-  const hotPickCount = useSeasonStore(s => s.getHotPickCount());
   const savePick = useSeasonStore(s => s.savePick);
+  const setHotPick = useSeasonStore(s => s.setHotPick);
   const isSaving = useSeasonStore(s => s.isSaving);
 
   const pickedTeam = existingPick?.picked_team ?? null;
@@ -132,8 +132,8 @@ export function SeasonMatchCard({
   const kickoffDate = new Date(game.kickoff_at);
   const rank = game.frozen_rank ?? game.rank ?? 0;
 
-  const hotPicksRemaining = config.hotPicksPerWeek - hotPickCount;
-  const canToggleHotPick = isHotPick || hotPicksRemaining > 0;
+  // Flame is tappable if this game has a pick and isn't already the hotpick
+  const canSetHotPick = pickedTeam != null && !isHotPick;
 
   const homeTeamName =
     config.teams.find(t => t.code === game.home_team)?.shortName ??
@@ -147,15 +147,9 @@ export function SeasonMatchCard({
     savePick({userId, gameId: game.game_id, pickedTeam: team, isHotPick});
   };
 
-  const toggleHotPick = () => {
-    if (!pickedTeam || isLocked || isSaving) return;
-    if (!canToggleHotPick && !isHotPick) return;
-    savePick({
-      userId,
-      gameId: game.game_id,
-      pickedTeam,
-      isHotPick: !isHotPick,
-    });
+  const handleFlamePress = () => {
+    if (!pickedTeam || isLocked || isSaving || isHotPick) return;
+    setHotPick({userId, gameId: game.game_id});
   };
 
   // HotPick points label in header
@@ -235,13 +229,8 @@ export function SeasonMatchCard({
         {/* Flame icon — outline when inactive, filled orange when HotPick */}
         <TouchableOpacity
           style={styles.flameColumn}
-          onPress={toggleHotPick}
-          disabled={
-            isLocked ||
-            isSaving ||
-            !pickedTeam ||
-            (!canToggleHotPick && !isHotPick)
-          }
+          onPress={handleFlamePress}
+          disabled={isLocked || isSaving || !canSetHotPick}
           activeOpacity={0.6}>
           <Flame
             size={48}

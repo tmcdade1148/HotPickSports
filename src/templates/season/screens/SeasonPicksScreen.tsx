@@ -1,5 +1,5 @@
-import React, {useEffect} from 'react';
-import {View, Text, FlatList, ActivityIndicator, StyleSheet} from 'react-native';
+import React, {useEffect, useCallback} from 'react';
+import {View, Text, FlatList, ActivityIndicator, Alert, StyleSheet} from 'react-native';
 import {useSeasonStore} from '../stores/seasonStore';
 import {WeekSelector} from '../components/WeekSelector';
 import {SeasonMatchCard} from '../components/SeasonMatchCard';
@@ -41,6 +41,21 @@ export function SeasonPicksScreen() {
     load();
   }, [config, currentWeek, user?.id, fetchWeekGames, fetchUserPicks]);
 
+  // Block week navigation if user has picks but no HotPick
+  const handleSelectWeek = useCallback(
+    (week: number) => {
+      if (pickCount > 0 && hotPickCount === 0) {
+        Alert.alert(
+          'Select Your HotPick',
+          'You need to pick a HotPick before switching weeks. Tap the flame icon on any game.',
+        );
+        return;
+      }
+      setCurrentWeek(week);
+    },
+    [pickCount, hotPickCount, setCurrentWeek],
+  );
+
   if (!config) {
     return (
       <View style={styles.centered}>
@@ -62,7 +77,7 @@ export function SeasonPicksScreen() {
       <WeekSelector
         totalWeeks={config.totalWeeks}
         currentWeek={currentWeek}
-        onSelectWeek={setCurrentWeek}
+        onSelectWeek={handleSelectWeek}
         accentColor={config.color}
         playoffStartWeek={config.playoffStartWeek}
       />
