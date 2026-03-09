@@ -399,6 +399,7 @@ const styles = StyleSheet.create({
   scoreColumn: {
     width: 55,
     alignItems: 'flex-start',
+    marginLeft: 8,
   },
   scoreInner: {
     flexDirection: 'row',
