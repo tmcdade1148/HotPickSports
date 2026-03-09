@@ -334,34 +334,16 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   },
 
   joinPool: async (userId, inviteCode) => {
-    // Find the pool by invite code
-    const {data: pool, error: findError} = await supabase
-      .from('pools')
-      .select('*')
-      .eq('invite_code', inviteCode.toUpperCase())
-      .single();
+    // Use SECURITY DEFINER RPC to bypass RLS for pool lookup
+    const {data, error} = await supabase.rpc('join_pool_by_invite', {
+      p_invite_code: inviteCode.toUpperCase(),
+    });
 
-    if (findError || !pool) {
+    if (error || !data || data.error) {
       return null;
     }
 
-    // Check if already a member
-    const {data: existing} = await supabase
-      .from('pool_members')
-      .select('pool_id')
-      .eq('pool_id', pool.id)
-      .eq('user_id', userId)
-      .single();
-
-    if (!existing) {
-      await supabase.from('pool_members').insert({
-        pool_id: pool.id,
-        user_id: userId,
-        invite_code_used: inviteCode.toUpperCase(),
-      });
-    }
-
-    const typedPool = pool as DbPool;
+    const typedPool = data.pool as DbPool;
     const competition = typedPool.competition;
 
     // Auto-select and add to both local list and competition cache
