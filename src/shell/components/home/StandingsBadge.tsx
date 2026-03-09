@@ -80,7 +80,9 @@ export function StandingsBadge({onPress}: StandingsBadgeProps) {
           userProfile?.display_name_preference === 'poolie_name' &&
           userProfile?.poolie_name
             ? userProfile.poolie_name
-            : userProfile?.first_name ?? 'You';
+            : userProfile?.first_name
+              ? `${userProfile.first_name}${userProfile.last_name ? ` ${userProfile.last_name.charAt(0)}.` : ''}`
+              : 'You';
 
         return (
           <View key={ctx.poolId} style={styles.row}>
