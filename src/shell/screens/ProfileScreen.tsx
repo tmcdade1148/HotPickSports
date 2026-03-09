@@ -222,7 +222,11 @@ export function ProfileScreen({navigation}: any) {
                       styles.toggleText,
                       displayPref === 'first_name' && styles.toggleTextActive,
                     ]}>
-                    {firstName.trim() || 'First name'}
+                    {firstName.trim()
+                      ? lastName.trim()
+                        ? `${firstName.trim()} ${lastName.trim().charAt(0).toUpperCase()}.`
+                        : firstName.trim()
+                      : 'First name'}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
