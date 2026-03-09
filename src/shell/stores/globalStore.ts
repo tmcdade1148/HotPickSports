@@ -7,10 +7,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {getEventsByPriority} from '@sports/registry';
 
 const POOL_STORAGE_PREFIX = 'hotpick_active_pool_';
+const DEFAULT_POOL_PREFIX = 'hotpick_default_pool_';
 
 /** AsyncStorage key for a competition's active pool */
 function poolStorageKey(competition: string): string {
   return `${POOL_STORAGE_PREFIX}${competition}`;
+}
+
+/** AsyncStorage key for a competition's default pool (loads on app open) */
+function defaultPoolStorageKey(competition: string): string {
+  return `${DEFAULT_POOL_PREFIX}${competition}`;
 }
 
 /** Generate a random 6-character alphanumeric invite code. */
@@ -61,11 +67,14 @@ interface GlobalState {
 
   // Pool state — global, drives all tabs simultaneously
   activePoolId: string | null;
+  defaultPoolId: string | null; // loads on app open (persisted per competition)
   userPools: DbPool[];
   poolRoles: Record<string, string>; // poolId → 'member' | 'admin' | 'organizer'
   poolsByCompetition: Record<string, DbPool[]>;
   isLoadingPools: boolean;
   setActivePoolId: (poolId: string | null) => void;
+  setDefaultPoolId: (poolId: string) => void;
+  loadDefaultPoolId: (competition: string) => Promise<void>;
   fetchUserPools: (userId: string, competition: string) => Promise<void>;
   getPoolsForCompetition: (competition: string) => DbPool[];
   createPool: (params: {
@@ -108,9 +117,11 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     // Clean up Realtime subscription
     get().unsubscribeSmackUnread();
 
-    // Clear all per-competition pool keys
+    // Clear all per-competition pool + default pool keys
     const keys = await AsyncStorage.getAllKeys();
-    const poolKeys = keys.filter(k => k.startsWith(POOL_STORAGE_PREFIX));
+    const poolKeys = keys.filter(
+      k => k.startsWith(POOL_STORAGE_PREFIX) || k.startsWith(DEFAULT_POOL_PREFIX),
+    );
     if (poolKeys.length > 0) {
       await AsyncStorage.multiRemove(poolKeys);
     }
@@ -119,6 +130,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       user: null,
       userProfile: null,
       activePoolId: null,
+      defaultPoolId: null,
       userPools: [],
       poolRoles: {},
       poolsByCompetition: {},
@@ -251,6 +263,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   // Pool state
   // ---------------------------------------------------------------------------
   activePoolId: null,
+  defaultPoolId: null,
   userPools: [],
   poolRoles: {},
   poolsByCompetition: {},
@@ -263,6 +276,23 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       AsyncStorage.setItem(poolStorageKey(competition), poolId);
     } else if (competition) {
       AsyncStorage.removeItem(poolStorageKey(competition));
+    }
+  },
+
+  setDefaultPoolId: poolId => {
+    set({defaultPoolId: poolId});
+    const competition = get().activeSport?.competition;
+    if (competition) {
+      AsyncStorage.setItem(defaultPoolStorageKey(competition), poolId);
+    }
+  },
+
+  loadDefaultPoolId: async (competition: string) => {
+    const poolId = await AsyncStorage.getItem(
+      defaultPoolStorageKey(competition),
+    );
+    if (poolId) {
+      set({defaultPoolId: poolId});
     }
   },
 
