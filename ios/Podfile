@@ -30,5 +30,14 @@ target 'HotPickSports' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+
+    # Expose React-RCTLinking as a Swift module so AppDelegate can import it
+    installer.pods_project.targets.each do |target|
+      if target.name == 'React-RCTLinking'
+        target.build_configurations.each do |config|
+          config.build_settings['DEFINES_MODULE'] = 'YES'
+        end
+      end
+    end
   end
 end
