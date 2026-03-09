@@ -12,6 +12,9 @@ export function getDisplayName(profile: DbProfile | null): string {
   ) {
     return profile.poolie_name;
   }
+  if (profile.first_name && profile.last_name) {
+    return `${profile.first_name} ${profile.last_name.charAt(0).toUpperCase()}.`;
+  }
   return profile.first_name || 'Poolie';
 }
 
