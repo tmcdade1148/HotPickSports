@@ -14,6 +14,7 @@ import {
   Grid3x3,
   BarChart2,
   MessageCircle,
+  Settings,
   ChevronDown,
   ChevronLeft,
   User,
@@ -27,6 +28,7 @@ import {GroupPicksScreen} from '../screens/GroupPicksScreen';
 import {MatchPicksScreen} from '../screens/MatchPicksScreen';
 import {TournamentBoardScreen} from '../screens/TournamentBoardScreen';
 import {SmackTalkScreen} from '@shared/components/SmackTalkScreen';
+import {SettingsScreen} from '@shell/screens/SettingsScreen';
 
 // ---------------------------------------------------------------------------
 // Icon mapping — maps config icon strings to Lucide components
@@ -333,6 +335,16 @@ export function TournamentTabNavigator({
             />
           );
         })}
+        <Tab.Screen
+          name="Tournament_settings"
+          component={SettingsScreen}
+          options={{
+            title: 'Settings',
+            tabBarIcon: ({color, size}: {color: string; size: number}) => (
+              <Settings color={color} size={size} />
+            ),
+          }}
+        />
       </Tab.Navigator>
     </View>
   );
