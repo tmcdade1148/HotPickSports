@@ -349,7 +349,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
 
     const typedPool = data.pool as DbPool;
 
-    // Auto-select and add to both local list and competition cache
+    // Auto-select, add role, and add to both local list and competition cache
     set(state => {
       const updatedPools = [...state.userPools, typedPool];
       return {
@@ -359,6 +359,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
           [competition]: updatedPools,
         },
         activePoolId: typedPool.id,
+        poolRoles: {...state.poolRoles, [typedPool.id]: 'organizer'},
       };
     });
     AsyncStorage.setItem(poolStorageKey(competition), typedPool.id);
