@@ -72,17 +72,24 @@ export function LoadingScreen({navigation}: any) {
         const pools = useGlobalStore.getState().userPools;
 
         if (pools.length > 0) {
-          // Restore persisted pool selection, or default to global pool, or first pool
-          const persistedId = await AsyncStorage.getItem(
-            `hotpick_active_pool_${defaultEvent.competition}`,
+          // Priority: default pool → global pool → first pool
+          const defaultId = await AsyncStorage.getItem(
+            `hotpick_default_pool_${defaultEvent.competition}`,
           );
-          const persistedPool = persistedId
-            ? pools.find(p => p.id === persistedId)
+          const defaultPool = defaultId
+            ? pools.find(p => p.id === defaultId)
             : null;
           const globalPool = pools.find(p => p.is_global);
-          setActivePoolId(
-            persistedPool?.id ?? globalPool?.id ?? pools[0].id,
-          );
+          const startPoolId =
+            defaultPool?.id ?? globalPool?.id ?? pools[0].id;
+
+          setActivePoolId(startPoolId);
+
+          // Also load the default pool ID into store state
+          if (defaultId) {
+            useGlobalStore.getState().loadDefaultPoolId(defaultEvent.competition);
+          }
+
           const poolIds = pools.map(p => p.id);
           await fetchSmackUnreadCounts(session.user.id, poolIds);
         }

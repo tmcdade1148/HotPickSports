@@ -16,6 +16,7 @@ import {
   LogOut,
   ChevronRight,
   Users,
+  Star,
 } from 'lucide-react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {SYSTEM_AVATARS} from '@shell/components/AvatarSelector';
@@ -31,7 +32,9 @@ export function SettingsScreen() {
   const userPools = useGlobalStore(s => s.userPools);
   const poolRoles = useGlobalStore(s => s.poolRoles);
   const activePoolId = useGlobalStore(s => s.activePoolId);
+  const defaultPoolId = useGlobalStore(s => s.defaultPoolId);
   const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
+  const setDefaultPoolId = useGlobalStore(s => s.setDefaultPoolId);
   const activeSport = useGlobalStore(s => s.activeSport);
   const joinPool = useGlobalStore(s => s.joinPool);
   const signOut = useGlobalStore(s => s.signOut);
@@ -152,9 +155,24 @@ export function SettingsScreen() {
               ) : null}
             </View>
           </View>
-          {pool.id === activePoolId && (
-            <Text style={styles.activeLabel}>Active</Text>
-          )}
+          <View style={styles.poolActions}>
+            {pool.id === activePoolId && (
+              <Text style={styles.activeLabel}>Active</Text>
+            )}
+            <TouchableOpacity
+              onPress={() => setDefaultPoolId(pool.id)}
+              hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+              <Star
+                size={18}
+                color={
+                  pool.id === defaultPoolId
+                    ? colors.primary
+                    : colors.textSecondary
+                }
+                fill={pool.id === defaultPoolId ? colors.primary : 'none'}
+              />
+            </TouchableOpacity>
+          </View>
         </TouchableOpacity>
       ))}
 
@@ -294,6 +312,11 @@ const styles = StyleSheet.create({
   poolNameActive: {
     color: colors.primary,
     fontWeight: '600',
+  },
+  poolActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   activeLabel: {
     fontSize: 12,
