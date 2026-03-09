@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import {supabase} from '@shared/config/supabase';
 import {useAuth} from '@shared/hooks/useAuth';
+import {useGlobalStore} from '@shell/stores/globalStore';
+import {getDisplayName} from '@shared/utils/displayName';
 import {colors, spacing, borderRadius} from '@shared/theme';
 import type {DbSmackMessage} from '@shared/types/database';
 
@@ -28,6 +30,7 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
   const {user} = useAuth();
+  const userProfile = useGlobalStore(s => s.userProfile);
   const flatListRef = useRef<FlatList<DbSmackMessage>>(null);
 
   useEffect(() => {
@@ -80,7 +83,7 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
     await supabase.from('smack_messages').insert({
       pool_id: poolId,
       user_id: user.id,
-      author_name: 'Player', // TODO: pass display name from profile
+      author_name: getDisplayName(userProfile),
       text: newMessage.trim(),
     });
 
