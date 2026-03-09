@@ -44,6 +44,10 @@ interface SeasonState {
     pickedTeam: string;
     isHotPick: boolean;
   }) => Promise<void>;
+  setHotPick: (params: {
+    userId: string;
+    gameId: string;
+  }) => Promise<void>;
   fetchLeaderboard: () => Promise<void>;
 
   // Picks completion
@@ -215,6 +219,66 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       set({weekPicks: prevWeekPicks, saveError: error.message});
     }
 
+    set({isSaving: false});
+  },
+
+  setHotPick: async ({userId, gameId}) => {
+    const {config, weekPicks, currentWeek} = get();
+    if (!config) return;
+
+    const pick = weekPicks.find(p => p.game_id === gameId);
+    if (!pick) return; // Must have a pick first
+
+    // Already the hotpick — nothing to do
+    if (pick.is_hot_pick) return;
+
+    const prevWeekPicks = weekPicks;
+
+    // Optimistic: clear old hotpick, set new one
+    const updated = weekPicks.map(p => ({
+      ...p,
+      is_hot_pick: p.game_id === gameId,
+    }));
+    set({weekPicks: updated, isSaving: true, saveError: null});
+
+    // Find old hotpick to clear in DB
+    const oldHotPick = prevWeekPicks.find(p => p.is_hot_pick && p.game_id !== gameId);
+
+    // Clear old hotpick in DB
+    if (oldHotPick) {
+      const {error: clearError} = await supabase.from('season_picks').upsert(
+        {
+          user_id: userId,
+          competition: config.competition,
+          game_id: oldHotPick.game_id,
+          week: currentWeek,
+          picked_team: oldHotPick.picked_team,
+          is_hot_pick: false,
+        },
+        {onConflict: 'user_id,competition,game_id'},
+      );
+      if (clearError) {
+        set({weekPicks: prevWeekPicks, saveError: clearError.message, isSaving: false});
+        return;
+      }
+    }
+
+    // Set new hotpick in DB
+    const {error} = await supabase.from('season_picks').upsert(
+      {
+        user_id: userId,
+        competition: config.competition,
+        game_id: gameId,
+        week: currentWeek,
+        picked_team: pick.picked_team,
+        is_hot_pick: true,
+      },
+      {onConflict: 'user_id,competition,game_id'},
+    );
+
+    if (error) {
+      set({weekPicks: prevWeekPicks, saveError: error.message});
+    }
     set({isSaving: false});
   },
 

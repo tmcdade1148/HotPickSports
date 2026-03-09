@@ -50,7 +50,7 @@ export function SubmitPicksButton(props: SubmitPicksButtonProps) {
       enabled: false,
     },
     needs_hotpick: {
-      label: `Select ${remaining} more HotPick${remaining !== 1 ? 's' : ''}`,
+      label: 'Select Your HotPick',
       bgColor: colors.warning,
       enabled: false,
     },
