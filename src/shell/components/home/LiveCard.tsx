@@ -49,7 +49,7 @@ export function LiveCard({
             {userHotPickGame.frozen_rank != null && (
               <View style={styles.rankBadge}>
                 <Text style={styles.rankBadgeText}>
-                  {'\uD83D\uDD25'} Rank {userHotPickGame.frozen_rank}
+                  {'\uD83D\uDD25'} {userHotPickGame.frozen_rank} HotPick Pts
                 </Text>
               </View>
             )}
