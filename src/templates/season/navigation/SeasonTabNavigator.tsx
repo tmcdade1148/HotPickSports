@@ -14,7 +14,7 @@ import {
   MessageCircle,
   ChevronDown,
   ChevronLeft,
-  User,
+  Settings,
 } from 'lucide-react-native';
 import type {SeasonConfig, TabConfig} from '@shared/types/templates';
 import type {DbPool} from '@shared/types/database';
@@ -63,7 +63,7 @@ interface PoolSwitcherHeaderProps {
   onSwitchPool: (poolId: string) => void;
   activePoolId: string;
   accentColor: string;
-  onOpenProfile?: () => void;
+  onOpenSettings?: () => void;
   onGoHome?: () => void;
 }
 
@@ -73,7 +73,7 @@ function PoolSwitcherHeader({
   onSwitchPool,
   activePoolId,
   accentColor,
-  onOpenProfile,
+  onOpenSettings,
   onGoHome,
 }: PoolSwitcherHeaderProps) {
   const [modalVisible, setModalVisible] = useState(false);
@@ -105,11 +105,11 @@ function PoolSwitcherHeader({
           <ChevronDown size={16} color={colors.textSecondary} />
         </TouchableOpacity>
 
-        {onOpenProfile ? (
+        {onOpenSettings ? (
           <TouchableOpacity
-            style={headerStyles.profileButton}
-            onPress={onOpenProfile}>
-            <User size={22} color={colors.textSecondary} />
+            style={headerStyles.settingsButton}
+            onPress={onOpenSettings}>
+            <Settings size={22} color={colors.textSecondary} />
           </TouchableOpacity>
         ) : (
           <View style={headerStyles.iconSpacer} />
@@ -182,7 +182,7 @@ const headerStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  profileButton: {
+  settingsButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
@@ -250,7 +250,7 @@ interface SeasonTabNavigatorProps {
   /** Callback when user selects a different pool in the switcher. */
   onSwitchPool?: (poolId: string) => void;
   /** Callback to open the profile screen (provided by shell). */
-  onOpenProfile?: () => void;
+  onOpenSettings?: () => void;
   /** Callback to navigate back to the Home Screen. */
   onGoHome?: () => void;
 }
@@ -270,7 +270,7 @@ export function SeasonTabNavigator({
   poolName,
   userPools,
   onSwitchPool,
-  onOpenProfile,
+  onOpenSettings,
   onGoHome,
 }: SeasonTabNavigatorProps) {
   const initialize = useSeasonStore(s => s.initialize);
@@ -290,7 +290,7 @@ export function SeasonTabNavigator({
           onSwitchPool={onSwitchPool}
           activePoolId={poolId}
           accentColor={config.color}
-          onOpenProfile={onOpenProfile}
+          onOpenSettings={onOpenSettings}
           onGoHome={onGoHome}
         />
       )}
