@@ -14,6 +14,7 @@ import {JoinPoolScreen} from '@shell/screens/JoinPoolScreen';
 import {HomeScreen} from '@shell/screens/HomeScreen';
 import {EventDetailScreen} from '@shell/screens/EventDetailScreen';
 import {ProfileScreen} from '@shell/screens/ProfileScreen';
+import {SettingsScreen} from '@shell/screens/SettingsScreen';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {Linking} from 'react-native';
 
@@ -106,6 +107,7 @@ export function RootNavigator() {
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="EventDetail" component={EventDetailScreen} />
         <Stack.Screen name="Profile" component={ProfileScreen} />
+        <Stack.Screen name="Settings" component={SettingsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

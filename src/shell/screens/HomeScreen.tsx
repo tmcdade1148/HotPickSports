@@ -7,7 +7,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {User} from 'lucide-react-native';
+import {Settings} from 'lucide-react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {getDisplayName} from '@shared/utils/displayName';
 import {SeasonEventCard} from '@shell/components/home/SeasonEventCard';
@@ -84,8 +84,8 @@ export function HomeScreen({navigation}: any) {
         </View>
         <TouchableOpacity
           style={styles.profileButton}
-          onPress={() => navigation.navigate('Profile')}>
-          <User size={22} color={colors.text} />
+          onPress={() => navigation.navigate('Settings')}>
+          <Settings size={22} color={colors.text} />
         </TouchableOpacity>
       </View>
 

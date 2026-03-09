@@ -10,12 +10,14 @@ import {
   StyleSheet,
   Clipboard,
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import {
   User,
   Plus,
   LogOut,
   ChevronRight,
+  ChevronLeft,
   Users,
   Star,
 } from 'lucide-react-native';
@@ -26,7 +28,6 @@ import {colors, spacing, borderRadius} from '@shared/theme';
 
 export function SettingsScreen() {
   const navigation = useNavigation<any>();
-  const rootNavigation = navigation.getParent();
 
   const user = useGlobalStore(s => s.user);
   const userProfile = useGlobalStore(s => s.userProfile);
@@ -71,7 +72,7 @@ export function SettingsScreen() {
 
   const handleCreatePool = () => {
     if (activeSport) {
-      rootNavigation?.navigate('CreatePool');
+      navigation.navigate('CreatePool');
     }
   };
 
@@ -83,21 +84,33 @@ export function SettingsScreen() {
         style: 'destructive',
         onPress: async () => {
           await signOut();
-          rootNavigation?.reset({index: 0, routes: [{name: 'Welcome'}]});
+          navigation.reset({index: 0, routes: [{name: 'Welcome'}]});
         },
       },
     ]);
   };
 
   return (
+    <SafeAreaView style={styles.container} edges={['top']}>
     <ScrollView
-      style={styles.container}
+      style={styles.flex}
       contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="handled">
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+          <ChevronLeft size={24} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Settings</Text>
+        <View style={{width: 24}} />
+      </View>
+
       {/* Profile card */}
       <TouchableOpacity
         style={styles.profileCard}
-        onPress={() => rootNavigation?.navigate('Profile')}>
+        onPress={() => navigation.navigate('Profile')}>
         <View style={styles.profileInfo}>
           <View
             style={[
@@ -251,6 +264,7 @@ export function SettingsScreen() {
         <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
     </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -259,9 +273,24 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  flex: {
+    flex: 1,
+  },
   content: {
     padding: spacing.lg,
     paddingBottom: spacing.xxl,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
   },
   profileCard: {
     flexDirection: 'row',

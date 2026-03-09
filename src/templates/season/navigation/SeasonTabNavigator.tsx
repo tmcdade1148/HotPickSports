@@ -12,7 +12,6 @@ import {
   CheckCircle,
   BarChart2,
   MessageCircle,
-  Settings,
   ChevronDown,
   ChevronLeft,
   User,
@@ -24,7 +23,6 @@ import {useSeasonStore} from '../stores/seasonStore';
 import {SeasonPicksScreen} from '../screens/SeasonPicksScreen';
 import {SeasonBoardScreen} from '../screens/SeasonBoardScreen';
 import {SmackTalkScreen} from '@shared/components/SmackTalkScreen';
-import {SettingsScreen} from '@shell/screens/SettingsScreen';
 
 // ---------------------------------------------------------------------------
 // Icon mapping — maps config icon strings to Lucide components
@@ -327,16 +325,6 @@ export function SeasonTabNavigator({
             />
           );
         })}
-        <Tab.Screen
-          name="Season_settings"
-          component={SettingsScreen}
-          options={{
-            title: 'Settings',
-            tabBarIcon: ({color, size}: {color: string; size: number}) => (
-              <Settings color={color} size={size} />
-            ),
-          }}
-        />
       </Tab.Navigator>
     </View>
   );
