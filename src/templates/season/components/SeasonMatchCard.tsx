@@ -416,7 +416,7 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   winnerTriangle: {
-    fontSize: 8,
+    fontSize: 16,
     color: colors.success,
   },
 
