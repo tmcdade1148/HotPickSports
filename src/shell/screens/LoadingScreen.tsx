@@ -72,20 +72,33 @@ export function LoadingScreen({navigation}: any) {
         const pools = useGlobalStore.getState().userPools;
 
         if (pools.length > 0) {
-          // Priority: default pool → global pool → first pool
-          const defaultId = await AsyncStorage.getItem(
-            `hotpick_default_pool_${defaultEvent.competition}`,
-          );
+          // Priority: default pool → last active pool → global pool → first pool
+          let defaultId: string | null = null;
+          let activeId: string | null = null;
+          try {
+            defaultId = await AsyncStorage.getItem(
+              `hotpick_default_pool_${defaultEvent.competition}`,
+            );
+            activeId = await AsyncStorage.getItem(
+              `hotpick_active_pool_${defaultEvent.competition}`,
+            );
+          } catch {
+            // AsyncStorage read failed — proceed with fallbacks
+          }
+
           const defaultPool = defaultId
             ? pools.find(p => p.id === defaultId)
             : null;
+          const activePool = activeId
+            ? pools.find(p => p.id === activeId)
+            : null;
           const globalPool = pools.find(p => p.is_global);
           const startPoolId =
-            defaultPool?.id ?? globalPool?.id ?? pools[0].id;
+            defaultPool?.id ?? activePool?.id ?? globalPool?.id ?? pools[0].id;
 
           setActivePoolId(startPoolId);
 
-          // Also load the default pool ID into store state
+          // Load the default pool ID into store state for the star icon
           if (defaultId) {
             useGlobalStore.getState().loadDefaultPoolId(defaultEvent.competition);
           }

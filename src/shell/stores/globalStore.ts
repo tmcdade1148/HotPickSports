@@ -288,11 +288,15 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   },
 
   loadDefaultPoolId: async (competition: string) => {
-    const poolId = await AsyncStorage.getItem(
-      defaultPoolStorageKey(competition),
-    );
-    if (poolId) {
-      set({defaultPoolId: poolId});
+    try {
+      const poolId = await AsyncStorage.getItem(
+        defaultPoolStorageKey(competition),
+      );
+      if (poolId) {
+        set({defaultPoolId: poolId});
+      }
+    } catch {
+      // AsyncStorage read failed — leave defaultPoolId as null
     }
   },
 
