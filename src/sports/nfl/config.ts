@@ -23,7 +23,7 @@ export const nflSeason: SeasonConfig = {
   playoffStartWeek: 19,
 
   // Scoring
-  hotPicksPerWeek: 3,
+  hotPicksPerWeek: 1,
   rankSource: 'odds',
   rankRange: [1, 10],
 
