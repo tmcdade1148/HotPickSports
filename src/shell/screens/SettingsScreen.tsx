@@ -137,14 +137,35 @@ export function SettingsScreen() {
                   : colors.textSecondary
               }
             />
-            <View>
-              <Text
-                style={[
-                  styles.poolName,
-                  pool.id === activePoolId && styles.poolNameActive,
-                ]}>
-                {pool.name}
-              </Text>
+            <View style={styles.poolNameCol}>
+              <View style={styles.poolNameRow}>
+                <Text
+                  style={[
+                    styles.poolName,
+                    pool.id === activePoolId && styles.poolNameActive,
+                  ]}
+                  numberOfLines={1}>
+                  {pool.name}
+                </Text>
+                {!pool.is_global &&
+                  pool.invite_code &&
+                  (poolRoles[pool.id] === 'organizer' ||
+                    poolRoles[pool.id] === 'admin') && (
+                    <TouchableOpacity
+                      onPress={() =>
+                        Alert.alert(
+                          'Invite Code',
+                          pool.invite_code ?? '',
+                          [{text: 'OK'}],
+                        )
+                      }
+                      hitSlop={{top: 6, bottom: 6, left: 6, right: 6}}>
+                      <Text style={styles.inviteCode}>
+                        {pool.invite_code}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+              </View>
               {pool.is_global ? (
                 <Text style={styles.globalBadge}>Global pool</Text>
               ) : poolRoles[pool.id] ? (
@@ -304,10 +325,30 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     flex: 1,
   },
+  poolNameCol: {
+    flex: 1,
+  },
+  poolNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   poolName: {
     fontSize: 15,
     fontWeight: '500',
     color: colors.text,
+    flexShrink: 1,
+  },
+  inviteCode: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.primary,
+    backgroundColor: colors.primary + '15',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+    letterSpacing: 1,
+    overflow: 'hidden',
   },
   poolNameActive: {
     color: colors.primary,
