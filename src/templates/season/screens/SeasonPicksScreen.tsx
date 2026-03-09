@@ -115,8 +115,8 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   list: {
-    padding: spacing.md,
     paddingTop: 0,
+    paddingBottom: spacing.xl,
   },
   centered: {
     flex: 1,
