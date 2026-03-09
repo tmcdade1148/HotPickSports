@@ -11,8 +11,10 @@ import {
   ScrollView,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
+import {getDefaultEvent} from '@sports/registry';
 import {colors, spacing, borderRadius} from '@shared/theme';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -29,10 +31,17 @@ export function EmailEntryScreen({navigation}: any) {
   const [error, setError] = useState('');
 
   const setUser = useGlobalStore(s => s.setUser);
+  const setActiveSport = useGlobalStore(s => s.setActiveSport);
   const fetchProfile = useGlobalStore(s => s.fetchProfile);
+  const fetchUserPools = useGlobalStore(s => s.fetchUserPools);
+  const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
   const acceptTos = useGlobalStore(s => s.acceptTos);
   const ensureGlobalPoolMembership = useGlobalStore(
     s => s.ensureGlobalPoolMembership,
+  );
+  const subscribeSmackUnread = useGlobalStore(s => s.subscribeSmackUnread);
+  const fetchSmackUnreadCounts = useGlobalStore(
+    s => s.fetchSmackUnreadCounts,
   );
 
   const isValidEmail = EMAIL_REGEX.test(email.trim());
@@ -70,6 +79,8 @@ export function EmailEntryScreen({navigation}: any) {
 
       if (data.user) {
         setUser(data.user);
+        const defaultEvent = getDefaultEvent();
+        setActiveSport(defaultEvent);
         await acceptTos(data.user.id);
         await ensureGlobalPoolMembership();
         navigation.replace('ProfileSetup');
@@ -94,14 +105,59 @@ export function EmailEntryScreen({navigation}: any) {
 
       if (data.user) {
         setUser(data.user);
+        const defaultEvent = getDefaultEvent();
+        setActiveSport(defaultEvent);
+
         await ensureGlobalPoolMembership();
         const profile = await fetchProfile(data.user.id);
 
         if (!profile || !profile.first_name) {
           navigation.replace('ProfileSetup');
-        } else {
-          navigation.replace('Home');
+          return;
         }
+
+        // Load pools and select active pool — same logic as LoadingScreen
+        await fetchUserPools(data.user.id, defaultEvent.competition);
+        const pools = useGlobalStore.getState().userPools;
+
+        if (pools.length > 0) {
+          let defaultId: string | null = null;
+          let activeId: string | null = null;
+          try {
+            defaultId = await AsyncStorage.getItem(
+              `hotpick_default_pool_${defaultEvent.competition}`,
+            );
+            activeId = await AsyncStorage.getItem(
+              `hotpick_active_pool_${defaultEvent.competition}`,
+            );
+          } catch {
+            // proceed with fallbacks
+          }
+
+          const defaultPool = defaultId
+            ? pools.find(p => p.id === defaultId)
+            : null;
+          const activePool = activeId
+            ? pools.find(p => p.id === activeId)
+            : null;
+          const globalPool = pools.find(p => p.is_global);
+          const startPoolId =
+            defaultPool?.id ?? activePool?.id ?? globalPool?.id ?? pools[0].id;
+
+          setActivePoolId(startPoolId);
+
+          if (defaultId) {
+            useGlobalStore
+              .getState()
+              .loadDefaultPoolId(defaultEvent.competition);
+          }
+
+          const poolIds = pools.map(p => p.id);
+          await fetchSmackUnreadCounts(data.user.id, poolIds);
+        }
+
+        subscribeSmackUnread();
+        navigation.replace('Home');
       }
     }
   };
