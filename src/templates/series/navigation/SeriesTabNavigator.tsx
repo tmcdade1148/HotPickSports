@@ -12,6 +12,7 @@ import {
   CheckCircle,
   BarChart2,
   MessageCircle,
+  Settings,
   ChevronDown,
   ChevronLeft,
   User,
@@ -23,6 +24,7 @@ import {useSeriesStore} from '../stores/seriesStore';
 import {SeriesPicksScreen} from '../screens/SeriesPicksScreen';
 import {SeriesBoardScreen} from '../screens/SeriesBoardScreen';
 import {SmackTalkScreen} from '@shared/components/SmackTalkScreen';
+import {SettingsScreen} from '@shell/screens/SettingsScreen';
 
 // ---------------------------------------------------------------------------
 // Icon mapping — maps config icon strings to Lucide components
@@ -311,6 +313,16 @@ export function SeriesTabNavigator({
             />
           );
         })}
+        <Tab.Screen
+          name="Series_settings"
+          component={SettingsScreen}
+          options={{
+            title: 'Settings',
+            tabBarIcon: ({color, size}: {color: string; size: number}) => (
+              <Settings color={color} size={size} />
+            ),
+          }}
+        />
       </Tab.Navigator>
     </View>
   );
