@@ -335,7 +335,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   rankLabel: {
-    fontSize: 7,
+    fontSize: 8,
     fontWeight: '600',
     color: colors.textSecondary,
     textAlign: 'center',
