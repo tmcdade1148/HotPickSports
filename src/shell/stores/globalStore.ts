@@ -335,30 +335,19 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   createPool: async ({userId, competition, name, isPublic}) => {
     const inviteCode = generateInviteCode();
 
-    // Insert the pool
-    const {data: pool, error: poolError} = await supabase
-      .from('pools')
-      .insert({
-        name,
-        competition,
-        created_by: userId,
-        invite_code: inviteCode,
-        is_public: isPublic,
-      })
-      .select()
-      .single();
+    // Use SECURITY DEFINER RPC to create pool + add creator atomically
+    const {data, error} = await supabase.rpc('create_pool', {
+      p_name: name,
+      p_competition: competition,
+      p_is_public: isPublic,
+      p_invite_code: inviteCode,
+    });
 
-    if (poolError || !pool) {
+    if (error || !data || data.error) {
       return null;
     }
 
-    // Add creator as first member
-    await supabase.from('pool_members').insert({
-      pool_id: pool.id,
-      user_id: userId,
-    });
-
-    const typedPool = pool as DbPool;
+    const typedPool = data.pool as DbPool;
 
     // Auto-select and add to both local list and competition cache
     set(state => {
