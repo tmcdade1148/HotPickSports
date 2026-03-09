@@ -49,6 +49,7 @@ interface NFLState {
   weekState: WeekState;
   picksDeadline: Date | null;
   userHotPick: DbSeasonPick | null;
+  userHotPickGame: DbSeasonGame | null;
   liveScores: Record<string, GameScore>;
   weekResult: WeekResult | null;
   poolStandings: Standing[];
@@ -88,6 +89,7 @@ export const useNFLStore = create<NFLState>((set, get) => ({
   weekState: 'picks_open',
   picksDeadline: null,
   userHotPick: null,
+  userHotPickGame: null,
   liveScores: {},
   weekResult: null,
   poolStandings: [],
@@ -108,6 +110,7 @@ export const useNFLStore = create<NFLState>((set, get) => ({
   initialize: async (competition: string) => {
     set({
       competition,
+      userHotPickGame: null,
       liveScores: {},
       weekResult: null,
       poolStandings: [],
@@ -178,17 +181,30 @@ export const useNFLStore = create<NFLState>((set, get) => ({
   fetchUserHotPick: async (userId: string) => {
     const {competition, currentWeek} = get();
 
-    const {data} = await supabase
+    const {data: pick} = await supabase
       .from('season_picks')
       .select('*')
       .eq('user_id', userId)
       .eq('competition', competition)
       .eq('week', currentWeek)
-      .eq('is_hot_pick', true)
+      .eq('is_hotpick', true)
       .limit(1)
       .maybeSingle();
 
-    set({userHotPick: (data as DbSeasonPick) ?? null});
+    set({userHotPick: (pick as DbSeasonPick) ?? null});
+
+    // Fetch the game to get frozen_rank + team identifiers
+    if (pick?.game_id) {
+      const {data: game} = await supabase
+        .from('season_games')
+        .select('*')
+        .eq('game_id', pick.game_id)
+        .maybeSingle();
+
+      set({userHotPickGame: (game as DbSeasonGame) ?? null});
+    } else {
+      set({userHotPickGame: null});
+    }
   },
 
   fetchHighestRankedGame: async () => {

@@ -44,6 +44,7 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
   const currentPhase = useNFLStore(s => s.currentPhase);
   const picksDeadline = useNFLStore(s => s.picksDeadline);
   const userHotPick = useNFLStore(s => s.userHotPick);
+  const userHotPickGame = useNFLStore(s => s.userHotPickGame);
   const liveScores = useNFLStore(s => s.liveScores);
   const weekResult = useNFLStore(s => s.weekResult);
   const poolStandings = useNFLStore(s => s.poolStandings);
@@ -205,6 +206,7 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
         currentWeek,
         picksDeadline,
         userHotPick,
+        userHotPickGame,
         liveScores,
         weekResult,
         poolStandings,
@@ -229,6 +231,7 @@ function renderWeekState(props: {
   currentWeek: number;
   picksDeadline: Date | null;
   userHotPick: any;
+  userHotPickGame: any;
   liveScores: Record<string, any>;
   weekResult: any;
   poolStandings: any[];
@@ -260,6 +263,7 @@ function renderWeekState(props: {
         <LiveCard
           currentWeek={props.currentWeek}
           userHotPick={props.userHotPick}
+          userHotPickGame={props.userHotPickGame}
           liveScores={props.liveScores}
         />
       );

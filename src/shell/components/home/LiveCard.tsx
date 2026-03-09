@@ -1,23 +1,37 @@
 import React from 'react';
 import {View, Text, StyleSheet} from 'react-native';
 import {colors, spacing, typography} from '@shared/theme';
-import type {DbSeasonPick} from '@shared/types/database';
+import type {DbSeasonPick, DbSeasonGame} from '@shared/types/database';
 import type {GameScore} from '@sports/nfl/stores/nflStore';
+import {getHotPickImpact} from '@sports/nfl/utils/hotPickImpact';
+import type {HotPickImpact} from '@sports/nfl/utils/hotPickImpact';
 
 interface LiveCardProps {
   currentWeek: number;
   userHotPick: DbSeasonPick | null;
+  userHotPickGame: DbSeasonGame | null;
   liveScores: Record<string, GameScore>;
 }
 
 /**
  * Shown when weekState === 'live'.
- * Displays user's HotPick game with live score + point impact.
+ * Displays user's HotPick game with live score + color-coded point impact.
  */
-export function LiveCard({currentWeek, userHotPick, liveScores}: LiveCardProps) {
+export function LiveCard({
+  currentWeek,
+  userHotPick,
+  userHotPickGame,
+  liveScores,
+}: LiveCardProps) {
   const hotPickScore = userHotPick
     ? liveScores[userHotPick.game_id]
     : null;
+
+  // Compute point impact when all data is available
+  const impact: HotPickImpact | null =
+    userHotPick && userHotPickGame
+      ? getHotPickImpact(userHotPick, userHotPickGame, hotPickScore ?? undefined)
+      : null;
 
   return (
     <View style={styles.container}>
@@ -27,20 +41,34 @@ export function LiveCard({currentWeek, userHotPick, liveScores}: LiveCardProps) 
         <Text style={styles.liveText}>Games in progress</Text>
       </View>
 
-      {userHotPick && hotPickScore ? (
+      {userHotPick && userHotPickGame ? (
         <View style={styles.hotPickSection}>
-          <Text style={styles.hotPickLabel}>Your HotPick</Text>
+          {/* Header: YOUR HOTPICK + rank badge */}
+          <View style={styles.hotPickHeader}>
+            <Text style={styles.hotPickLabel}>YOUR HOTPICK</Text>
+            {userHotPickGame.frozen_rank != null && (
+              <View style={styles.rankBadge}>
+                <Text style={styles.rankBadgeText}>
+                  {'\uD83D\uDD25'} Rank {userHotPickGame.frozen_rank}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Full matchup line */}
           <Text style={styles.matchup}>
-            {userHotPick.picked_team}
+            {userHotPickGame.away_team} {hotPickScore?.awayScore ?? '—'} — {userHotPickGame.home_team} {hotPickScore?.homeScore ?? '—'}
           </Text>
-          <Text style={styles.score}>
-            {hotPickScore.homeScore} - {hotPickScore.awayScore}
-          </Text>
-          {hotPickScore.gameClock && (
+
+          {/* Game clock */}
+          {hotPickScore?.gameClock && (
             <Text style={styles.clock}>
               Q{hotPickScore.currentPeriod} {hotPickScore.gameClock}
             </Text>
           )}
+
+          {/* Point impact line */}
+          {impact && <ImpactLine impact={impact} />}
         </View>
       ) : (
         <Text style={styles.body}>Follow your picks live</Text>
@@ -48,6 +76,49 @@ export function LiveCard({currentWeek, userHotPick, liveScores}: LiveCardProps) 
     </View>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Impact Line — color-coded HotPick point impact
+// ---------------------------------------------------------------------------
+
+function ImpactLine({impact}: {impact: HotPickImpact}) {
+  switch (impact.status) {
+    case 'winning':
+      return (
+        <Text style={[styles.impactText, {color: colors.success}]}>
+          +{impact.points} if this holds {'\uD83D\uDD25'}
+        </Text>
+      );
+
+    case 'losing':
+      return (
+        <Text style={[styles.impactText, {color: colors.error}]}>
+          {'\u2212'}{impact.points} at risk {'\u26A0\uFE0F'}
+        </Text>
+      );
+
+    case 'tied':
+      return (
+        <Text style={[styles.impactText, {color: colors.warning}]}>
+          +{impact.points} or {'\u2212'}{impact.points} — game tied {'\u2696\uFE0F'}
+        </Text>
+      );
+
+    case 'final':
+      return (
+        <Text style={[styles.impactText, {color: colors.textSecondary}]}>
+          Game final — scoring shortly {'\u23F3'}
+        </Text>
+      );
+
+    case 'unavailable':
+      return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Styles
+// ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
   container: {
@@ -82,25 +153,43 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: spacing.md,
   },
+  hotPickHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
   hotPickLabel: {
     ...typography.small,
     color: colors.primary,
     fontWeight: '700',
-    marginBottom: spacing.xs,
+    letterSpacing: 0.5,
+  },
+  rankBadge: {
+    backgroundColor: colors.primary + '15',
+    borderRadius: 4,
+    paddingHorizontal: spacing.xs + 2,
+    paddingVertical: 2,
+  },
+  rankBadgeText: {
+    ...typography.small,
+    color: colors.primary,
+    fontWeight: '600',
   },
   matchup: {
     ...typography.h3,
     color: colors.text,
     marginBottom: spacing.xs,
   },
-  score: {
-    ...typography.h2,
-    color: colors.text,
-    marginBottom: spacing.xs,
-  },
   clock: {
     ...typography.caption,
     color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+  impactText: {
+    ...typography.body,
+    fontWeight: '700',
+    marginTop: spacing.xs,
   },
   body: {
     ...typography.body,
