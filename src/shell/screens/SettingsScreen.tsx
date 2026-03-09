@@ -29,6 +29,7 @@ export function SettingsScreen() {
   const user = useGlobalStore(s => s.user);
   const userProfile = useGlobalStore(s => s.userProfile);
   const userPools = useGlobalStore(s => s.userPools);
+  const poolRoles = useGlobalStore(s => s.poolRoles);
   const activePoolId = useGlobalStore(s => s.activePoolId);
   const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
   const activeSport = useGlobalStore(s => s.activeSport);
@@ -141,9 +142,14 @@ export function SettingsScreen() {
                 ]}>
                 {pool.name}
               </Text>
-              {pool.is_global && (
+              {pool.is_global ? (
                 <Text style={styles.globalBadge}>Global pool</Text>
-              )}
+              ) : poolRoles[pool.id] ? (
+                <Text style={styles.roleBadge}>
+                  {poolRoles[pool.id].charAt(0).toUpperCase() +
+                    poolRoles[pool.id].slice(1)}
+                </Text>
+              ) : null}
             </View>
           </View>
           {pool.id === activePoolId && (
@@ -295,6 +301,11 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   globalBadge: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginTop: 1,
+  },
+  roleBadge: {
     fontSize: 11,
     color: colors.textSecondary,
     marginTop: 1,

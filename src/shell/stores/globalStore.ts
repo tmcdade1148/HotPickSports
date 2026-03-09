@@ -62,6 +62,7 @@ interface GlobalState {
   // Pool state — global, drives all tabs simultaneously
   activePoolId: string | null;
   userPools: DbPool[];
+  poolRoles: Record<string, string>; // poolId → 'member' | 'admin' | 'organizer'
   poolsByCompetition: Record<string, DbPool[]>;
   isLoadingPools: boolean;
   setActivePoolId: (poolId: string | null) => void;
@@ -119,6 +120,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       userProfile: null,
       activePoolId: null,
       userPools: [],
+      poolRoles: {},
       poolsByCompetition: {},
       smackUnreadCounts: {},
       showGlobalPool: false,
@@ -250,6 +252,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   // ---------------------------------------------------------------------------
   activePoolId: null,
   userPools: [],
+  poolRoles: {},
   poolsByCompetition: {},
   isLoadingPools: false,
 
@@ -268,7 +271,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     // Join pools with pool_members to get pools this user belongs to
     const {data} = await supabase
       .from('pool_members')
-      .select('pool_id, pools!inner(*)')
+      .select('pool_id, role, pools!inner(*)')
       .eq('user_id', userId)
       .eq('pools.competition', competition)
       .eq('status', 'active');
@@ -276,9 +279,16 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     const pools: DbPool[] =
       data?.map((row: any) => row.pools as DbPool) ?? [];
 
+    // Build poolId → role map
+    const roles: Record<string, string> = {};
+    for (const row of data ?? []) {
+      roles[(row as any).pool_id] = (row as any).role;
+    }
+
     // Cache per competition and set as active list
     set(state => ({
       userPools: pools,
+      poolRoles: {...state.poolRoles, ...roles},
       poolsByCompetition: {...state.poolsByCompetition, [competition]: pools},
       isLoadingPools: false,
     }));
