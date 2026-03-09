@@ -244,17 +244,10 @@ export function SeasonMatchCard({
           }
           activeOpacity={0.6}>
           <Flame
-            size={38}
-            color={isHotPick ? '#FF8C00' : colors.text}
+            size={48}
+            color={isHotPick ? '#FF8C00' : '#555555'}
             fill={isHotPick ? '#FF8C00' : 'none'}
-            strokeWidth={isHotPick ? 2.5 : 1.5}
-            opacity={
-              !pickedTeam || (isLocked && !isHotPick) || (!isHotPick && !canToggleHotPick)
-                ? 0.15
-                : isHotPick
-                  ? 1
-                  : 0.4
-            }
+            strokeWidth={isHotPick ? 2.5 : 1.2}
           />
         </TouchableOpacity>
       </View>
@@ -278,7 +271,8 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 1,
+    marginLeft: 56, // align over left edge of team pills (rankColumn 44 + gap 12)
   },
   kickoffText: {
     fontSize: 12,
@@ -327,7 +321,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingVertical: 8,
+    paddingVertical: 4,
   },
 
   // Rank circle
@@ -427,10 +421,11 @@ const styles = StyleSheet.create({
 
   // Flame
   flameColumn: {
-    width: 40,
+    width: 48,
+    alignSelf: 'stretch',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
+    marginRight: 4,
   },
   // Separator
   separator: {
