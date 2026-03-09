@@ -1,5 +1,6 @@
 import React from 'react';
 import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
+import {Flame} from 'lucide-react-native';
 import type {SeasonConfig} from '@shared/types/templates';
 import type {DbSeasonGame} from '@shared/types/database';
 import {colors, spacing} from '@shared/theme';
@@ -231,7 +232,7 @@ export function SeasonMatchCard({
           />
         </View>
 
-        {/* Flame icon */}
+        {/* Flame icon — outline when inactive, filled orange when HotPick */}
         <TouchableOpacity
           style={styles.flameColumn}
           onPress={toggleHotPick}
@@ -242,16 +243,19 @@ export function SeasonMatchCard({
             (!canToggleHotPick && !isHotPick)
           }
           activeOpacity={0.6}>
-          <Text
-            style={[
-              styles.flameIcon,
-              isHotPick && styles.flameActive,
-              (!pickedTeam || (isLocked && !isHotPick)) &&
-                styles.flameDisabled,
-              !isHotPick && !canToggleHotPick && styles.flameDisabled,
-            ]}>
-            {'\uD83D\uDD25'}
-          </Text>
+          <Flame
+            size={26}
+            color={isHotPick ? '#FF8C00' : colors.textSecondary}
+            fill={isHotPick ? '#FF8C00' : 'none'}
+            strokeWidth={isHotPick ? 2 : 1.5}
+            opacity={
+              !pickedTeam || (isLocked && !isHotPick) || (!isHotPick && !canToggleHotPick)
+                ? 0.25
+                : isHotPick
+                  ? 1
+                  : 0.5
+            }
+          />
         </TouchableOpacity>
       </View>
 
@@ -373,6 +377,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     borderWidth: 2,
     borderColor: 'transparent',
+    backgroundColor: 'rgba(0, 0, 0, 0.03)',
   },
   teamButtonSelected: {
     borderColor: colors.primary,
@@ -425,18 +430,8 @@ const styles = StyleSheet.create({
     width: 32,
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 8,
   },
-  flameIcon: {
-    fontSize: 26,
-    opacity: 0.35,
-  },
-  flameActive: {
-    opacity: 1,
-  },
-  flameDisabled: {
-    opacity: 0.2,
-  },
-
   // Separator
   separator: {
     height: StyleSheet.hairlineWidth,
