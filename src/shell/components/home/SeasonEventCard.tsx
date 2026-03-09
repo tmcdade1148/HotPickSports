@@ -49,10 +49,12 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
   const weekResult = useNFLStore(s => s.weekResult);
   const poolStandings = useNFLStore(s => s.poolStandings);
   const highestRankedGame = useNFLStore(s => s.highestRankedGame);
+  const weekFirstKickoff = useNFLStore(s => s.weekFirstKickoff);
   const userPickCount = useNFLStore(s => s.userPickCount);
 
   const initialize = useNFLStore(s => s.initialize);
   const fetchUserPickStatus = useNFLStore(s => s.fetchUserPickStatus);
+  const fetchUserHotPick = useNFLStore(s => s.fetchUserHotPick);
   const fetchPoolStandings = useNFLStore(s => s.fetchPoolStandings);
   const fetchUserSeasonScore = useNFLStore(s => s.fetchUserSeasonScore);
 
@@ -87,13 +89,14 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
     }
   }, [userId, fetchUserSeasonScore]);
 
-  // ── 3. Fetch user pick status when picks_open ────────────────────────
+  // ── 3. Fetch user pick status + HotPick when picks_open ──────────────
   useEffect(() => {
     if (weekState !== 'picks_open' || !userId) {
       return;
     }
     fetchUserPickStatus(userId);
-  }, [weekState, userId, currentWeek, fetchUserPickStatus]);
+    fetchUserHotPick(userId);
+  }, [weekState, userId, currentWeek, fetchUserPickStatus, fetchUserHotPick]);
 
   // ── 3. Pool-scoped poolies count query ───────────────────────────────
   const fetchPooliesCount = useCallback(async () => {
@@ -213,6 +216,7 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
         userId,
         totalWeeks: config.totalWeeks,
         highestRankedGame,
+        weekFirstKickoff,
         userHasSubmitted: userPickCount > 0,
         poolPicksSubmittedCount,
         poolMemberCount,
@@ -238,6 +242,7 @@ function renderWeekState(props: {
   userId: string | null;
   totalWeeks: number;
   highestRankedGame: any;
+  weekFirstKickoff: Date | null;
   userHasSubmitted: boolean;
   poolPicksSubmittedCount: number;
   poolMemberCount: number;
@@ -250,6 +255,9 @@ function renderWeekState(props: {
           deadline={props.picksDeadline}
           currentWeek={props.currentWeek}
           highestRankedGame={props.highestRankedGame}
+          weekFirstKickoff={props.weekFirstKickoff}
+          hotPickKickoff={props.userHotPickGame?.kickoff_at ? new Date(props.userHotPickGame.kickoff_at) : null}
+          hotPickTeam={props.userHotPick?.picked_team ?? null}
           userHasSubmitted={props.userHasSubmitted}
           poolPicksSubmittedCount={props.poolPicksSubmittedCount}
           poolMemberCount={props.poolMemberCount}
