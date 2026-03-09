@@ -83,7 +83,7 @@ export function HomeScreen({navigation}: any) {
           <Text style={styles.name}>{firstName}</Text>
         </View>
         <TouchableOpacity
-          style={styles.profileButton}
+          style={styles.settingsButton}
           onPress={() => navigation.navigate('Settings')}>
           <Settings size={22} color={colors.text} />
         </TouchableOpacity>
@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
     ...typography.h2,
     color: colors.text,
   },
-  profileButton: {
+  settingsButton: {
     width: 40,
     height: 40,
     borderRadius: 20,

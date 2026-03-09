@@ -75,7 +75,7 @@ export function EventDetailScreen({navigation}: any) {
           poolName={activePool?.name}
           userPools={userPools}
           onSwitchPool={setActivePoolId}
-          onOpenProfile={() => navigation.navigate('Profile')}
+          onOpenSettings={() => navigation.navigate('Settings')}
           onGoHome={goHome}
         />
       );
@@ -87,7 +87,7 @@ export function EventDetailScreen({navigation}: any) {
           poolName={activePool?.name}
           userPools={userPools}
           onSwitchPool={setActivePoolId}
-          onOpenProfile={() => navigation.navigate('Profile')}
+          onOpenSettings={() => navigation.navigate('Settings')}
           onGoHome={goHome}
         />
       );
@@ -99,7 +99,7 @@ export function EventDetailScreen({navigation}: any) {
           poolName={activePool?.name}
           userPools={userPools}
           onSwitchPool={setActivePoolId}
-          onOpenProfile={() => navigation.navigate('Profile')}
+          onOpenSettings={() => navigation.navigate('Settings')}
           onGoHome={goHome}
         />
       );
