@@ -7,7 +7,7 @@ import {
   ScrollView,
   StyleSheet,
 } from 'react-native';
-import {ChevronDown} from 'lucide-react-native';
+import {ChevronDown, MessageCircle} from 'lucide-react-native';
 import {colors, spacing, borderRadius, typography} from '@shared/theme';
 import {supabase} from '@shared/config/supabase';
 import type {SeasonConfig} from '@shared/types/templates';
@@ -363,7 +363,13 @@ function CardHeader({
                         ]}>
                         {item.name}
                       </Text>
-                      {unread > 0 && <View style={styles.unreadDot} />}
+                      {unread > 0 && (
+                        <MessageCircle
+                          size={14}
+                          color={colors.primary}
+                          fill={colors.primary}
+                        />
+                      )}
                     </View>
                     {item.id === activePoolId && (
                       <Text style={{color: accentColor, fontSize: 16}}>
@@ -466,11 +472,5 @@ const styles = StyleSheet.create({
   poolOptionText: {
     ...typography.body,
     color: colors.text,
-  },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.primary,
   },
 });

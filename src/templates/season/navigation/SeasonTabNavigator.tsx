@@ -19,6 +19,7 @@ import {
 import type {SeasonConfig, TabConfig} from '@shared/types/templates';
 import type {DbPool} from '@shared/types/database';
 import {colors, spacing, borderRadius} from '@shared/theme';
+import {useGlobalStore} from '@shell/stores/globalStore';
 import {useSeasonStore} from '../stores/seasonStore';
 import {SeasonPicksScreen} from '../screens/SeasonPicksScreen';
 import {SeasonBoardScreen} from '../screens/SeasonBoardScreen';
@@ -77,6 +78,7 @@ function PoolSwitcherHeader({
   onGoHome,
 }: PoolSwitcherHeaderProps) {
   const [modalVisible, setModalVisible] = useState(false);
+  const smackUnreadCounts = useGlobalStore(s => s.smackUnreadCounts);
 
   const switchTo = (poolId: string) => {
     onSwitchPool(poolId);
@@ -132,23 +134,35 @@ function PoolSwitcherHeader({
           <View style={headerStyles.modal}>
             <Text style={headerStyles.modalTitle}>Switch Pool</Text>
             <ScrollView bounces={false}>
-              {userPools.map(item => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={headerStyles.poolOption}
-                  onPress={() => switchTo(item.id)}>
-                  <Text
-                    style={[
-                      headerStyles.poolOptionText,
-                      item.id === activePoolId && {color: accentColor},
-                    ]}>
-                    {item.name}
-                  </Text>
-                  {item.id === activePoolId && (
-                    <Text style={{color: accentColor}}>{'\u2713'}</Text>
-                  )}
-                </TouchableOpacity>
-              ))}
+              {userPools.map(item => {
+                const unread = smackUnreadCounts[item.id] ?? 0;
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={headerStyles.poolOption}
+                    onPress={() => switchTo(item.id)}>
+                    <View style={headerStyles.poolOptionRow}>
+                      <Text
+                        style={[
+                          headerStyles.poolOptionText,
+                          item.id === activePoolId && {color: accentColor},
+                        ]}>
+                        {item.name}
+                      </Text>
+                      {unread > 0 && (
+                        <MessageCircle
+                          size={14}
+                          color={colors.primary}
+                          fill={colors.primary}
+                        />
+                      )}
+                    </View>
+                    {item.id === activePoolId && (
+                      <Text style={{color: accentColor}}>{'\u2713'}</Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
           </View>
         </View>
@@ -227,6 +241,12 @@ const headerStyles = StyleSheet.create({
     paddingVertical: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+  },
+  poolOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flex: 1,
   },
   poolOptionText: {
     fontSize: 16,
