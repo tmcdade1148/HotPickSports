@@ -1,7 +1,6 @@
 import UIKit
 import React
 import React_RCTAppDelegate
-import React_RCTLinkingManager
 import ReactAppDependencyProvider
 
 @main
@@ -39,7 +38,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     open url: URL,
     options: [UIApplication.OpenURLOptionsKey: Any] = [:]
   ) -> Bool {
-    return RCTLinkingManager.application(app, open: url, options: options)
+    // Forward to RN Linking module via the same notification RCTLinkingManager uses
+    NotificationCenter.default.post(
+      name: NSNotification.Name("RCTOpenURLNotification"),
+      object: self,
+      userInfo: ["url": url.absoluteString]
+    )
+    return true
   }
 
   // Handle universal links (https://hotpick.app)
@@ -48,11 +53,16 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     continue userActivity: NSUserActivity,
     restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void
   ) -> Bool {
-    return RCTLinkingManager.application(
-      application,
-      continue: userActivity,
-      restorationHandler: restorationHandler
+    guard userActivity.activityType == NSUserActivityTypeBrowsingWeb,
+          let url = userActivity.webpageURL else {
+      return false
+    }
+    NotificationCenter.default.post(
+      name: NSNotification.Name("RCTOpenURLNotification"),
+      object: self,
+      userInfo: ["url": url.absoluteString]
     )
+    return true
   }
 }
 
