@@ -93,7 +93,8 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       leaderboard: [],
       userNames: {},
       isWeekComplete: false,
-    }),
+    });
+  },
 
   setCurrentWeek: (week: number) => {
     set({currentWeek: week, isWeekComplete: false});
