@@ -64,6 +64,7 @@ interface PoolSwitcherHeaderProps {
   onSwitchPool: (poolId: string) => void;
   activePoolId: string;
   accentColor: string;
+  activeTabKey?: string;
   onOpenSettings?: () => void;
   onGoHome?: () => void;
 }
@@ -74,11 +75,14 @@ function PoolSwitcherHeader({
   onSwitchPool,
   activePoolId,
   accentColor,
+  activeTabKey,
   onOpenSettings,
   onGoHome,
 }: PoolSwitcherHeaderProps) {
   const [modalVisible, setModalVisible] = useState(false);
   const smackUnreadCounts = useGlobalStore(s => s.smackUnreadCounts);
+
+  const isPicksTab = activeTabKey === 'picks';
 
   const switchTo = (poolId: string) => {
     onSwitchPool(poolId);
@@ -98,14 +102,20 @@ function PoolSwitcherHeader({
           <View style={headerStyles.iconSpacer} />
         )}
 
-        <TouchableOpacity
-          style={headerStyles.selector}
-          onPress={() => setModalVisible(true)}>
-          <Text style={headerStyles.poolName} numberOfLines={1}>
-            {poolName}
+        {isPicksTab ? (
+          <Text style={headerStyles.picksMessage}>
+            Pick once. Play every pool.
           </Text>
-          <ChevronDown size={16} color={colors.textSecondary} />
-        </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={headerStyles.selector}
+            onPress={() => setModalVisible(true)}>
+            <Text style={headerStyles.poolName} numberOfLines={1}>
+              {poolName}
+            </Text>
+            <ChevronDown size={16} color={colors.textSecondary} />
+          </TouchableOpacity>
+        )}
 
         {onOpenSettings ? (
           <TouchableOpacity
@@ -215,6 +225,12 @@ const headerStyles = StyleSheet.create({
     color: colors.text,
     maxWidth: 200,
   },
+  picksMessage: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+  },
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.4)',
@@ -294,6 +310,9 @@ export function SeasonTabNavigator({
   onGoHome,
 }: SeasonTabNavigatorProps) {
   const initialize = useSeasonStore(s => s.initialize);
+  const [activeTabKey, setActiveTabKey] = useState(
+    config.tabs[0]?.key ?? 'picks',
+  );
 
   useEffect(() => {
     initialize(config, poolId);
@@ -310,6 +329,7 @@ export function SeasonTabNavigator({
           onSwitchPool={onSwitchPool}
           activePoolId={poolId}
           accentColor={config.color}
+          activeTabKey={activeTabKey}
           onOpenSettings={onOpenSettings}
           onGoHome={onGoHome}
         />
@@ -320,6 +340,17 @@ export function SeasonTabNavigator({
           tabBarActiveTintColor: config.color,
           tabBarInactiveTintColor: colors.textSecondary,
           headerShown: false,
+        }}
+        screenListeners={{
+          state: e => {
+            const state = e.data?.state;
+            if (state) {
+              const route = state.routes[state.index];
+              // Route names are "Season_picks", "Season_board", etc.
+              const key = route?.name?.replace('Season_', '') ?? '';
+              setActiveTabKey(key);
+            }
+          },
         }}>
         {config.tabs.map((tab: TabConfig) => {
           const Icon = ICON_MAP[tab.icon];
