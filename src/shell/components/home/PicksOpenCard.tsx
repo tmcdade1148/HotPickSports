@@ -5,6 +5,22 @@ import {useCountdown} from '@shared/hooks/useCountdown';
 import {CardFooter} from './CardFooter';
 import type {DbSeasonGame} from '@shared/types/database';
 
+/** Format a Date into "Sunday, 1:00 PM" for display */
+function formatGameDateTime(date: Date): string {
+  const days = [
+    'Sunday', 'Monday', 'Tuesday', 'Wednesday',
+    'Thursday', 'Friday', 'Saturday',
+  ];
+  const dayName = days[date.getDay()];
+  let hours = date.getHours();
+  const minutes = date.getMinutes();
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  if (hours === 0) hours = 12;
+  const minuteStr = minutes < 10 ? `0${minutes}` : String(minutes);
+  return `${dayName}, ${hours}:${minuteStr} ${ampm}`;
+}
+
 interface PicksOpenCardProps {
   /** Picks deadline from competition_config */
   deadline: Date | null;
@@ -100,9 +116,16 @@ export function PicksOpenCard({
         {hotPickTeam && hotPickCountdown.timeLeft && !hotPickCountdown.hasExpired && (
           <View style={styles.kickoffRow}>
             <Text style={styles.kickoffIcon}>{'\uD83D\uDD25'}</Text>
-            <Text style={styles.kickoffText}>
-              {hotPickTeam} kicks off in {hotPickCountdown.timeLeft}
-            </Text>
+            <View style={styles.kickoffTextGroup}>
+              <Text style={styles.kickoffText}>
+                {hotPickTeam} kicks off in {hotPickCountdown.timeLeft}
+              </Text>
+              {hotPickKickoff && (
+                <Text style={styles.kickoffDateTime}>
+                  {formatGameDateTime(hotPickKickoff)}
+                </Text>
+              )}
+            </View>
           </View>
         )}
 
@@ -175,10 +198,18 @@ const styles = StyleSheet.create({
   kickoffIcon: {
     fontSize: 16,
   },
+  kickoffTextGroup: {
+    flex: 1,
+  },
   kickoffText: {
     ...typography.body,
     color: colors.text,
     fontWeight: '600',
+  },
+  kickoffDateTime: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
   placeholderText: {
     ...typography.caption,
