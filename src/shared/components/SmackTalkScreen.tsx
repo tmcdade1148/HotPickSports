@@ -31,9 +31,13 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
   const [sending, setSending] = useState(false);
   const {user} = useAuth();
   const userProfile = useGlobalStore(s => s.userProfile);
+  const markPoolAsRead = useGlobalStore(s => s.markPoolAsRead);
   const flatListRef = useRef<FlatList<DbSmackMessage>>(null);
 
   useEffect(() => {
+    // Mark pool as read on open
+    markPoolAsRead(poolId);
+
     // Fetch existing messages
     const fetchMessages = async () => {
       const {data} = await supabase
@@ -63,6 +67,8 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
         payload => {
           const msg = payload.new as DbSmackMessage;
           setMessages(prev => [...prev, msg]);
+          // Mark as read immediately since user is viewing this screen
+          markPoolAsRead(poolId);
         },
       )
       .subscribe();
@@ -70,7 +76,7 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [poolId]);
+  }, [poolId, markPoolAsRead]);
 
   const handleSend = async () => {
     if (!newMessage.trim() || !user?.id || sending) {
