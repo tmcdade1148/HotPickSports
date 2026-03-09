@@ -56,6 +56,7 @@ interface NFLState {
 
   // picks_open state data
   highestRankedGame: DbSeasonGame | null;
+  weekFirstKickoff: Date | null;
   userPickCount: number;
   totalGamesThisWeek: number;
 
@@ -96,6 +97,7 @@ export const useNFLStore = create<NFLState>((set, get) => ({
 
   // picks_open state data
   highestRankedGame: null,
+  weekFirstKickoff: null,
   userPickCount: 0,
   totalGamesThisWeek: 0,
 
@@ -115,6 +117,7 @@ export const useNFLStore = create<NFLState>((set, get) => ({
       weekResult: null,
       poolStandings: [],
       highestRankedGame: null,
+      weekFirstKickoff: null,
       userPickCount: 0,
       totalGamesThisWeek: 0,
       userSeasonTotal: 0,
@@ -221,6 +224,23 @@ export const useNFLStore = create<NFLState>((set, get) => ({
       .maybeSingle();
 
     set({highestRankedGame: (data as DbSeasonGame) ?? null});
+
+    // Fetch earliest kickoff this week for countdown
+    const {data: earliest} = await supabase
+      .from('season_games')
+      .select('kickoff_at')
+      .eq('competition', competition)
+      .eq('week', currentWeek)
+      .not('kickoff_at', 'is', null)
+      .order('kickoff_at', {ascending: true})
+      .limit(1)
+      .maybeSingle();
+
+    set({
+      weekFirstKickoff: earliest?.kickoff_at
+        ? new Date(earliest.kickoff_at)
+        : null,
+    });
   },
 
   fetchUserPickStatus: async (userId: string) => {

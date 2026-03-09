@@ -12,6 +12,12 @@ interface PicksOpenCardProps {
   currentWeek: number;
   /** Top-ranked game this week (highest rank value) */
   highestRankedGame: DbSeasonGame | null;
+  /** Earliest kickoff time this week */
+  weekFirstKickoff: Date | null;
+  /** User's HotPick game kickoff time (null if no HotPick selected) */
+  hotPickKickoff: Date | null;
+  /** User's HotPick team name (null if no HotPick selected) */
+  hotPickTeam: string | null;
   /** Whether the current user has submitted at least one pick this week */
   userHasSubmitted: boolean;
   /** Number of pool members who have submitted picks this week */
@@ -28,29 +34,34 @@ interface PicksOpenCardProps {
  * Full spec (top to bottom):
  *   1. Ticking countdown to deadline (useCountdown) — warning color, red when urgent
  *   2. Social pressure: "{X} of {Y} poolies have locked in"
- *   3. Highest-ranked game preview: "{away} vs {home} · Rank {rank}"
+ *   3. Countdown to kickoff + HotPick kickoff (if selected)
  *   4. CardFooter CTA: "Make Your Picks" or "Edit Your Picks"
  */
 export function PicksOpenCard({
   deadline,
   currentWeek,
   highestRankedGame,
+  weekFirstKickoff,
+  hotPickKickoff,
+  hotPickTeam,
   userHasSubmitted,
   poolPicksSubmittedCount,
   poolMemberCount,
   onMakePicks,
 }: PicksOpenCardProps) {
   const {timeLeft, isUrgent, hasExpired} = useCountdown(deadline);
+  const kickoff = useCountdown(weekFirstKickoff);
+  const hotPickCountdown = useCountdown(hotPickKickoff);
 
   const ctaLabel = userHasSubmitted ? 'Edit Your Picks' : 'Make Your Picks';
-  const lockedInLabel = userHasSubmitted ? 'You\'re locked in \u2713' : undefined;
+  const lockedInLabel = userHasSubmitted ? 'Your picks are in \u2713' : undefined;
 
   return (
     <View style={styles.container}>
       {/* Week label */}
       <Text style={styles.weekLabel}>WEEK {currentWeek}</Text>
 
-      {/* Countdown */}
+      {/* Countdown to deadline */}
       {timeLeft && (
         <View style={styles.countdownRow}>
           <Text
@@ -73,11 +84,34 @@ export function PicksOpenCard({
         </Text>
       )}
 
-      {/* Placeholder — kickoff prompt TBD */}
-      <View style={styles.gamePreview}>
-        <Text style={styles.placeholderText}>
-          Tuesday AM — kickoff prompt here.
-        </Text>
+      {/* Kickoff countdowns */}
+      <View style={styles.kickoffSection}>
+        {/* First game kickoff */}
+        {kickoff.timeLeft && !kickoff.hasExpired && (
+          <View style={styles.kickoffRow}>
+            <Text style={styles.kickoffIcon}>{'\uD83C\uDFC8'}</Text>
+            <Text style={styles.kickoffText}>
+              Kickoff in {kickoff.timeLeft}
+            </Text>
+          </View>
+        )}
+
+        {/* HotPick game kickoff */}
+        {hotPickTeam && hotPickCountdown.timeLeft && !hotPickCountdown.hasExpired && (
+          <View style={styles.kickoffRow}>
+            <Text style={styles.kickoffIcon}>{'\uD83D\uDD25'}</Text>
+            <Text style={styles.kickoffText}>
+              {hotPickTeam} kicks off in {hotPickCountdown.timeLeft}
+            </Text>
+          </View>
+        )}
+
+        {/* Placeholder — kickoff prompt TBD */}
+        {!kickoff.timeLeft && !hotPickTeam && (
+          <Text style={styles.placeholderText}>
+            Tuesday AM — kickoff prompt here.
+          </Text>
+        )}
       </View>
 
       {/* CTA footer */}
@@ -125,21 +159,31 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     paddingHorizontal: spacing.md,
   },
-  gamePreview: {
+  kickoffSection: {
     backgroundColor: colors.surface,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     marginHorizontal: spacing.md,
     marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  kickoffRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: spacing.sm,
+  },
+  kickoffIcon: {
+    fontSize: 16,
+  },
+  kickoffText: {
+    ...typography.body,
+    color: colors.text,
+    fontWeight: '600',
   },
   placeholderText: {
     ...typography.caption,
     color: colors.textSecondary,
     fontStyle: 'italic',
     textAlign: 'center',
-    flex: 1,
   },
 });
