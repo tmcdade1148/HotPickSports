@@ -6,7 +6,7 @@
  * Season:     season_games, season_picks, season_user_totals
  * Series:     series_matchups, series_games, series_picks, series_user_totals
  * Shared:     profiles, pools, pool_members, smack_messages, smack_reactions,
- *             smack_read_state, competition_config
+ *             smack_read_state, competition_config, event_recaps
  */
 
 // ---------------------------------------------------------------------------
@@ -107,6 +107,36 @@ export interface DbCompetitionConfig {
   key: string;
   value: unknown;
   updated_at: string;
+}
+
+/**
+ * Table: event_recaps — Drama digest per pool per scoring period.
+ * Template-agnostic: works across Season (weekly), Series (per-round), Tournament (per-stage).
+ * Written by Edge Functions only (service role). Clients read via RLS (active pool members).
+ */
+export interface DbEventRecap {
+  id: string;
+  pool_id: string;
+  competition: string;
+  /** Scoring period identifier. Season: "week_1".."week_18". Series: "first_round", etc. Tournament: "group_stage", "round_of_16", etc. */
+  period_key: string;
+  /** Integer for ordering. Season: week number. Series: round number (1-4). Tournament: stage ordinal. */
+  period_number: number;
+  /** Array of headline objects: [{type, text, subject_user_id}]. Types vary by template. */
+  headlines: EventRecapHeadline[];
+  generated_at: string;
+  /** When push notification was sent. NULL until delivered. */
+  notified_at: string | null;
+}
+
+/** Single headline within an event recap. */
+export interface EventRecapHeadline {
+  /** Headline type — template-specific. Season: heartbreaker, biggest_swing, bold_call, tough_week, comeback, race_report, perfect_week. */
+  type: string;
+  /** Human-readable headline text with real names and numbers. */
+  text: string;
+  /** The pool member this headline is about. Null for race_report (pool-wide). */
+  subject_user_id: string | null;
 }
 
 // ---------------------------------------------------------------------------

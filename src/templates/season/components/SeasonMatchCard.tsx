@@ -120,7 +120,7 @@ export function SeasonMatchCard({
   const isSaving = useSeasonStore(s => s.isSaving);
 
   const pickedTeam = existingPick?.picked_team ?? null;
-  const isHotPick = existingPick?.is_hot_pick ?? false;
+  const isHotPick = existingPick?.is_hotpick ?? false;
 
   // Status — handle both uppercase (DB/ESPN) and lowercase
   const status = (game.status ?? '').toUpperCase();

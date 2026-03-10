@@ -230,19 +230,19 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
     if (!pick) return; // Must have a pick first
 
     // Already the hotpick — nothing to do
-    if (pick.is_hot_pick) return;
+    if (pick.is_hotpick) return;
 
     const prevWeekPicks = weekPicks;
 
     // Optimistic: clear old hotpick, set new one
     const updated = weekPicks.map(p => ({
       ...p,
-      is_hot_pick: p.game_id === gameId,
+      is_hotpick: p.game_id === gameId,
     }));
     set({weekPicks: updated, isSaving: true, saveError: null});
 
     // Find old hotpick to clear in DB
-    const oldHotPick = prevWeekPicks.find(p => p.is_hot_pick && p.game_id !== gameId);
+    const oldHotPick = prevWeekPicks.find(p => p.is_hotpick && p.game_id !== gameId);
 
     // Clear old hotpick in DB
     if (oldHotPick) {
@@ -253,7 +253,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
           game_id: oldHotPick.game_id,
           week: currentWeek,
           picked_team: oldHotPick.picked_team,
-          is_hot_pick: false,
+          is_hotpick: false,
         },
         {onConflict: 'user_id,competition,game_id'},
       );
@@ -271,7 +271,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
         game_id: gameId,
         week: currentWeek,
         picked_team: pick.picked_team,
-        is_hot_pick: true,
+        is_hotpick: true,
       },
       {onConflict: 'user_id,competition,game_id'},
     );
