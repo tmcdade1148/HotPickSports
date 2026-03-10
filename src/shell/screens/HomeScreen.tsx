@@ -56,8 +56,17 @@ export function HomeScreen({navigation}: any) {
     }
   };
 
+  /** Navigate to SmackTalk tab for the active pool */
+  const handleNavigateToSmackTalk = () => {
+    const config = activeEventCards[0] ?? activeSport;
+    if (config) {
+      setActiveSport(config);
+      navigation.navigate('EventDetail', {screen: 'Season_smacktalk'});
+    }
+  };
+
   /** Switch pool globally, then navigate to SmackTalk tab */
-  const handleNavigateToSmackTalk = (poolId: string) => {
+  const handleNavigateToSmackTalkPool = (poolId: string) => {
     useGlobalStore.getState().setActivePoolId(poolId);
     const config = activeEventCards[0] ?? activeSport;
     if (config) {
@@ -116,7 +125,10 @@ export function HomeScreen({navigation}: any) {
 
         {/* SmackTalkNudge — below standings */}
         {cardsToShow.length > 0 && (
-          <SmackTalkNudge onPressPool={handleNavigateToSmackTalk} />
+          <SmackTalkNudge
+            onPress={handleNavigateToSmackTalk}
+            onPressPool={handleNavigateToSmackTalkPool}
+          />
         )}
 
         {cardsToShow.length === 0 && (
