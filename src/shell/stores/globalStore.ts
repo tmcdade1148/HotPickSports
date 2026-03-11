@@ -2,6 +2,7 @@ import {create} from 'zustand';
 import type {User} from '@supabase/supabase-js';
 import type {AnyEventConfig} from '@shared/types/templates';
 import type {DbPool, DbProfile} from '@shared/types/database';
+import type {BrandConfig} from '@shell/theme/types';
 import {supabase} from '@shared/config/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {getEventsByPriority} from '@sports/registry';
@@ -101,6 +102,10 @@ interface GlobalState {
   // Global pool auto-enrollment
   ensureGlobalPoolMembership: () => Promise<void>;
 
+  // Brand config — drives useTheme() and useBrand() hooks
+  activeBrandConfig: BrandConfig | null;
+  setActiveBrandConfig: (config: BrandConfig | null) => void;
+
   // Feature flags
   showGlobalPool: boolean;
 }
@@ -137,6 +142,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       smackUnreadCounts: {},
       showGlobalPool: false,
       pendingInviteCode: null,
+      activeBrandConfig: null,
     });
   },
 
@@ -270,7 +276,13 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   isLoadingPools: false,
 
   setActivePoolId: poolId => {
-    set({activePoolId: poolId});
+    // Update brand config from the selected pool
+    const pool = poolId
+      ? get().userPools.find(p => p.id === poolId)
+      : null;
+    const brandConfig = (pool?.brand_config as unknown as BrandConfig) ?? null;
+
+    set({activePoolId: poolId, activeBrandConfig: brandConfig});
     const competition = get().activeSport?.competition;
     if (poolId && competition) {
       AsyncStorage.setItem(poolStorageKey(competition), poolId);
@@ -557,6 +569,12 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     // Call the SECURITY DEFINER RPC — enrolls user in all active global pools
     await supabase.rpc('auto_enroll_global_pools');
   },
+
+  // ---------------------------------------------------------------------------
+  // Brand config
+  // ---------------------------------------------------------------------------
+  activeBrandConfig: null,
+  setActiveBrandConfig: config => set({activeBrandConfig: config}),
 
   // ---------------------------------------------------------------------------
   // Feature flags

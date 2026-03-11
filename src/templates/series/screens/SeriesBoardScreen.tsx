@@ -4,6 +4,7 @@ import {useSeriesStore} from '../stores/seriesStore';
 import {SeriesProgress} from '../components/SeriesProgress';
 import {useAuth} from '@shared/hooks/useAuth';
 import {colors, spacing, borderRadius} from '@shared/theme';
+import {PoweredByHotPick} from '@shell/components/PoweredByHotPick';
 import type {DbSeriesUserTotal} from '@shared/types/database';
 
 /**
@@ -73,6 +74,7 @@ export function SeriesBoardScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       <SeriesProgress config={config} userId={user?.id ?? ''} />
+      <PoweredByHotPick />
 
       <View style={styles.leaderboard}>
         <Text style={styles.sectionTitle}>Standings</Text>

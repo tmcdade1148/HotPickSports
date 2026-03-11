@@ -20,6 +20,7 @@ import {
   ChevronLeft,
   Users,
   Star,
+  Palette,
 } from 'lucide-react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {SYSTEM_AVATARS} from '@shell/components/AvatarSelector';
@@ -258,6 +259,16 @@ export function SettingsScreen() {
         <Text style={styles.createPoolText}>Create a pool</Text>
       </TouchableOpacity>
 
+      {/* Developer tools — only visible in dev builds */}
+      {__DEV__ && (
+        <TouchableOpacity
+          style={styles.devButton}
+          onPress={() => navigation.navigate('PartnerAdmin')}>
+          <Palette size={18} color={colors.textSecondary} />
+          <Text style={styles.devButtonText}>Partner Admin (Dev)</Text>
+        </TouchableOpacity>
+      )}
+
       {/* Sign out */}
       <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
         <LogOut size={18} color={colors.error} />
@@ -468,6 +479,23 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: colors.primary,
+  },
+  devButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+    marginBottom: spacing.md,
+  },
+  devButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.textSecondary,
   },
   signOutButton: {
     flexDirection: 'row',

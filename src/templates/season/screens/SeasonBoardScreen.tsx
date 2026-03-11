@@ -5,6 +5,7 @@ import type {SeasonLeaderboardEntry} from '../stores/seasonStore';
 import {SeasonProgress} from '../components/SeasonProgress';
 import {useAuth} from '@shared/hooks/useAuth';
 import {colors, spacing, borderRadius} from '@shared/theme';
+import {PoweredByHotPick} from '@shell/components/PoweredByHotPick';
 
 /**
  * SeasonBoardScreen — Standings showing pool leaderboard.
@@ -70,6 +71,7 @@ export function SeasonBoardScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       <SeasonProgress config={config} userId={user?.id ?? ''} />
+      <PoweredByHotPick />
 
       <View style={styles.leaderboard}>
         <Text style={styles.sectionTitle}>Standings</Text>

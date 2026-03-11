@@ -54,8 +54,22 @@ export interface DbPool {
   status: string;
   name_display: string | null;
   pool_start_date: string;
+  partner_id: string | null;
+  invite_slug: string | null;
+  brand_config: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
+}
+
+/** Table: partners */
+export interface DbPartner {
+  id: string;
+  name: string;
+  slug: string;
+  brand_config: Record<string, unknown>;
+  is_active: boolean;
+  created_at: string;
+  created_by: string | null;
 }
 
 /** Table: pool_members (composite PK: pool_id, user_id) */

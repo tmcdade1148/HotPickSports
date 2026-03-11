@@ -14,6 +14,7 @@ import {useAuth} from '@shared/hooks/useAuth';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {getDisplayName} from '@shared/utils/displayName';
 import {colors, spacing, borderRadius} from '@shared/theme';
+import {PoweredByHotPick} from '@shell/components/PoweredByHotPick';
 import type {DbSmackMessage} from '@shared/types/database';
 
 interface SmackTalkScreenProps {
@@ -143,6 +144,7 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
         />
       )}
 
+      <PoweredByHotPick />
       <View style={styles.inputRow}>
         <TextInput
           style={styles.input}

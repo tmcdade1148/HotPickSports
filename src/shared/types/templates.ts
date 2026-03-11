@@ -21,6 +21,22 @@ export interface TabConfig {
   icon: string;
 }
 
+/**
+ * Sport-specific visual identity — separate from brand (who) vs sport (what).
+ * "HotPick Football" = HotPick brand + football sport identity.
+ * "Mes Que Football" = Mes Que brand + football sport identity.
+ */
+export interface SportIdentity {
+  /** Sport-qualified display name: "HotPick Football", "HotPick Hockey" */
+  displayName: string;
+  /** Sport-specific icon/graphic mark (football, puck, soccer ball) */
+  sportMark: string;
+  /** Sport-qualified text lockup: "HotPick Football" wordmark */
+  sportWordmark: string;
+  /** Optional sport-specific accent color (overrides event.color when set) */
+  accentColor?: string;
+}
+
 export interface BaseEventConfig {
   competition: string; // 'world_cup_2026', 'nfl_2026', 'nhl_playoffs_2027'
   templateType: TemplateType;
@@ -33,6 +49,7 @@ export interface BaseEventConfig {
   picksOpenDate?: string;
   color: string; // Accent color for UI
   tabs: TabConfig[];
+  sportIdentity: SportIdentity;
 }
 
 // ---------------------------------------------------------------------------

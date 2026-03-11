@@ -12,6 +12,13 @@ export const nhlPlayoffs2027: SeriesConfig = {
   picksOpenDate: '2027-04-10',
   color: '#000000',
 
+  sportIdentity: {
+    displayName: 'HotPick Hockey',
+    sportMark: '',       // hockey puck icon asset
+    sportWordmark: '',   // "HotPick Hockey" text lockup
+    accentColor: '#000000',
+  },
+
   tabs: [
     {key: 'picks', label: 'Picks', icon: 'check-circle'},
     {key: 'board', label: 'Board', icon: 'bar-chart-2'},
