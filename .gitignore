@@ -73,3 +73,13 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# Secrets
+.env
+.env.*
+
+# Claude Code
+.claude/
+
+# Supabase local
+supabase/.temp/
