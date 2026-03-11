@@ -21,6 +21,7 @@ import {
   Users,
   Star,
   Palette,
+  Settings,
 } from 'lucide-react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {SYSTEM_AVATARS} from '@shell/components/AvatarSelector';
@@ -59,14 +60,16 @@ export function SettingsScreen() {
     setJoining(true);
     setJoinError('');
 
-    const pool = await joinPool(user.id, inviteCode.trim());
+    const result = await joinPool(user.id, inviteCode.trim());
 
-    if (pool) {
+    if (result.pool) {
       setInviteCode('');
-      setActivePoolId(pool.id);
-      Alert.alert('Joined!', `You've joined ${pool.name}`);
+      setActivePoolId(result.pool.id);
+      Alert.alert('Joined!', `You've joined ${result.pool.name}`);
+    } else if (result.poolFull) {
+      setJoinError('This pool is full and cannot accept new members.');
     } else {
-      setJoinError('Invalid invite code or pool is full.');
+      setJoinError(result.error ?? 'Invalid invite code or pool is full.');
     }
     setJoining(false);
   };
@@ -195,6 +198,25 @@ export function SettingsScreen() {
           <View style={styles.poolActions}>
             {pool.id === activePoolId && (
               <Text style={styles.activeLabel}>Active</Text>
+            )}
+            {(poolRoles[pool.id] === 'organizer' ||
+              poolRoles[pool.id] === 'admin') && (
+              <TouchableOpacity
+                onPress={() =>
+                  navigation.navigate('PoolMembers', {poolId: pool.id})
+                }
+                hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                <Users size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            )}
+            {poolRoles[pool.id] === 'organizer' && (
+              <TouchableOpacity
+                onPress={() =>
+                  navigation.navigate('PoolSettings', {poolId: pool.id})
+                }
+                hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                <Settings size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
             )}
             <TouchableOpacity
               onPress={() => setDefaultPoolId(pool.id)}

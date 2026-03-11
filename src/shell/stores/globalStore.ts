@@ -1,7 +1,7 @@
 import {create} from 'zustand';
 import type {User} from '@supabase/supabase-js';
 import type {AnyEventConfig} from '@shared/types/templates';
-import type {DbPool, DbProfile} from '@shared/types/database';
+import type {DbPool, DbProfile, DbPoolMember} from '@shared/types/database';
 import type {BrandConfig} from '@shell/theme/types';
 import {supabase} from '@shared/config/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -83,10 +83,48 @@ interface GlobalState {
     competition: string;
     name: string;
     isPublic: boolean;
-  }) => Promise<DbPool | null>;
-  joinPool: (userId: string, inviteCode: string) => Promise<DbPool | null>;
+  }) => Promise<{pool?: DbPool; error?: string; upgradeRequired?: boolean}>;
+  joinPool: (
+    userId: string,
+    inviteCode: string,
+  ) => Promise<{pool?: DbPool; error?: string; poolFull?: boolean}>;
   loadPersistedPoolId: (competition: string) => Promise<void>;
   clearPoolState: () => void;
+
+  // Pool member management
+  poolMembers: (DbPoolMember & {profile?: DbProfile})[];
+  isLoadingMembers: boolean;
+  fetchPoolMembers: (poolId: string) => Promise<void>;
+  removePoolMember: (
+    poolId: string,
+    userId: string,
+  ) => Promise<{success: boolean; error?: string}>;
+  updateMemberRole: (
+    poolId: string,
+    userId: string,
+    newRole: string,
+  ) => Promise<{success: boolean; error?: string}>;
+
+  // Pool settings management
+  updatePoolSettings: (
+    poolId: string,
+    settings: {name?: string; isPublic?: boolean},
+  ) => Promise<{success: boolean; error?: string}>;
+  archivePool: (
+    poolId: string,
+  ) => Promise<{success: boolean; error?: string}>;
+
+  // Organizer broadcast
+  broadcastToPool: (
+    poolId: string,
+    message: string,
+  ) => Promise<{
+    success: boolean;
+    error?: string;
+    recipients?: number;
+    remainingToday?: number;
+  }>;
+  fetchBroadcastsToday: (poolId: string) => Promise<number>;
 
   // SmackTalk unread counts — poolId → unread count
   smackUnreadCounts: Record<string, number>;
@@ -355,8 +393,16 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       p_invite_code: inviteCode,
     });
 
-    if (error || !data || data.error) {
-      return null;
+    if (error) {
+      return {error: error.message};
+    }
+
+    if (!data || data.error) {
+      // Tier enforcement errors
+      if (data?.error === 'pool_limit_reached') {
+        return {error: 'pool_limit_reached', upgradeRequired: true};
+      }
+      return {error: data?.error ?? 'Failed to create pool'};
     }
 
     const typedPool = data.pool as DbPool;
@@ -376,7 +422,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     });
     AsyncStorage.setItem(poolStorageKey(competition), typedPool.id);
 
-    return typedPool;
+    return {pool: typedPool};
   },
 
   joinPool: async (userId, inviteCode) => {
@@ -385,8 +431,15 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       p_invite_code: inviteCode.toUpperCase(),
     });
 
-    if (error || !data || data.error) {
-      return null;
+    if (error) {
+      return {error: error.message};
+    }
+
+    if (!data || data.error) {
+      if (data?.error === 'pool_full') {
+        return {error: 'pool_full', poolFull: true};
+      }
+      return {error: data?.error ?? 'Invalid invite code or pool is full.'};
     }
 
     const typedPool = data.pool as DbPool;
@@ -409,7 +462,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     });
     AsyncStorage.setItem(poolStorageKey(competition), typedPool.id);
 
-    return typedPool;
+    return {pool: typedPool};
   },
 
   loadPersistedPoolId: async (competition: string) => {
@@ -425,6 +478,190 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       AsyncStorage.removeItem(poolStorageKey(competition));
     }
     set({activePoolId: null, userPools: []});
+  },
+
+  // ---------------------------------------------------------------------------
+  // Pool member management
+  // ---------------------------------------------------------------------------
+  poolMembers: [],
+  isLoadingMembers: false,
+
+  fetchPoolMembers: async (poolId: string) => {
+    set({isLoadingMembers: true});
+    const {data} = await supabase
+      .from('pool_members')
+      .select('*, profiles:user_id(*)')
+      .eq('pool_id', poolId)
+      .eq('status', 'active')
+      .order('joined_at', {ascending: true});
+
+    const members =
+      data?.map((row: any) => ({
+        pool_id: row.pool_id,
+        user_id: row.user_id,
+        role: row.role,
+        status: row.status,
+        invited_by: row.invited_by,
+        invite_code_used: row.invite_code_used,
+        joined_at: row.joined_at,
+        left_at: row.left_at,
+        last_active_at: row.last_active_at,
+        notification_override: row.notification_override,
+        profile: row.profiles as DbProfile | undefined,
+      })) ?? [];
+
+    set({poolMembers: members, isLoadingMembers: false});
+  },
+
+  removePoolMember: async (poolId, userId) => {
+    const {data, error} = await supabase.rpc('remove_pool_member', {
+      p_pool_id: poolId,
+      p_user_id: userId,
+    });
+
+    if (error) {
+      return {success: false, error: error.message};
+    }
+
+    if (data?.error) {
+      return {success: false, error: data.error};
+    }
+
+    // Remove from local state
+    set(state => ({
+      poolMembers: state.poolMembers.filter(m => m.user_id !== userId),
+    }));
+
+    return {success: true};
+  },
+
+  updateMemberRole: async (poolId, userId, newRole) => {
+    const {data, error} = await supabase.rpc('update_member_role', {
+      p_pool_id: poolId,
+      p_user_id: userId,
+      p_new_role: newRole,
+    });
+
+    if (error) {
+      return {success: false, error: error.message};
+    }
+
+    if (data?.error) {
+      return {success: false, error: data.error};
+    }
+
+    // Update local state
+    set(state => ({
+      poolMembers: state.poolMembers.map(m =>
+        m.user_id === userId ? {...m, role: newRole as DbPoolMember['role']} : m,
+      ),
+    }));
+
+    return {success: true};
+  },
+
+  // ---------------------------------------------------------------------------
+  // Pool settings management
+  // ---------------------------------------------------------------------------
+
+  updatePoolSettings: async (poolId, settings) => {
+    const {data, error} = await supabase.rpc('update_pool_settings', {
+      p_pool_id: poolId,
+      p_name: settings.name ?? null,
+      p_is_public: settings.isPublic ?? null,
+    });
+
+    if (error) {
+      return {success: false, error: error.message};
+    }
+
+    if (data?.error) {
+      return {success: false, error: data.error};
+    }
+
+    // Update local state
+    set(state => ({
+      userPools: state.userPools.map(p =>
+        p.id === poolId
+          ? {
+              ...p,
+              ...(settings.name !== undefined ? {name: settings.name} : {}),
+              ...(settings.isPublic !== undefined
+                ? {is_public: settings.isPublic}
+                : {}),
+            }
+          : p,
+      ),
+    }));
+
+    return {success: true};
+  },
+
+  archivePool: async poolId => {
+    const {data, error} = await supabase.rpc('archive_pool', {
+      p_pool_id: poolId,
+    });
+
+    if (error) {
+      return {success: false, error: error.message};
+    }
+
+    if (data?.error) {
+      return {success: false, error: data.error};
+    }
+
+    // Remove from local state
+    set(state => ({
+      userPools: state.userPools.filter(p => p.id !== poolId),
+      activePoolId:
+        state.activePoolId === poolId ? null : state.activePoolId,
+    }));
+
+    return {success: true};
+  },
+
+  // ---------------------------------------------------------------------------
+  // Organizer broadcast
+  // ---------------------------------------------------------------------------
+
+  broadcastToPool: async (poolId, message) => {
+    const {data, error} = await supabase.rpc('broadcast_to_pool', {
+      p_pool_id: poolId,
+      p_message: message,
+    });
+
+    if (error) {
+      return {success: false, error: error.message};
+    }
+
+    if (data?.error) {
+      return {
+        success: false,
+        error: data.error,
+        remainingToday: data.remaining_today ?? undefined,
+      };
+    }
+
+    return {
+      success: true,
+      recipients: data.recipients,
+      remainingToday: data.remaining_today,
+    };
+  },
+
+  fetchBroadcastsToday: async (poolId: string) => {
+    const twentyFourHoursAgo = new Date(
+      Date.now() - 24 * 60 * 60 * 1000,
+    ).toISOString();
+
+    const {count} = await supabase
+      .from('organizer_notifications')
+      .select('*', {count: 'exact', head: true})
+      .eq('pool_id', poolId)
+      .eq('notification_type', 'broadcast')
+      .gte('sent_at', twentyFourHoursAgo);
+
+    return count ?? 0;
   },
 
   // ---------------------------------------------------------------------------

@@ -44,7 +44,7 @@ export function CreatePoolScreen({navigation}: any) {
     setCreating(true);
     setError(null);
 
-    const pool = await createPool({
+    const result = await createPool({
       userId: user.id,
       competition: activeSport.competition,
       name: trimmed,
@@ -53,10 +53,14 @@ export function CreatePoolScreen({navigation}: any) {
 
     setCreating(false);
 
-    if (pool) {
+    if (result.pool) {
       navigation.goBack();
+    } else if (result.upgradeRequired) {
+      setError(
+        'You have reached the maximum number of pools for your plan. Upgrade to create more pools.',
+      );
     } else {
-      setError('Failed to create pool. Please try again.');
+      setError(result.error ?? 'Failed to create pool. Please try again.');
     }
   };
 

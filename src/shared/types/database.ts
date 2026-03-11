@@ -6,7 +6,8 @@
  * Season:     season_games, season_picks, season_user_totals
  * Series:     series_matchups, series_games, series_picks, series_user_totals
  * Shared:     profiles, pools, pool_members, smack_messages, smack_reactions,
- *             smack_read_state, competition_config, event_recaps
+ *             smack_read_state, competition_config, event_recaps, pool_events,
+ *             organizer_notifications
  */
 
 // ---------------------------------------------------------------------------
@@ -57,6 +58,8 @@ export interface DbPool {
   partner_id: string | null;
   invite_slug: string | null;
   brand_config: Record<string, unknown> | null;
+  is_archived: boolean;
+  archived_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -151,6 +154,28 @@ export interface EventRecapHeadline {
   text: string;
   /** The pool member this headline is about. Null for race_report (pool-wide). */
   subject_user_id: string | null;
+}
+
+/** Table: pool_events — event log for all pool actions */
+export interface DbPoolEvent {
+  id: string;
+  pool_id: string;
+  competition: string;
+  user_id: string | null;
+  event_type: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+/** Table: organizer_notifications — broadcast/nudge history with rate limiting */
+export interface DbOrganizerNotification {
+  id: string;
+  pool_id: string;
+  sender_id: string;
+  message: string;
+  notification_type: 'broadcast' | 'nudge';
+  sent_at: string;
+  recipient_count: number;
 }
 
 // ---------------------------------------------------------------------------

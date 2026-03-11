@@ -57,14 +57,16 @@ export function PoolWelcomeScreen({navigation}: any) {
     setJoining(true);
     setJoinError('');
 
-    const pool = await joinPool(user.id, code.trim());
+    const result = await joinPool(user.id, code.trim());
     clearPendingInviteCode();
 
-    if (pool) {
-      setJoinedPool({name: pool.name});
+    if (result.pool) {
+      setJoinedPool({name: result.pool.name});
+    } else if (result.poolFull) {
+      setJoinError('This pool is full and cannot accept new members.');
     } else {
       setJoinError(
-        'Could not join the pool. The invite code may be invalid or the pool is full.',
+        result.error ?? 'Could not join the pool. The invite code may be invalid or the pool is full.',
       );
     }
     setJoining(false);
