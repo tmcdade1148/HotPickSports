@@ -1775,3 +1775,104 @@ depends on a live join to the partners table. Pools are self-contained.
 - `powered_by_hotpick` is typed as literal `true` — cannot be set to false
 - Partner Admin is `__DEV__`-gated in Settings screen
 - `PoweredByHotPick` component self-gates on `isBranded` — returns null for non-branded pools
+
+---
+
+## 26. Authentication & Onboarding Architecture
+
+### Auth Methods (three, all live)
+
+| Method | SDK | Supabase Call | Notes |
+|--------|-----|---------------|-------|
+| Email + password | Built-in | `signUp()` / `signInWithPassword()` | Primary method. Keychain/autofill via `autoComplete` + `textContentType` on TextInputs. |
+| Apple Sign In | `@invertase/react-native-apple-authentication` | `signInWithIdToken({ provider: 'apple', token })` | iOS only (`Platform.OS === 'ios'`). Apple sends name only on first sign-in — capture via `providerName`. |
+| Google Sign In | `@react-native-google-signin/google-signin` | `signInWithIdToken({ provider: 'google', token })` | Both platforms. Configured with Web + iOS client IDs. |
+
+**`signInWithIdToken()` auto-creates users.** Supabase creates the
+`auth.users` row on first call, which triggers the DB trigger chain:
+`handle_new_user` → `auto_join_public_beta_pool` →
+`trg_create_notification_preferences`.
+
+### Key Files
+
+```
+src/shared/config/authConfig.ts      ← Google OAuth client IDs (not secrets)
+src/shell/services/socialAuth.ts     ← signInWithApple(), signInWithGoogle()
+src/shell/services/postAuthFlow.ts   ← unified post-auth pipeline
+src/shell/screens/WelcomeScreen.tsx  ← all 3 auth entry points
+src/shell/screens/EmailEntryScreen.tsx ← email sign-in/sign-up
+ios/HotPickSports/HotPickSports.entitlements ← Sign In with Apple capability
+```
+
+### Unified Post-Auth Pipeline (`runPostAuthFlow`)
+
+All three auth methods converge into one pipeline after successful auth:
+
+```
+signUp/signIn/signInWithIdToken
+  → setUser + setActiveSport (store hydration)
+  → acceptTos (idempotent)
+  → ensureGlobalPoolMembership
+  → fetchProfile
+  → if no first_name → ProfileSetup (with providerName for Apple)
+  → else → load pools, restore selection, navigate Home
+```
+
+**Never duplicate post-auth logic.** All auth methods call
+`runPostAuthFlow()`. If the pipeline changes, it changes in one place.
+
+### Apple Sign In — Name Capture Rule
+
+Apple sends `fullName.givenName` and `fullName.familyName` **only on
+the very first sign-in** for a given Apple ID + app combination. If
+missed, the user must revoke the app in Apple ID settings and
+re-authorize to get the name again.
+
+The `providerName` is passed through `runPostAuthFlow` →
+`ProfileSetupScreen` route params → pre-fills first/last name fields.
+
+### Keychain / Credential Autofill
+
+No extra package required. iOS Keychain and Android credential manager
+are triggered by `TextInput` props:
+
+```typescript
+// Email field
+textContentType="emailAddress" autoComplete="email"
+
+// Password (sign-in)
+textContentType="password" autoComplete="password"
+
+// Password (sign-up)
+textContentType="newPassword" autoComplete="new-password"
+```
+
+### External Config (not in code — dashboard/portal settings)
+
+| Service | What's configured |
+|---------|-------------------|
+| Apple Developer Portal | App ID `com.hotpicksports` with Sign In with Apple, Service ID, Key (.p8) |
+| Google Cloud Console | 3 OAuth client IDs (iOS, Android, Web) |
+| Supabase Auth Providers | Apple: Client ID = `com.hotpicksports`. Google: Web Client ID + Secret. |
+| Xcode | Sign In with Apple capability on HotPickSports target |
+
+### Password Reset
+
+Password reset uses Supabase magic links (email with reset URL).
+`ForgotPasswordScreen.tsx` handles this. Regular sign-in is
+password-based — magic links are **only** for password recovery.
+
+### Red Flags: Auth Violations
+- Post-auth logic duplicated across auth methods instead of using
+  `runPostAuthFlow()`
+- Apple name captured but not passed as `providerName` to ProfileSetup
+- `signInWithIdToken` called without the corresponding provider
+  configured in Supabase Dashboard
+- Google client IDs swapped (iOS ID used as Web ID or vice versa)
+- `autoComplete` props missing from email/password TextInputs
+- Service role key used for auth on the client
+
+> **What to say:** "All auth methods must use runPostAuthFlow() after
+> successful authentication. Apple name capture requires providerName
+> passthrough. Keychain autofill uses TextInput props, not a separate
+> package. Please revise."
