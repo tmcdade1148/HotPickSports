@@ -88,6 +88,7 @@ per sport or event. Add rows to existing template tables with an
 - `profiles` — user identity (full name, poolie name, display toggle)
 - `pools` — pool definitions (one pool = one event, no rollover)
 - `pool_members` — pool membership
+- `partners` — white label partner definitions (name, slug, canonical brand_config)
 - `smack_messages` — per-pool chat messages
 - `smack_reactions` — emoji reactions on messages (6 allowed types, max 8 distinct per message)
 - `smack_read_state` — tracks last_read_at per user per pool for unread dot computation
@@ -614,6 +615,14 @@ displays scores; it never computes them.
   pools possible with zero additional schema changes
 - **Never build a leaderboard query that ignores pool_start_date**
 
+**White label pool columns:**
+- `partner_id UUID REFERENCES partners(id)` — nullable, set when pool
+  is created for a partner
+- `invite_slug TEXT UNIQUE` — nullable, the slug used in the invite URL
+  (e.g. "mesque" for hotpick.app/mesque)
+- `brand_config JSONB DEFAULT NULL` — NULL = HotPick defaults, populated
+  = partner branding (copied from partners table at creation time)
+
 **Founding pool mechanic:**
 - `is_founding_pool BOOLEAN NOT NULL DEFAULT false` on pools table
 - First 100 pools created (any size) are free forever
@@ -816,11 +825,15 @@ Do not implement or suggest these unless explicitly asked:
 - Global leaderboard (deferred until 500 active users — Personal Performance Dashboard ships instead)
 - AI SmackTalk observations
 - Organiser Pro premium tier UI
-- White label enterprise UI
 - Player opt-in public profiles
 - Referral program UI
 - Series template (NHL Playoffs April 2027 — deep dive session October 2026)
 - Tournament template (World Cup — no committed date)
+- Automated Instagram posts for white label partners
+- White label season-end summary screen (partner-specific CTA)
+- White label partner dashboard / reporting (weekly email digest covers interim)
+- Stripe billing for white label (manual billing at current partner count)
+- Acquisition source tagging for partner invite links
 
 **Scope creep on any of these risks the NFL Season 2 September 2026 launch.**
 
@@ -908,9 +921,11 @@ advanced moderation, multi-pool management.
 
 ## 16. White Label & Theming Architecture
 
-HotPick is being built to support white label licensing and organizer-level
-custom branding in the future. The groundwork is laid during World Cup build.
-**Do not build the white label or admin UI yet — just follow these rules.**
+HotPick supports white label licensing via branded pool experiences
+inside the standard app. Partners do not get a separate app. Users
+download HotPick; when they arrive via a partner invite link
+(hotpick.app/mesque), the app renders in the partner's colours and name.
+**"Powered by HotPick" is non-negotiable on all branded screens.**
 
 ### The Three Rules
 
@@ -948,25 +963,37 @@ via hooks — they never define their own colors.
 
 ```typescript
 interface BrandConfig {
-  primary_color: string;
+  partner_name: string;        // e.g. "Mes Que"
+  pool_label: string;          // e.g. "HotPick Mes Que"
+  primary_color: string;       // hex e.g. #1A3A5C
   secondary_color: string;
   background_color: string;
   surface_color: string;
   text_primary: string;
   text_secondary: string;
-  logo_url: string;
-  app_name: string;
-  powered_by_hotpick: boolean;
-  welcome_message?: string;
+  logo_url: string;            // CDN URL, PNG or SVG
+  app_name: string;            // always "HotPick"
+  invite_slug: string;         // e.g. "mesque"
+  is_branded: boolean;         // true for partner pools
+  powered_by_hotpick: true;    // literal type — cannot be false
 }
 ```
 
+One definition. Lives in `src/shell/theme/types.ts`. Never duplicated.
+`powered_by_hotpick` is typed as the literal `true`, not `boolean`.
+A developer cannot set it to false. Enforcement is in the type system.
+
+### Partners Table
+
+The `partners` table holds canonical brand config for each partner.
+At pool creation, the partner's brand_config is copied into the pool's
+`brand_config` column. **Rendering never depends on a live join to the
+partners table — pools are self-contained.** (Hard Rule #23)
+
 ### Database
 
-One column addition required — nothing else:
-```sql
-ALTER TABLE pools ADD COLUMN brand_config JSONB DEFAULT NULL;
--- NULL = use HotPick defaults. Populated = custom organizer branding.
+`brand_config JSONB DEFAULT NULL` exists on `pools` table.
+NULL = use HotPick defaults. Populated = partner branding.
 ```
 
 ### White Label Red Flags
@@ -1133,9 +1160,14 @@ ways the architecture gets quietly broken.
 - Hardcoded logo paths like `require('@/assets/hotpick_logo.png')` in components
 - The string `"HotPick Sports"` or `"HotPick"` hardcoded in any component
 - Pool screen UI that doesn't read from a `brandConfig` object
+- Leaderboard or pool screen joining to `partners` table at render time
+- `powered_by_hotpick` typed as `boolean` instead of literal `true`
+- Missing "Powered by HotPick" on any branded pool screen
 
 > **What to say:** "All colors and brand assets must go through the
-> theme system via useTheme() and useBrand(). Please revise."
+> theme system via useTheme() and useBrand(). Partner brand config is
+> copied to the pool at creation — never join to partners at render
+> time. Please revise."
 
 ### 🚨 Admin Intelligence Computed Client-Side
 - Pool intelligence or streak detection logic inside a React component
@@ -1250,6 +1282,10 @@ ways the architecture gets quietly broken.
     → SUPERBOWL_INTRO → SUPERBOWL → SEASON_COMPLETE. The weekly
     cycle only runs inside REGULAR, PLAYOFFS, and SUPERBOWL. All
     other phases show static cards with no week_state.
+23. **Partner brand config is copied to pool at creation** — rendering
+    never depends on a live join to the partners table. Pools are
+    self-contained. If a partner updates branding mid-season, active
+    pools are refreshed manually.
 
 ---
 
@@ -1697,3 +1733,45 @@ role) can INSERT/UPDATE. No client write policies.
 > deterministic templates and written to event_recaps. Delivery is
 > decoupled — channels read independently. One table serves all
 > templates via period_key. Please revise."
+
+---
+
+## 25. White Label Build Status
+
+White label is a branded pool experience inside the standard HotPick
+app. Partners get custom colours and names; users download HotPick
+from the App Store. Brand config is pool-scoped via `brand_config`
+JSONB on the pools table.
+
+### Completed Phases
+
+| Phase | What | Key Files |
+|-------|------|-----------|
+| 1 | Database verification | `partners` table, `pools.partner_id`, `pools.invite_slug` |
+| 2 | ThemeProvider + useBrand() wiring | `src/shell/theme/` (types, defaults, hooks, index) |
+| 6 | PoweredByHotPick component | `src/shell/components/PoweredByHotPick.tsx` — wired into all 3 board screens + SmackTalk |
+| 7 | Partner Admin Screen | `src/shell/screens/PartnerAdminScreen.tsx` — create partners, assign to pools, reset |
+| 8 | QR code generation | Integrated into Partner Admin via `react-native-qrcode-svg` |
+
+### Remaining Phases (require real device testing)
+
+| Phase | What | Depends On | Notes |
+|-------|------|------------|-------|
+| 3 | Branch.io SDK integration | Phase 1 | Deferred deep links cannot be tested on simulator. Install Branch SDK, configure Universal Links (iOS) + App Links (Android). Highest-risk step. |
+| 4 | Deep link handler | Phases 1+3 | `src/shell/deepLink.ts` — slug lookup: partners table first, pools.invite_slug fallback. Brand config applied to store before navigation. Basic handler exists in RootNavigator but needs Branch.io + partner slug lookup. |
+| 5 | Branded pool join flow | Phases 2+4 | Three screens: Branded Landing, Auth Gate, Join Confirmation. All read from globalStore activeBrandConfig. |
+
+### Hard Rule #23 (added)
+
+Partner brand config is copied to pool at creation. Rendering never
+depends on a live join to the partners table. Pools are self-contained.
+
+### Key Architecture Decisions
+
+- `BrandConfig` type lives in `src/shell/theme/types.ts` — one definition, never duplicated
+- `HOTPICK_DEFAULTS` in `src/shell/theme/defaults.ts` — canonical HotPick brand values
+- `useTheme()` returns `ThemeColors` (primary, secondary, background, surface, textPrimary, textSecondary + semantic)
+- `useBrand()` returns `BrandIdentity` (partnerName, poolLabel, appName, logo, isBranded)
+- `powered_by_hotpick` is typed as literal `true` — cannot be set to false
+- Partner Admin is `__DEV__`-gated in Settings screen
+- `PoweredByHotPick` component self-gates on `isBranded` — returns null for non-branded pools

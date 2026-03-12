@@ -8,7 +8,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import {ChevronDown, MessageCircle} from 'lucide-react-native';
-import {colors, spacing, borderRadius, typography} from '@shared/theme';
+import {spacing, borderRadius, typography} from '@shared/theme';
 import {supabase} from '@shared/config/supabase';
 import type {SeasonConfig} from '@shared/types/templates';
 import type {DbPool} from '@shared/types/database';
@@ -19,6 +19,7 @@ import {LockedCard} from './LockedCard';
 import {LiveCard} from './LiveCard';
 import {SettlingCard} from './SettlingCard';
 import {CompleteCard} from './CompleteCard';
+import {useTheme} from '@shell/theme';
 
 interface SeasonEventCardProps {
   config: SeasonConfig;
@@ -38,6 +39,8 @@ interface SeasonEventCardProps {
  *   6. Dispatches to the correct week-state sub-component
  */
 export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProps) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   // ── Store subscriptions ──────────────────────────────────────────────
   const weekState = useNFLStore(s => s.weekState);
   const currentWeek = useNFLStore(s => s.currentWeek);
@@ -321,6 +324,8 @@ function CardHeader({
   accentColor,
   smackUnreadCounts,
 }: CardHeaderProps) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const [modalVisible, setModalVisible] = useState(false);
 
   const switchTo = (poolId: string) => {
@@ -403,7 +408,7 @@ function CardHeader({
 // Styles
 // ---------------------------------------------------------------------------
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   card: {
     backgroundColor: colors.background,
     borderRadius: borderRadius.lg,
@@ -446,7 +451,7 @@ const styles = StyleSheet.create({
   },
   poolName: {
     ...typography.caption,
-    color: colors.text,
+    color: colors.textPrimary,
     fontWeight: '500',
     maxWidth: 150,
   },
@@ -465,7 +470,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     ...typography.h3,
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: spacing.md,
   },
   poolOption: {
@@ -483,6 +488,6 @@ const styles = StyleSheet.create({
   },
   poolOptionText: {
     ...typography.body,
-    color: colors.text,
+    color: colors.textPrimary,
   },
 });

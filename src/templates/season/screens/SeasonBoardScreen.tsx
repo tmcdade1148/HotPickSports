@@ -4,7 +4,9 @@ import {useSeasonStore} from '../stores/seasonStore';
 import type {SeasonLeaderboardEntry} from '../stores/seasonStore';
 import {SeasonProgress} from '../components/SeasonProgress';
 import {useAuth} from '@shared/hooks/useAuth';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {spacing, borderRadius} from '@shared/theme';
+import {PoweredByHotPick} from '@shell/components/PoweredByHotPick';
+import {useTheme} from '@shell/theme';
 
 /**
  * SeasonBoardScreen — Standings showing pool leaderboard.
@@ -12,6 +14,8 @@ import {colors, spacing, borderRadius} from '@shared/theme';
  * Never references a specific sport.
  */
 export function SeasonBoardScreen() {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const config = useSeasonStore(s => s.config);
   const leaderboard = useSeasonStore(s => s.leaderboard);
   const userNames = useSeasonStore(s => s.userNames);
@@ -70,6 +74,7 @@ export function SeasonBoardScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       <SeasonProgress config={config} userId={user?.id ?? ''} />
+      <PoweredByHotPick />
 
       <View style={styles.leaderboard}>
         <Text style={styles.sectionTitle}>Standings</Text>
@@ -87,7 +92,7 @@ export function SeasonBoardScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -108,7 +113,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: spacing.md,
   },
   row: {
@@ -138,7 +143,7 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 16,
     fontWeight: '500',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   breakdown: {
     fontSize: 12,
@@ -148,7 +153,7 @@ const styles = StyleSheet.create({
   totalPoints: {
     fontSize: 16,
     fontWeight: '700',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   textHighlight: {
     color: colors.primary,

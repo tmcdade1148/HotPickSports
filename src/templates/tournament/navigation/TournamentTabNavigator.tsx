@@ -20,7 +20,7 @@ import {
 } from 'lucide-react-native';
 import type {TournamentConfig, TabConfig} from '@shared/types/templates';
 import type {DbPool} from '@shared/types/database';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {spacing, borderRadius} from '@shared/theme';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {useTournamentStore} from '../stores/tournamentStore';
 import {TournamentPicksHub} from '../screens/TournamentPicksHub';
@@ -29,6 +29,7 @@ import {MatchPicksScreen} from '../screens/MatchPicksScreen';
 import {TournamentBoardScreen} from '../screens/TournamentBoardScreen';
 import {SmackTalkScreen} from '@shared/components/SmackTalkScreen';
 import {SettingsScreen} from '@shell/screens/SettingsScreen';
+import {useTheme} from '@shell/theme';
 
 // ---------------------------------------------------------------------------
 // Icon mapping — maps config icon strings to Lucide components
@@ -100,6 +101,8 @@ function PoolSwitcherHeader({
   onOpenSettings,
   onGoHome,
 }: PoolSwitcherHeaderProps) {
+  const {colors} = useTheme();
+  const headerStyles = createHeaderStyles(colors);
   const [modalVisible, setModalVisible] = useState(false);
   const smackUnreadCounts = useGlobalStore(s => s.smackUnreadCounts);
 
@@ -187,7 +190,7 @@ function PoolSwitcherHeader({
   );
 }
 
-const headerStyles = StyleSheet.create({
+const createHeaderStyles = (colors: any) => StyleSheet.create({
   container: {
     backgroundColor: colors.background,
     paddingTop: spacing.xxl,
@@ -228,7 +231,7 @@ const headerStyles = StyleSheet.create({
   poolName: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.textPrimary,
     maxWidth: 200,
   },
   overlay: {
@@ -247,7 +250,7 @@ const headerStyles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: spacing.md,
   },
   poolOption: {
@@ -266,7 +269,7 @@ const headerStyles = StyleSheet.create({
   },
   poolOptionText: {
     fontSize: 16,
-    color: colors.text,
+    color: colors.textPrimary,
   },
 });
 
@@ -305,6 +308,7 @@ export function TournamentTabNavigator({
   onOpenSettings,
   onGoHome,
 }: TournamentTabNavigatorProps) {
+  const {colors} = useTheme();
   const initialize = useTournamentStore(s => s.initialize);
 
   useEffect(() => {

@@ -12,6 +12,13 @@ export const nflSeason: SeasonConfig = {
   picksOpenDate: '2026-09-07',
   color: '#013369',
 
+  sportIdentity: {
+    displayName: 'HotPick Football',
+    sportMark: '',       // football icon asset — populate when assets are added
+    sportWordmark: '',   // "HotPick Football" text lockup — populate when assets are added
+    accentColor: '#013369',
+  },
+
   tabs: [
     {key: 'picks', label: 'Picks', icon: 'check-circle'},
     {key: 'board', label: 'Leaderboard', icon: 'bar-chart-2'},

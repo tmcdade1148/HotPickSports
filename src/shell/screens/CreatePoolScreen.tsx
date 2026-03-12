@@ -11,13 +11,16 @@ import {
   StyleSheet,
 } from 'react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {spacing, borderRadius} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 
 /**
  * CreatePoolScreen — Form to create a new pool for the active event.
  * Generates an invite code automatically. Sets the new pool as active.
  */
 export function CreatePoolScreen({navigation}: any) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const user = useGlobalStore(s => s.user);
   const activeSport = useGlobalStore(s => s.activeSport);
   const createPool = useGlobalStore(s => s.createPool);
@@ -44,7 +47,7 @@ export function CreatePoolScreen({navigation}: any) {
     setCreating(true);
     setError(null);
 
-    const pool = await createPool({
+    const result = await createPool({
       userId: user.id,
       competition: activeSport.competition,
       name: trimmed,
@@ -53,10 +56,14 @@ export function CreatePoolScreen({navigation}: any) {
 
     setCreating(false);
 
-    if (pool) {
+    if (result.pool) {
       navigation.goBack();
+    } else if (result.upgradeRequired) {
+      setError(
+        'You have reached the maximum number of pools for your plan. Upgrade to create more pools.',
+      );
     } else {
-      setError('Failed to create pool. Please try again.');
+      setError(result.error ?? 'Failed to create pool. Please try again.');
     }
   };
 
@@ -117,7 +124,7 @@ export function CreatePoolScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -137,7 +144,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   form: {
     padding: spacing.lg,
@@ -155,7 +162,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     padding: spacing.md,
     fontSize: 16,
-    color: colors.text,
+    color: colors.textPrimary,
     borderWidth: 1,
     borderColor: colors.border,
     marginBottom: spacing.lg,
@@ -176,7 +183,7 @@ const styles = StyleSheet.create({
   switchLabel: {
     fontSize: 16,
     fontWeight: '500',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   switchHint: {
     fontSize: 12,

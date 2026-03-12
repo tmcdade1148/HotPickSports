@@ -8,8 +8,8 @@ import {
   ScrollView,
   ActivityIndicator,
   StyleSheet,
-  Clipboard,
 } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import {
@@ -20,11 +20,16 @@ import {
   ChevronLeft,
   Users,
   Star,
+  Palette,
+  Settings,
 } from 'lucide-react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {SYSTEM_AVATARS} from '@shell/components/AvatarSelector';
 import {getDisplayName} from '@shared/utils/displayName';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {useTheme} from '@shell/theme';
+import {spacing, borderRadius} from '@shared/theme';
+import type {BrandConfig} from '@shell/theme/types';
+import {HOTPICK_DEFAULTS} from '@shell/theme/defaults';
 
 export function SettingsScreen() {
   const navigation = useNavigation<any>();
@@ -41,11 +46,28 @@ export function SettingsScreen() {
   const joinPool = useGlobalStore(s => s.joinPool);
   const signOut = useGlobalStore(s => s.signOut);
 
+  const {colors} = useTheme();
+
+  // App-level chrome always uses HotPick defaults (profile card, join, create pool)
+  const hp = {
+    primary: HOTPICK_DEFAULTS.primary_color,
+    surface: HOTPICK_DEFAULTS.surface_color,
+  };
+
   const [inviteCode, setInviteCode] = useState('');
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState('');
 
   const displayName = getDisplayName(userProfile);
+
+  // Get brand colors for a specific pool (per-pool branding)
+  const getPoolColors = (pool: {brand_config?: unknown}) => {
+    const config = pool.brand_config as BrandConfig | null | undefined;
+    if (config && config.is_branded) {
+      return {primary: config.primary_color, secondary: config.secondary_color};
+    }
+    return {primary: HOTPICK_DEFAULTS.primary_color, secondary: HOTPICK_DEFAULTS.secondary_color};
+  };
 
   // Resolve avatar emoji for profile card
   const avatarInfo = userProfile?.avatar_key
@@ -58,14 +80,16 @@ export function SettingsScreen() {
     setJoining(true);
     setJoinError('');
 
-    const pool = await joinPool(user.id, inviteCode.trim());
+    const result = await joinPool(user.id, inviteCode.trim());
 
-    if (pool) {
+    if (result.pool) {
       setInviteCode('');
-      setActivePoolId(pool.id);
-      Alert.alert('Joined!', `You've joined ${pool.name}`);
+      setActivePoolId(result.pool.id);
+      Alert.alert('Joined!', `You've joined ${result.pool.name}`);
+    } else if (result.poolFull) {
+      setJoinError('This pool is full and cannot accept new members.');
     } else {
-      setJoinError('Invalid invite code or pool is full.');
+      setJoinError(result.error ?? 'Invalid invite code or pool is full.');
     }
     setJoining(false);
   };
@@ -91,7 +115,7 @@ export function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]} edges={['top']}>
     <ScrollView
       style={styles.flex}
       contentContainerStyle={styles.content}
@@ -101,20 +125,21 @@ export function SettingsScreen() {
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-          <ChevronLeft size={24} color={colors.text} />
+          <ChevronLeft size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Settings</Text>
+        <Text style={[styles.headerTitle, {color: colors.textPrimary}]}>Settings</Text>
         <View style={{width: 24}} />
       </View>
 
       {/* Profile card */}
       <TouchableOpacity
-        style={styles.profileCard}
+        style={[styles.profileCard, {backgroundColor: hp.surface}]}
         onPress={() => navigation.navigate('Profile')}>
         <View style={styles.profileInfo}>
           <View
             style={[
               styles.avatarCircle,
+              {backgroundColor: colors.border},
               avatarInfo && {backgroundColor: avatarInfo.color},
             ]}>
             {avatarInfo ? (
@@ -124,100 +149,131 @@ export function SettingsScreen() {
             )}
           </View>
           <View style={styles.profileText}>
-            <Text style={styles.profileName}>{displayName}</Text>
-            <Text style={styles.profileEmail}>{user?.email}</Text>
+            <Text style={[styles.profileName, {color: colors.textPrimary}]}>{displayName}</Text>
+            <Text style={[styles.profileEmail, {color: colors.textSecondary}]}>{user?.email}</Text>
           </View>
         </View>
         <ChevronRight size={20} color={colors.textSecondary} />
       </TouchableOpacity>
 
       {/* Pools section */}
-      <Text style={styles.sectionTitle}>My Pools</Text>
+      <Text style={[styles.sectionTitle, {color: colors.textPrimary}]}>My Pools</Text>
 
-      {userPools.map(pool => (
-        <TouchableOpacity
-          key={pool.id}
-          style={[
-            styles.poolRow,
-            pool.id === activePoolId && styles.poolRowActive,
-          ]}
-          onPress={() => setActivePoolId(pool.id)}>
-          <View style={styles.poolInfo}>
-            <Users
-              size={18}
-              color={
-                pool.id === activePoolId
-                  ? colors.primary
-                  : colors.textSecondary
-              }
-            />
-            <View style={styles.poolNameCol}>
-              <View style={styles.poolNameRow}>
-                <Text
-                  style={[
-                    styles.poolName,
-                    pool.id === activePoolId && styles.poolNameActive,
-                  ]}
-                  numberOfLines={1}>
-                  {pool.name}
-                </Text>
-                {!pool.is_global &&
-                  pool.invite_code &&
-                  (poolRoles[pool.id] === 'organizer' ||
-                    poolRoles[pool.id] === 'admin') && (
-                    <TouchableOpacity
-                      onPress={() => {
-                        Clipboard.setString(pool.invite_code ?? '');
-                        Alert.alert(
-                          'Invite Code Copied',
-                          pool.invite_code ?? '',
-                          [{text: 'OK'}],
-                        );
-                      }}
-                      hitSlop={{top: 6, bottom: 6, left: 6, right: 6}}>
-                      <Text style={styles.inviteCode}>
-                        {pool.invite_code}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-              </View>
-              {pool.is_global ? (
-                <Text style={styles.globalBadge}>Global pool</Text>
-              ) : poolRoles[pool.id] ? (
-                <Text style={styles.roleBadge}>
-                  {poolRoles[pool.id].charAt(0).toUpperCase() +
-                    poolRoles[pool.id].slice(1)}
-                </Text>
-              ) : null}
-            </View>
-          </View>
-          <View style={styles.poolActions}>
-            {pool.id === activePoolId && (
-              <Text style={styles.activeLabel}>Active</Text>
-            )}
-            <TouchableOpacity
-              onPress={() => setDefaultPoolId(pool.id)}
-              hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-              <Star
+      {userPools.map(pool => {
+        const poolBrand = getPoolColors(pool);
+        const isActive = pool.id === activePoolId;
+
+        return (
+          <TouchableOpacity
+            key={pool.id}
+            style={[
+              styles.poolRow,
+              {backgroundColor: poolBrand.secondary + '10'},
+              isActive && {borderWidth: 1, borderColor: poolBrand.primary},
+            ]}
+            onPress={() => setActivePoolId(pool.id)}>
+            <View style={styles.poolInfo}>
+              <Users
                 size={18}
-                color={
-                  pool.id === defaultPoolId
-                    ? colors.primary
-                    : colors.textSecondary
-                }
-                fill={pool.id === defaultPoolId ? colors.primary : 'none'}
+                color={isActive ? poolBrand.primary : colors.textSecondary}
               />
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      ))}
+              <View style={styles.poolNameCol}>
+                <View style={styles.poolNameRow}>
+                  <Text
+                    style={[
+                      styles.poolName,
+                      {color: colors.textPrimary},
+                      isActive && {color: poolBrand.primary, fontWeight: '600'},
+                    ]}
+                    numberOfLines={1}>
+                    {pool.name}
+                  </Text>
+                  {!pool.is_global &&
+                    pool.invite_code &&
+                    (poolRoles[pool.id] === 'organizer' ||
+                      poolRoles[pool.id] === 'admin') && (
+                      <TouchableOpacity
+                        onPress={() => {
+                          Clipboard.setString(pool.invite_code ?? '');
+                          Alert.alert(
+                            'Invite Code Copied',
+                            pool.invite_code ?? '',
+                            [{text: 'OK'}],
+                          );
+                        }}
+                        hitSlop={{top: 6, bottom: 6, left: 6, right: 6}}>
+                        <Text
+                          style={[
+                            styles.inviteCode,
+                            {
+                              color: poolBrand.primary,
+                              backgroundColor: poolBrand.primary + '15',
+                            },
+                          ]}>
+                          {pool.invite_code}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                </View>
+                {pool.is_global ? (
+                  <Text style={styles.globalBadge}>Global pool</Text>
+                ) : poolRoles[pool.id] ? (
+                  <Text style={styles.roleBadge}>
+                    {poolRoles[pool.id].charAt(0).toUpperCase() +
+                      poolRoles[pool.id].slice(1)}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+            <View style={styles.poolActions}>
+              {isActive && (
+                <Text style={[styles.activeLabel, {color: poolBrand.primary}]}>
+                  Active
+                </Text>
+              )}
+              {(poolRoles[pool.id] === 'organizer' ||
+                poolRoles[pool.id] === 'admin') && (
+                <TouchableOpacity
+                  onPress={() =>
+                    navigation.navigate('PoolMembers', {poolId: pool.id})
+                  }
+                  hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                  <Users size={18} color={colors.textSecondary} />
+                </TouchableOpacity>
+              )}
+              {poolRoles[pool.id] === 'organizer' && (
+                <TouchableOpacity
+                  onPress={() =>
+                    navigation.navigate('PoolSettings', {poolId: pool.id})
+                  }
+                  hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                  <Settings size={18} color={colors.textSecondary} />
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                onPress={() => setDefaultPoolId(pool.id)}
+                hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                <Star
+                  size={18}
+                  color={
+                    pool.id === defaultPoolId
+                      ? poolBrand.primary
+                      : colors.textSecondary
+                  }
+                  fill={pool.id === defaultPoolId ? poolBrand.primary : 'none'}
+                />
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        );
+      })}
 
       {/* Join pool */}
       <View style={styles.joinSection}>
-        <Text style={styles.joinLabel}>Have an invite code?</Text>
+        <Text style={[styles.joinLabel, {color: colors.textPrimary}]}>Have an invite code?</Text>
         <View style={styles.codeRow}>
           <TextInput
-            style={styles.codeInput}
+            style={[styles.codeInput, {borderColor: colors.border, color: colors.textPrimary, backgroundColor: hp.surface}]}
             placeholder="Enter code"
             placeholderTextColor={colors.textSecondary}
             value={inviteCode}
@@ -234,6 +290,7 @@ export function SettingsScreen() {
           <TouchableOpacity
             style={[
               styles.joinButton,
+              {backgroundColor: hp.primary},
               (!inviteCode.trim() || joining) && styles.joinButtonDisabled,
             ]}
             onPress={handleJoinPool}
@@ -246,22 +303,32 @@ export function SettingsScreen() {
           </TouchableOpacity>
         </View>
         {joinError ? (
-          <Text style={styles.codeError}>{joinError}</Text>
+          <Text style={[styles.codeError, {color: colors.error}]}>{joinError}</Text>
         ) : null}
       </View>
 
       {/* Create pool */}
       <TouchableOpacity
-        style={styles.createPoolButton}
+        style={[styles.createPoolButton, {backgroundColor: hp.surface, borderColor: hp.primary}]}
         onPress={handleCreatePool}>
-        <Plus size={18} color={colors.primary} />
-        <Text style={styles.createPoolText}>Create a pool</Text>
+        <Plus size={18} color={hp.primary} />
+        <Text style={[styles.createPoolText, {color: hp.primary}]}>Create a pool</Text>
       </TouchableOpacity>
 
+      {/* Developer tools — only visible in dev builds */}
+      {__DEV__ && (
+        <TouchableOpacity
+          style={[styles.devButton, {borderColor: colors.border}]}
+          onPress={() => navigation.navigate('PartnerAdmin')}>
+          <Palette size={18} color={colors.textSecondary} />
+          <Text style={[styles.devButtonText, {color: colors.textSecondary}]}>Partner Admin (Dev)</Text>
+        </TouchableOpacity>
+      )}
+
       {/* Sign out */}
-      <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
+      <TouchableOpacity style={[styles.signOutButton, {borderColor: colors.error}]} onPress={handleSignOut}>
         <LogOut size={18} color={colors.error} />
-        <Text style={styles.signOutText}>Sign Out</Text>
+        <Text style={[styles.signOutText, {color: colors.error}]}>Sign Out</Text>
       </TouchableOpacity>
     </ScrollView>
     </SafeAreaView>
@@ -271,7 +338,6 @@ export function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
   },
   flex: {
     flex: 1,
@@ -290,13 +356,11 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: colors.text,
   },
   profileCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
     marginBottom: spacing.xl,
@@ -311,7 +375,6 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -324,31 +387,23 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: 17,
     fontWeight: '600',
-    color: colors.text,
   },
   profileEmail: {
     fontSize: 13,
-    color: colors.textSecondary,
     marginTop: 2,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: colors.text,
     marginBottom: spacing.md,
   },
   poolRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.surface,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.sm,
-  },
-  poolRowActive: {
-    borderWidth: 1,
-    borderColor: colors.primary,
   },
   poolInfo: {
     flexDirection: 'row',
@@ -367,23 +422,16 @@ const styles = StyleSheet.create({
   poolName: {
     fontSize: 15,
     fontWeight: '500',
-    color: colors.text,
     flexShrink: 1,
   },
   inviteCode: {
     fontSize: 12,
     fontWeight: '700',
-    color: colors.primary,
-    backgroundColor: colors.primary + '15',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: borderRadius.sm,
     letterSpacing: 1,
     overflow: 'hidden',
-  },
-  poolNameActive: {
-    color: colors.primary,
-    fontWeight: '600',
   },
   poolActions: {
     flexDirection: 'row',
@@ -393,16 +441,13 @@ const styles = StyleSheet.create({
   activeLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: colors.primary,
   },
   globalBadge: {
     fontSize: 11,
-    color: colors.textSecondary,
     marginTop: 1,
   },
   roleBadge: {
     fontSize: 11,
-    color: colors.textSecondary,
     marginTop: 1,
   },
   joinSection: {
@@ -412,7 +457,6 @@ const styles = StyleSheet.create({
   joinLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.text,
     marginBottom: spacing.sm,
   },
   codeRow: {
@@ -422,17 +466,13 @@ const styles = StyleSheet.create({
   codeInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     fontSize: 16,
-    color: colors.text,
-    backgroundColor: colors.surface,
     letterSpacing: 2,
     fontWeight: '600',
   },
   joinButton: {
-    backgroundColor: colors.primary,
     paddingHorizontal: spacing.lg,
     borderRadius: borderRadius.md,
     alignItems: 'center',
@@ -447,7 +487,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   codeError: {
-    color: colors.error,
     fontSize: 13,
     marginTop: spacing.xs,
   },
@@ -456,10 +495,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
-    backgroundColor: colors.surface,
     borderRadius: borderRadius.md,
     borderWidth: 1,
-    borderColor: colors.primary,
     borderStyle: 'dashed',
     padding: spacing.md,
     marginBottom: spacing.xl,
@@ -467,7 +504,21 @@ const styles = StyleSheet.create({
   createPoolText: {
     fontSize: 15,
     fontWeight: '600',
-    color: colors.primary,
+  },
+  devButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    marginBottom: spacing.md,
+  },
+  devButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
   signOutButton: {
     flexDirection: 'row',
@@ -477,10 +528,8 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderRadius: borderRadius.md,
     borderWidth: 2,
-    borderColor: colors.error,
   },
   signOutText: {
-    color: colors.error,
     fontSize: 16,
     fontWeight: '600',
   },

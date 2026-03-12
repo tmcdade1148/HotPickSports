@@ -2,14 +2,17 @@ import React from 'react';
 import {View, Text, TouchableOpacity, StyleSheet, ScrollView} from 'react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {getEventsByPriority} from '@sports/registry';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {spacing, borderRadius} from '@shared/theme';
 import type {AnyEventConfig} from '@shared/types/templates';
+import {useTheme} from '@shell/theme';
 
 /**
  * SportSwitcher — Slack-style sport/event switcher.
  * Allows the user to switch between active events (World Cup, NFL, etc.).
  */
 export function SportSwitcher() {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const activeSport = useGlobalStore(s => s.activeSport);
   const setActiveSport = useGlobalStore(s => s.setActiveSport);
   const events = getEventsByPriority();
@@ -45,7 +48,7 @@ export function SportSwitcher() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
@@ -61,7 +64,7 @@ const styles = StyleSheet.create({
   chipText: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   chipTextActive: {
     color: '#FFFFFF',

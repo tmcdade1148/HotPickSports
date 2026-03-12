@@ -13,9 +13,12 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {getDefaultEvent} from '@sports/registry';
 import {getDisplayName} from '@shared/utils/displayName';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {spacing, borderRadius} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 
 export function PoolWelcomeScreen({navigation}: any) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const user = useGlobalStore(s => s.user);
   const userProfile = useGlobalStore(s => s.userProfile);
   const pendingInviteCode = useGlobalStore(s => s.pendingInviteCode);
@@ -57,14 +60,16 @@ export function PoolWelcomeScreen({navigation}: any) {
     setJoining(true);
     setJoinError('');
 
-    const pool = await joinPool(user.id, code.trim());
+    const result = await joinPool(user.id, code.trim());
     clearPendingInviteCode();
 
-    if (pool) {
-      setJoinedPool({name: pool.name});
+    if (result.pool) {
+      setJoinedPool({name: result.pool.name});
+    } else if (result.poolFull) {
+      setJoinError('This pool is full and cannot accept new members.');
     } else {
       setJoinError(
-        'Could not join the pool. The invite code may be invalid or the pool is full.',
+        result.error ?? 'Could not join the pool. The invite code may be invalid or the pool is full.',
       );
     }
     setJoining(false);
@@ -216,7 +221,7 @@ export function PoolWelcomeScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -241,7 +246,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: spacing.sm,
     textAlign: 'center',
   },
@@ -269,7 +274,7 @@ const styles = StyleSheet.create({
   mechanicTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: spacing.xs,
   },
   mechanicText: {
@@ -284,7 +289,7 @@ const styles = StyleSheet.create({
   inviteLabel: {
     fontSize: 15,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
   codeRow: {
@@ -298,7 +303,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     padding: spacing.md,
     fontSize: 16,
-    color: colors.text,
+    color: colors.textPrimary,
     backgroundColor: colors.surface,
     letterSpacing: 2,
     fontWeight: '600',

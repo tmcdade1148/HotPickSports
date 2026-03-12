@@ -1,7 +1,8 @@
 import React from 'react';
 import {View, Text, StyleSheet} from 'react-native';
 import {Flame} from 'lucide-react-native';
-import {colors, spacing} from '@shared/theme';
+import {spacing} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 
 interface PicksProgressHeaderProps {
   currentWeek: number;
@@ -30,6 +31,8 @@ export function PicksProgressHeader({
   hotPicksRequired,
   accentColor,
 }: PicksProgressHeaderProps) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const progress = totalGames > 0 ? pickCount / totalGames : 0;
   const allPicked = pickCount >= totalGames && totalGames > 0;
   const hasPicks = pickCount > 0;
@@ -87,7 +90,7 @@ export function PicksProgressHeader({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.sm,
@@ -101,7 +104,7 @@ const styles = StyleSheet.create({
   weekTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   countRow: {
     flexDirection: 'row',

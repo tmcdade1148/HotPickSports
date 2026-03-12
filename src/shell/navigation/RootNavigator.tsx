@@ -15,6 +15,9 @@ import {HomeScreen} from '@shell/screens/HomeScreen';
 import {EventDetailScreen} from '@shell/screens/EventDetailScreen';
 import {ProfileScreen} from '@shell/screens/ProfileScreen';
 import {SettingsScreen} from '@shell/screens/SettingsScreen';
+import {PartnerAdminScreen} from '@shell/screens/PartnerAdminScreen';
+import {PoolMembersScreen} from '@shell/screens/PoolMembersScreen';
+import {PoolSettingsScreen} from '@shell/screens/PoolSettingsScreen';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {Linking} from 'react-native';
 
@@ -108,6 +111,9 @@ export function RootNavigator() {
         <Stack.Screen name="EventDetail" component={EventDetailScreen} />
         <Stack.Screen name="Profile" component={ProfileScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
+        <Stack.Screen name="PoolMembers" component={PoolMembersScreen} />
+        <Stack.Screen name="PoolSettings" component={PoolSettingsScreen} />
+        <Stack.Screen name="PartnerAdmin" component={PartnerAdminScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

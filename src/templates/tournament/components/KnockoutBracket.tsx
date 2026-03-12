@@ -2,8 +2,9 @@ import React from 'react';
 import {View, Text, ScrollView, StyleSheet} from 'react-native';
 import type {TournamentConfig, KnockoutRoundConfig} from '@shared/types/templates';
 import type {DbTournamentMatch} from '@shared/types/database';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {spacing, borderRadius} from '@shared/theme';
 import {useTournamentStore} from '../stores/tournamentStore';
+import {useTheme} from '@shell/theme';
 
 interface KnockoutBracketProps {
   config: TournamentConfig;
@@ -21,6 +22,8 @@ interface MatchSlot {
  * Highlights user's picks. Never references a specific sport.
  */
 export function KnockoutBracket({config}: KnockoutBracketProps) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const matches = useTournamentStore(s => s.matches);
   const matchPicks = useTournamentStore(s => s.matchPicks);
 
@@ -110,6 +113,8 @@ function MatchSlotView({
   accentColor,
   isFinal,
 }: MatchSlotViewProps) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const {match} = slot;
   const homeCode = match?.home_team ?? 'TBD';
   const awayCode = match?.away_team ?? 'TBD';
@@ -160,6 +165,8 @@ interface TeamRowProps {
 }
 
 function TeamRow({code, score, isPicked, isWinner, accentColor}: TeamRowProps) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const isTBD = code === 'TBD';
 
   return (
@@ -199,14 +206,14 @@ function TeamRow({code, score, isPicked, isWinner, accentColor}: TeamRowProps) {
 
 const SLOT_WIDTH = 120;
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     padding: spacing.md,
   },
   title: {
     fontSize: 18,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: spacing.md,
   },
   bracketScroll: {
@@ -265,7 +272,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   teamCodeTBD: {
     color: colors.textSecondary,
@@ -283,7 +290,7 @@ const styles = StyleSheet.create({
   },
   teamScoreWinner: {
     fontWeight: '700',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   divider: {
     height: 1,

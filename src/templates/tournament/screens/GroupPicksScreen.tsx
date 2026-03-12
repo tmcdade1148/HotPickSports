@@ -3,7 +3,8 @@ import {View, Text, FlatList, ActivityIndicator, StyleSheet} from 'react-native'
 import {useTournamentStore} from '../stores/tournamentStore';
 import {GroupCard} from '../components/GroupCard';
 import {useAuth} from '@shared/hooks/useAuth';
-import {colors, spacing} from '@shared/theme';
+import {spacing} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 
 /**
  * GroupPicksScreen — Pick which teams advance from each group.
@@ -11,6 +12,8 @@ import {colors, spacing} from '@shared/theme';
  * Never references a specific sport.
  */
 export function GroupPicksScreen() {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const config = useTournamentStore(s => s.config);
   const isLoading = useTournamentStore(s => s.isLoading);
   const fetchUserPicks = useTournamentStore(s => s.fetchUserPicks);
@@ -56,7 +59,7 @@ export function GroupPicksScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,

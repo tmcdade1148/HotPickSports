@@ -1,7 +1,8 @@
 import React, {useRef, useEffect} from 'react';
 import {ScrollView, TouchableOpacity, Text, StyleSheet} from 'react-native';
 import type {SeriesRoundConfig} from '@shared/types/templates';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {spacing, borderRadius} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 
 interface RoundSelectorProps {
   rounds: SeriesRoundConfig[];
@@ -24,6 +25,8 @@ export function RoundSelector({
   onSelectRound,
   accentColor,
 }: RoundSelectorProps) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const scrollRef = useRef<ScrollView>(null);
 
   // Auto-scroll to current round on mount
@@ -67,7 +70,7 @@ export function RoundSelector({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,

@@ -11,6 +11,14 @@ export const worldCup2026: TournamentConfig = {
   endDate: '2026-07-19',
   picksOpenDate: '2026-05-27',
   color: '#8B1A4A',
+
+  sportIdentity: {
+    displayName: 'HotPick Soccer',
+    sportMark: '',       // soccer ball icon asset
+    sportWordmark: '',   // "HotPick Soccer" text lockup
+    accentColor: '#8B1A4A',
+  },
+
   tabs: [
     {key: 'picks', label: 'Picks', icon: 'check-circle'},
     {key: 'groups', label: 'Groups', icon: 'grid-3x3'},

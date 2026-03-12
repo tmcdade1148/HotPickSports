@@ -1,6 +1,7 @@
 import React, {useRef, useEffect} from 'react';
 import {ScrollView, TouchableOpacity, Text, StyleSheet} from 'react-native';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {spacing, borderRadius} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 
 interface WeekSelectorProps {
   totalWeeks: number;
@@ -25,6 +26,8 @@ export function WeekSelector({
   accentColor,
   playoffStartWeek,
 }: WeekSelectorProps) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const scrollRef = useRef<ScrollView>(null);
 
   // Auto-scroll to current week on mount
@@ -70,7 +73,7 @@ export function WeekSelector({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,

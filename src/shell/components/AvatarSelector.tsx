@@ -6,7 +6,8 @@ import {
   Text,
   StyleSheet,
 } from 'react-native';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {spacing, borderRadius} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 
 /** System avatars — colored abstract shapes with initials fallback */
 const SYSTEM_AVATARS = [
@@ -31,6 +32,8 @@ export function AvatarSelector({
   onSelect,
   onUploadPress,
 }: AvatarSelectorProps) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   return (
     <View>
       <ScrollView
@@ -67,7 +70,7 @@ export function AvatarSelector({
 
 export {SYSTEM_AVATARS};
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   scrollContent: {
     paddingVertical: spacing.sm,
     gap: spacing.sm,
@@ -82,7 +85,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   avatarSelected: {
-    borderColor: colors.text,
+    borderColor: colors.textPrimary,
   },
   avatarEmoji: {
     fontSize: 24,

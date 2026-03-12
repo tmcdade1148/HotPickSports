@@ -1,7 +1,8 @@
 import React from 'react';
 import {View, Text, StyleSheet} from 'react-native';
-import {colors, spacing, typography} from '@shared/theme';
+import {spacing, typography} from '@shared/theme';
 import type {WeekResult} from '@sports/nfl/stores/nflStore';
+import {useTheme} from '@shell/theme';
 
 interface SettlingCardProps {
   currentWeek: number;
@@ -13,6 +14,8 @@ interface SettlingCardProps {
  * Games ended within last 24 hours — shows weekly result + rank movement.
  */
 export function SettlingCard({currentWeek, weekResult}: SettlingCardProps) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   return (
     <View style={styles.container}>
       <Text style={styles.label}>WEEK {currentWeek} — RESULTS</Text>
@@ -54,7 +57,7 @@ export function SettlingCard({currentWeek, weekResult}: SettlingCardProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     padding: spacing.md,
   },
@@ -67,7 +70,7 @@ const styles = StyleSheet.create({
   },
   headline: {
     ...typography.h3,
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: spacing.md,
   },
   resultSection: {
@@ -80,7 +83,7 @@ const styles = StyleSheet.create({
   },
   statValue: {
     ...typography.h2,
-    color: colors.text,
+    color: colors.textPrimary,
   },
   statLabel: {
     ...typography.caption,
