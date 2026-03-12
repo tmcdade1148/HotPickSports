@@ -62,21 +62,42 @@ async function uploadPartnerLogo(
   fileName: string,
 ): Promise<string | null> {
   try {
-    const response = await fetch(uri);
-    const blob = await response.blob();
-
-    const ext = fileName.split('.').pop() || 'png';
+    const ext = fileName.split('.').pop()?.toLowerCase() || 'png';
     const storagePath = `${slug}/logo.${ext}`;
+    const mimeType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
 
-    const {error: uploadError} = await supabase.storage
-      .from('partner-logos')
-      .upload(storagePath, blob, {
-        contentType: `image/${ext === 'jpg' ? 'jpeg' : ext}`,
-        upsert: true,
-      });
+    // Get auth token for the upload
+    const {data: {session}} = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) {
+      Alert.alert('Upload Error', 'Not authenticated');
+      return null;
+    }
 
-    if (uploadError) {
-      console.warn('Logo upload error:', uploadError.message);
+    // React Native: upload directly via REST API using fetch + FormData
+    const SUPABASE_URL = 'https://mzqtrpdiqhopjmxjccwy.supabase.co';
+    const uploadUrl = `${SUPABASE_URL}/storage/v1/object/partner-logos/${storagePath}`;
+
+    const formData = new FormData();
+    formData.append('file', {
+      uri,
+      name: `logo.${ext}`,
+      type: mimeType,
+    } as any);
+
+    const uploadResponse = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'x-upsert': 'true',
+      },
+      body: formData,
+    });
+
+    if (!uploadResponse.ok) {
+      const errText = await uploadResponse.text();
+      console.warn('Logo upload error:', errText);
+      Alert.alert('Upload Error', `${uploadResponse.status}: ${errText}`);
       return null;
     }
 
@@ -85,8 +106,9 @@ async function uploadPartnerLogo(
       .getPublicUrl(storagePath);
 
     return data.publicUrl;
-  } catch (err) {
+  } catch (err: any) {
     console.warn('Logo upload failed:', err);
+    Alert.alert('Upload Error', err?.message || 'Unknown error');
     return null;
   }
 }
@@ -141,30 +163,35 @@ export function PartnerAdminScreen() {
     slug: string,
     onSuccess: (url: string) => void,
   ) => {
-    const result = await launchImageLibrary({
-      mediaType: 'photo',
-      quality: 0.8,
-      maxWidth: 512,
-      maxHeight: 512,
-    });
+    try {
+      const result = await launchImageLibrary({
+        mediaType: 'photo',
+        quality: 0.8,
+        maxWidth: 512,
+        maxHeight: 512,
+      });
 
-    if (result.didCancel || !result.assets?.[0]) return;
+      if (result.didCancel || !result.assets?.[0]) return;
 
-    const asset = result.assets[0];
-    if (!asset.uri) return;
+      const asset = result.assets[0];
+      if (!asset.uri) return;
 
-    setUploadingLogo(true);
-    const publicUrl = await uploadPartnerLogo(
-      slug,
-      asset.uri,
-      asset.fileName || 'logo.png',
-    );
-    setUploadingLogo(false);
+      setUploadingLogo(true);
+      const publicUrl = await uploadPartnerLogo(
+        slug,
+        asset.uri,
+        asset.fileName || 'logo.png',
+      );
+      setUploadingLogo(false);
 
-    if (publicUrl) {
-      onSuccess(publicUrl);
-    } else {
-      Alert.alert('Upload Failed', 'Could not upload logo. Check that the partner-logos storage bucket exists in Supabase.');
+      if (publicUrl) {
+        onSuccess(publicUrl);
+      } else {
+        Alert.alert('Upload Failed', 'Upload returned null. See previous error alerts for details.');
+      }
+    } catch (err: any) {
+      setUploadingLogo(false);
+      Alert.alert('Pick/Upload Error', err?.message || String(err));
     }
   };
 
@@ -285,58 +312,67 @@ export function PartnerAdminScreen() {
     if (!editName.trim()) return;
     setSaving(true);
 
-    const bc = partner.brand_config as unknown as BrandConfig | null;
-    const derived = deriveFullBrandColors(
-      editColors.primary_color,
-      editColors.secondary_color,
-      editColors.background_color,
-    );
+    try {
+      const bc = partner.brand_config as unknown as BrandConfig | null;
+      const derived = deriveFullBrandColors(
+        editColors.primary_color,
+        editColors.secondary_color,
+        editColors.background_color,
+      );
 
-    const updatedConfig: BrandConfig = {
-      ...(bc ?? HOTPICK_DEFAULTS),
-      partner_name: editName.trim(),
-      pool_label: editName.trim(),
-      app_name: editName.trim(),
-      invite_slug: slugify(editName.trim()),
-      ...derived,
-      logo: {
-        ...(bc?.logo ?? HOTPICK_DEFAULTS.logo),
-        full: editLogoUrl,
-      },
-      is_branded: true,
-      powered_by_hotpick: true,
-    };
+      const updatedConfig: BrandConfig = {
+        ...(bc ?? HOTPICK_DEFAULTS),
+        partner_name: editName.trim(),
+        pool_label: editName.trim(),
+        app_name: editName.trim(),
+        invite_slug: slugify(editName.trim()),
+        ...derived,
+        logo: {
+          ...(bc?.logo ?? HOTPICK_DEFAULTS.logo),
+          full: editLogoUrl,
+        },
+        is_branded: true,
+        powered_by_hotpick: true,
+      };
 
-    const {error} = await supabase
-      .from('partners')
-      .update({
-        name: editName.trim(),
-        slug: slugify(editName.trim()),
-        brand_config: updatedConfig as unknown,
-      })
-      .eq('id', partner.id);
+      const {error} = await supabase
+        .from('partners')
+        .update({
+          name: editName.trim(),
+          slug: slugify(editName.trim()),
+          brand_config: updatedConfig as unknown,
+        })
+        .eq('id', partner.id);
 
-    if (error) {
-      Alert.alert('Error', error.message);
+      if (error) {
+        Alert.alert('Error', error.message);
+        setSaving(false);
+        return;
+      }
+
+      // Update any pools that use this partner's brand
+      const assignedPools = userPools.filter(
+        p => (p as any).partner_id === partner.id,
+      );
+      for (const pool of assignedPools) {
+        const {error: poolError} = await supabase
+          .from('pools')
+          .update({brand_config: updatedConfig as unknown})
+          .eq('id', pool.id);
+        if (poolError) {
+          console.warn('Pool brand update error:', poolError.message);
+        }
+        updatePoolBrandConfig(pool.id, updatedConfig);
+      }
+
+      setEditingPartnerId(null);
+      fetchPartners();
+      Alert.alert('Saved', `${editName.trim()} updated successfully.`);
+    } catch (err: any) {
+      Alert.alert('Save Error', err?.message || String(err));
+    } finally {
       setSaving(false);
-      return;
     }
-
-    // Update any pools that use this partner's brand
-    const assignedPools = userPools.filter(
-      p => (p as any).partner_id === partner.id,
-    );
-    for (const pool of assignedPools) {
-      await supabase
-        .from('pools')
-        .update({brand_config: updatedConfig as unknown})
-        .eq('id', pool.id);
-      updatePoolBrandConfig(pool.id, updatedConfig);
-    }
-
-    setEditingPartnerId(null);
-    setSaving(false);
-    fetchPartners();
   };
 
   /** Shared color field row renderer */
@@ -530,12 +566,12 @@ export function PartnerAdminScreen() {
 
             return (
               <View key={partner.id} style={styles.partnerCard}>
-                <TouchableOpacity
-                  style={styles.partnerHeader}
-                  onPress={() =>
-                    setExpandedPartnerId(isExpanded ? null : partner.id)
-                  }>
-                  <View style={styles.partnerInfo}>
+                <View style={styles.partnerHeader}>
+                  <TouchableOpacity
+                    style={styles.partnerInfo}
+                    onPress={() =>
+                      setExpandedPartnerId(isExpanded ? null : partner.id)
+                    }>
                     {logoUrl ? (
                       <Image
                         source={{uri: logoUrl}}
@@ -559,32 +595,42 @@ export function PartnerAdminScreen() {
                       </View>
                     ) : null}
                     <Text style={styles.partnerName}>{partner.name}</Text>
-                  </View>
+                  </TouchableOpacity>
                   <View style={styles.partnerHeaderActions}>
                     <TouchableOpacity
-                      onPress={(e) => {
-                        e.stopPropagation?.();
+                      style={styles.editButton}
+                      onPress={() => {
                         if (isEditing) {
                           setEditingPartnerId(null);
                         } else {
                           startEditing(partner);
                         }
-                      }}
-                      hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                      }}>
                       {isEditing ? (
-                        <X size={18} color={colors.primary} />
+                        <>
+                          <X size={14} color={colors.primary} />
+                          <Text style={[styles.editButtonLabel, {color: colors.primary}]}>Close</Text>
+                        </>
                       ) : (
-                        <Pencil size={16} color={colors.textSecondary} />
+                        <>
+                          <Pencil size={14} color={colors.primary} />
+                          <Text style={[styles.editButtonLabel, {color: colors.primary}]}>Edit</Text>
+                        </>
                       )}
                     </TouchableOpacity>
-                    <Users
-                      size={18}
-                      color={
-                        isExpanded ? colors.primary : colors.textSecondary
-                      }
-                    />
+                    <TouchableOpacity
+                      onPress={() =>
+                        setExpandedPartnerId(isExpanded ? null : partner.id)
+                      }>
+                      <Users
+                        size={18}
+                        color={
+                          isExpanded ? colors.primary : colors.textSecondary
+                        }
+                      />
+                    </TouchableOpacity>
                   </View>
-                </TouchableOpacity>
+                </View>
 
                 {/* Edit form */}
                 {isEditing && (
@@ -927,7 +973,21 @@ const createStyles = (colors: any) => StyleSheet.create({
   partnerHeaderActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing.md,
+  },
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  editButtonLabel: {
+    fontSize: 12,
+    fontWeight: '600' as const,
   },
   editSection: {
     borderTopWidth: 1,

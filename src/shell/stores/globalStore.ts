@@ -321,6 +321,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       : null;
     const brandConfig = (pool?.brand_config as unknown as BrandConfig) ?? null;
 
+
     set({activePoolId: poolId, activeBrandConfig: brandConfig});
     const competition = get().activeSport?.competition;
     if (poolId && competition) {

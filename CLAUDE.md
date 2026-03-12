@@ -671,6 +671,12 @@ WHERE pool_id = $pool_id AND user_id = $user_id;
 DELETE FROM pool_members WHERE pool_id = $pool_id AND user_id = $user_id;
 ```
 
+### Foreign Keys
+- `pool_members_user_id_profiles_fkey` — `user_id` → `profiles(id)`.
+  Required for PostgREST join syntax `profiles:user_id(*)` used by
+  `fetchPoolMembers`. Added March 2026.
+- `invited_by` → `profiles(id)` (original FK)
+
 ### Index Rules
 Three indexes only — all others are redundant and should be dropped:
 - Primary key on (pool_id, user_id)
@@ -816,7 +822,7 @@ Do not implement or suggest these unless explicitly asked:
 - Personality profiles / career stats (needs multiple events of data)
 - Achievement tracking (table exists, no triggers)
 - Tier system (needs cross-event data)
-- Advanced pool admin (remove member, nudge flow)
+- Advanced pool admin: nudge flow (member list, pool settings, broadcast are built)
 - Pool discovery / browse
 - SmackTalk reactions and pick-linked auto-messages
 - Exact score predictions
@@ -889,19 +895,19 @@ ADD COLUMN max_members INTEGER DEFAULT NULL,
 ADD COLUMN is_archived BOOLEAN NOT NULL DEFAULT false;
 ```
 
-### Admin Directory Structure
+### Admin Screens (as built)
 ```
-/src/shell/admin/
-  AdminDashboard.tsx      ← 3 sections: Attention, Pulse, Actions
-  AttentionSection.tsx    ← Time-sensitive action cards
-  PulseSection.tsx        ← Human-readable pool intelligence
-  ActionsSection.tsx      ← 4 primary buttons
-  MemberList.tsx          ← Member list with status indicators
-  BroadcastComposer.tsx   ← Message everyone (160 char, 3/day limit)
-  SmackTalkModerator.tsx  ← Chat with moderation overlay
+/src/shell/screens/
+  PoolMembersScreen.tsx     ← FlatList of active members, promote/demote/remove
+  PoolSettingsScreen.tsx    ← Edit name, share invite, archive pool, broadcast
+  PartnerAdminScreen.tsx    ← __DEV__-gated partner management (create, edit colors/logo, assign pools)
+/src/shell/components/
+  BroadcastComposer.tsx     ← Modal: 160 char message, 3/day rate limit, send to pool
 ```
 
-Admin screens live in /shell/admin/, never in sport modules.
+Admin screens live in /shell/screens/, never in sport modules.
+Entry points: SettingsScreen pool rows show Users icon (→ PoolMembers)
+and Settings gear (→ PoolSettings) for organizer/admin roles.
 
 ### Admin Red Flags
 - Intelligence computed in a React component → use pool_pulse table
@@ -912,9 +918,11 @@ Admin screens live in /shell/admin/, never in sport modules.
 - Admin UI importing from a sport module → admin lives in shell only
 
 ### What Ships vs What Waits
-Ships: pool CRUD, member list, SmackTalk remove, broadcast, nudge,
-all 4 database tables, compute_pool_intelligence Edge Function skeleton.
-Deferred: Pulse digest UI, analytics, brand editor, AI copy,
+Ships: pool CRUD, member list (with promote/demote/remove), pool settings
+(edit name, share invite, archive), broadcast composer (160 char, 3/day
+rate limit), all 4 database tables, compute_pool_intelligence Edge
+Function skeleton.
+Deferred: nudge flow, Pulse digest UI, analytics, AI copy,
 advanced moderation, multi-pool management.
 
 ---
@@ -1752,6 +1760,8 @@ JSONB on the pools table.
 | 6 | PoweredByHotPick component | `src/shell/components/PoweredByHotPick.tsx` — wired into all 3 board screens + SmackTalk |
 | 7 | Partner Admin Screen | `src/shell/screens/PartnerAdminScreen.tsx` — create partners, assign to pools, reset |
 | 8 | QR code generation | Integrated into Partner Admin via `react-native-qrcode-svg` |
+| 9 | Partner color editing | Partner Admin edit mode: 3 settable colors (primary, secondary, background) with `deriveFullBrandColors()` auto-computing surface/text. Brand colors scoped to partner pool rows only in Settings/PoolSettings. |
+| 10 | Partner logo upload | Upload via Supabase Storage REST API + FormData (RN workaround — JS client doesn't handle blobs). Bucket: `partner-logos` (public, 5MB, PNG/JPEG/WebP/SVG). |
 
 ### Remaining Phases (require real device testing)
 

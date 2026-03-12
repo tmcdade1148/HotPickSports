@@ -95,9 +95,18 @@ export function LoadingScreen({navigation}: any) {
           const activePool = activeId
             ? pools.find(p => p.id === activeId)
             : null;
+          // Partner pools get priority when no manual default is set
+          const partnerPools = pools
+            .filter(p => (p.brand_config as any)?.is_branded)
+            .sort((a, b) => a.created_at.localeCompare(b.created_at));
+          const firstPartnerPool = partnerPools[0] ?? null;
           const globalPool = pools.find(p => p.is_global);
           const startPoolId =
-            defaultPool?.id ?? activePool?.id ?? globalPool?.id ?? pools[0].id;
+            defaultPool?.id ??
+            firstPartnerPool?.id ??
+            activePool?.id ??
+            globalPool?.id ??
+            pools[0].id;
 
           setActivePoolId(startPoolId);
 

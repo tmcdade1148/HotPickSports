@@ -25,6 +25,8 @@ import {useGlobalStore} from '@shell/stores/globalStore';
 import {BroadcastComposer} from '@shell/components/BroadcastComposer';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
+import type {BrandConfig} from '@shell/theme/types';
+import {HOTPICK_DEFAULTS} from '@shell/theme/defaults';
 
 export function PoolSettingsScreen() {
   const {colors} = useTheme();
@@ -42,6 +44,12 @@ export function PoolSettingsScreen() {
     () => userPools.find(p => p.id === poolId),
     [userPools, poolId],
   );
+
+  const poolBrand = useMemo(() => {
+    const bc = pool?.brand_config as unknown as BrandConfig | null | undefined;
+    return bc?.is_branded ? bc : null;
+  }, [pool]);
+  const accentColor = poolBrand?.secondary_color ?? HOTPICK_DEFAULTS.primary_color;
 
   const [poolName, setPoolName] = useState(pool?.name ?? '');
   const [saving, setSaving] = useState(false);
@@ -203,19 +211,19 @@ export function PoolSettingsScreen() {
           <>
             <Text style={styles.sectionTitle}>Invite Code</Text>
             <View style={styles.inviteCard}>
-              <Text style={styles.inviteCodeLarge}>{pool.invite_code}</Text>
+              <Text style={[styles.inviteCodeLarge, {color: accentColor}]}>{pool.invite_code}</Text>
               <View style={styles.inviteActions}>
                 <TouchableOpacity
-                  style={styles.inviteButton}
+                  style={[styles.inviteButton, {borderColor: accentColor}]}
                   onPress={handleCopyCode}>
-                  <Copy size={16} color={colors.primary} />
-                  <Text style={styles.inviteButtonText}>Copy</Text>
+                  <Copy size={16} color={accentColor} />
+                  <Text style={[styles.inviteButtonText, {color: accentColor}]}>Copy</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={styles.inviteButton}
+                  style={[styles.inviteButton, {borderColor: accentColor}]}
                   onPress={handleShareInvite}>
-                  <Share2 size={16} color={colors.primary} />
-                  <Text style={styles.inviteButtonText}>Share</Text>
+                  <Share2 size={16} color={accentColor} />
+                  <Text style={[styles.inviteButtonText, {color: accentColor}]}>Share</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -278,10 +286,10 @@ export function PoolSettingsScreen() {
         {/* Broadcast */}
         <Text style={styles.sectionTitle}>Communication</Text>
         <TouchableOpacity
-          style={styles.broadcastButton}
+          style={[styles.broadcastButton, {borderColor: accentColor}]}
           onPress={() => setBroadcastVisible(true)}>
-          <Megaphone size={18} color={colors.primary} />
-          <Text style={styles.broadcastText}>Send Broadcast</Text>
+          <Megaphone size={18} color={accentColor} />
+          <Text style={[styles.broadcastText, {color: accentColor}]}>Send Broadcast</Text>
         </TouchableOpacity>
 
         {/* Danger Zone */}

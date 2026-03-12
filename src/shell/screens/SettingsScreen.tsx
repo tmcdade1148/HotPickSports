@@ -161,21 +161,24 @@ export function SettingsScreen() {
 
       {userPools.map(pool => {
         const poolBrand = getPoolColors(pool);
+        const isBranded = !!(pool.brand_config as any)?.is_branded;
         const isActive = pool.id === activePoolId;
+        const hotpick = {primary: HOTPICK_DEFAULTS.primary_color, secondary: HOTPICK_DEFAULTS.secondary_color};
+        const rowColors = isBranded ? poolBrand : hotpick;
 
         return (
           <TouchableOpacity
             key={pool.id}
             style={[
               styles.poolRow,
-              {backgroundColor: poolBrand.secondary + '10'},
-              isActive && {borderWidth: 1, borderColor: poolBrand.primary},
+              isBranded && {backgroundColor: rowColors.secondary + '18'},
+              isActive && {borderWidth: 1.5, borderColor: rowColors.primary},
             ]}
             onPress={() => setActivePoolId(pool.id)}>
             <View style={styles.poolInfo}>
               <Users
                 size={18}
-                color={isActive ? poolBrand.primary : colors.textSecondary}
+                color={isActive ? rowColors.primary : colors.textSecondary}
               />
               <View style={styles.poolNameCol}>
                 <View style={styles.poolNameRow}>
@@ -183,7 +186,7 @@ export function SettingsScreen() {
                     style={[
                       styles.poolName,
                       {color: colors.textPrimary},
-                      isActive && {color: poolBrand.primary, fontWeight: '600'},
+                      isActive && {color: rowColors.primary, fontWeight: '600'},
                     ]}
                     numberOfLines={1}>
                     {pool.name}
@@ -206,8 +209,8 @@ export function SettingsScreen() {
                           style={[
                             styles.inviteCode,
                             {
-                              color: poolBrand.primary,
-                              backgroundColor: poolBrand.primary + '15',
+                              color: isBranded ? rowColors.secondary : hotpick.primary,
+                              backgroundColor: (isBranded ? rowColors.secondary : hotpick.primary) + '15',
                             },
                           ]}>
                           {pool.invite_code}
@@ -227,7 +230,7 @@ export function SettingsScreen() {
             </View>
             <View style={styles.poolActions}>
               {isActive && (
-                <Text style={[styles.activeLabel, {color: poolBrand.primary}]}>
+                <Text style={[styles.activeLabel, {color: rowColors.primary}]}>
                   Active
                 </Text>
               )}
@@ -257,10 +260,10 @@ export function SettingsScreen() {
                   size={18}
                   color={
                     pool.id === defaultPoolId
-                      ? poolBrand.primary
+                      ? rowColors.primary
                       : colors.textSecondary
                   }
-                  fill={pool.id === defaultPoolId ? poolBrand.primary : 'none'}
+                  fill={pool.id === defaultPoolId ? rowColors.primary : 'none'}
                 />
               </TouchableOpacity>
             </View>
