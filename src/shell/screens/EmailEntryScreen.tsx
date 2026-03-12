@@ -1,6 +1,5 @@
 import React, {useState} from 'react';
 import {
-  View,
   Text,
   TextInput,
   TouchableOpacity,
@@ -11,10 +10,8 @@ import {
   ScrollView,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {supabase} from '@shared/config/supabase';
-import {useGlobalStore} from '@shell/stores/globalStore';
-import {getDefaultEvent} from '@sports/registry';
+import {runPostAuthFlow} from '@shell/services/postAuthFlow';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 
@@ -32,20 +29,6 @@ export function EmailEntryScreen({navigation}: any) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  const setUser = useGlobalStore(s => s.setUser);
-  const setActiveSport = useGlobalStore(s => s.setActiveSport);
-  const fetchProfile = useGlobalStore(s => s.fetchProfile);
-  const fetchUserPools = useGlobalStore(s => s.fetchUserPools);
-  const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
-  const acceptTos = useGlobalStore(s => s.acceptTos);
-  const ensureGlobalPoolMembership = useGlobalStore(
-    s => s.ensureGlobalPoolMembership,
-  );
-  const subscribeSmackUnread = useGlobalStore(s => s.subscribeSmackUnread);
-  const fetchSmackUnreadCounts = useGlobalStore(
-    s => s.fetchSmackUnreadCounts,
-  );
 
   const isValidEmail = EMAIL_REGEX.test(email.trim());
   const isValidPassword = password.length >= MIN_PASSWORD_LENGTH;
@@ -67,101 +50,45 @@ export function EmailEntryScreen({navigation}: any) {
     setError('');
     setLoading(true);
 
-    if (mode === 'sign_up') {
-      const {data, error: signUpError} = await supabase.auth.signUp({
-        email: trimmedEmail,
-        password,
-      });
-
-      setLoading(false);
-
-      if (signUpError) {
-        setError(signUpError.message);
-        return;
-      }
-
-      if (data.user) {
-        setUser(data.user);
-        const defaultEvent = getDefaultEvent();
-        setActiveSport(defaultEvent);
-        await acceptTos(data.user.id);
-        await ensureGlobalPoolMembership();
-        navigation.replace('ProfileSetup');
-      }
-    } else {
-      const {data, error: signInError} =
-        await supabase.auth.signInWithPassword({
+    try {
+      if (mode === 'sign_up') {
+        const {data, error: signUpError} = await supabase.auth.signUp({
           email: trimmedEmail,
           password,
         });
 
-      setLoading(false);
-
-      if (signInError) {
-        if (signInError.message === 'Invalid login credentials') {
-          setError('Incorrect email or password.');
-        } else {
-          setError(signInError.message);
-        }
-        return;
-      }
-
-      if (data.user) {
-        setUser(data.user);
-        const defaultEvent = getDefaultEvent();
-        setActiveSport(defaultEvent);
-
-        await ensureGlobalPoolMembership();
-        const profile = await fetchProfile(data.user.id);
-
-        if (!profile || !profile.first_name) {
-          navigation.replace('ProfileSetup');
+        if (signUpError) {
+          setError(signUpError.message);
           return;
         }
 
-        // Load pools and select active pool — same logic as LoadingScreen
-        await fetchUserPools(data.user.id, defaultEvent.competition);
-        const pools = useGlobalStore.getState().userPools;
+        if (data.user) {
+          await runPostAuthFlow({user: data.user, navigation});
+        }
+      } else {
+        const {data, error: signInError} =
+          await supabase.auth.signInWithPassword({
+            email: trimmedEmail,
+            password,
+          });
 
-        if (pools.length > 0) {
-          let defaultId: string | null = null;
-          let activeId: string | null = null;
-          try {
-            defaultId = await AsyncStorage.getItem(
-              `hotpick_default_pool_${defaultEvent.competition}`,
-            );
-            activeId = await AsyncStorage.getItem(
-              `hotpick_active_pool_${defaultEvent.competition}`,
-            );
-          } catch {
-            // proceed with fallbacks
+        if (signInError) {
+          if (signInError.message === 'Invalid login credentials') {
+            setError('Incorrect email or password.');
+          } else {
+            setError(signInError.message);
           }
-
-          const defaultPool = defaultId
-            ? pools.find(p => p.id === defaultId)
-            : null;
-          const activePool = activeId
-            ? pools.find(p => p.id === activeId)
-            : null;
-          const globalPool = pools.find(p => p.is_global);
-          const startPoolId =
-            defaultPool?.id ?? activePool?.id ?? globalPool?.id ?? pools[0].id;
-
-          setActivePoolId(startPoolId);
-
-          if (defaultId) {
-            useGlobalStore
-              .getState()
-              .loadDefaultPoolId(defaultEvent.competition);
-          }
-
-          const poolIds = pools.map(p => p.id);
-          await fetchSmackUnreadCounts(data.user.id, poolIds);
+          return;
         }
 
-        subscribeSmackUnread();
-        navigation.replace('Home');
+        if (data.user) {
+          await runPostAuthFlow({user: data.user, navigation});
+        }
       }
+    } catch (err: any) {
+      setError(err?.message || 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -215,6 +142,7 @@ export function EmailEntryScreen({navigation}: any) {
             editable={!loading}
             returnKeyType="next"
             textContentType="emailAddress"
+            autoComplete="email"
           />
 
           <TextInput
@@ -235,6 +163,9 @@ export function EmailEntryScreen({navigation}: any) {
             textContentType={
               mode === 'sign_up' ? 'newPassword' : 'password'
             }
+            autoComplete={
+              mode === 'sign_up' ? 'new-password' : 'password'
+            }
           />
 
           {mode === 'sign_up' && (
@@ -254,6 +185,7 @@ export function EmailEntryScreen({navigation}: any) {
               returnKeyType="go"
               onSubmitEditing={handleSubmit}
               textContentType="newPassword"
+              autoComplete="new-password"
             />
           )}
 

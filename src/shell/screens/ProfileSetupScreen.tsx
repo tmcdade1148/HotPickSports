@@ -17,14 +17,20 @@ import {AvatarSelector, SYSTEM_AVATARS} from '@shell/components/AvatarSelector';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 
-export function ProfileSetupScreen({navigation}: any) {
+export function ProfileSetupScreen({navigation, route}: any) {
   const {colors} = useTheme();
   const styles = createStyles(colors);
   const user = useGlobalStore(s => s.user);
   const updateProfile = useGlobalStore(s => s.updateProfile);
 
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  // Apple Sign In only sends the user's name on the VERY FIRST sign-in.
+  // We capture it here via route params so it can pre-fill the form.
+  const providerName = route?.params?.providerName as
+    | {firstName?: string; lastName?: string}
+    | undefined;
+
+  const [firstName, setFirstName] = useState(providerName?.firstName ?? '');
+  const [lastName, setLastName] = useState(providerName?.lastName ?? '');
   const [poolieName, setPoolieName] = useState('');
   const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);

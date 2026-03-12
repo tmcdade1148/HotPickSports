@@ -530,12 +530,12 @@ export function PartnerAdminScreen() {
 
             return (
               <View key={partner.id} style={styles.partnerCard}>
-                <TouchableOpacity
-                  style={styles.partnerHeader}
-                  onPress={() =>
-                    setExpandedPartnerId(isExpanded ? null : partner.id)
-                  }>
-                  <View style={styles.partnerInfo}>
+                <View style={styles.partnerHeader}>
+                  <TouchableOpacity
+                    style={styles.partnerInfo}
+                    onPress={() =>
+                      setExpandedPartnerId(isExpanded ? null : partner.id)
+                    }>
                     {logoUrl ? (
                       <Image
                         source={{uri: logoUrl}}
@@ -559,32 +559,42 @@ export function PartnerAdminScreen() {
                       </View>
                     ) : null}
                     <Text style={styles.partnerName}>{partner.name}</Text>
-                  </View>
+                  </TouchableOpacity>
                   <View style={styles.partnerHeaderActions}>
                     <TouchableOpacity
-                      onPress={(e) => {
-                        e.stopPropagation?.();
+                      style={styles.editButton}
+                      onPress={() => {
                         if (isEditing) {
                           setEditingPartnerId(null);
                         } else {
                           startEditing(partner);
                         }
-                      }}
-                      hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                      }}>
                       {isEditing ? (
-                        <X size={18} color={colors.primary} />
+                        <>
+                          <X size={14} color={colors.primary} />
+                          <Text style={[styles.editButtonLabel, {color: colors.primary}]}>Close</Text>
+                        </>
                       ) : (
-                        <Pencil size={16} color={colors.textSecondary} />
+                        <>
+                          <Pencil size={14} color={colors.primary} />
+                          <Text style={[styles.editButtonLabel, {color: colors.primary}]}>Edit</Text>
+                        </>
                       )}
                     </TouchableOpacity>
-                    <Users
-                      size={18}
-                      color={
-                        isExpanded ? colors.primary : colors.textSecondary
-                      }
-                    />
+                    <TouchableOpacity
+                      onPress={() =>
+                        setExpandedPartnerId(isExpanded ? null : partner.id)
+                      }>
+                      <Users
+                        size={18}
+                        color={
+                          isExpanded ? colors.primary : colors.textSecondary
+                        }
+                      />
+                    </TouchableOpacity>
                   </View>
-                </TouchableOpacity>
+                </View>
 
                 {/* Edit form */}
                 {isEditing && (
@@ -927,7 +937,21 @@ const createStyles = (colors: any) => StyleSheet.create({
   partnerHeaderActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing.md,
+  },
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  editButtonLabel: {
+    fontSize: 12,
+    fontWeight: '600' as const,
   },
   editSection: {
     borderTopWidth: 1,
