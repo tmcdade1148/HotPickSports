@@ -8,11 +8,12 @@ import {
   StyleSheet,
 } from 'react-native';
 import {ChevronDown} from 'lucide-react-native';
-import {colors, spacing, borderRadius, typography} from '@shared/theme';
+import {spacing, borderRadius, typography} from '@shared/theme';
 import type {SeriesConfig} from '@shared/types/templates';
 import type {DbPool} from '@shared/types/database';
 import {useNHLStore} from '@sports/nhl/stores/nhlStore';
 import {useGlobalStore} from '@shell/stores/globalStore';
+import {useTheme} from '@shell/theme';
 
 interface SeriesEventCardProps {
   config: SeriesConfig;
@@ -26,6 +27,8 @@ interface SeriesEventCardProps {
  *   2. activePoolId from globalStore
  */
 export function SeriesEventCard({config}: SeriesEventCardProps) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const currentRound = useNHLStore(s => s.currentRound);
   const seriesPicksOpen = useNHLStore(s => s.seriesPicksOpen);
   const isComplete = useNHLStore(s => s.isComplete);
@@ -92,6 +95,8 @@ function CardHeader({
   accentColor,
   smackUnreadCounts,
 }: CardHeaderProps) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const [modalVisible, setModalVisible] = useState(false);
 
   const switchTo = (poolId: string) => {
@@ -158,7 +163,7 @@ function CardHeader({
 // Styles
 // ---------------------------------------------------------------------------
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   card: {
     backgroundColor: colors.background,
     borderRadius: borderRadius.lg,
@@ -193,7 +198,7 @@ const styles = StyleSheet.create({
   },
   poolName: {
     ...typography.caption,
-    color: colors.text,
+    color: colors.textPrimary,
     fontWeight: '500',
     maxWidth: 150,
   },
@@ -209,7 +214,7 @@ const styles = StyleSheet.create({
   },
   headline: {
     ...typography.h3,
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
   sub: {
@@ -231,7 +236,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     ...typography.h3,
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: spacing.md,
   },
   poolOption: {
@@ -249,7 +254,7 @@ const styles = StyleSheet.create({
   },
   poolOptionText: {
     ...typography.body,
-    color: colors.text,
+    color: colors.textPrimary,
   },
   unreadDot: {
     width: 8,

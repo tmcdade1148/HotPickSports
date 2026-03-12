@@ -16,7 +16,8 @@ import {SeriesEventCard} from '@shell/components/home/SeriesEventCard';
 import {ScoreModule} from '@shell/components/home/ScoreModule';
 import {StandingsBadge} from '@shell/components/home/StandingsBadge';
 import {SmackTalkNudge} from '@shell/components/home/SmackTalkNudge';
-import {colors, spacing, typography} from '@shared/theme';
+import {spacing, typography} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 import type {
   AnyEventConfig,
   SeasonConfig,
@@ -33,6 +34,8 @@ import type {
  * template tab navigator for that event.
  */
 export function HomeScreen({navigation}: any) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const userProfile = useGlobalStore(s => s.userProfile);
   const activeEventCards = useGlobalStore(s => s.activeEventCards);
   const activeSport = useGlobalStore(s => s.activeSport);
@@ -94,7 +97,7 @@ export function HomeScreen({navigation}: any) {
         <TouchableOpacity
           style={styles.settingsButton}
           onPress={() => navigation.navigate('Settings')}>
-          <Settings size={22} color={colors.text} />
+          <Settings size={22} color={colors.textPrimary} />
         </TouchableOpacity>
       </View>
 
@@ -182,7 +185,7 @@ function getGreeting(): string {
   return 'Good evening';
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surface,
@@ -201,7 +204,7 @@ const styles = StyleSheet.create({
   },
   name: {
     ...typography.h2,
-    color: colors.text,
+    color: colors.textPrimary,
   },
   settingsButton: {
     width: 40,
@@ -229,7 +232,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     ...typography.h3,
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
   emptySubtitle: {

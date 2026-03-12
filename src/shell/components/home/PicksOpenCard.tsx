@@ -1,9 +1,10 @@
 import React from 'react';
 import {View, Text, StyleSheet} from 'react-native';
-import {colors, spacing, typography, borderRadius} from '@shared/theme';
+import {spacing, typography, borderRadius} from '@shared/theme';
 import {useCountdown} from '@shared/hooks/useCountdown';
 import {CardFooter} from './CardFooter';
 import type {DbSeasonGame} from '@shared/types/database';
+import {useTheme} from '@shell/theme';
 
 /** Format a Date into "Sunday, 1:00 PM" for display */
 function formatGameDateTime(date: Date): string {
@@ -65,6 +66,8 @@ export function PicksOpenCard({
   poolMemberCount,
   onMakePicks,
 }: PicksOpenCardProps) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const {timeLeft, isUrgent, hasExpired} = useCountdown(deadline);
   const kickoff = useCountdown(weekFirstKickoff);
   const hotPickCountdown = useCountdown(hotPickKickoff);
@@ -148,7 +151,7 @@ export function PicksOpenCard({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     paddingTop: spacing.md,
   },
@@ -203,7 +206,7 @@ const styles = StyleSheet.create({
   },
   kickoffText: {
     ...typography.body,
-    color: colors.text,
+    color: colors.textPrimary,
     fontWeight: '600',
   },
   kickoffDateTime: {

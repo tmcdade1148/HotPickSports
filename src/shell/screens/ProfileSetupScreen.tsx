@@ -14,9 +14,12 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {AvatarSelector, SYSTEM_AVATARS} from '@shell/components/AvatarSelector';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {spacing, borderRadius} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 
 export function ProfileSetupScreen({navigation}: any) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const user = useGlobalStore(s => s.user);
   const updateProfile = useGlobalStore(s => s.updateProfile);
 
@@ -195,7 +198,7 @@ export function ProfileSetupScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -210,7 +213,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: spacing.lg,
   },
   section: {
@@ -224,7 +227,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: spacing.xs,
   },
   required: {
@@ -242,7 +245,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     padding: spacing.md,
     fontSize: 16,
-    color: colors.text,
+    color: colors.textPrimary,
     backgroundColor: colors.surface,
   },
   inputError: {

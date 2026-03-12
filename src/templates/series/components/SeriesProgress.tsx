@@ -1,8 +1,9 @@
 import React from 'react';
 import {View, Text, StyleSheet} from 'react-native';
 import type {SeriesConfig} from '@shared/types/templates';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {spacing, borderRadius} from '@shared/theme';
 import {useSeriesStore} from '../stores/seriesStore';
+import {useTheme} from '@shell/theme';
 
 interface SeriesProgressProps {
   config: SeriesConfig;
@@ -15,6 +16,8 @@ interface SeriesProgressProps {
  * Never references a specific sport.
  */
 export function SeriesProgress({config, userId}: SeriesProgressProps) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const score = useSeriesStore(s => s.getUserScore(userId));
   const leaderboard = useSeriesStore(s => s.leaderboard);
   const currentRound = useSeriesStore(s => s.currentRound);
@@ -83,7 +86,7 @@ export function SeriesProgress({config, userId}: SeriesProgressProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     padding: spacing.md,
     backgroundColor: colors.surface,
@@ -98,12 +101,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   totalPoints: {
     fontSize: 20,
     fontWeight: '700',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   rankText: {
     fontSize: 13,
@@ -149,6 +152,6 @@ const styles = StyleSheet.create({
   roundPoints: {
     fontSize: 11,
     fontWeight: '700',
-    color: colors.text,
+    color: colors.textPrimary,
   },
 });

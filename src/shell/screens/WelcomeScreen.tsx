@@ -9,9 +9,12 @@ import {
   Alert,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {spacing, borderRadius} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 
 export function WelcomeScreen({navigation}: any) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const [loading, setLoading] = useState<string | null>(null);
 
   const handleApple = () => {
@@ -69,7 +72,7 @@ export function WelcomeScreen({navigation}: any) {
             onPress={handleGoogle}
             disabled={loading !== null}>
             {loading === 'google' ? (
-              <ActivityIndicator color={colors.text} />
+              <ActivityIndicator color={colors.textPrimary} />
             ) : (
               <Text style={[styles.authButtonText, styles.googleButtonText]}>
                 Continue with Google
@@ -98,7 +101,7 @@ export function WelcomeScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -154,7 +157,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   googleButtonText: {
-    color: colors.text,
+    color: colors.textPrimary,
   },
   emailButton: {
     backgroundColor: colors.primary,

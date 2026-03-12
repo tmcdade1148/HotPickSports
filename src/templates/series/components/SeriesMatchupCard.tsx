@@ -2,9 +2,10 @@ import React from 'react';
 import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
 import type {SeriesConfig} from '@shared/types/templates';
 import type {DbSeriesMatchup} from '@shared/types/database';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {spacing, borderRadius} from '@shared/theme';
 import {useSeriesStore} from '../stores/seriesStore';
 import {getSeriesWinner, getSeriesLength} from '../services/seriesScoring';
+import {useTheme} from '@shell/theme';
 
 interface SeriesMatchupCardProps {
   matchup: DbSeriesMatchup;
@@ -22,6 +23,8 @@ export function SeriesMatchupCard({
   config,
   userId,
 }: SeriesMatchupCardProps) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const existingPick = useSeriesStore(s => s.getPickForMatchup(matchup.series_id));
   const savePick = useSeriesStore(s => s.savePick);
   const isSaving = useSeriesStore(s => s.isSaving);
@@ -258,7 +261,7 @@ export function SeriesMatchupCard({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
@@ -291,7 +294,7 @@ const styles = StyleSheet.create({
   winsText: {
     fontSize: 28,
     fontWeight: '700',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   winsDash: {
     fontSize: 20,
@@ -322,7 +325,7 @@ const styles = StyleSheet.create({
   teamText: {
     fontSize: 18,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   teamTextSelected: {
     color: colors.primary,
@@ -365,7 +368,7 @@ const styles = StyleSheet.create({
   gameChipText: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   gameChipTextSelected: {
     color: colors.secondary,

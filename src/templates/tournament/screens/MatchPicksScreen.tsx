@@ -3,7 +3,8 @@ import {View, Text, FlatList, ActivityIndicator, StyleSheet} from 'react-native'
 import {useTournamentStore} from '../stores/tournamentStore';
 import {MatchPickCard} from '../components/MatchPickCard';
 import {useAuth} from '@shared/hooks/useAuth';
-import {colors, spacing} from '@shared/theme';
+import {spacing} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 
 /**
  * MatchPicksScreen — Pick winners for knockout round matches.
@@ -11,6 +12,8 @@ import {colors, spacing} from '@shared/theme';
  * Never references a specific sport.
  */
 export function MatchPicksScreen() {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const config = useTournamentStore(s => s.config);
   const matches = useTournamentStore(s => s.matches);
   const isLoading = useTournamentStore(s => s.isLoading);
@@ -67,7 +70,7 @@ export function MatchPicksScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -90,7 +93,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
   emptyText: {

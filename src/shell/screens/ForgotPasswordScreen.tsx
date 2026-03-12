@@ -11,12 +11,15 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {supabase} from '@shared/config/supabase';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {spacing, borderRadius} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const RESEND_COOLDOWN_SECONDS = 60;
 
 export function ForgotPasswordScreen({navigation, route}: any) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const initialEmail: string = route.params?.email ?? '';
   const [email, setEmail] = useState(initialEmail);
   const [sent, setSent] = useState(false);
@@ -160,7 +163,7 @@ export function ForgotPasswordScreen({navigation, route}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -191,7 +194,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
   subtitle: {
@@ -203,7 +206,7 @@ const styles = StyleSheet.create({
   email: {
     fontSize: 15,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: spacing.md,
   },
   instruction: {
@@ -221,7 +224,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     padding: spacing.md,
     fontSize: 16,
-    color: colors.text,
+    color: colors.textPrimary,
     backgroundColor: colors.surface,
   },
   inputError: {

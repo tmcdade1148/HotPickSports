@@ -10,13 +10,16 @@ import {
   StyleSheet,
 } from 'react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {spacing, borderRadius} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 
 /**
  * JoinPoolScreen — Enter a 6-character invite code to join an existing pool.
  * Auto-uppercases input. Sets the joined pool as active on success.
  */
 export function JoinPoolScreen({navigation}: any) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const user = useGlobalStore(s => s.user);
   const joinPool = useGlobalStore(s => s.joinPool);
 
@@ -98,7 +101,7 @@ export function JoinPoolScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -118,7 +121,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   form: {
     padding: spacing.lg,
@@ -137,7 +140,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     fontSize: 24,
     fontWeight: '700',
-    color: colors.text,
+    color: colors.textPrimary,
     borderWidth: 1,
     borderColor: colors.border,
     textAlign: 'center',

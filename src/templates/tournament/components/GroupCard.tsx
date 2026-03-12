@@ -1,8 +1,9 @@
 import React from 'react';
 import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
 import type {GroupConfig, TeamConfig} from '@shared/types/templates';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {spacing, borderRadius} from '@shared/theme';
 import {useTournamentStore} from '../stores/tournamentStore';
+import {useTheme} from '@shell/theme';
 
 interface GroupCardProps {
   group: GroupConfig;
@@ -23,6 +24,8 @@ export function GroupCard({
   accentColor,
   userId,
 }: GroupCardProps) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const groupPick = useTournamentStore(s => s.getGroupPick(group.name));
   const selectedTeams = useTournamentStore(s =>
     s.getGroupPickCodes(group.name),
@@ -116,7 +119,7 @@ export function GroupCard({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
@@ -157,7 +160,7 @@ const styles = StyleSheet.create({
   teamName: {
     flex: 1,
     fontSize: 16,
-    color: colors.text,
+    color: colors.textPrimary,
   },
   checkmark: {
     width: 24,

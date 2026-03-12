@@ -7,9 +7,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {getDefaultEvent} from '@sports/registry';
-import {colors, spacing} from '@shared/theme';
+import {spacing} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 
 export function LoadingScreen({navigation}: any) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const setUser = useGlobalStore(s => s.setUser);
   const setAuthLoading = useGlobalStore(s => s.setAuthLoading);
   const refreshAvailableEvents = useGlobalStore(s => s.refreshAvailableEvents);
@@ -143,7 +146,7 @@ export function LoadingScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',

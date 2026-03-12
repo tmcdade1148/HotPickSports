@@ -4,8 +4,9 @@ import {useSeriesStore} from '../stores/seriesStore';
 import {RoundSelector} from '../components/RoundSelector';
 import {SeriesMatchupCard} from '../components/SeriesMatchupCard';
 import {useAuth} from '@shared/hooks/useAuth';
-import {colors, spacing} from '@shared/theme';
+import {spacing} from '@shared/theme';
 import type {DbSeriesMatchup} from '@shared/types/database';
+import {useTheme} from '@shell/theme';
 
 /**
  * SeriesPicksScreen — Main playoff picks screen.
@@ -13,6 +14,8 @@ import type {DbSeriesMatchup} from '@shared/types/database';
  * Never references a specific sport.
  */
 export function SeriesPicksScreen() {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const config = useSeriesStore(s => s.config);
   const matchups = useSeriesStore(s => s.matchups);
   const currentRound = useSeriesStore(s => s.currentRound);
@@ -93,7 +96,7 @@ export function SeriesPicksScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -108,7 +111,7 @@ const styles = StyleSheet.create({
   roundTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   bestOfInfo: {
     fontSize: 13,
@@ -128,7 +131,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
   emptyText: {

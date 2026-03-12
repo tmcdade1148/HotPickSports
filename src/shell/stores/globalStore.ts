@@ -143,6 +143,7 @@ interface GlobalState {
   // Brand config — drives useTheme() and useBrand() hooks
   activeBrandConfig: BrandConfig | null;
   setActiveBrandConfig: (config: BrandConfig | null) => void;
+  updatePoolBrandConfig: (poolId: string, config: BrandConfig | null) => void;
 
   // Feature flags
   showGlobalPool: boolean;
@@ -812,6 +813,15 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   // ---------------------------------------------------------------------------
   activeBrandConfig: null,
   setActiveBrandConfig: config => set({activeBrandConfig: config}),
+  updatePoolBrandConfig: (poolId, config) => {
+    set(state => ({
+      userPools: state.userPools.map(p =>
+        p.id === poolId ? {...p, brand_config: config as Record<string, unknown> | null} : p,
+      ),
+      // If this is the active pool, also update the global theme
+      ...(state.activePoolId === poolId ? {activeBrandConfig: config} : {}),
+    }));
+  },
 
   // ---------------------------------------------------------------------------
   // Feature flags

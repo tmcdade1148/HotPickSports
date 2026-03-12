@@ -1,10 +1,11 @@
 import React from 'react';
 import {View, Text, StyleSheet} from 'react-native';
-import {colors, spacing, typography} from '@shared/theme';
+import {spacing, typography} from '@shared/theme';
 import type {DbSeasonPick, DbSeasonGame} from '@shared/types/database';
 import type {GameScore} from '@sports/nfl/stores/nflStore';
 import {getHotPickImpact} from '@sports/nfl/utils/hotPickImpact';
 import type {HotPickImpact} from '@sports/nfl/utils/hotPickImpact';
+import {useTheme} from '@shell/theme';
 
 interface LiveCardProps {
   currentWeek: number;
@@ -23,6 +24,8 @@ export function LiveCard({
   userHotPickGame,
   liveScores,
 }: LiveCardProps) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const hotPickScore = userHotPick
     ? liveScores[userHotPick.game_id]
     : null;
@@ -82,6 +85,8 @@ export function LiveCard({
 // ---------------------------------------------------------------------------
 
 function ImpactLine({impact}: {impact: HotPickImpact}) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   switch (impact.status) {
     case 'winning':
       return (
@@ -120,7 +125,7 @@ function ImpactLine({impact}: {impact: HotPickImpact}) {
 // Styles
 // ---------------------------------------------------------------------------
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     padding: spacing.md,
   },
@@ -178,7 +183,7 @@ const styles = StyleSheet.create({
   },
   matchup: {
     ...typography.h3,
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: spacing.xs,
   },
   clock: {

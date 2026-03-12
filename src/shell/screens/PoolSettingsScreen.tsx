@@ -8,8 +8,8 @@ import {
   ScrollView,
   Share,
   StyleSheet,
-  Clipboard,
 } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {
@@ -23,9 +23,12 @@ import {
 } from 'lucide-react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {BroadcastComposer} from '@shell/components/BroadcastComposer';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {spacing, borderRadius} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 
 export function PoolSettingsScreen() {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const poolId = route.params?.poolId as string;
@@ -51,7 +54,7 @@ export function PoolSettingsScreen() {
           <TouchableOpacity
             onPress={() => navigation.goBack()}
             hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-            <ChevronLeft size={24} color={colors.text} />
+            <ChevronLeft size={24} color={colors.textPrimary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Pool Settings</Text>
           <View style={{width: 24}} />
@@ -164,7 +167,7 @@ export function PoolSettingsScreen() {
           <TouchableOpacity
             onPress={() => navigation.goBack()}
             hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-            <ChevronLeft size={24} color={colors.text} />
+            <ChevronLeft size={24} color={colors.textPrimary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Pool Settings</Text>
           <View style={{width: 24}} />
@@ -301,7 +304,7 @@ export function PoolSettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -322,7 +325,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   sectionTitle: {
     fontSize: 14,
@@ -347,7 +350,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     padding: spacing.md,
     fontSize: 16,
-    color: colors.text,
+    color: colors.textPrimary,
     backgroundColor: colors.surface,
     fontWeight: '500',
   },
@@ -417,7 +420,7 @@ const styles = StyleSheet.create({
   infoValue: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   foundingBadge: {
     flexDirection: 'row',
@@ -451,7 +454,7 @@ const styles = StyleSheet.create({
   toggleLabel: {
     fontSize: 15,
     fontWeight: '500',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   toggleDesc: {
     fontSize: 12,

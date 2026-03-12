@@ -1,7 +1,8 @@
 import React from 'react';
 import {View, Text, StyleSheet} from 'react-native';
-import {colors, spacing, typography} from '@shared/theme';
+import {spacing, typography} from '@shared/theme';
 import type {Standing} from '@sports/nfl/stores/nflStore';
+import {useTheme} from '@shell/theme';
 
 interface CompleteCardProps {
   currentWeek: number;
@@ -20,6 +21,8 @@ export function CompleteCard({
   poolStandings,
   userId,
 }: CompleteCardProps) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const weeksLeft = totalWeeks - currentWeek;
   const myStanding = userId
     ? poolStandings.find(s => s.userId === userId)
@@ -59,7 +62,7 @@ export function CompleteCard({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     padding: spacing.md,
   },
@@ -72,7 +75,7 @@ const styles = StyleSheet.create({
   },
   headline: {
     ...typography.h3,
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: spacing.md,
   },
   standingsSection: {
@@ -80,7 +83,7 @@ const styles = StyleSheet.create({
   },
   rank: {
     ...typography.h2,
-    color: colors.text,
+    color: colors.textPrimary,
   },
   chase: {
     ...typography.body,

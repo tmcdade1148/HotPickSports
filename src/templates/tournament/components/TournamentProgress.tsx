@@ -1,8 +1,9 @@
 import React from 'react';
 import {View, Text, StyleSheet} from 'react-native';
 import type {TournamentConfig} from '@shared/types/templates';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {spacing, borderRadius} from '@shared/theme';
 import {useTournamentStore} from '../stores/tournamentStore';
+import {useTheme} from '@shell/theme';
 
 interface TournamentProgressProps {
   config: TournamentConfig;
@@ -14,6 +15,8 @@ interface TournamentProgressProps {
  * Shows max available points from config, current earned points from store.
  */
 export function TournamentProgress({config, userId}: TournamentProgressProps) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const score = useTournamentStore(s => s.getUserScore(userId));
 
   const groupPoints = score?.group_stage_points ?? 0;
@@ -51,7 +54,7 @@ export function TournamentProgress({config, userId}: TournamentProgressProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     padding: spacing.md,
     backgroundColor: colors.surface,
@@ -67,7 +70,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   points: {
     fontSize: 14,

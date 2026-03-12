@@ -69,6 +69,67 @@ export function deriveDarkColors(config: BrandConfig): BrandConfig {
 }
 
 /**
+ * Derive surface + text colors from 3 partner inputs.
+ *
+ * Partners provide only primary, secondary, and background.
+ * We auto-compute the rest so they can't create unreadable combos.
+ */
+export function deriveFullBrandColors(
+  primary: string,
+  secondary: string,
+  background: string,
+): {
+  primary_color: string;
+  secondary_color: string;
+  background_color: string;
+  surface_color: string;
+  text_primary: string;
+  text_secondary: string;
+} {
+  const isLightBg = isLightColor(background);
+
+  return {
+    primary_color: primary,
+    secondary_color: secondary,
+    background_color: background,
+    surface_color: isLightBg
+      ? darkenHex(background, 0.03) // slightly darker surface on light bg
+      : lightenHex(background, 0.06), // slightly lighter surface on dark bg
+    text_primary: isLightBg ? '#1A1A1A' : '#F5F5F5',
+    text_secondary: isLightBg ? '#6B6B6B' : '#A0A0A0',
+  };
+}
+
+/**
+ * Check if a hex color is "light" (luminance > 0.5).
+ */
+function isLightColor(hex: string): boolean {
+  const c = hex.replace('#', '');
+  const r = parseInt(c.substring(0, 2), 16) / 255;
+  const g = parseInt(c.substring(2, 4), 16) / 255;
+  const b = parseInt(c.substring(4, 6), 16) / 255;
+  // Relative luminance (simplified)
+  const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+  return luminance > 0.5;
+}
+
+function darkenHex(hex: string, amount: number): string {
+  const c = hex.replace('#', '');
+  const r = Math.max(0, Math.round(parseInt(c.substring(0, 2), 16) * (1 - amount)));
+  const g = Math.max(0, Math.round(parseInt(c.substring(2, 4), 16) * (1 - amount)));
+  const b = Math.max(0, Math.round(parseInt(c.substring(4, 6), 16) * (1 - amount)));
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`.toUpperCase();
+}
+
+function lightenHex(hex: string, amount: number): string {
+  const c = hex.replace('#', '');
+  const r = Math.min(255, Math.round(parseInt(c.substring(0, 2), 16) + (255 - parseInt(c.substring(0, 2), 16)) * amount));
+  const g = Math.min(255, Math.round(parseInt(c.substring(2, 4), 16) + (255 - parseInt(c.substring(2, 4), 16)) * amount));
+  const b = Math.min(255, Math.round(parseInt(c.substring(4, 6), 16) + (255 - parseInt(c.substring(4, 6), 16)) * amount));
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`.toUpperCase();
+}
+
+/**
  * Semantic colors that are always HotPick-owned.
  * Partners cannot override these — they ensure UI consistency
  * for success/error/warning states across all branded experiences.

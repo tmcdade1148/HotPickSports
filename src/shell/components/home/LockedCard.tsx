@@ -1,6 +1,7 @@
 import React from 'react';
 import {View, Text, StyleSheet} from 'react-native';
-import {colors, spacing, typography} from '@shared/theme';
+import {spacing, typography} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 
 interface LockedCardProps {
   currentWeek: number;
@@ -11,6 +12,8 @@ interface LockedCardProps {
  * Picks are in, games haven't started yet — waiting state.
  */
 export function LockedCard({currentWeek}: LockedCardProps) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   return (
     <View style={styles.container}>
       <Text style={styles.label}>WEEK {currentWeek}</Text>
@@ -22,7 +25,7 @@ export function LockedCard({currentWeek}: LockedCardProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     padding: spacing.md,
   },
@@ -35,7 +38,7 @@ const styles = StyleSheet.create({
   },
   headline: {
     ...typography.h3,
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
   body: {

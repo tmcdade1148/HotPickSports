@@ -15,7 +15,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {getDefaultEvent} from '@sports/registry';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {spacing, borderRadius} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
@@ -23,6 +24,8 @@ const MIN_PASSWORD_LENGTH = 8;
 type Mode = 'sign_in' | 'sign_up';
 
 export function EmailEntryScreen({navigation}: any) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const [mode, setMode] = useState<Mode>('sign_in');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -305,7 +308,7 @@ export function EmailEntryScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -332,7 +335,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
   subtitle: {
@@ -348,7 +351,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     padding: spacing.md,
     fontSize: 16,
-    color: colors.text,
+    color: colors.textPrimary,
     backgroundColor: colors.surface,
   },
   inputSpaced: {
