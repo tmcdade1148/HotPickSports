@@ -1,10 +1,11 @@
 import React, {useEffect} from 'react';
 import {View, Text, ActivityIndicator, StyleSheet} from 'react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {spacing, borderRadius} from '@shared/theme';
 import {TournamentTabNavigator} from '@templates/tournament/navigation/TournamentTabNavigator';
 import {SeasonTabNavigator} from '@templates/season/navigation/SeasonTabNavigator';
 import {SeriesTabNavigator} from '@templates/series/navigation/SeriesTabNavigator';
+import {useTheme} from '@shell/theme';
 import type {
   TournamentConfig,
   SeasonConfig,
@@ -22,6 +23,8 @@ import type {
  * the Board tab and SmackTalk simultaneously.
  */
 export function EventDetailScreen({navigation}: any) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const activeSport = useGlobalStore(s => s.activeSport);
   const activePoolId = useGlobalStore(s => s.activePoolId);
   const userPools = useGlobalStore(s => s.userPools);
@@ -106,7 +109,7 @@ export function EventDetailScreen({navigation}: any) {
   }
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -129,7 +132,7 @@ const styles = StyleSheet.create({
   debugTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
   debugDetail: {

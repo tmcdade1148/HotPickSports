@@ -3,9 +3,10 @@ import {View, Text, ScrollView, ActivityIndicator, StyleSheet} from 'react-nativ
 import {useSeriesStore} from '../stores/seriesStore';
 import {SeriesProgress} from '../components/SeriesProgress';
 import {useAuth} from '@shared/hooks/useAuth';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {spacing, borderRadius} from '@shared/theme';
 import {PoweredByHotPick} from '@shell/components/PoweredByHotPick';
 import type {DbSeriesUserTotal} from '@shared/types/database';
+import {useTheme} from '@shell/theme';
 
 /**
  * SeriesBoardScreen — Standings showing pool leaderboard.
@@ -13,6 +14,8 @@ import type {DbSeriesUserTotal} from '@shared/types/database';
  * Never references a specific sport.
  */
 export function SeriesBoardScreen() {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const config = useSeriesStore(s => s.config);
   const leaderboard = useSeriesStore(s => s.leaderboard);
   const userNames = useSeriesStore(s => s.userNames);
@@ -92,7 +95,7 @@ export function SeriesBoardScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -113,7 +116,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: spacing.md,
   },
   row: {
@@ -143,7 +146,7 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 16,
     fontWeight: '500',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   breakdown: {
     fontSize: 12,
@@ -153,7 +156,7 @@ const styles = StyleSheet.create({
   totalPoints: {
     fontSize: 16,
     fontWeight: '700',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   textHighlight: {
     color: colors.primary,

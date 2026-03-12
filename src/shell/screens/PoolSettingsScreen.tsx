@@ -8,8 +8,8 @@ import {
   ScrollView,
   Share,
   StyleSheet,
-  Clipboard,
 } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {
@@ -23,9 +23,14 @@ import {
 } from 'lucide-react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {BroadcastComposer} from '@shell/components/BroadcastComposer';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {spacing, borderRadius} from '@shared/theme';
+import {useTheme} from '@shell/theme';
+import type {BrandConfig} from '@shell/theme/types';
+import {HOTPICK_DEFAULTS} from '@shell/theme/defaults';
 
 export function PoolSettingsScreen() {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const poolId = route.params?.poolId as string;
@@ -40,6 +45,12 @@ export function PoolSettingsScreen() {
     [userPools, poolId],
   );
 
+  const poolBrand = useMemo(() => {
+    const bc = pool?.brand_config as unknown as BrandConfig | null | undefined;
+    return bc?.is_branded ? bc : null;
+  }, [pool]);
+  const accentColor = poolBrand?.secondary_color ?? HOTPICK_DEFAULTS.primary_color;
+
   const [poolName, setPoolName] = useState(pool?.name ?? '');
   const [saving, setSaving] = useState(false);
   const [broadcastVisible, setBroadcastVisible] = useState(false);
@@ -51,7 +62,7 @@ export function PoolSettingsScreen() {
           <TouchableOpacity
             onPress={() => navigation.goBack()}
             hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-            <ChevronLeft size={24} color={colors.text} />
+            <ChevronLeft size={24} color={colors.textPrimary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Pool Settings</Text>
           <View style={{width: 24}} />
@@ -164,7 +175,7 @@ export function PoolSettingsScreen() {
           <TouchableOpacity
             onPress={() => navigation.goBack()}
             hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-            <ChevronLeft size={24} color={colors.text} />
+            <ChevronLeft size={24} color={colors.textPrimary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Pool Settings</Text>
           <View style={{width: 24}} />
@@ -200,19 +211,19 @@ export function PoolSettingsScreen() {
           <>
             <Text style={styles.sectionTitle}>Invite Code</Text>
             <View style={styles.inviteCard}>
-              <Text style={styles.inviteCodeLarge}>{pool.invite_code}</Text>
+              <Text style={[styles.inviteCodeLarge, {color: accentColor}]}>{pool.invite_code}</Text>
               <View style={styles.inviteActions}>
                 <TouchableOpacity
-                  style={styles.inviteButton}
+                  style={[styles.inviteButton, {borderColor: accentColor}]}
                   onPress={handleCopyCode}>
-                  <Copy size={16} color={colors.primary} />
-                  <Text style={styles.inviteButtonText}>Copy</Text>
+                  <Copy size={16} color={accentColor} />
+                  <Text style={[styles.inviteButtonText, {color: accentColor}]}>Copy</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={styles.inviteButton}
+                  style={[styles.inviteButton, {borderColor: accentColor}]}
                   onPress={handleShareInvite}>
-                  <Share2 size={16} color={colors.primary} />
-                  <Text style={styles.inviteButtonText}>Share</Text>
+                  <Share2 size={16} color={accentColor} />
+                  <Text style={[styles.inviteButtonText, {color: accentColor}]}>Share</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -275,10 +286,10 @@ export function PoolSettingsScreen() {
         {/* Broadcast */}
         <Text style={styles.sectionTitle}>Communication</Text>
         <TouchableOpacity
-          style={styles.broadcastButton}
+          style={[styles.broadcastButton, {borderColor: accentColor}]}
           onPress={() => setBroadcastVisible(true)}>
-          <Megaphone size={18} color={colors.primary} />
-          <Text style={styles.broadcastText}>Send Broadcast</Text>
+          <Megaphone size={18} color={accentColor} />
+          <Text style={[styles.broadcastText, {color: accentColor}]}>Send Broadcast</Text>
         </TouchableOpacity>
 
         {/* Danger Zone */}
@@ -301,7 +312,7 @@ export function PoolSettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -322,7 +333,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   sectionTitle: {
     fontSize: 14,
@@ -347,7 +358,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     padding: spacing.md,
     fontSize: 16,
-    color: colors.text,
+    color: colors.textPrimary,
     backgroundColor: colors.surface,
     fontWeight: '500',
   },
@@ -417,7 +428,7 @@ const styles = StyleSheet.create({
   infoValue: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   foundingBadge: {
     flexDirection: 'row',
@@ -451,7 +462,7 @@ const styles = StyleSheet.create({
   toggleLabel: {
     fontSize: 15,
     fontWeight: '500',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   toggleDesc: {
     fontSize: 12,

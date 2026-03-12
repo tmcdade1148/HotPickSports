@@ -3,8 +3,9 @@ import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
 import {Flame} from 'lucide-react-native';
 import type {SeasonConfig} from '@shared/types/templates';
 import type {DbSeasonGame} from '@shared/types/database';
-import {colors, spacing} from '@shared/theme';
+import {spacing} from '@shared/theme';
 import {useSeasonStore} from '../stores/seasonStore';
+import {useTheme} from '@shell/theme';
 
 interface SeasonMatchCardProps {
   game: DbSeasonGame;
@@ -56,6 +57,8 @@ function TeamRow({
   isLocked,
   onPress,
 }: TeamRowProps) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const isWinner =
     isFinal && score != null && opponentScore != null && score > opponentScore;
 
@@ -114,6 +117,8 @@ export function SeasonMatchCard({
   config,
   userId,
 }: SeasonMatchCardProps) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const existingPick = useSeasonStore(s => s.getPickForGame(game.game_id));
   const savePick = useSeasonStore(s => s.savePick);
   const setHotPick = useSeasonStore(s => s.setHotPick);
@@ -251,7 +256,7 @@ export function SeasonMatchCard({
 // Styles
 // ---------------------------------------------------------------------------
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     paddingHorizontal: 12,
   },
@@ -282,12 +287,12 @@ const styles = StyleSheet.create({
   periodText: {
     fontSize: 11,
     fontWeight: '700',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   clockText: {
     fontSize: 11,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.textPrimary,
     fontVariant: ['tabular-nums'],
   },
   finalText: {
@@ -369,7 +374,7 @@ const styles = StyleSheet.create({
   teamName: {
     fontSize: 16,
     fontWeight: '800',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   teamNameSelected: {
     color: colors.primary,
@@ -398,11 +403,11 @@ const styles = StyleSheet.create({
   scoreText: {
     fontSize: 18,
     fontWeight: '700',
-    color: colors.text,
+    color: colors.textPrimary,
     fontVariant: ['tabular-nums'],
   },
   scoreWinner: {
-    color: colors.text,
+    color: colors.textPrimary,
   },
   winnerTriangle: {
     fontSize: 16,

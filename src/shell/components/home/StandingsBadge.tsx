@@ -1,9 +1,10 @@
 import React from 'react';
 import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
 import {ChevronRight} from 'lucide-react-native';
-import {colors, spacing, borderRadius, typography} from '@shared/theme';
+import {spacing, borderRadius, typography} from '@shared/theme';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useGlobalStore} from '@shell/stores/globalStore';
+import {useTheme} from '@shell/theme';
 
 // ---------------------------------------------------------------------------
 // Future-proofed type — array of 1 for Season 2, expandable later
@@ -33,6 +34,8 @@ interface StandingsBadgeProps {
  * Does NOT fetch data — SeasonEventCard triggers fetchPoolStandings().
  */
 export function StandingsBadge({onPress}: StandingsBadgeProps) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const userSeasonTotal = useNFLStore(s => s.userSeasonTotal);
   const userPoolRank = useNFLStore(s => s.userPoolRank);
   const activePoolMemberCount = useNFLStore(s => s.activePoolMemberCount);
@@ -130,7 +133,7 @@ function ordinal(n: number): string {
 // Styles
 // ---------------------------------------------------------------------------
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     backgroundColor: colors.background,
     borderRadius: borderRadius.lg,
@@ -160,11 +163,11 @@ const styles = StyleSheet.create({
   },
   standingText: {
     ...typography.body,
-    color: colors.text,
+    color: colors.textPrimary,
   },
   pointsValue: {
     fontWeight: '700',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   pointsLabel: {
     fontWeight: '400',

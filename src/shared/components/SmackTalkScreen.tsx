@@ -13,9 +13,10 @@ import {supabase} from '@shared/config/supabase';
 import {useAuth} from '@shared/hooks/useAuth';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {getDisplayName} from '@shared/utils/displayName';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {spacing, borderRadius} from '@shared/theme';
 import {PoweredByHotPick} from '@shell/components/PoweredByHotPick';
 import type {DbSmackMessage} from '@shared/types/database';
+import {useTheme} from '@shell/theme';
 
 interface SmackTalkScreenProps {
   poolId: string;
@@ -27,6 +28,8 @@ interface SmackTalkScreenProps {
  * Subscribes to Supabase Realtime for instant message delivery.
  */
 export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const [messages, setMessages] = useState<DbSmackMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
@@ -170,7 +173,7 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -188,7 +191,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
   emptyText: {
@@ -218,7 +221,7 @@ const styles = StyleSheet.create({
   },
   messageText: {
     fontSize: 15,
-    color: colors.text,
+    color: colors.textPrimary,
   },
   messageTextMe: {
     color: '#FFFFFF',
@@ -250,7 +253,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     fontSize: 15,
-    color: colors.text,
+    color: colors.textPrimary,
     backgroundColor: colors.surface,
   },
   sendButton: {

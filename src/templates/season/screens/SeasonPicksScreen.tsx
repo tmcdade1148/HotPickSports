@@ -6,8 +6,9 @@ import {SeasonMatchCard} from '../components/SeasonMatchCard';
 import {PicksProgressHeader} from '../components/PicksProgressHeader';
 import {SubmitPicksButton} from '../components/SubmitPicksButton';
 import {useAuth} from '@shared/hooks/useAuth';
-import {colors, spacing} from '@shared/theme';
+import {spacing} from '@shared/theme';
 import type {DbSeasonGame} from '@shared/types/database';
+import {useTheme} from '@shell/theme';
 
 /**
  * SeasonPicksScreen — Main weekly picks screen.
@@ -15,6 +16,8 @@ import type {DbSeasonGame} from '@shared/types/database';
  * Never references a specific sport.
  */
 export function SeasonPicksScreen() {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const config = useSeasonStore(s => s.config);
   const games = useSeasonStore(s => s.games);
   const currentWeek = useSeasonStore(s => s.currentWeek);
@@ -126,7 +129,7 @@ export function SeasonPicksScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -144,7 +147,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
   emptyText: {

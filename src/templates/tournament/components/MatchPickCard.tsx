@@ -2,8 +2,9 @@ import React from 'react';
 import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
 import type {TournamentConfig} from '@shared/types/templates';
 import type {DbTournamentMatch} from '@shared/types/database';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {spacing, borderRadius} from '@shared/theme';
 import {useTournamentStore} from '../stores/tournamentStore';
+import {useTheme} from '@shell/theme';
 
 interface MatchPickCardProps {
   match: DbTournamentMatch;
@@ -20,6 +21,8 @@ export function MatchPickCard({
   config,
   userId,
 }: MatchPickCardProps) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const existingPick = useTournamentStore(s => s.getMatchPick(match.match_id));
   const saveMatchPick = useTournamentStore(s => s.saveMatchPick);
   const isSaving = useTournamentStore(s => s.isSaving);
@@ -114,7 +117,7 @@ export function MatchPickCard({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
@@ -157,7 +160,7 @@ const styles = StyleSheet.create({
   teamText: {
     fontSize: 18,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   teamTextSelected: {
     color: colors.primary,

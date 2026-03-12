@@ -1,6 +1,7 @@
 import React from 'react';
 import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
-import {colors, spacing, borderRadius, typography} from '@shared/theme';
+import {spacing, borderRadius, typography} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 
 interface CardFooterProps {
   /** Primary CTA button label */
@@ -25,19 +26,23 @@ interface CardFooterProps {
 export function CardFooter({
   label,
   onPress,
-  accentColor = colors.primary,
+  accentColor,
   secondaryLabel,
-  secondaryColor = colors.success,
+  secondaryColor,
 }: CardFooterProps) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
+  const resolvedAccent = accentColor ?? colors.primary;
+  const resolvedSecondary = secondaryColor ?? colors.success;
   return (
     <View style={styles.container}>
       {secondaryLabel && (
-        <Text style={[styles.secondaryLabel, {color: secondaryColor}]}>
+        <Text style={[styles.secondaryLabel, {color: resolvedSecondary}]}>
           {secondaryLabel}
         </Text>
       )}
       <TouchableOpacity
-        style={[styles.button, {backgroundColor: accentColor}]}
+        style={[styles.button, {backgroundColor: resolvedAccent}]}
         activeOpacity={0.8}
         onPress={onPress}>
         <Text style={styles.buttonText}>{label}</Text>
@@ -46,7 +51,7 @@ export function CardFooter({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     borderTopWidth: 1,
     borderTopColor: colors.border,

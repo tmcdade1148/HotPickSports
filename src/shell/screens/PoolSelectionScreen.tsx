@@ -9,14 +9,17 @@ import {
 } from 'react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {getDefaultEvent} from '@sports/registry';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {spacing, borderRadius} from '@shared/theme';
 import type {DbPool} from '@shared/types/database';
+import {useTheme} from '@shell/theme';
 
 /**
  * PoolSelectionScreen — Displays the user's pools for the active event.
  * Allows selecting an existing pool, creating a new one, or joining via code.
  */
 export function PoolSelectionScreen({navigation}: any) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const user = useGlobalStore(s => s.user);
   const activeSport = useGlobalStore(s => s.activeSport);
   const setActiveSport = useGlobalStore(s => s.setActiveSport);
@@ -103,7 +106,7 @@ export function PoolSelectionScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -121,7 +124,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   subtitle: {
     fontSize: 16,
@@ -145,7 +148,7 @@ const styles = StyleSheet.create({
   poolName: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   poolCode: {
     fontSize: 12,
@@ -166,7 +169,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
   emptyText: {

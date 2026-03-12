@@ -1,13 +1,16 @@
 import React from 'react';
 import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
 import {useTournamentStore} from '../stores/tournamentStore';
-import {colors, spacing} from '@shared/theme';
+import {spacing} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 
 /**
  * TournamentPicksHub — Routes the user to group picks or match picks.
  * Which picks are available depends on the tournament phase.
  */
 export function TournamentPicksHub({navigation}: any) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const config = useTournamentStore(s => s.config);
 
   if (!config) {
@@ -43,7 +46,7 @@ export function TournamentPicksHub({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     padding: spacing.lg,
@@ -52,7 +55,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: spacing.xs,
   },
   subtitle: {
@@ -70,7 +73,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: spacing.xs,
   },
   cardDescription: {

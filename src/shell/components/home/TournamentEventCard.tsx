@@ -8,11 +8,12 @@ import {
   StyleSheet,
 } from 'react-native';
 import {ChevronDown} from 'lucide-react-native';
-import {colors, spacing, borderRadius, typography} from '@shared/theme';
+import {spacing, borderRadius, typography} from '@shared/theme';
 import type {TournamentConfig} from '@shared/types/templates';
 import type {DbPool} from '@shared/types/database';
 import {useWorldCupStore} from '@sports/worldcup/stores/worldCupStore';
 import {useGlobalStore} from '@shell/stores/globalStore';
+import {useTheme} from '@shell/theme';
 
 interface TournamentEventCardProps {
   config: TournamentConfig;
@@ -26,6 +27,8 @@ interface TournamentEventCardProps {
  *   2. activePoolId from globalStore
  */
 export function TournamentEventCard({config}: TournamentEventCardProps) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const currentStage = useWorldCupStore(s => s.currentStage);
   const groupPicksOpen = useWorldCupStore(s => s.groupPicksOpen);
   const groupPicksLocked = useWorldCupStore(s => s.groupPicksLocked);
@@ -52,25 +55,27 @@ export function TournamentEventCard({config}: TournamentEventCardProps) {
       />
       <View style={styles.body}>
         <Text style={styles.label}>{currentStage.replace(/_/g, ' ')}</Text>
-        {renderTournamentState({
-          currentStage,
-          groupPicksOpen,
-          groupPicksLocked,
-          knockoutPicksOpen,
-          isComplete,
-        })}
+        <RenderTournamentState
+          currentStage={currentStage}
+          groupPicksOpen={groupPicksOpen}
+          groupPicksLocked={groupPicksLocked}
+          knockoutPicksOpen={knockoutPicksOpen}
+          isComplete={isComplete}
+        />
       </View>
     </View>
   );
 }
 
-function renderTournamentState(props: {
+function RenderTournamentState(props: {
   currentStage: string;
   groupPicksOpen: boolean;
   groupPicksLocked: boolean;
   knockoutPicksOpen: boolean;
   isComplete: boolean;
 }) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   if (props.isComplete) {
     return <Text style={styles.headline}>Tournament complete</Text>;
   }
@@ -124,6 +129,8 @@ function CardHeader({
   accentColor,
   smackUnreadCounts,
 }: CardHeaderProps) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const [modalVisible, setModalVisible] = useState(false);
 
   const switchTo = (poolId: string) => {
@@ -190,7 +197,7 @@ function CardHeader({
 // Styles
 // ---------------------------------------------------------------------------
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   card: {
     backgroundColor: colors.background,
     borderRadius: borderRadius.lg,
@@ -225,7 +232,7 @@ const styles = StyleSheet.create({
   },
   poolName: {
     ...typography.caption,
-    color: colors.text,
+    color: colors.textPrimary,
     fontWeight: '500',
     maxWidth: 150,
   },
@@ -241,7 +248,7 @@ const styles = StyleSheet.create({
   },
   headline: {
     ...typography.h3,
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
   sub: {
@@ -263,7 +270,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     ...typography.h3,
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: spacing.md,
   },
   poolOption: {
@@ -281,7 +288,7 @@ const styles = StyleSheet.create({
   },
   poolOptionText: {
     ...typography.body,
-    color: colors.text,
+    color: colors.textPrimary,
   },
   unreadDot: {
     width: 8,

@@ -1,7 +1,8 @@
 import React from 'react';
 import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
 import {CheckCircle, Flame} from 'lucide-react-native';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {spacing, borderRadius} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 
 interface SubmitPicksButtonProps {
   pickCount: number;
@@ -34,6 +35,8 @@ function getSubmitState(props: SubmitPicksButtonProps): SubmitState {
  * Does NOT make any Supabase call — picks are already auto-saved.
  */
 export function SubmitPicksButton(props: SubmitPicksButtonProps) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const state = getSubmitState(props);
   const {pickCount, totalGames, hotPickCount, hotPicksRequired, onSubmit} =
     props;
@@ -99,7 +102,7 @@ export function SubmitPicksButton(props: SubmitPicksButtonProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   wrapper: {
     position: 'absolute',
     bottom: 0,

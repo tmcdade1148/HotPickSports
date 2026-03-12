@@ -9,7 +9,8 @@ import {
   Alert,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {spacing, borderRadius} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 
 const BENEFITS = [
   {icon: '\u{23F0}', text: 'Pick deadline reminders so you never miss a week'},
@@ -18,6 +19,8 @@ const BENEFITS = [
 ];
 
 export function PushNotificationScreen({navigation}: any) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const [requesting, setRequesting] = useState(false);
 
   const handleEnable = async () => {
@@ -99,7 +102,7 @@ export function PushNotificationScreen({navigation}: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -125,7 +128,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: spacing.sm,
   },
   subtitle: {
@@ -151,7 +154,7 @@ const styles = StyleSheet.create({
   benefitText: {
     flex: 1,
     fontSize: 15,
-    color: colors.text,
+    color: colors.textPrimary,
     lineHeight: 22,
   },
   buttonsContainer: {

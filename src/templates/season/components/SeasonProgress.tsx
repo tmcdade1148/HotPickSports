@@ -1,8 +1,9 @@
 import React from 'react';
 import {View, Text, StyleSheet} from 'react-native';
 import type {SeasonConfig} from '@shared/types/templates';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {spacing, borderRadius} from '@shared/theme';
 import {useSeasonStore} from '../stores/seasonStore';
+import {useTheme} from '@shell/theme';
 
 interface SeasonProgressProps {
   config: SeasonConfig;
@@ -15,6 +16,8 @@ interface SeasonProgressProps {
  * Never references a specific sport.
  */
 export function SeasonProgress({config, userId}: SeasonProgressProps) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const score = useSeasonStore(s => s.getUserScore(userId));
   const leaderboard = useSeasonStore(s => s.leaderboard);
   const currentWeek = useSeasonStore(s => s.currentWeek);
@@ -80,7 +83,7 @@ export function SeasonProgress({config, userId}: SeasonProgressProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     padding: spacing.md,
     backgroundColor: colors.surface,
@@ -95,12 +98,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   totalPoints: {
     fontSize: 20,
     fontWeight: '700',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   rankText: {
     fontSize: 13,
@@ -146,6 +149,6 @@ const styles = StyleSheet.create({
   weekPoints: {
     fontSize: 11,
     fontWeight: '700',
-    color: colors.text,
+    color: colors.textPrimary,
   },
 });

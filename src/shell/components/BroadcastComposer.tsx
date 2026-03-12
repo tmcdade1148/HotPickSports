@@ -13,7 +13,8 @@ import {
 } from 'react-native';
 import {X, Send} from 'lucide-react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {spacing, borderRadius} from '@shared/theme';
+import {useTheme} from '@shell/theme';
 
 const MAX_CHARS = 160;
 const MAX_PER_DAY = 3;
@@ -31,6 +32,8 @@ export function BroadcastComposer({
   visible,
   onClose,
 }: BroadcastComposerProps) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const broadcastToPool = useGlobalStore(s => s.broadcastToPool);
   const fetchBroadcastsToday = useGlobalStore(s => s.fetchBroadcastsToday);
   const poolMembers = useGlobalStore(s => s.poolMembers);
@@ -110,7 +113,7 @@ export function BroadcastComposer({
           <TouchableOpacity
             onPress={onClose}
             hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-            <X size={24} color={colors.text} />
+            <X size={24} color={colors.textPrimary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Broadcast</Text>
           <View style={{width: 24}} />
@@ -180,7 +183,7 @@ export function BroadcastComposer({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -197,7 +200,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   loading: {
     flex: 1,
@@ -226,7 +229,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     padding: spacing.md,
     fontSize: 16,
-    color: colors.text,
+    color: colors.textPrimary,
     minHeight: 120,
     textAlignVertical: 'top',
   },

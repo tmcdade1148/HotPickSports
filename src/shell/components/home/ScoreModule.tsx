@@ -1,7 +1,8 @@
 import React from 'react';
 import {View, Text, StyleSheet} from 'react-native';
-import {colors, spacing, borderRadius, typography} from '@shared/theme';
+import {spacing, borderRadius, typography} from '@shared/theme';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
+import {useTheme} from '@shell/theme';
 
 /**
  * ScoreModule — Always-visible season total + weekly delta.
@@ -16,6 +17,8 @@ import {useNFLStore} from '@sports/nfl/stores/nflStore';
  * (Supabase Realtime during live state).
  */
 export function ScoreModule() {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const userSeasonTotal = useNFLStore(s => s.userSeasonTotal);
   const weekState = useNFLStore(s => s.weekState);
   const currentWeek = useNFLStore(s => s.currentWeek);
@@ -108,7 +111,7 @@ function formatDelta(n: number): string {
 // Styles
 // ---------------------------------------------------------------------------
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     backgroundColor: colors.background,
     borderRadius: borderRadius.lg,
@@ -124,7 +127,7 @@ const styles = StyleSheet.create({
   },
   seasonTotal: {
     ...typography.h2,
-    color: colors.text,
+    color: colors.textPrimary,
     fontWeight: '700',
   },
   ptsLabel: {

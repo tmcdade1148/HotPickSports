@@ -1,8 +1,9 @@
 import React from 'react';
 import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
 import {MessageCircle, ChevronRight} from 'lucide-react-native';
-import {colors, spacing, borderRadius, typography} from '@shared/theme';
+import {spacing, borderRadius, typography} from '@shared/theme';
 import {useGlobalStore} from '@shell/stores/globalStore';
+import {useTheme} from '@shell/theme';
 
 interface SmackTalkNudgeProps {
   /** Called when user taps the card with no unread alerts — navigates to SmackTalk */
@@ -23,6 +24,8 @@ interface SmackTalkNudgeProps {
  * this component only reads, it never manages subscriptions.
  */
 export function SmackTalkNudge({onPress, onPressPool}: SmackTalkNudgeProps) {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const smackUnreadCounts = useGlobalStore(s => s.smackUnreadCounts);
   const userPools = useGlobalStore(s => s.userPools);
   const activePoolId = useGlobalStore(s => s.activePoolId);
@@ -84,7 +87,7 @@ export function SmackTalkNudge({onPress, onPressPool}: SmackTalkNudgeProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     backgroundColor: colors.background,
     borderRadius: borderRadius.lg,
@@ -109,7 +112,7 @@ const styles = StyleSheet.create({
   labelText: {
     ...typography.body,
     fontWeight: '700',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   subtitleText: {
     ...typography.small,
@@ -125,7 +128,7 @@ const styles = StyleSheet.create({
   },
   nudgeText: {
     ...typography.caption,
-    color: colors.text,
+    color: colors.textPrimary,
     flex: 1,
   },
   count: {

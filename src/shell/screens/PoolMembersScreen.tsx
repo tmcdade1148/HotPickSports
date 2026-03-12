@@ -15,12 +15,15 @@ import {useGlobalStore} from '@shell/stores/globalStore';
 import {useAuth} from '@shared/hooks/useAuth';
 import {getDisplayName} from '@shared/utils/displayName';
 import {SYSTEM_AVATARS} from '@shell/components/AvatarSelector';
-import {colors, spacing, borderRadius} from '@shared/theme';
+import {spacing, borderRadius} from '@shared/theme';
 import type {DbPoolMember, DbProfile} from '@shared/types/database';
+import {useTheme} from '@shell/theme';
 
 type MemberWithProfile = DbPoolMember & {profile?: DbProfile};
 
 export function PoolMembersScreen() {
+  const {colors} = useTheme();
+  const styles = createStyles(colors);
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const poolId = route.params?.poolId as string;
@@ -195,7 +198,7 @@ export function PoolMembersScreen() {
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-          <ChevronLeft size={24} color={colors.text} />
+          <ChevronLeft size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Members</Text>
         <View style={styles.countBadge}>
@@ -225,7 +228,7 @@ export function PoolMembersScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -240,7 +243,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: colors.text,
+    color: colors.textPrimary,
   },
   countBadge: {
     backgroundColor: colors.primary + '20',
@@ -299,7 +302,7 @@ const styles = StyleSheet.create({
   memberName: {
     fontSize: 15,
     fontWeight: '500',
-    color: colors.text,
+    color: colors.textPrimary,
     flexShrink: 1,
   },
   memberNameMe: {
