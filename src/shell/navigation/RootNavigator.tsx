@@ -1,6 +1,7 @@
-import React from 'react';
+import React, {useState, useCallback} from 'react';
 import {NavigationContainer} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
+import {SplashScreen} from '@shell/screens/SplashScreen';
 import {LoadingScreen} from '@shell/screens/LoadingScreen';
 import {WelcomeScreen} from '@shell/screens/WelcomeScreen';
 import {EmailEntryScreen} from '@shell/screens/EmailEntryScreen';
@@ -77,6 +78,19 @@ function handleDeepLink(url: string) {
 }
 
 export function RootNavigator() {
+  const [splashDone, setSplashDone] = useState(false);
+
+  const handleSplashComplete = useCallback(() => {
+    setSplashDone(true);
+  }, []);
+
+  // Layer 2: JS animated splash plays before any navigation renders.
+  // Once it completes, we show the navigator starting at LoadingScreen
+  // which handles auth session check and routing.
+  if (!splashDone) {
+    return <SplashScreen onComplete={handleSplashComplete} />;
+  }
+
   return (
     <NavigationContainer linking={linking}>
       <Stack.Navigator
