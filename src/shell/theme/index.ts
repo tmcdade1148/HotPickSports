@@ -5,7 +5,15 @@
  * screens import from '@shell/theme' — never from shared/theme directly.
  */
 export {useTheme, useBrand} from './hooks';
-export {HOTPICK_DEFAULTS, HOTPICK_LOGOS, SEMANTIC_COLORS, deriveDarkColors, deriveFullBrandColors} from './defaults';
+export {
+  HOTPICK_DEFAULTS,
+  HOTPICK_BRAND,
+  HOTPICK_BRAND_COLORS,
+  HOTPICK_LOGOS,
+  SEMANTIC_COLORS,
+  deriveDarkColors,
+  deriveFullBrandColors,
+} from './defaults';
 export type {
   BrandConfig,
   BrandLogoSet,

@@ -1,18 +1,15 @@
 import React, {useEffect, useRef} from 'react';
-import {View, Text, ActivityIndicator, StyleSheet, LogBox} from 'react-native';
+import {View, Image, StyleSheet, LogBox} from 'react-native';
 
 // Suppress red screen for Supabase auth retry errors on iOS simulator
 LogBox.ignoreLogs(['AuthRetryableFetchError', 'Network request failed']);
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import BootSplash from 'react-native-bootsplash';
 import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {getDefaultEvent} from '@sports/registry';
-import {spacing} from '@shared/theme';
-import {useTheme} from '@shell/theme';
 
 export function LoadingScreen({navigation}: any) {
-  const {colors} = useTheme();
-  const styles = createStyles(colors);
   const setUser = useGlobalStore(s => s.setUser);
   const setAuthLoading = useGlobalStore(s => s.setAuthLoading);
   const refreshAvailableEvents = useGlobalStore(s => s.refreshAvailableEvents);
@@ -30,6 +27,9 @@ export function LoadingScreen({navigation}: any) {
   const didNavigate = useRef(false);
 
   useEffect(() => {
+    // Dismiss native splash — LoadingScreen has matching background
+    BootSplash.hide({fade: true}).catch(() => {});
+
     // Populate available events from registry
     refreshAvailableEvents();
 
@@ -144,36 +144,26 @@ export function LoadingScreen({navigation}: any) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>HotPick</Text>
-      <Text style={styles.subtitle}>Sports</Text>
-      <ActivityIndicator
-        size="large"
-        color={colors.primary}
-        style={styles.spinner}
+      <Image
+        source={require('../../../assets/hotpick-logo.png')}
+        style={styles.logo}
+        resizeMode="contain"
       />
     </View>
   );
 }
 
-const createStyles = (colors: any) => StyleSheet.create({
+const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.background,
+    paddingTop: '30%',
+    // ✅ PERMITTED EXCEPTION — matches native splash exactly.
+    // See CLAUDE.md Section 16 — Splash Screen Color Exception.
+    backgroundColor: '#082640',
   },
-  title: {
-    fontSize: 40,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  subtitle: {
-    fontSize: 20,
-    fontWeight: '300',
-    color: colors.textSecondary,
-    marginBottom: spacing.xl,
-  },
-  spinner: {
-    marginTop: spacing.lg,
+  logo: {
+    width: 240,
+    height: 240,
   },
 });
