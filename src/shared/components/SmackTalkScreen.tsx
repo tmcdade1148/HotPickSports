@@ -216,19 +216,19 @@ const createStyles = (colors: any) => StyleSheet.create({
   sender: {
     fontSize: 11,
     fontWeight: '600',
-    color: colors.textSecondary,
+    color: '#A0A0A0',
     marginBottom: 2,
   },
   messageText: {
     fontSize: 15,
-    color: colors.textPrimary,
+    color: '#F5F5F5',
   },
   messageTextMe: {
     color: '#FFFFFF',
   },
   time: {
     fontSize: 10,
-    color: colors.textSecondary,
+    color: '#A0A0A0',
     marginTop: 4,
     alignSelf: 'flex-end',
   },
@@ -253,7 +253,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     fontSize: 15,
-    color: colors.textPrimary,
+    color: '#F5F5F5',
     backgroundColor: colors.surface,
   },
   sendButton: {

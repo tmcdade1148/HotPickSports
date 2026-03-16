@@ -13,7 +13,6 @@ import {getDisplayName} from '@shared/utils/displayName';
 import {SeasonEventCard} from '@shell/components/home/SeasonEventCard';
 import {TournamentEventCard} from '@shell/components/home/TournamentEventCard';
 import {SeriesEventCard} from '@shell/components/home/SeriesEventCard';
-import {ScoreModule} from '@shell/components/home/ScoreModule';
 import {StandingsBadge} from '@shell/components/home/StandingsBadge';
 import {SmackTalkNudge} from '@shell/components/home/SmackTalkNudge';
 import {spacing, typography} from '@shared/theme';
@@ -118,9 +117,6 @@ export function HomeScreen({navigation}: any) {
           </TouchableOpacity>
         ))}
 
-        {/* ScoreModule — season total + weekly delta */}
-        {cardsToShow.length > 0 && <ScoreModule />}
-
         {/* StandingsBadge — below event cards */}
         {cardsToShow.length > 0 && (
           <StandingsBadge onPress={handleNavigateToBoard} />
@@ -188,7 +184,7 @@ function getGreeting(): string {
 const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',

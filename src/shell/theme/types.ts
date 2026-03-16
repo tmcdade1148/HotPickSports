@@ -77,6 +77,7 @@ export interface ThemeColors {
   warning: string;
   error: string;
   border: string;
+  glow: string;
 }
 
 /**

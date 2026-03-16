@@ -110,10 +110,8 @@ export function LoadingScreen({navigation}: any) {
 
           setActivePoolId(startPoolId);
 
-          // Load the default pool ID into store state for the star icon
-          if (defaultId) {
-            useGlobalStore.getState().loadDefaultPoolId(defaultEvent.competition);
-          }
+          // Always load default pool ID into store state for the star icon
+          await useGlobalStore.getState().loadDefaultPoolId(defaultEvent.competition);
 
           const poolIds = pools.map(p => p.id);
           await fetchSmackUnreadCounts(session.user.id, poolIds);
@@ -160,7 +158,7 @@ const styles = StyleSheet.create({
     paddingTop: '30%',
     // ✅ PERMITTED EXCEPTION — matches native splash exactly.
     // See CLAUDE.md Section 16 — Splash Screen Color Exception.
-    backgroundColor: '#082640',
+    backgroundColor: '#111414',
   },
   logo: {
     width: 240,

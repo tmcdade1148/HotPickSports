@@ -6,17 +6,17 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#082640"
+      "backgroundColor": "#111414"
     },
     "android": {
       "splash": {
         "image": "./assets/splash.png",
         "resizeMode": "contain",
-        "backgroundColor": "#082640"
+        "backgroundColor": "#111414"
       },
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#082640"
+        "backgroundColor": "#111414"
       }
     },
     "ios": {

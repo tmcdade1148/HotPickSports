@@ -10,7 +10,7 @@ import {useBrand, useTheme} from '@shell/theme';
  * Cannot be omitted. No prop to hide it. Not conditional on anything.
  *
  * Minimum font size: 11pt. Always visible against partner background.
- * Uses "Powered by HotPick" (product name, not company name).
+ * Uses "Powered by HotPick Sports" (product name).
  */
 export function PoweredByHotPick() {
   const {isBranded} = useBrand();
@@ -23,7 +23,7 @@ export function PoweredByHotPick() {
   return (
     <View style={styles.container}>
       <Text style={[styles.text, {color: colors.textSecondary}]}>
-        Powered by HotPick
+        Powered by <Text style={styles.bold}>HotPick Sports</Text>
       </Text>
     </View>
   );
@@ -35,8 +35,11 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   text: {
-    fontSize: 11,
-    fontWeight: '500',
+    fontSize: 13,
+    fontWeight: '400',
     letterSpacing: 0.3,
+  },
+  bold: {
+    fontWeight: '700',
   },
 });

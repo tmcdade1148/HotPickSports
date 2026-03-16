@@ -85,9 +85,9 @@ export function useCountdown(deadline: Date | null): CountdownResult {
 
   let timeLeft: string;
   if (days > 0) {
-    timeLeft = `${days}d ${hours}h`;
+    timeLeft = `${days} ${days === 1 ? 'day' : 'days'}`;
   } else if (hours > 0) {
-    timeLeft = `${hours}h ${minutes}m`;
+    timeLeft = `${hours} ${hours === 1 ? 'hour' : 'hours'}`;
   } else {
     timeLeft = `${minutes}m ${seconds}s`;
   }

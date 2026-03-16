@@ -20,6 +20,7 @@ import {LiveCard} from './LiveCard';
 import {SettlingCard} from './SettlingCard';
 import {CompleteCard} from './CompleteCard';
 import {useTheme} from '@shell/theme';
+import {useCountdown} from '@shared/hooks/useCountdown';
 
 interface SeasonEventCardProps {
   config: SeasonConfig;
@@ -54,6 +55,7 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
   const highestRankedGame = useNFLStore(s => s.highestRankedGame);
   const weekFirstKickoff = useNFLStore(s => s.weekFirstKickoff);
   const userPickCount = useNFLStore(s => s.userPickCount);
+  const userSeasonTotal = useNFLStore(s => s.userSeasonTotal);
 
   const initialize = useNFLStore(s => s.initialize);
   const fetchUserPickStatus = useNFLStore(s => s.fetchUserPickStatus);
@@ -192,19 +194,45 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
         ? 'Super Bowl'
         : 'Regular Season';
 
+  // ── Kickoff countdown ──────────────────────────────────────────────
+  const kickoff = useCountdown(weekFirstKickoff);
+
   return (
-    <View style={[styles.card, {borderTopColor: config.color}]}>
+    <View style={[styles.card, {borderTopColor: '#FF8B3D'}]}>
       {/* Card header with pool switcher */}
       <CardHeader
-        eventName={config.shortName}
-        weekLabel={`Week ${currentWeek} \u00B7 ${phaseLabel}`}
+        eventName={config.competition.replace(/_/g, ' ').toUpperCase()}
+        weekLabel={phaseLabel}
         poolName={activePool?.name ?? 'Select Pool'}
         userPools={userPools}
         activePoolId={activePoolId}
         onSwitchPool={setActivePoolId}
         accentColor={config.color}
         smackUnreadCounts={smackUnreadCounts}
+        activePool={activePool}
       />
+
+      {/* Score + Kickoff pills row */}
+      <View style={styles.pillRow}>
+        {/* Score pill */}
+        <View style={styles.scorePill}>
+          <Text style={styles.scoreValue}>
+            {userSeasonTotal}
+          </Text>
+          <Text style={styles.scorePtsLabel}>pts</Text>
+        </View>
+
+        {/* Kickoff pill */}
+        {kickoff.timeLeft && !kickoff.hasExpired && (
+          <View style={styles.kickoffPill}>
+            <Text style={styles.kickoffIcon}>{'\uD83C\uDFC8'}</Text>
+            <View>
+              <Text style={styles.kickoffLabel}>Kickoff</Text>
+              <Text style={styles.kickoffValue}>{kickoff.timeLeft}</Text>
+            </View>
+          </View>
+        )}
+      </View>
 
       {/* Week state sub-component */}
       {renderWeekState({
@@ -312,6 +340,7 @@ interface CardHeaderProps {
   onSwitchPool: (poolId: string | null) => void;
   accentColor: string;
   smackUnreadCounts: Record<string, number>;
+  activePool?: DbPool | null;
 }
 
 function CardHeader({
@@ -323,10 +352,14 @@ function CardHeader({
   onSwitchPool,
   accentColor,
   smackUnreadCounts,
+  activePool,
 }: CardHeaderProps) {
   const {colors} = useTheme();
   const styles = createStyles(colors);
   const [modalVisible, setModalVisible] = useState(false);
+  const isBranded = !!(activePool?.brand_config as any)?.is_branded;
+  const partnerPrimary = isBranded ? (activePool?.brand_config as any)?.primary_color : null;
+  const headerLineColor = partnerPrimary || '#FE843C';
 
   const switchTo = (poolId: string) => {
     onSwitchPool(poolId);
@@ -336,7 +369,7 @@ function CardHeader({
   return (
     <View style={styles.header}>
       <View style={styles.headerLeft}>
-        <Text style={[styles.eventName, {color: accentColor}]}>{eventName}</Text>
+        <Text style={styles.eventName}>{eventName}</Text>
         <Text style={styles.weekLabel}>{weekLabel}</Text>
       </View>
 
@@ -421,6 +454,55 @@ const createStyles = (colors: any) => StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
+  pillRow: {
+    flexDirection: 'row',
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+    gap: spacing.sm,
+  },
+  scorePill: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: spacing.xs,
+  },
+  scoreValue: {
+    fontSize: 48,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  scorePtsLabel: {
+    ...typography.body,
+    color: colors.textSecondary,
+    fontWeight: '400',
+  },
+  kickoffPill: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    justifyContent: 'center',
+  },
+  kickoffIcon: {
+    fontSize: 24,
+  },
+  kickoffLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+  kickoffValue: {
+    ...typography.h3,
+    color: colors.textPrimary,
+    fontWeight: '700',
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -428,16 +510,16 @@ const createStyles = (colors: any) => StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
     paddingBottom: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
   },
   headerLeft: {
     flex: 1,
   },
   eventName: {
-    ...typography.caption,
+    ...typography.body,
     fontWeight: '700',
+    fontStyle: 'italic',
     letterSpacing: 0.5,
+    color: '#FFFFFF',
   },
   weekLabel: {
     ...typography.small,

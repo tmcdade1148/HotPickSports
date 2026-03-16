@@ -156,10 +156,20 @@ export function SettingsScreen() {
         <ChevronRight size={20} color={colors.textSecondary} />
       </TouchableOpacity>
 
-      {/* Pools section */}
+      {/* Pools section — partner pools first, then HotPick pools */}
       <Text style={[styles.sectionTitle, {color: colors.textPrimary}]}>My Pools</Text>
 
-      {userPools.map(pool => {
+      {[
+        ...userPools.filter(p => !!(p.brand_config as any)?.is_branded),
+        'DIVIDER' as const,
+        ...userPools.filter(p => !(p.brand_config as any)?.is_branded),
+      ].map((poolOrDivider) => {
+        if (poolOrDivider === 'DIVIDER') {
+          const hasPartner = userPools.some(p => !!(p.brand_config as any)?.is_branded);
+          if (!hasPartner) return null;
+          return <View key="partner-divider" style={{height: 16}} />;
+        }
+        const pool = poolOrDivider as typeof userPools[0];
         const poolBrand = getPoolColors(pool);
         const isBranded = !!(pool.brand_config as any)?.is_branded;
         const isActive = pool.id === activePoolId;

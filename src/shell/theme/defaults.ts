@@ -116,6 +116,7 @@ export const SEMANTIC_COLORS = {
   warning: '#FFD166',
   error: '#EF476F',
   border: '#E0E0E0',
+  glow: '#51A1A6',
 } as const;
 
 /**
@@ -126,4 +127,5 @@ export const SEMANTIC_COLORS_DARK = {
   warning: '#FFD166',
   error: '#EF476F',
   border: '#333333',
+  glow: '#51A1A6',
 } as const;

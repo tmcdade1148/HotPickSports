@@ -133,7 +133,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     width: 32,
     fontSize: 16,
     fontWeight: '700',
-    color: colors.textSecondary,
+    color: '#A0A0A0',
     textAlign: 'center',
   },
   userInfo: {
@@ -143,17 +143,17 @@ const createStyles = (colors: any) => StyleSheet.create({
   userName: {
     fontSize: 16,
     fontWeight: '500',
-    color: colors.textPrimary,
+    color: '#F5F5F5',
   },
   breakdown: {
     fontSize: 12,
-    color: colors.textSecondary,
+    color: '#A0A0A0',
     marginTop: 2,
   },
   totalPoints: {
     fontSize: 16,
     fontWeight: '700',
-    color: colors.textPrimary,
+    color: '#F5F5F5',
   },
   textHighlight: {
     color: colors.primary,

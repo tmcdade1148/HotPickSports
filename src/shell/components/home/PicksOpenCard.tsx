@@ -103,43 +103,6 @@ export function PicksOpenCard({
         </Text>
       )}
 
-      {/* Kickoff countdowns */}
-      <View style={styles.kickoffSection}>
-        {/* First game kickoff */}
-        {kickoff.timeLeft && !kickoff.hasExpired && (
-          <View style={styles.kickoffRow}>
-            <Text style={styles.kickoffIcon}>{'\uD83C\uDFC8'}</Text>
-            <Text style={styles.kickoffText}>
-              Kickoff in {kickoff.timeLeft}
-            </Text>
-          </View>
-        )}
-
-        {/* HotPick game kickoff */}
-        {hotPickTeam && hotPickCountdown.timeLeft && !hotPickCountdown.hasExpired && (
-          <View style={styles.kickoffRow}>
-            <Text style={styles.kickoffIcon}>{'\uD83D\uDD25'}</Text>
-            <View style={styles.kickoffTextGroup}>
-              <Text style={styles.kickoffText}>
-                {hotPickTeam} kicks off in {hotPickCountdown.timeLeft}
-              </Text>
-              {hotPickKickoff && (
-                <Text style={styles.kickoffDateTime}>
-                  {formatGameDateTime(hotPickKickoff)}
-                </Text>
-              )}
-            </View>
-          </View>
-        )}
-
-        {/* Placeholder — kickoff prompt TBD */}
-        {!kickoff.timeLeft && !hotPickTeam && (
-          <Text style={styles.placeholderText}>
-            Tuesday AM — kickoff prompt here.
-          </Text>
-        )}
-      </View>
-
       {/* CTA footer */}
       <CardFooter
         label={ctaLabel}
@@ -156,9 +119,10 @@ const createStyles = (colors: any) => StyleSheet.create({
     paddingTop: spacing.md,
   },
   weekLabel: {
-    ...typography.small,
-    color: colors.textSecondary,
-    fontWeight: '600',
+    ...typography.h2,
+    color: '#0E6666',
+    fontWeight: '900',
+    fontStyle: 'italic',
     letterSpacing: 1,
     marginBottom: spacing.xs,
     paddingHorizontal: spacing.md,
@@ -184,40 +148,5 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontStyle: 'italic',
     marginBottom: spacing.md,
     paddingHorizontal: spacing.md,
-  },
-  kickoffSection: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    marginHorizontal: spacing.md,
-    marginBottom: spacing.md,
-    gap: spacing.sm,
-  },
-  kickoffRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  kickoffIcon: {
-    fontSize: 16,
-  },
-  kickoffTextGroup: {
-    flex: 1,
-  },
-  kickoffText: {
-    ...typography.body,
-    color: colors.textPrimary,
-    fontWeight: '600',
-  },
-  kickoffDateTime: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  placeholderText: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    fontStyle: 'italic',
-    textAlign: 'center',
   },
 });

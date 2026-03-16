@@ -53,8 +53,6 @@ export function CardFooter({
 
 const createStyles = (colors: any) => StyleSheet.create({
   container: {
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
     paddingHorizontal: spacing.md,
     paddingTop: spacing.sm,
     paddingBottom: spacing.md,

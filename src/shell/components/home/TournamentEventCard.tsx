@@ -199,7 +199,7 @@ function CardHeader({
 
 const createStyles = (colors: any) => StyleSheet.create({
   card: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
     borderTopWidth: 3,
     marginHorizontal: spacing.md,
@@ -262,7 +262,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
   },
   modal: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
     width: '80%',

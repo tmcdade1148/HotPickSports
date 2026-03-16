@@ -179,7 +179,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: '#FFFFFF',
   },
   googleButton: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
   },

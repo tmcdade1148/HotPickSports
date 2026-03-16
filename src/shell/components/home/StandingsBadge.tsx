@@ -135,7 +135,7 @@ function ordinal(n: number): string {
 
 const createStyles = (colors: any) => StyleSheet.create({
   container: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
     marginHorizontal: spacing.md,
     marginBottom: spacing.md,

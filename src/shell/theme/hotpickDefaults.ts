@@ -13,16 +13,18 @@ import type {BrandConfig, BrandLogoSet} from './types';
  *
  * | Token      | Hex       | Usage                                          |
  * |------------|-----------|------------------------------------------------|
- * | background | #082640   | App bg, splash bg, adaptive icon bg            |
- * | surface    | #405C74   | Cards, rows, pick cards, SmackTalk bubbles     |
+ * | background | #111414   | App bg, splash bg, adaptive icon bg            |
+ * | surface    | #474747   | Cards, rows, pick cards, SmackTalk bubbles     |
  * | secondary  | #F28B30   | Soft amber — secondary accents, inactive states|
- * | primary    | #F25922   | Hot orange — CTAs, HotPick indicator, highlights|
+ * | primary    | #FF8B3D   | Hot orange — CTAs, active buttons, highlights  |
+ * | glow       | #51A1A6   | Glow around active/highlighted elements        |
  */
 export const HOTPICK_BRAND_COLORS = {
-  background: '#082640',
-  surface: '#405C74',
+  background: '#111414',
+  surface: '#474747',
   secondary: '#F28B30',
-  primary: '#F25922',
+  primary: '#FF8B3D',
+  glow: '#51A1A6',
 } as const;
 
 /**
