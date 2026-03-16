@@ -18,6 +18,8 @@ import {SettingsScreen} from '@shell/screens/SettingsScreen';
 import {PartnerAdminScreen} from '@shell/screens/PartnerAdminScreen';
 import {PoolMembersScreen} from '@shell/screens/PoolMembersScreen';
 import {PoolSettingsScreen} from '@shell/screens/PoolSettingsScreen';
+import {AboutScreen} from '@shell/screens/AboutScreen';
+import {InstructionsScreen} from '@shell/screens/InstructionsScreen';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {Linking} from 'react-native';
 
@@ -114,6 +116,8 @@ export function RootNavigator() {
         <Stack.Screen name="PoolMembers" component={PoolMembersScreen} />
         <Stack.Screen name="PoolSettings" component={PoolSettingsScreen} />
         <Stack.Screen name="PartnerAdmin" component={PartnerAdminScreen} />
+        <Stack.Screen name="About" component={AboutScreen} />
+        <Stack.Screen name="Instructions" component={InstructionsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -8,6 +8,9 @@ import {
   ScrollView,
   ActivityIndicator,
   StyleSheet,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -18,18 +21,29 @@ import {
   LogOut,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
+  ChevronUp,
   Users,
   Star,
   Palette,
   Settings,
+  Info,
+  BookOpen,
 } from 'lucide-react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {SYSTEM_AVATARS} from '@shell/components/AvatarSelector';
 import {getDisplayName} from '@shared/utils/displayName';
-import {useTheme} from '@shell/theme';
 import {spacing, borderRadius} from '@shared/theme';
 import type {BrandConfig} from '@shell/theme/types';
-import {HOTPICK_DEFAULTS} from '@shell/theme/defaults';
+import {HOTPICK_DEFAULTS, isLightColor} from '@shell/theme/defaults';
+
+// Enable LayoutAnimation on Android
+if (
+  Platform.OS === 'android' &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 export function SettingsScreen() {
   const navigation = useNavigation<any>();
@@ -46,17 +60,22 @@ export function SettingsScreen() {
   const joinPool = useGlobalStore(s => s.joinPool);
   const signOut = useGlobalStore(s => s.signOut);
 
-  const {colors} = useTheme();
-
-  // App-level chrome always uses HotPick defaults (profile card, join, create pool)
-  const hp = {
+  // Settings page always uses HotPick colors — never changes for partner pools
+  const colors = {
     primary: HOTPICK_DEFAULTS.primary_color,
+    secondary: HOTPICK_DEFAULTS.secondary_color,
+    background: HOTPICK_DEFAULTS.background_color,
     surface: HOTPICK_DEFAULTS.surface_color,
+    textPrimary: HOTPICK_DEFAULTS.text_primary,
+    textSecondary: HOTPICK_DEFAULTS.text_secondary,
+    border: '#333333',
+    error: '#EF476F',
   };
 
   const [inviteCode, setInviteCode] = useState('');
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState('');
+  const [poolsExpanded, setPoolsExpanded] = useState(false);
 
   const displayName = getDisplayName(userProfile);
 
@@ -73,6 +92,11 @@ export function SettingsScreen() {
   const avatarInfo = userProfile?.avatar_key
     ? SYSTEM_AVATARS.find(a => a.key === userProfile.avatar_key)
     : null;
+
+  const togglePools = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setPoolsExpanded(!poolsExpanded);
+  };
 
   const handleJoinPool = async () => {
     if (!inviteCode.trim() || !user?.id) return;
@@ -114,13 +138,12 @@ export function SettingsScreen() {
     ]);
   };
 
+  // Find active pool name for the collapsed summary
+  const activePool = userPools.find(p => p.id === activePoolId);
+
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]} edges={['top']}>
-    <ScrollView
-      style={styles.flex}
-      contentContainerStyle={styles.content}
-      keyboardShouldPersistTaps="handled">
-      {/* Header */}
+      {/* Header — outside ScrollView, matches About/Instructions */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -130,10 +153,14 @@ export function SettingsScreen() {
         <Text style={[styles.headerTitle, {color: colors.textPrimary}]}>Settings</Text>
         <View style={{width: 24}} />
       </View>
+    <ScrollView
+      style={styles.flex}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled">
 
       {/* Profile card */}
       <TouchableOpacity
-        style={[styles.profileCard, {backgroundColor: hp.surface}]}
+        style={[styles.profileCard, {backgroundColor: colors.surface}]}
         onPress={() => navigation.navigate('Profile')}>
         <View style={styles.profileInfo}>
           <View
@@ -156,176 +183,234 @@ export function SettingsScreen() {
         <ChevronRight size={20} color={colors.textSecondary} />
       </TouchableOpacity>
 
-      {/* Pools section — partner pools first, then HotPick pools */}
-      <Text style={[styles.sectionTitle, {color: colors.textPrimary}]}>My Pools</Text>
+      {/* Pools section — collapsible */}
+      <TouchableOpacity
+        style={[styles.poolsHeader, {backgroundColor: colors.surface}]}
+        onPress={togglePools}
+        activeOpacity={0.7}>
+        <View style={styles.poolsHeaderLeft}>
+          <Users size={18} color={colors.primary} />
+          <Text style={[styles.sectionTitle, {color: colors.textPrimary}]}>My Pools</Text>
+          <Text style={[styles.poolCount, {color: colors.textSecondary}]}>
+            ({userPools.length})
+          </Text>
+        </View>
+        <View style={styles.poolsHeaderRight}>
+          {!poolsExpanded && activePool && (
+            <Text style={[styles.activePoolHint, {color: colors.primary}]} numberOfLines={1}>
+              {activePool.name}
+            </Text>
+          )}
+          {poolsExpanded ? (
+            <ChevronUp size={20} color={colors.textSecondary} />
+          ) : (
+            <ChevronDown size={20} color={colors.textSecondary} />
+          )}
+        </View>
+      </TouchableOpacity>
 
-      {[
-        ...userPools.filter(p => !!(p.brand_config as any)?.is_branded),
-        'DIVIDER' as const,
-        ...userPools.filter(p => !(p.brand_config as any)?.is_branded),
-      ].map((poolOrDivider) => {
-        if (poolOrDivider === 'DIVIDER') {
-          const hasPartner = userPools.some(p => !!(p.brand_config as any)?.is_branded);
-          if (!hasPartner) return null;
-          return <View key="partner-divider" style={{height: 16}} />;
-        }
-        const pool = poolOrDivider as typeof userPools[0];
-        const poolBrand = getPoolColors(pool);
-        const isBranded = !!(pool.brand_config as any)?.is_branded;
-        const isActive = pool.id === activePoolId;
-        const hotpick = {primary: HOTPICK_DEFAULTS.primary_color, secondary: HOTPICK_DEFAULTS.secondary_color};
-        const rowColors = isBranded ? poolBrand : hotpick;
+      {poolsExpanded && (
+        <View style={styles.poolsContent}>
+          {/* Pool list — partner pools first, then HotPick pools */}
+          {[
+            ...userPools.filter(p => !!(p.brand_config as any)?.is_branded),
+            'DIVIDER' as const,
+            ...userPools.filter(p => !(p.brand_config as any)?.is_branded),
+          ].map((poolOrDivider) => {
+            if (poolOrDivider === 'DIVIDER') {
+              const hasPartner = userPools.some(p => !!(p.brand_config as any)?.is_branded);
+              if (!hasPartner) return null;
+              return <View key="partner-divider" style={{height: 16}} />;
+            }
+            const pool = poolOrDivider as typeof userPools[0];
+            const poolBrand = getPoolColors(pool);
+            const isBranded = !!(pool.brand_config as any)?.is_branded;
+            const isActive = pool.id === activePoolId;
+            const hotpick = {primary: HOTPICK_DEFAULTS.primary_color, secondary: HOTPICK_DEFAULTS.secondary_color};
 
-        return (
-          <TouchableOpacity
-            key={pool.id}
-            style={[
-              styles.poolRow,
-              isBranded && {backgroundColor: rowColors.secondary + '18'},
-              isActive && {borderWidth: 1.5, borderColor: rowColors.primary},
-            ]}
-            onPress={() => setActivePoolId(pool.id)}>
-            <View style={styles.poolInfo}>
-              <Users
-                size={18}
-                color={isActive ? rowColors.primary : colors.textSecondary}
-              />
-              <View style={styles.poolNameCol}>
-                <View style={styles.poolNameRow}>
-                  <Text
-                    style={[
-                      styles.poolName,
-                      {color: colors.textPrimary},
-                      isActive && {color: rowColors.primary, fontWeight: '600'},
-                    ]}
-                    numberOfLines={1}>
-                    {pool.name}
-                  </Text>
-                  {!pool.is_global &&
-                    pool.invite_code &&
-                    (poolRoles[pool.id] === 'organizer' ||
-                      poolRoles[pool.id] === 'admin') && (
-                      <TouchableOpacity
-                        onPress={() => {
-                          Clipboard.setString(pool.invite_code ?? '');
-                          Alert.alert(
-                            'Invite Code Copied',
-                            pool.invite_code ?? '',
-                            [{text: 'OK'}],
-                          );
-                        }}
-                        hitSlop={{top: 6, bottom: 6, left: 6, right: 6}}>
-                        <Text
-                          style={[
-                            styles.inviteCode,
-                            {
-                              color: isBranded ? rowColors.secondary : hotpick.primary,
-                              backgroundColor: (isBranded ? rowColors.secondary : hotpick.primary) + '15',
-                            },
-                          ]}>
-                          {pool.invite_code}
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                </View>
-                {pool.is_global ? (
-                  <Text style={styles.globalBadge}>Global pool</Text>
-                ) : poolRoles[pool.id] ? (
-                  <Text style={styles.roleBadge}>
-                    {poolRoles[pool.id].charAt(0).toUpperCase() +
-                      poolRoles[pool.id].slice(1)}
-                  </Text>
-                ) : null}
-              </View>
-            </View>
-            <View style={styles.poolActions}>
-              {isActive && (
-                <Text style={[styles.activeLabel, {color: rowColors.primary}]}>
-                  Active
-                </Text>
-              )}
-              {(poolRoles[pool.id] === 'organizer' ||
-                poolRoles[pool.id] === 'admin') && (
-                <TouchableOpacity
-                  onPress={() =>
-                    navigation.navigate('PoolMembers', {poolId: pool.id})
-                  }
-                  hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-                  <Users size={18} color={colors.textSecondary} />
-                </TouchableOpacity>
-              )}
-              {poolRoles[pool.id] === 'organizer' && (
-                <TouchableOpacity
-                  onPress={() =>
-                    navigation.navigate('PoolSettings', {poolId: pool.id})
-                  }
-                  hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-                  <Settings size={18} color={colors.textSecondary} />
-                </TouchableOpacity>
-              )}
+            // Partner pills: secondary bg when inactive, primary bg when active
+            // HotPick pills: no bg when inactive, primary border when active
+            const pillBg = isBranded
+              ? (isActive ? poolBrand.primary : poolBrand.secondary)
+              : undefined;
+            // Contrast text for partner pill backgrounds
+            const pillTextColor = isBranded
+              ? (isLightColor(pillBg!) ? '#1A1A1A' : '#FFFFFF')
+              : (isActive ? hotpick.primary : colors.textPrimary);
+            const pillIconColor = isBranded
+              ? (isLightColor(pillBg!) ? '#1A1A1A' : '#FFFFFF')
+              : (isActive ? hotpick.primary : colors.textSecondary);
+
+            return (
               <TouchableOpacity
-                onPress={() => setDefaultPoolId(pool.id)}
-                hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-                <Star
-                  size={18}
-                  color={
-                    pool.id === defaultPoolId
-                      ? rowColors.primary
-                      : colors.textSecondary
-                  }
-                  fill={pool.id === defaultPoolId ? rowColors.primary : 'none'}
-                />
+                key={pool.id}
+                style={[
+                  styles.poolRow,
+                  isBranded && {backgroundColor: pillBg},
+                  !isBranded && isActive && {borderWidth: 1.5, borderColor: hotpick.primary},
+                ]}
+                onPress={() => setActivePoolId(pool.id)}>
+                <View style={styles.poolInfo}>
+                  <Users size={18} color={pillIconColor} />
+                  <View style={styles.poolNameCol}>
+                      <Text
+                        style={[
+                          styles.poolName,
+                          {color: pillTextColor},
+                          isActive && !isBranded && {fontWeight: '600'},
+                        ]}
+                        numberOfLines={1}>
+                        {pool.name}
+                      </Text>
+                    <View style={styles.poolMetaRow}>
+                      {pool.is_global ? (
+                        <Text style={[styles.globalBadge, isBranded && {color: pillTextColor + 'AA'}]}>Global pool</Text>
+                      ) : poolRoles[pool.id] ? (
+                        <Text style={[styles.roleBadge, isBranded && {color: pillTextColor + 'AA'}]}>
+                          {poolRoles[pool.id].charAt(0).toUpperCase() +
+                            poolRoles[pool.id].slice(1)}
+                        </Text>
+                      ) : null}
+                      {!pool.is_global &&
+                        pool.invite_code &&
+                        (poolRoles[pool.id] === 'organizer' ||
+                          poolRoles[pool.id] === 'admin') && (
+                          <TouchableOpacity
+                            onPress={() => {
+                              Clipboard.setString(pool.invite_code ?? '');
+                              Alert.alert(
+                                'Invite Code Copied',
+                                pool.invite_code ?? '',
+                                [{text: 'OK'}],
+                              );
+                            }}
+                            hitSlop={{top: 6, bottom: 6, left: 6, right: 6}}>
+                            <Text
+                              style={[
+                                styles.inviteCode,
+                                {
+                                  color: pillTextColor,
+                                  backgroundColor: (isBranded ? pillTextColor : hotpick.primary) + '15',
+                                },
+                              ]}>
+                              {pool.invite_code}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                    </View>
+                  </View>
+                </View>
+                <View style={styles.poolActions}>
+                  {isActive && (
+                    <Text style={[styles.activeLabel, {color: isBranded ? pillTextColor : hotpick.primary}]}>
+                      Active
+                    </Text>
+                  )}
+                  {(poolRoles[pool.id] === 'organizer' ||
+                    poolRoles[pool.id] === 'admin') && (
+                    <TouchableOpacity
+                      onPress={() =>
+                        navigation.navigate('PoolMembers', {poolId: pool.id})
+                      }
+                      hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                      <Users size={18} color={pillIconColor} />
+                    </TouchableOpacity>
+                  )}
+                  {poolRoles[pool.id] === 'organizer' && (
+                    <TouchableOpacity
+                      onPress={() =>
+                        navigation.navigate('PoolSettings', {poolId: pool.id})
+                      }
+                      hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                      <Settings size={18} color={pillIconColor} />
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    onPress={() => setDefaultPoolId(pool.id)}
+                    hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                    <Star
+                      size={18}
+                      color={
+                        pool.id === defaultPoolId
+                          ? (isBranded ? pillTextColor : hotpick.primary)
+                          : pillIconColor
+                      }
+                      fill={pool.id === defaultPoolId ? (isBranded ? pillTextColor : hotpick.primary) : 'none'}
+                    />
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+
+          {/* Join pool */}
+          <View style={styles.joinSection}>
+            <Text style={[styles.joinLabel, {color: colors.textPrimary}]}>Have an invite code?</Text>
+            <View style={styles.codeRow}>
+              <TextInput
+                style={[styles.codeInput, {borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surface}]}
+                placeholder="Enter code"
+                placeholderTextColor={colors.textSecondary}
+                value={inviteCode}
+                onChangeText={text => {
+                  setInviteCode(text.toUpperCase());
+                  if (joinError) setJoinError('');
+                }}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                maxLength={6}
+                returnKeyType="go"
+                onSubmitEditing={handleJoinPool}
+              />
+              <TouchableOpacity
+                style={[
+                  styles.joinButton,
+                  {backgroundColor: colors.primary},
+                  (!inviteCode.trim() || joining) && styles.joinButtonDisabled,
+                ]}
+                onPress={handleJoinPool}
+                disabled={!inviteCode.trim() || joining}>
+                {joining ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.joinButtonText}>Join</Text>
+                )}
               </TouchableOpacity>
             </View>
-          </TouchableOpacity>
-        );
-      })}
+            {joinError ? (
+              <Text style={[styles.codeError, {color: colors.error}]}>{joinError}</Text>
+            ) : null}
+          </View>
 
-      {/* Join pool */}
-      <View style={styles.joinSection}>
-        <Text style={[styles.joinLabel, {color: colors.textPrimary}]}>Have an invite code?</Text>
-        <View style={styles.codeRow}>
-          <TextInput
-            style={[styles.codeInput, {borderColor: colors.border, color: colors.textPrimary, backgroundColor: hp.surface}]}
-            placeholder="Enter code"
-            placeholderTextColor={colors.textSecondary}
-            value={inviteCode}
-            onChangeText={text => {
-              setInviteCode(text.toUpperCase());
-              if (joinError) setJoinError('');
-            }}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            maxLength={6}
-            returnKeyType="go"
-            onSubmitEditing={handleJoinPool}
-          />
+          {/* Create pool */}
           <TouchableOpacity
-            style={[
-              styles.joinButton,
-              {backgroundColor: hp.primary},
-              (!inviteCode.trim() || joining) && styles.joinButtonDisabled,
-            ]}
-            onPress={handleJoinPool}
-            disabled={!inviteCode.trim() || joining}>
-            {joining ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <Text style={styles.joinButtonText}>Join</Text>
-            )}
+            style={[styles.createPoolButton, {backgroundColor: colors.surface, borderColor: colors.primary}]}
+            onPress={handleCreatePool}>
+            <Plus size={18} color={colors.primary} />
+            <Text style={[styles.createPoolText, {color: colors.primary}]}>Create a pool</Text>
           </TouchableOpacity>
         </View>
-        {joinError ? (
-          <Text style={[styles.codeError, {color: colors.error}]}>{joinError}</Text>
-        ) : null}
-      </View>
+      )}
 
-      {/* Create pool */}
+      {/* Links section */}
       <TouchableOpacity
-        style={[styles.createPoolButton, {backgroundColor: hp.surface, borderColor: hp.primary}]}
-        onPress={handleCreatePool}>
-        <Plus size={18} color={hp.primary} />
-        <Text style={[styles.createPoolText, {color: hp.primary}]}>Create a pool</Text>
+        style={[styles.linkRow, {backgroundColor: colors.surface}]}
+        onPress={() => navigation.navigate('Instructions')}>
+        <View style={styles.linkLeft}>
+          <BookOpen size={20} color={colors.primary} />
+          <Text style={[styles.linkText, {color: colors.textPrimary}]}>How HotPick Works</Text>
+        </View>
+        <ChevronRight size={18} color={colors.textSecondary} />
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.linkRow, {backgroundColor: colors.surface}]}
+        onPress={() => navigation.navigate('About')}>
+        <View style={styles.linkLeft}>
+          <Info size={20} color={colors.primary} />
+          <Text style={[styles.linkText, {color: colors.textPrimary}]}>About HotPick Sports</Text>
+        </View>
+        <ChevronRight size={18} color={colors.textSecondary} />
       </TouchableOpacity>
 
       {/* Developer tools — only visible in dev builds */}
@@ -376,7 +461,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.lg,
   },
   profileInfo: {
     flexDirection: 'row',
@@ -405,11 +490,44 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 2,
   },
+  // Pools collapsible header
+  poolsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  poolsHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  poolsHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
+  },
+  poolCount: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  activePoolHint: {
+    fontSize: 13,
+    fontWeight: '500',
+    maxWidth: 140,
+  },
+  poolsContent: {
     marginBottom: spacing.md,
   },
+  // Pool rows
   poolRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -427,10 +545,11 @@ const styles = StyleSheet.create({
   poolNameCol: {
     flex: 1,
   },
-  poolNameRow: {
+  poolMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+    marginTop: 2,
   },
   poolName: {
     fontSize: 15,
@@ -464,7 +583,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   joinSection: {
-    marginTop: spacing.lg,
+    marginTop: spacing.md,
     marginBottom: spacing.md,
   },
   joinLabel: {
@@ -512,11 +631,29 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderStyle: 'dashed',
     padding: spacing.md,
-    marginBottom: spacing.xl,
   },
   createPoolText: {
     fontSize: 15,
     fontWeight: '600',
+  },
+  // Link rows
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    paddingVertical: spacing.md + 2,
+    marginBottom: spacing.sm,
+  },
+  linkLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  linkText: {
+    fontSize: 15,
+    fontWeight: '500',
   },
   devButton: {
     flexDirection: 'row',
@@ -527,6 +664,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     borderWidth: 1,
     borderStyle: 'dashed',
+    marginTop: spacing.md,
     marginBottom: spacing.md,
   },
   devButtonText: {
@@ -541,6 +679,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderRadius: borderRadius.md,
     borderWidth: 2,
+    marginTop: spacing.sm,
   },
   signOutText: {
     fontSize: 16,

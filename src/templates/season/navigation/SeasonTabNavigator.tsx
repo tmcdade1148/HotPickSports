@@ -25,6 +25,7 @@ import {SeasonPicksScreen} from '../screens/SeasonPicksScreen';
 import {SeasonBoardScreen} from '../screens/SeasonBoardScreen';
 import {SmackTalkScreen} from '@shared/components/SmackTalkScreen';
 import {useTheme} from '@shell/theme';
+import {HOTPICK_DEFAULTS} from '@shell/theme/defaults';
 
 // ---------------------------------------------------------------------------
 // Icon mapping — maps config icon strings to Lucide components
@@ -341,8 +342,12 @@ export function SeasonTabNavigator({
       <Tab.Navigator
         initialRouteName={initialRouteName}
         screenOptions={{
-          tabBarActiveTintColor: config.color,
+          tabBarActiveTintColor: colors.primary,
           tabBarInactiveTintColor: colors.textSecondary,
+          tabBarStyle: {
+            backgroundColor: colors.background,
+            borderTopColor: colors.surface,
+          },
           headerShown: false,
         }}
         screenListeners={{
