@@ -11,10 +11,8 @@ import {
   ScrollView,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {supabase} from '@shared/config/supabase';
-import {useGlobalStore} from '@shell/stores/globalStore';
-import {getDefaultEvent} from '@sports/registry';
+import {runPostAuthFlow} from '@shell/services/postAuthFlow';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 
@@ -32,20 +30,6 @@ export function EmailEntryScreen({navigation}: any) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  const setUser = useGlobalStore(s => s.setUser);
-  const setActiveSport = useGlobalStore(s => s.setActiveSport);
-  const fetchProfile = useGlobalStore(s => s.fetchProfile);
-  const fetchUserPools = useGlobalStore(s => s.fetchUserPools);
-  const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
-  const acceptTos = useGlobalStore(s => s.acceptTos);
-  const ensureGlobalPoolMembership = useGlobalStore(
-    s => s.ensureGlobalPoolMembership,
-  );
-  const subscribeSmackUnread = useGlobalStore(s => s.subscribeSmackUnread);
-  const fetchSmackUnreadCounts = useGlobalStore(
-    s => s.fetchSmackUnreadCounts,
-  );
 
   const isValidEmail = EMAIL_REGEX.test(email.trim());
   const isValidPassword = password.length >= MIN_PASSWORD_LENGTH;

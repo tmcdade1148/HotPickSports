@@ -1830,3 +1830,182 @@ depends on a live join to the partners table. Pools are self-contained.
 - `powered_by_hotpick` is typed as literal `true` — cannot be set to false
 - Partner Admin is `__DEV__`-gated in Settings screen
 - `PoweredByHotPick` component self-gates on `isBranded` — returns null for non-branded pools
+
+---
+
+## 26. Onboarding Architecture
+
+Reference spec: `HotPick_Onboarding_Spec_Rev3.docx` (March 2026).
+This section captures the architectural rules. The spec has the full
+screen-by-screen details.
+
+### Auth Methods (locked)
+
+- Email (magic link — passwordless, no password)
+- Apple Sign-In
+- Google Sign-In
+- **TOS checkbox must be checked before any auth button is active**
+- Auth buttons are disabled in component state until checkbox = true
+
+### Signup Trigger Chain
+
+Three DB triggers fire automatically on every new signup. **Never
+create profiles rows manually. Always let `handle_new_user()` do it
+via the auth trigger.**
+
+| Order | Trigger | Fires On | What It Does |
+|-------|---------|----------|-------------|
+| 1 | `on_auth_user_created` | `auth.users` INSERT | Calls `handle_new_user()`. Creates `profiles` row. Writes first_name + last_name from OAuth metadata if present. Sets `avatar_type = 'oauth'` if avatar_url present, else `'system'`. |
+| 2 | `on_profile_created_join_pool` | `profiles` INSERT | Calls `auto_join_public_beta_pool()`. Finds oldest active public pool (`is_public=true`, `status='active'`, `is_archived=false`). Enrolls user. Silently skips if no pool found. |
+| 3 | `trg_create_notification_preferences` | `profiles` INSERT | Creates `notification_preferences` row with all types = true (opt-out model). |
+
+**Global pool state (as of March 2026):** Only `HotPick NFL 2026` is
+active and public. The 2025 beta pool and Mes Que are archived. Do not
+un-archive them or new users land in the wrong pool.
+
+### TOS Tracking — Legal Record Rules
+
+```
+tos_accepted_at   — on profiles table (timestamptz, nullable)
+tos_version       — on profiles table (text, nullable)
+rpc_accept_tos()  — RPC that writes both columns
+```
+
+**CRITICAL:** Do NOT record `tos_accepted_at` from the checkbox tap.
+Record it from `rpc_accept_tos()` AFTER successful auth. The profiles
+row does not exist until auth completes and the trigger fires.
+
+```typescript
+// CORRECT: call after auth completes
+await supabase.rpc('rpc_accept_tos', { p_tos_version: '1.0' });
+
+// WRONG: recording TOS before auth
+setTosAccepted(true); // ← this is UI state only, not the legal record
+```
+
+### Entry Point Detection
+
+| Entry Type | Detection | Behaviour |
+|---|---|---|
+| Invite link (direct) | App opened via `hotpick://join?code=XXXX` | Extract code. Store in Zustand. After profile complete, call `rpc_join_pool_by_code()`. |
+| Invite link (deferred) | App installed from App Store after tapping invite link | Expo fetches deferred link on first open. Store code immediately. Same flow. |
+| Organic | No deep link detected | Proceed through auth. Show global pool only after profile complete. |
+| Returning user | Supabase session exists on app open | Skip all onboarding. Check for incomplete profile or stale TOS version. |
+
+**Store invite code in Zustand global store — NOT AsyncStorage.** It
+only needs to survive the signup flow. If app is killed before signup,
+user re-taps the invite link.
+
+### RPC Parameter Name (BREAKING)
+
+```typescript
+// CORRECT
+await supabase.rpc('rpc_join_pool_by_code', { p_invite_code: code });
+
+// WRONG — will silently fail
+await supabase.rpc('rpc_join_pool_by_code', { invite_code: code });
+```
+
+### Onboarding Screen Flow (6 screens)
+
+1. **Welcome / Auth Choice** — Logo, TOS checkbox, 3 auth buttons
+   (disabled until checkbox checked)
+2. **Email Entry** (email path only) — Single input, `signInWithOtp()`
+3. **Email Verification** (email path only) — Listen for `SIGNED_IN`
+   auth state, call `rpc_accept_tos()` on arrival
+4. **Profile Setup** — First name (required), last name (optional,
+   shown as initial only), poolie name (optional), avatar selector
+5. **Push Notification Permission** — Priming screen BEFORE iOS system
+   dialog. iOS only shows the system dialog once ever.
+6. **Welcome to Your Pool** — Invite path shows pool name + member
+   count. Organic path shows global pool + Create/Join CTAs.
+
+### Avatar Rules
+
+- 8+ system avatar options (abstract shapes / sport-themed, no faces)
+- Upload photo option — resize to max 400×400px client-side, upload
+  to Supabase Storage: `avatars/{userId}`
+- **Never store third-party OAuth avatar URLs directly.** Re-upload
+  Google/Apple avatars to HotPick Storage immediately — third-party
+  URLs expire.
+- No selection = auto-assign from first name initial (`avatar_type = 'system'`)
+
+### Returning User Checks (sequential, all mandatory)
+
+```
+1. Session valid?     → No  → Show auth (Screen 1)
+2. first_name NULL?   → Yes → Show "Complete your profile" (Screen 4 trimmed)
+3. tos_accepted_at NULL? → Yes → Show TOS acceptance screen
+4. tos_version mismatch? → Yes → Show TOS re-acceptance screen
+5. All good           → Navigate to Home Screen
+```
+
+The 23 existing beta users all have `first_name = NULL`. They hit the
+profile prompt on first React Native launch. This is expected.
+
+### Profile Fields (canonical)
+
+| Field | Required | Editable | Notes |
+|-------|----------|----------|-------|
+| first_name | Yes | Yes | Cannot be blank. Inline validation. |
+| last_name | No | Yes | Shown as "Tom M." only. Never full surname. |
+| poolie_name | No | Yes | Display persona for leaderboards and SmackTalk. |
+| display_name_preference | N/A | Yes | Toggle: 'first_name' or 'poolie_name'. Default: 'first_name'. |
+| avatar | No | Yes | System avatar or uploaded photo. |
+| email | N/A | No | Display only. Managed via Supabase Auth. |
+
+### Account Deletion
+
+Two-step confirmation. Calls `anonymize_deleted_user(p_user_id)`.
+Identity removed; picks and scores preserved for pool integrity.
+Show clearly: "Your picks and scores will remain but your name and
+identity will be removed."
+
+### Applied Migrations (do not re-run)
+
+| Migration | What It Did |
+|---|---|
+| `profiles_identity_cleanup` | Migrated display_name → poolie_name for 23 beta users. Dropped username + display_name. Added display_name_preference, avatar_type, career stats, referral_code, referred_by. |
+| `split_full_name_into_first_last` | Renamed full_name → first_name. Added last_name (nullable). |
+| `fix_broken_signup_triggers` | Rewrote handle_new_user, auto_join_public_beta_pool. All use correct column names. |
+| `enable_rls_on_unprotected_tables` | Enabled RLS on smack_read_state, smack_messages_archive, admin_audit_log, awards_cache. |
+| `onboarding_futureproof_columns` | Added tos_accepted_at, tos_version, email_verified_at. Added rpc_accept_tos(). Added anonymize_deleted_user(). Seeded require_email_verification + current_tos_version. |
+| `archive_legacy_public_pools_pre_season2` | Archived 2025 Public Beta Pool and Mes Que. HotPick NFL 2026 is now the only active public pool. |
+| `add_pool_members_user_id_profiles_fkey` | Added FK from pool_members.user_id → profiles.id. Required for PostgREST joins. Orphaned rows cleaned first. |
+
+**Email verification is NOT required at launch.** The column and config
+key exist to be toggled via `competition_config` without migration.
+
+### Edge Cases (handle explicitly)
+
+- **OAuth user with no name** (Apple Hide My Email): `first_name` will
+  be NULL — show Screen 4, do not skip for OAuth users
+- **Invite code for full pool**: Show "This pool is full. Ask the
+  organiser to upgrade." User still has global pool access.
+- **Invite code for wrong competition**: Show "This invite link is for
+  a previous season."
+- **Already signed in + invite link**: Skip onboarding, call
+  `rpc_join_pool_by_code()` directly, show confirmation sheet.
+- **Push token already exists** (reinstall/second device):
+  `ON CONFLICT DO NOTHING` — never error on duplicate.
+- **Poolie name not set**: Leaderboard shows first_name. Profile
+  Settings shows persistent "Add your poolie name" prompt. Never show
+  blank or "Player" fallback.
+
+### Red Flags: Onboarding Violations
+
+- Creating a `profiles` row manually instead of through auth trigger
+- Recording `tos_accepted_at` from checkbox tap instead of
+  `rpc_accept_tos()` after auth
+- Using `invite_code` instead of `p_invite_code` as RPC parameter
+- Storing invite code in AsyncStorage instead of Zustand
+- Storing third-party OAuth avatar URLs directly on profiles
+- Showing iOS push permission dialog without the priming screen first
+- Un-archiving legacy pools (2025 beta, Mes Que) — breaks auto-enroll
+- Skipping profile completion for OAuth users with null first_name
+- Hard-deleting user data on account deletion instead of anonymizing
+
+> **What to say:** "Onboarding follows the trigger chain: auth →
+> handle_new_user → auto_join_pool → notification_preferences. TOS is
+> recorded via rpc_accept_tos() after auth, never from the checkbox.
+> Invite codes use p_invite_code parameter. Please revise."
