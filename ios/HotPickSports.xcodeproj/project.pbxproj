@@ -10,7 +10,9 @@
 		0C80B921A6F3F58F76C31292 /* libPods-HotPickSports.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-HotPickSports.a */; };
 		126A9B3339183E58A13844E1 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		5A9A7B6015444ED7ADCAF4F0 /* Colors.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7DAFD1BC79E345998E27CEFF /* Colors.xcassets */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
+		78BE216C575A4B439790B864 /* BootSplash.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = F14169EF94C44DF0B8CEB803 /* BootSplash.storyboard */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 /* End PBXBuildFile section */
 
@@ -23,8 +25,10 @@
 		5709B34CF0A7D63546082F79 /* Pods-HotPickSports.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-HotPickSports.release.xcconfig"; path = "Target Support Files/Pods-HotPickSports/Pods-HotPickSports.release.xcconfig"; sourceTree = "<group>"; };
 		5DCACB8F33CDC322A6C60F78 /* libPods-HotPickSports.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-HotPickSports.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = HotPickSports/AppDelegate.swift; sourceTree = "<group>"; };
+		7DAFD1BC79E345998E27CEFF /* Colors.xcassets */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = folder.assetcatalog; name = Colors.xcassets; path = HotPickSports/Colors.xcassets; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = HotPickSports/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
+		F14169EF94C44DF0B8CEB803 /* BootSplash.storyboard */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = BootSplash.storyboard; path = HotPickSports/BootSplash.storyboard; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -47,6 +51,8 @@
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
+				F14169EF94C44DF0B8CEB803 /* BootSplash.storyboard */,
+				7DAFD1BC79E345998E27CEFF /* Colors.xcassets */,
 			);
 			name = HotPickSports;
 			sourceTree = "<group>";
@@ -161,6 +167,8 @@
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				126A9B3339183E58A13844E1 /* PrivacyInfo.xcprivacy in Resources */,
+				78BE216C575A4B439790B864 /* BootSplash.storyboard in Resources */,
+				5A9A7B6015444ED7ADCAF4F0 /* Colors.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

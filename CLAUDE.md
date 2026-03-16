@@ -969,6 +969,22 @@ uses HotPick defaults. The rendering pipeline must support custom values.
 Lives at /src/shell/theme/. Wraps the entire app. Sport modules consume
 via hooks — they never define their own colors.
 
+### HotPick Brand Color Tokens (Canonical)
+
+These are the locked brand values for the HotPick consumer product.
+They are the source of truth for all theming. Update hotpickDefaults.ts
+first if they ever change — then update app.json and the splash exception.
+
+| Token          | Hex       | Usage                                              |
+|----------------|-----------|----------------------------------------------------|
+| `background`   | `#082640` | App bg, splash bg, adaptive icon bg                |
+| `surface`      | `#405C74` | Cards, rows, pick cards, SmackTalk bubbles         |
+| `secondary`    | `#F28B30` | Soft amber — secondary accents, inactive states    |
+| `primary`      | `#F25922` | Hot orange — CTAs, HotPick indicator, highlights   |
+
+Source of truth: `src/shell/theme/hotpickDefaults.ts`
+Never copy these hex strings into other files — import from hotpickDefaults.
+
 ```typescript
 interface BrandConfig {
   partner_name: string;        // e.g. "Mes Que"
@@ -1008,6 +1024,35 @@ NULL = use HotPick defaults. Populated = partner branding.
 - Any hex color value appearing directly in a StyleSheet → use useTheme()
 - Any hardcoded logo path or app name string in a component → use useBrand()
 - Pool screen UI that doesn't read from brandConfig → refactor to use config
+
+### Splash Screen Color Exception
+
+One hardcoded hex value is explicitly permitted — and required — in
+`SplashScreen.tsx`. This is the only component in the codebase where
+a hex color may appear directly in a StyleSheet.
+
+```typescript
+// ✅ PERMITTED EXCEPTION — container background only
+const styles = StyleSheet.create({
+  container: {
+    backgroundColor: '#082640', // Must match app.json exactly
+  },
+});
+```
+
+Why: useTheme() resolves after JS bridge init. The native and JS splash
+must share a pixel-identical background or the handoff flashes.
+
+The four locations that must always match — change all or change none:
+- `app.json` → `expo.splash.backgroundColor`
+- `app.json` → `expo.android.splash.backgroundColor`
+- `app.json` → `expo.android.adaptiveIcon.backgroundColor`
+- `SplashScreen.tsx` → `styles.container.backgroundColor`
+
+### Red Flag: Splash Color Exception Misuse
+- Any hex color in SplashScreen.tsx other than container.backgroundColor
+- Another component citing this exception as precedent
+- The four locations above having different values
 
 ---
 

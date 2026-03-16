@@ -2,6 +2,7 @@ import React, {useState} from 'react';
 import {
   View,
   Text,
+  Image,
   TouchableOpacity,
   ActivityIndicator,
   StyleSheet,
@@ -42,8 +43,11 @@ export function WelcomeScreen({navigation}: any) {
       <View style={styles.content}>
         {/* Logo */}
         <View style={styles.logoContainer}>
-          <Text style={styles.logoText}>HotPick</Text>
-          <Text style={styles.logoSubtext}>Sports</Text>
+          <Image
+            source={require('../../../assets/hotpick-logo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
         </View>
 
         <Text style={styles.tagline}>
@@ -108,24 +112,17 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   content: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
+    paddingTop: '10%',
   },
   logoContainer: {
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
-  logoText: {
-    fontSize: 48,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  logoSubtext: {
-    fontSize: 22,
-    fontWeight: '300',
-    color: colors.textSecondary,
-    marginTop: -4,
+  logo: {
+    width: 320,
+    height: 320,
   },
   tagline: {
     fontSize: 16,

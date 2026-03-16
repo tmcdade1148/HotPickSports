@@ -1,42 +1,19 @@
-import type {BrandConfig, BrandLogoSet} from './types';
-
 /**
- * HotPick Sports default logo set.
+ * Theme defaults and color derivation functions.
  *
- * Empty strings = use bundled assets (resolved at render time).
- * When HotPick logo assets are added to the project, update these
- * to reference the CDN URLs or bundled require() paths.
+ * Brand values come from hotpickDefaults.ts — the canonical source.
+ * This file re-exports those values and provides color derivation
+ * utilities for dark mode and partner brand config.
  */
-export const HOTPICK_LOGOS: BrandLogoSet = {
-  full: '',
-  mark: '',
-  wordmark: '',
-  mono_light: '',
-  mono_dark: '',
-};
+import type {BrandConfig} from './types';
 
-/**
- * HotPick Sports default brand configuration.
- *
- * Used when a pool has no brand_config (NULL) — i.e. every
- * non-partner pool. This is the canonical source of HotPick
- * brand values. Never hardcode these elsewhere.
- */
-export const HOTPICK_DEFAULTS: BrandConfig = {
-  partner_name: 'HotPick Sports',
-  pool_label: 'HotPick',
-  primary_color: '#FF6B35',
-  secondary_color: '#004E89',
-  background_color: '#FFFFFF',
-  surface_color: '#F7F7F7',
-  text_primary: '#1A1A1A',
-  text_secondary: '#6B6B6B',
-  logo: HOTPICK_LOGOS,
-  app_name: 'HotPick',
-  invite_slug: '',
-  is_branded: false,
-  powered_by_hotpick: true,
-};
+// Re-export canonical brand values from hotpickDefaults
+export {
+  HOTPICK_BRAND as HOTPICK_DEFAULTS,
+  HOTPICK_BRAND,
+  HOTPICK_BRAND_COLORS,
+  HOTPICK_LOGOS,
+} from './hotpickDefaults';
 
 /**
  * HotPick dark mode overrides.
@@ -103,7 +80,7 @@ export function deriveFullBrandColors(
 /**
  * Check if a hex color is "light" (luminance > 0.5).
  */
-function isLightColor(hex: string): boolean {
+export function isLightColor(hex: string): boolean {
   const c = hex.replace('#', '');
   const r = parseInt(c.substring(0, 2), 16) / 255;
   const g = parseInt(c.substring(2, 4), 16) / 255;

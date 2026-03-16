@@ -1,4 +1,26 @@
 {
   "name": "HotPickSports",
-  "displayName": "HotPickSports"
+  "displayName": "HotPick Sports",
+  "expo": {
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#082640"
+    },
+    "android": {
+      "splash": {
+        "image": "./assets/splash.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#082640"
+      },
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#082640"
+      }
+    },
+    "ios": {
+      "icon": "./assets/icon.png"
+    }
+  }
 }
