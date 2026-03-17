@@ -8,60 +8,31 @@ import {
   StyleSheet,
   Platform,
   Alert,
+  Linking,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
-import {signInWithApple, signInWithGoogle} from '@shell/services/socialAuth';
-import {runPostAuthFlow} from '@shell/services/postAuthFlow';
 
 export function WelcomeScreen({navigation}: any) {
   const {colors} = useTheme();
   const styles = createStyles(colors);
   const [loading, setLoading] = useState<string | null>(null);
 
-  const handleApple = async () => {
-    setLoading('apple');
-    try {
-      const {user, providerName} = await signInWithApple();
-      await runPostAuthFlow({user, navigation, providerName});
-    } catch (err: any) {
-      // Apple sign-in cancelled by user (error code 1001) — don't show alert
-      if (err?.code === '1001' || err?.message?.includes('canceled')) {
-        // User cancelled — silently ignore
-      } else {
-        Alert.alert(
-          'Sign In Failed',
-          err?.message || 'Something went wrong with Apple Sign In.',
-        );
-      }
-    } finally {
-      setLoading(null);
-    }
+  const handleApple = () => {
+    // Apple Sign In requires @invertase/react-native-apple-authentication + Xcode config
+    Alert.alert(
+      'Coming Soon',
+      'Apple Sign In will be available at launch. Use email for now.',
+    );
   };
 
-  const handleGoogle = async () => {
-    setLoading('google');
-    try {
-      const {user, providerName} = await signInWithGoogle();
-      await runPostAuthFlow({user, navigation, providerName});
-    } catch (err: any) {
-      // Google sign-in cancelled by user — don't show alert
-      if (
-        err?.code === 'SIGN_IN_CANCELLED' ||
-        err?.message?.includes('canceled') ||
-        err?.message?.includes('cancelled')
-      ) {
-        // User cancelled — silently ignore
-      } else {
-        Alert.alert(
-          'Sign In Failed',
-          err?.message || 'Something went wrong with Google Sign In.',
-        );
-      }
-    } finally {
-      setLoading(null);
-    }
+  const handleGoogle = () => {
+    // Google Sign In requires @react-native-google-signin/google-signin + Cloud Console config
+    Alert.alert(
+      'Coming Soon',
+      'Google Sign In will be available at launch. Use email for now.',
+    );
   };
 
   const handleEmail = () => {
@@ -95,7 +66,7 @@ export function WelcomeScreen({navigation}: any) {
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
                 <Text style={[styles.authButtonText, styles.appleButtonText]}>
-                   Continue with Apple
+                  Continue with Apple
                 </Text>
               )}
             </TouchableOpacity>
@@ -128,7 +99,15 @@ export function WelcomeScreen({navigation}: any) {
         <Text style={styles.tosText}>
           By continuing you agree to our{' '}
           <Text style={styles.tosLink}>Terms of Service</Text> and{' '}
-          <Text style={styles.tosLink}>Privacy Policy</Text>
+          <Text
+            style={styles.tosLink}
+            onPress={() =>
+              Linking.openURL(
+                'https://mzqtrpdiqhopjmxjccwy.supabase.co/storage/v1/object/public/public-data/legal/privacy-policy.html',
+              )
+            }>
+            Privacy Policy
+          </Text>
         </Text>
       </View>
     </SafeAreaView>
@@ -179,7 +158,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: '#FFFFFF',
   },
   googleButton: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.border,
   },
