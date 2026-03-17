@@ -43,6 +43,8 @@ interface PicksOpenCardProps {
   poolMemberCount: number;
   /** Navigate to make/edit picks */
   onMakePicks: () => void;
+  /** Override color for WEEK label (partner secondary color) */
+  weekLabelColor?: string;
 }
 
 /**
@@ -65,6 +67,7 @@ export function PicksOpenCard({
   poolPicksSubmittedCount,
   poolMemberCount,
   onMakePicks,
+  weekLabelColor,
 }: PicksOpenCardProps) {
   const {colors} = useTheme();
   const styles = createStyles(colors);
@@ -78,7 +81,7 @@ export function PicksOpenCard({
   return (
     <View style={styles.container}>
       {/* Week label */}
-      <Text style={styles.weekLabel}>WEEK {currentWeek}</Text>
+      <Text style={[styles.weekLabel, weekLabelColor ? {color: weekLabelColor} : undefined]}>WEEK {currentWeek}</Text>
 
       {/* Countdown to deadline */}
       {timeLeft && (

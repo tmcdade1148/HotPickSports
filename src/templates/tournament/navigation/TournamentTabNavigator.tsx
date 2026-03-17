@@ -152,10 +152,12 @@ function PoolSwitcherHeader({
           <View style={headerStyles.modal}>
             <Text style={headerStyles.modalTitle}>Switch Pool</Text>
             <FlatList
-              data={userPools}
+              data={[...userPools.filter(p => !!(p.brand_config as any)?.is_branded), ...userPools.filter(p => !(p.brand_config as any)?.is_branded)]}
               keyExtractor={p => p.id}
               renderItem={({item}) => {
                 const unread = smackUnreadCounts[item.id] ?? 0;
+                const itemBranded = !!(item.brand_config as any)?.is_branded;
+                const itemPrimary = itemBranded ? (item.brand_config as any)?.primary_color : null;
                 return (
                   <TouchableOpacity
                     style={headerStyles.poolOption}
@@ -164,7 +166,8 @@ function PoolSwitcherHeader({
                       <Text
                         style={[
                           headerStyles.poolOptionText,
-                          item.id === activePoolId && {color: accentColor},
+                          itemBranded && {fontWeight: '700', color: itemPrimary},
+                          item.id === activePoolId && !itemBranded && {color: accentColor},
                         ]}>
                         {item.name}
                       </Text>

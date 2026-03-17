@@ -125,10 +125,12 @@ function CardHeader({
           <View style={styles.modal}>
             <Text style={styles.modalTitle}>Switch Pool</Text>
             <FlatList
-              data={userPools}
+              data={[...userPools.filter(p => !!(p.brand_config as any)?.is_branded), ...userPools.filter(p => !(p.brand_config as any)?.is_branded)]}
               keyExtractor={p => p.id}
               renderItem={({item}) => {
                 const unread = smackUnreadCounts[item.id] ?? 0;
+                const itemBranded = !!(item.brand_config as any)?.is_branded;
+                const itemPrimary = itemBranded ? (item.brand_config as any)?.primary_color : null;
                 return (
                   <TouchableOpacity
                     style={styles.poolOption}
@@ -137,7 +139,8 @@ function CardHeader({
                       <Text
                         style={[
                           styles.poolOptionText,
-                          item.id === activePoolId && {color: accentColor},
+                          itemBranded && {fontWeight: '700', color: itemPrimary},
+                          item.id === activePoolId && !itemBranded && {color: accentColor},
                         ]}>
                         {item.name}
                       </Text>
@@ -165,7 +168,7 @@ function CardHeader({
 
 const createStyles = (colors: any) => StyleSheet.create({
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.background,
     borderRadius: borderRadius.lg,
     borderTopWidth: 3,
     marginHorizontal: spacing.md,
@@ -228,7 +231,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
   },
   modal: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.background,
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
     width: '80%',

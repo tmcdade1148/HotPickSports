@@ -148,8 +148,13 @@ function PoolSwitcherHeader({
           <View style={headerStyles.modal}>
             <Text style={headerStyles.modalTitle}>Switch Pool</Text>
             <ScrollView bounces={false}>
-              {userPools.map(item => {
+              {[
+                ...userPools.filter(p => !!(p.brand_config as any)?.is_branded),
+                ...userPools.filter(p => !(p.brand_config as any)?.is_branded),
+              ].map(item => {
                 const unread = smackUnreadCounts[item.id] ?? 0;
+                const itemBranded = !!(item.brand_config as any)?.is_branded;
+                const itemPrimary = itemBranded ? (item.brand_config as any)?.primary_color : null;
                 return (
                   <TouchableOpacity
                     key={item.id}
@@ -159,7 +164,8 @@ function PoolSwitcherHeader({
                       <Text
                         style={[
                           headerStyles.poolOptionText,
-                          item.id === activePoolId && {color: accentColor},
+                          itemBranded && {fontWeight: '700', color: itemPrimary},
+                          item.id === activePoolId && !itemBranded && {color: '#FF8B3D'},
                         ]}>
                         {item.name}
                       </Text>
@@ -172,7 +178,7 @@ function PoolSwitcherHeader({
                       )}
                     </View>
                     {item.id === activePoolId && (
-                      <Text style={{color: accentColor}}>{'\u2713'}</Text>
+                      <Text style={{color: '#FF8B3D'}}>{'\u2713'}</Text>
                     )}
                   </TouchableOpacity>
                 );

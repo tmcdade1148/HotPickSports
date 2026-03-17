@@ -49,7 +49,12 @@ export function StandingsBadge({onPress}: StandingsBadgeProps) {
     return null;
   }
 
-  const poolName = userPools.find(p => p.id === activePoolId)?.name ?? 'Pool';
+  const activePool = userPools.find(p => p.id === activePoolId);
+  const poolName = activePool?.name ?? 'Pool';
+  const isBranded = !!(activePool?.brand_config as any)?.is_branded;
+  const glowColor = isBranded
+    ? (activePool?.brand_config as any)?.secondary_color || '#0E6666'
+    : '#0E6666';
 
   // Build context array (1 item for Season 2)
   const contexts: StandingContext[] = [
@@ -66,7 +71,7 @@ export function StandingsBadge({onPress}: StandingsBadgeProps) {
   // Loading state: pool selected but standings not yet fetched
   if (activePoolMemberCount === 0) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, {}]}>
         <View style={styles.skeleton} />
       </View>
     );
@@ -74,7 +79,7 @@ export function StandingsBadge({onPress}: StandingsBadgeProps) {
 
   return (
     <TouchableOpacity
-      style={styles.container}
+      style={[styles.container, {}]}
       activeOpacity={0.7}
       onPress={onPress}>
       {contexts.map(ctx => {
@@ -141,11 +146,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginBottom: spacing.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 4,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 1},
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
   },
   skeleton: {
     height: 36,

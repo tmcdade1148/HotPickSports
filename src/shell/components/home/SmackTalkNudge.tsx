@@ -30,6 +30,12 @@ export function SmackTalkNudge({onPress, onPressPool}: SmackTalkNudgeProps) {
   const userPools = useGlobalStore(s => s.userPools);
   const activePoolId = useGlobalStore(s => s.activePoolId);
 
+  const activePool = userPools.find(p => p.id === activePoolId);
+  const isBranded = !!(activePool?.brand_config as any)?.is_branded;
+  const glowColor = isBranded
+    ? (activePool?.brand_config as any)?.secondary_color || '#0E6666'
+    : '#0E6666';
+
   // Filter to non-active pools with unread > 0, sorted by count desc, max 3
   const nudgePools = userPools
     .filter(
@@ -95,11 +101,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginBottom: spacing.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 4,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 1},
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
   },
   headerRow: {
     flexDirection: 'row',

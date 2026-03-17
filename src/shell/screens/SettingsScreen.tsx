@@ -24,6 +24,7 @@ import {
   ChevronDown,
   ChevronUp,
   Users,
+  Building2,
   Star,
   Palette,
   Settings,
@@ -226,7 +227,7 @@ export function SettingsScreen() {
             const poolBrand = getPoolColors(pool);
             const isBranded = !!(pool.brand_config as any)?.is_branded;
             const isActive = pool.id === activePoolId;
-            const hotpick = {primary: HOTPICK_DEFAULTS.primary_color, secondary: HOTPICK_DEFAULTS.secondary_color};
+            const hotpick = {primary: HOTPICK_DEFAULTS.primary_color, secondary: HOTPICK_DEFAULTS.secondary_color, surface: HOTPICK_DEFAULTS.surface_color};
 
             // Partner pills: secondary bg when inactive, primary bg when active
             // HotPick pills: no bg when inactive, primary border when active
@@ -241,17 +242,26 @@ export function SettingsScreen() {
               ? (isLightColor(pillBg!) ? '#1A1A1A' : '#FFFFFF')
               : (isActive ? hotpick.primary : colors.textSecondary);
 
+            const poolGlowColor = isBranded
+              ? (pool.brand_config as any)?.secondary_color || '#0E6666'
+              : '#0E6666';
+
             return (
               <TouchableOpacity
                 key={pool.id}
                 style={[
                   styles.poolRow,
                   isBranded && {backgroundColor: pillBg},
+                  !isBranded && {backgroundColor: hotpick.surface},
                   !isBranded && isActive && {borderWidth: 1.5, borderColor: hotpick.primary},
                 ]}
                 onPress={() => setActivePoolId(pool.id)}>
                 <View style={styles.poolInfo}>
-                  <Users size={18} color={pillIconColor} />
+                  {isBranded ? (
+                    <Building2 size={18} color={pillIconColor} />
+                  ) : (
+                    <Users size={18} color={pillIconColor} />
+                  )}
                   <View style={styles.poolNameCol}>
                       <Text
                         style={[
@@ -532,7 +542,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     padding: spacing.md,
     marginBottom: spacing.sm,
   },

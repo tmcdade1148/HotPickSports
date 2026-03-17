@@ -197,44 +197,63 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
   // ── Kickoff countdown ──────────────────────────────────────────────
   const kickoff = useCountdown(weekFirstKickoff);
 
-  return (
-    <View style={[styles.card, {borderTopColor: '#FF8B3D'}]}>
-      {/* Card header with pool switcher */}
-      <CardHeader
-        eventName={config.competition.replace(/_/g, ' ').toUpperCase()}
-        weekLabel={phaseLabel}
-        poolName={activePool?.name ?? 'Select Pool'}
-        userPools={userPools}
-        activePoolId={activePoolId}
-        onSwitchPool={setActivePoolId}
-        accentColor={config.color}
-        smackUnreadCounts={smackUnreadCounts}
-        activePool={activePool}
-      />
+  // ── Glow color: partner secondary or HotPick teal ─────────────────
+  const isBranded = !!(activePool?.brand_config as any)?.is_branded;
+  const glowColor = isBranded
+    ? (activePool?.brand_config as any)?.secondary_color || '#0E6666'
+    : '#0E6666';
 
-      {/* Score + Kickoff pills row */}
+  return (
+    <View style={styles.outerWrapper}>
+      {/* Card box — header only */}
+      <View style={[styles.card, {borderTopColor: '#FF8B3D'}]}>
+        <CardHeader
+          eventName={config.competition.replace(/_/g, ' ').toUpperCase()}
+          weekLabel={phaseLabel}
+          poolName={activePool?.name ?? 'Select Pool'}
+          userPools={userPools}
+          activePoolId={activePoolId}
+          onSwitchPool={setActivePoolId}
+          accentColor={config.color}
+          smackUnreadCounts={smackUnreadCounts}
+          activePool={activePool}
+        />
+      </View>
+
+      {/* Score + Kickoff pills row — outside the card box */}
       <View style={styles.pillRow}>
         {/* Score pill */}
         <View style={styles.scorePill}>
           <Text style={styles.scoreValue}>
-            {userSeasonTotal}
+            {248 /* PREVIEW: hardcoded for 3-digit test — revert to userSeasonTotal */}
           </Text>
           <Text style={styles.scorePtsLabel}>pts</Text>
         </View>
 
         {/* Kickoff pill */}
-        {kickoff.timeLeft && !kickoff.hasExpired && (
+        {kickoff.timeLeft && (
           <View style={styles.kickoffPill}>
-            <Text style={styles.kickoffIcon}>{'\uD83C\uDFC8'}</Text>
-            <View>
-              <Text style={styles.kickoffLabel}>Kickoff</Text>
-              <Text style={styles.kickoffValue}>{kickoff.timeLeft}</Text>
+            <View style={{flex: 1}}>
+              <Text style={styles.kickoffLabel}>
+                {weekState === 'live'
+                  ? 'Picks are LIVE'
+                  : weekState === 'settling'
+                    ? 'Scores settling'
+                    : weekState === 'locked'
+                      ? 'Picks are locked'
+                      : kickoff.hasExpired
+                        ? 'Picks are LIVE'
+                        : 'Picks go LIVE in:'}
+              </Text>
+              {!kickoff.hasExpired && (
+                <Text style={styles.kickoffValue}>{kickoff.timeLeft}</Text>
+              )}
             </View>
           </View>
         )}
       </View>
 
-      {/* Week state sub-component */}
+      {/* Week state content — outside the card box */}
       {renderWeekState({
         weekState,
         currentWeek,
@@ -252,6 +271,9 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
         poolPicksSubmittedCount,
         poolMemberCount,
         onMakePicks: onNavigateToEvent ?? (() => {}),
+        weekLabelColor: isBranded
+          ? (activePool?.brand_config as any)?.secondary_color || undefined
+          : undefined,
       })}
     </View>
   );
@@ -278,6 +300,7 @@ function renderWeekState(props: {
   poolPicksSubmittedCount: number;
   poolMemberCount: number;
   onMakePicks: () => void;
+  weekLabelColor?: string;
 }) {
   switch (props.weekState) {
     case 'picks_open':
@@ -291,6 +314,7 @@ function renderWeekState(props: {
           hotPickTeam={props.userHotPick?.picked_team ?? null}
           userHasSubmitted={props.userHasSubmitted}
           poolPicksSubmittedCount={props.poolPicksSubmittedCount}
+          weekLabelColor={props.weekLabelColor}
           poolMemberCount={props.poolMemberCount}
           onMakePicks={props.onMakePicks}
         />
@@ -369,7 +393,7 @@ function CardHeader({
   return (
     <View style={styles.header}>
       <View style={styles.headerLeft}>
-        <Text style={styles.eventName}>{eventName}</Text>
+        <Text style={[styles.eventName, isBranded && {color: '#1A1A1A'}]}>{eventName}</Text>
         <Text style={styles.weekLabel}>{weekLabel}</Text>
       </View>
 
@@ -398,8 +422,13 @@ function CardHeader({
           <View style={styles.modal}>
             <Text style={styles.modalTitle}>Switch Pool</Text>
             <ScrollView bounces={false}>
-              {userPools.map(item => {
+              {[
+                ...userPools.filter(p => !!(p.brand_config as any)?.is_branded),
+                ...userPools.filter(p => !(p.brand_config as any)?.is_branded),
+              ].map(item => {
                 const unread = smackUnreadCounts[item.id] ?? 0;
+                const itemBranded = !!(item.brand_config as any)?.is_branded;
+                const itemPrimary = itemBranded ? (item.brand_config as any)?.primary_color : null;
                 return (
                   <TouchableOpacity
                     key={item.id}
@@ -409,7 +438,8 @@ function CardHeader({
                       <Text
                         style={[
                           styles.poolOptionText,
-                          item.id === activePoolId && {color: accentColor},
+                          itemBranded && {fontWeight: '700', color: itemPrimary},
+                          item.id === activePoolId && !itemBranded && {color: '#FF8B3D'},
                         ]}>
                         {item.name}
                       </Text>
@@ -422,7 +452,7 @@ function CardHeader({
                       )}
                     </View>
                     {item.id === activePoolId && (
-                      <Text style={{color: accentColor, fontSize: 16}}>
+                      <Text style={{color: '#FF8B3D', fontSize: 16}}>
                         {'\u2713'}
                       </Text>
                     )}
@@ -442,21 +472,21 @@ function CardHeader({
 // ---------------------------------------------------------------------------
 
 const createStyles = (colors: any) => StyleSheet.create({
-  card: {
-    backgroundColor: colors.background,
-    borderRadius: borderRadius.lg,
-    borderTopWidth: 3,
+  outerWrapper: {
     marginHorizontal: spacing.md,
     marginBottom: spacing.md,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.08,
+  },
+  card: {
+    backgroundColor: 'transparent',
+    borderTopWidth: 3,
+    shadowColor: 'transparent',
+    shadowOffset: {width: 0, height: 0},
+    shadowOpacity: 0,
     shadowRadius: 8,
     elevation: 3,
   },
   pillRow: {
     flexDirection: 'row',
-    marginHorizontal: spacing.md,
     marginTop: spacing.sm,
     gap: spacing.sm,
   },
@@ -484,24 +514,24 @@ const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm + 4,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: spacing.sm,
-    justifyContent: 'center',
   },
   kickoffIcon: {
     fontSize: 24,
   },
   kickoffLabel: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    fontWeight: '500',
+    ...typography.body,
+    color: colors.textPrimary,
+    fontWeight: '700',
   },
   kickoffValue: {
     ...typography.h3,
-    color: colors.textPrimary,
+    color: colors.textSecondary,
     fontWeight: '700',
+    marginTop: 2,
   },
   header: {
     flexDirection: 'row',

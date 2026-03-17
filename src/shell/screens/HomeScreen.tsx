@@ -2,6 +2,7 @@ import React from 'react';
 import {
   View,
   Text,
+  Image,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
@@ -16,7 +17,8 @@ import {SeriesEventCard} from '@shell/components/home/SeriesEventCard';
 import {StandingsBadge} from '@shell/components/home/StandingsBadge';
 import {SmackTalkNudge} from '@shell/components/home/SmackTalkNudge';
 import {spacing, typography} from '@shared/theme';
-import {useTheme} from '@shell/theme';
+import {useTheme, useBrand} from '@shell/theme';
+import {PoweredByHotPick} from '@shell/components/PoweredByHotPick';
 import type {
   AnyEventConfig,
   SeasonConfig,
@@ -34,6 +36,7 @@ import type {
  */
 export function HomeScreen({navigation}: any) {
   const {colors} = useTheme();
+  const brand = useBrand();
   const styles = createStyles(colors);
   const userProfile = useGlobalStore(s => s.userProfile);
   const activeEventCards = useGlobalStore(s => s.activeEventCards);
@@ -87,6 +90,23 @@ export function HomeScreen({navigation}: any) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Brand wordmark / partner logo */}
+      <View style={styles.logoContainer}>
+        {brand.isBranded && brand.logo.full ? (
+          <Image
+            source={{uri: brand.logo.full}}
+            style={styles.partnerLogo}
+            resizeMode="contain"
+          />
+        ) : (
+          <Image
+            source={require('../../assets/hotpick-wordmark.png')}
+            style={styles.wordmark}
+            resizeMode="contain"
+          />
+        )}
+      </View>
+
       {/* Header */}
       <View style={styles.header}>
         <View>
@@ -129,6 +149,9 @@ export function HomeScreen({navigation}: any) {
             onPressPool={handleNavigateToSmackTalkPool}
           />
         )}
+
+        {/* Powered by HotPick — partner pools only */}
+        <PoweredByHotPick />
 
         {cardsToShow.length === 0 && (
           <View style={styles.emptyState}>
@@ -191,8 +214,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.lg,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.md,
   },
   greeting: {
     ...typography.caption,
@@ -214,6 +237,19 @@ const createStyles = (colors: any) => StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 4,
     elevation: 2,
+  },
+  logoContainer: {
+    alignItems: 'center',
+    paddingTop: spacing.sm,
+    paddingBottom: 0,
+  },
+  wordmark: {
+    height: 56,
+    width: 320,
+  },
+  partnerLogo: {
+    height: 56,
+    width: 280,
   },
   scrollView: {
     flex: 1,
