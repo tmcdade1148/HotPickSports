@@ -26,7 +26,7 @@ export function PoweredByHotPick() {
           Powered by
         </Text>
         <Image
-          source={require('../../assets/hotpick-wordmark.png')}
+          source={require('../../assets/hotpick-wordmark-w.png')}
           style={styles.wordmark}
           resizeMode="contain"
         />
@@ -53,6 +53,6 @@ const styles = StyleSheet.create({
   wordmark: {
     height: 28,
     width: 150,
-    marginLeft: -32,
+    marginLeft: -12,
   },
 });
