@@ -55,15 +55,20 @@ export function deriveFullBrandColors(
   primary: string,
   secondary: string,
   background: string,
+  highlight?: string,
 ): {
   primary_color: string;
   secondary_color: string;
   background_color: string;
   surface_color: string;
+  highlight_color: string;
   text_primary: string;
   text_secondary: string;
 } {
   const isLightBg = isLightColor(background);
+
+  // Auto-derive highlight if not provided: white on dark bg, dark on light bg
+  const derivedHighlight = highlight || (isLightBg ? '#1A1A1A' : '#FFFFFF');
 
   return {
     primary_color: primary,
@@ -72,6 +77,7 @@ export function deriveFullBrandColors(
     surface_color: isLightBg
       ? darkenHex(background, 0.03) // slightly darker surface on light bg
       : lightenHex(background, 0.06), // slightly lighter surface on dark bg
+    highlight_color: derivedHighlight,
     text_primary: isLightBg ? '#1A1A1A' : '#F5F5F5',
     text_secondary: isLightBg ? '#6B6B6B' : '#A0A0A0',
   };

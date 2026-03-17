@@ -35,6 +35,7 @@ export function useTheme(): {colors: ThemeColors; isDark: boolean} {
       secondary: config.secondary_color,
       background: config.background_color,
       surface: config.surface_color,
+      highlight: config.highlight_color ?? '#FFFFFF',
       textPrimary: config.text_primary,
       textSecondary: config.text_secondary,
       ...semantic,

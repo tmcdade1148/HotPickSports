@@ -56,6 +56,7 @@ export const HOTPICK_BRAND: BrandConfig = {
   secondary_color: HOTPICK_BRAND_COLORS.secondary,
   background_color: HOTPICK_BRAND_COLORS.background,
   surface_color: HOTPICK_BRAND_COLORS.surface,
+  highlight_color: '#FFFFFF',
   text_primary: '#FFFFFF',
   text_secondary: 'rgba(255,255,255,0.65)',
   logo: HOTPICK_LOGOS,

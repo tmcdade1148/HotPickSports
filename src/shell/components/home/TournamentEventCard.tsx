@@ -164,7 +164,7 @@ function CardHeader({
               renderItem={({item}) => {
                 const unread = smackUnreadCounts[item.id] ?? 0;
                 const itemBranded = !!(item.brand_config as any)?.is_branded;
-                const itemPrimary = itemBranded ? (item.brand_config as any)?.primary_color : null;
+                const itemHighlight = itemBranded ? (item.brand_config as any)?.highlight_color : null;
                 return (
                   <TouchableOpacity
                     style={styles.poolOption}
@@ -173,7 +173,7 @@ function CardHeader({
                       <Text
                         style={[
                           styles.poolOptionText,
-                          itemBranded && {fontWeight: '700', color: itemPrimary},
+                          itemBranded && {fontWeight: '700', color: itemHighlight || '#FFFFFF'},
                           item.id === activePoolId && !itemBranded && {color: accentColor},
                         ]}>
                         {item.name}

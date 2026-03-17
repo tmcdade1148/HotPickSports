@@ -12,6 +12,7 @@ export interface BrandConfig {
   secondary_color: string;
   background_color: string;
   surface_color: string;
+  highlight_color: string;
   text_primary: string;
   text_secondary: string;
   logo: BrandLogoSet;
@@ -69,6 +70,7 @@ export interface ThemeColors {
   secondary: string;
   background: string;
   surface: string;
+  highlight: string;
   textPrimary: string;
   textSecondary: string;
 

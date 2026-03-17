@@ -41,11 +41,12 @@ interface Partner {
   created_at: string;
 }
 
-/** Partners only set 3 colors — the rest are auto-derived */
-const COLOR_FIELDS: {key: 'primary_color' | 'secondary_color' | 'background_color'; label: string; hint: string}[] = [
+/** Partners set 4 colors — the rest are auto-derived */
+const COLOR_FIELDS: {key: 'primary_color' | 'secondary_color' | 'background_color' | 'highlight_color'; label: string; hint: string}[] = [
   {key: 'primary_color', label: 'Primary', hint: 'Buttons, headers'},
   {key: 'secondary_color', label: 'Secondary', hint: 'Accents'},
   {key: 'background_color', label: 'Background', hint: 'Page base'},
+  {key: 'highlight_color', label: 'Highlight', hint: 'Light color for dark bg'},
 ];
 
 function slugify(name: string): string {
@@ -140,6 +141,7 @@ export function PartnerAdminScreen() {
     primary_color: HOTPICK_DEFAULTS.primary_color,
     secondary_color: HOTPICK_DEFAULTS.secondary_color,
     background_color: HOTPICK_DEFAULTS.background_color,
+    highlight_color: HOTPICK_DEFAULTS.highlight_color,
   });
   const [formLogoUrl, setFormLogoUrl] = useState('');
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -205,6 +207,7 @@ export function PartnerAdminScreen() {
       formColors.primary_color,
       formColors.secondary_color,
       formColors.background_color,
+      formColors.highlight_color,
     );
 
     const brandConfig: BrandConfig = {
@@ -239,6 +242,7 @@ export function PartnerAdminScreen() {
         primary_color: HOTPICK_DEFAULTS.primary_color,
         secondary_color: HOTPICK_DEFAULTS.secondary_color,
         background_color: HOTPICK_DEFAULTS.background_color,
+        highlight_color: HOTPICK_DEFAULTS.highlight_color,
       });
       setFormLogoUrl('');
       setShowForm(false);
@@ -304,6 +308,7 @@ export function PartnerAdminScreen() {
       primary_color: bc?.primary_color ?? HOTPICK_DEFAULTS.primary_color,
       secondary_color: bc?.secondary_color ?? HOTPICK_DEFAULTS.secondary_color,
       background_color: bc?.background_color ?? HOTPICK_DEFAULTS.background_color,
+      highlight_color: bc?.highlight_color ?? HOTPICK_DEFAULTS.highlight_color,
     });
     setEditLogoUrl(bc?.logo?.full ?? '');
   };
@@ -318,6 +323,7 @@ export function PartnerAdminScreen() {
         editColors.primary_color,
         editColors.secondary_color,
         editColors.background_color,
+        editColors.highlight_color,
       );
 
       const updatedConfig: BrandConfig = {
