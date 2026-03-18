@@ -28,10 +28,14 @@ Never suggest designs that tie picks or scores to a pool_id.**
 
 **Current technical state (March 2026):**
 - DB completely restructured supporting all three templates
-- Working NFL Season 2 on Android and iOS simulators — untested live
+- Working NFL Season 2 on Android simulator and iOS (simulator + physical device)
+- Successfully deployed to physical iPhone via Xcode (TestFlight upload tested)
 - Edge Functions rebuilt for simplicity and efficiency
 - Scoring rebuild complete — addresses all Season 1 failures
 - Template-first architecture built in React Native
+- Bundle ID: `com.hotpicksports.app` (iOS + Android)
+- Marketing version: 2.0
+- Privacy policy hosted on Supabase Storage, linked from login screen
 
 **Default event:** `nfl_2026` — this is the active competition.
 Do not default to worldCup2026 or any other event.
@@ -901,8 +905,9 @@ ADD COLUMN is_archived BOOLEAN NOT NULL DEFAULT false;
   PoolMembersScreen.tsx     ← FlatList of active members, promote/demote/remove
   PoolSettingsScreen.tsx    ← Edit name, share invite, archive pool, broadcast
   PartnerAdminScreen.tsx    ← __DEV__-gated partner management (create, edit colors/logo, assign pools)
-  AboutScreen.tsx           ← About HotPick Sports placeholder
+  AboutScreen.tsx           ← About HotPick Sports (placeholder content)
   InstructionsScreen.tsx    ← How HotPick Works: accordion sections (picks, pools, pricing, phases)
+  WelcomeScreen.tsx         ← Login/signup with Privacy Policy link (opens hosted HTML)
 /src/shell/components/
   BroadcastComposer.tsx     ← Modal: 160 char message, 3/day rate limit, send to pool
 ```
@@ -994,6 +999,7 @@ interface BrandConfig {
   pool_label: string;          // e.g. "HotPick Mes Que"
   primary_color: string;       // hex e.g. #1A3A5C
   secondary_color: string;
+  highlight_color: string;     // light color for text on dark backgrounds
   background_color: string;
   surface_color: string;
   text_primary: string;
@@ -1807,7 +1813,7 @@ JSONB on the pools table.
 | 6 | PoweredByHotPick component | `src/shell/components/PoweredByHotPick.tsx` — wired into all 3 board screens + SmackTalk |
 | 7 | Partner Admin Screen | `src/shell/screens/PartnerAdminScreen.tsx` — create partners, assign to pools, reset |
 | 8 | QR code generation | Integrated into Partner Admin via `react-native-qrcode-svg` |
-| 9 | Partner color editing | Partner Admin edit mode: 3 settable colors (primary, secondary, background) with `deriveFullBrandColors()` auto-computing surface/text. Brand colors scoped to partner pool rows only in Settings/PoolSettings. |
+| 9 | Partner color editing | Partner Admin edit mode: 4 settable colors (primary, secondary, highlight, background) with `deriveFullBrandColors()` auto-computing surface/text. `highlight_color` is for light text on dark backgrounds (e.g. pool switcher dropdown names). Brand colors scoped to partner pool rows only in Settings/PoolSettings. |
 | 10 | Partner logo upload | Upload via Supabase Storage REST API + FormData (RN workaround — JS client doesn't handle blobs). Bucket: `partner-logos` (public, 5MB, PNG/JPEG/WebP/SVG). |
 
 ### Remaining Phases (require real device testing)
@@ -1827,14 +1833,14 @@ depends on a live join to the partners table. Pools are self-contained.
 
 - `BrandConfig` type lives in `src/shell/theme/types.ts` — one definition, never duplicated
 - `HOTPICK_DEFAULTS` in `src/shell/theme/defaults.ts` — canonical HotPick brand values
-- `useTheme()` returns `ThemeColors` (primary, secondary, background, surface, textPrimary, textSecondary, glow + semantic)
+- `useTheme()` returns `ThemeColors` (primary, secondary, highlight, background, surface, textPrimary, textSecondary, glow + semantic)
 - `useBrand()` returns `BrandIdentity` (partnerName, poolLabel, appName, logo, isBranded)
 - `powered_by_hotpick` is typed as literal `true` — cannot be set to false
 - Partner Admin is `__DEV__`-gated in Settings screen
 - `PoweredByHotPick` component self-gates on `isBranded` — returns null for non-branded pools
 - `PoweredByHotPick` uses `hotpick-wordmark-w.png` (white wordmark) instead of text for the brand name
 - Home Screen shows HotPick wordmark (`hotpick-wordmark.png`) above greeting; partner logo for branded pools
-- Settings page pools section is collapsible (twirly/accordion). Partner pools sorted to top with building icon.
+- Settings page pools section is collapsible (twirly/accordion). Partner pools sorted to top with building icon. Settings page always uses HotPick colors (never changes with active pool).
 - `AboutScreen.tsx` and `InstructionsScreen.tsx` live in `/src/shell/screens/` — linked from Settings
 - Bottom tab bars across all templates (Season, Series, Tournament) use active pool theme colors via `useTheme()`
 - Home Screen background uses `colors.background` (dynamic per active pool brand)
