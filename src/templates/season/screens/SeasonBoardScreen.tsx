@@ -133,7 +133,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     width: 32,
     fontSize: 16,
     fontWeight: '700',
-    color: '#A0A0A0',
+    color: colors.primary,
     textAlign: 'center',
   },
   userInfo: {

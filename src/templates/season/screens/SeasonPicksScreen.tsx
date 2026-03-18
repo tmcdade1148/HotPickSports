@@ -81,7 +81,7 @@ export function SeasonPicksScreen() {
         totalWeeks={config.totalWeeks}
         currentWeek={currentWeek}
         onSelectWeek={handleSelectWeek}
-        accentColor={config.color}
+        accentColor={colors.secondary}
         playoffStartWeek={config.playoffStartWeek}
       />
 

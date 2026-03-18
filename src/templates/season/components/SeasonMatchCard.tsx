@@ -332,7 +332,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center',
   },
   rankCircleHotPick: {
-    backgroundColor: '#FF8C00',
+    backgroundColor: colors.primary,
   },
   rankNumber: {
     fontSize: 16,

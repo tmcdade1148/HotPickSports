@@ -21,6 +21,11 @@
     },
     "ios": {
       "icon": "./assets/icon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "a541257f-7510-4192-ba2f-56996e189b9d"
+      }
     }
   }
 }

@@ -136,7 +136,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     width: 32,
     fontSize: 16,
     fontWeight: '700',
-    color: colors.textSecondary,
+    color: colors.primary,
     textAlign: 'center',
   },
   userInfo: {

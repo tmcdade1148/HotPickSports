@@ -9,22 +9,21 @@ import type {BrandConfig, BrandLogoSet} from './types';
 
 /**
  * HotPick Sports locked brand color tokens.
- * These four values are the source of truth for all theming.
+ * These are the only 4 settable brand colors. All other colors
+ * (surface, text) are auto-derived from background.
  *
  * | Token      | Hex       | Usage                                          |
  * |------------|-----------|------------------------------------------------|
- * | background | #111414   | App bg, splash bg, adaptive icon bg            |
- * | surface    | #474747   | Cards, rows, pick cards, SmackTalk bubbles     |
- * | secondary  | #F28B30   | Soft amber — secondary accents, inactive states|
- * | primary    | #FF8B3D   | Hot orange — CTAs, active buttons, highlights  |
- * | glow       | #51A1A6   | Glow around active/highlighted elements        |
+ * | primary    | #F66321   | CTAs, active buttons, highlights               |
+ * | secondary  | #45615E   | Accents, inactive states                       |
+ * | highlight  | #E39032   | Light color for text/elements on dark backgrounds |
+ * | background | #FCFCFC   | App bg, splash bg, adaptive icon bg            |
  */
 export const HOTPICK_BRAND_COLORS = {
-  background: '#111414',
-  surface: '#474747',
-  secondary: '#F28B30',
-  primary: '#FF8B3D',
-  glow: '#51A1A6',
+  primary: '#F66321',
+  secondary: '#45615E',
+  highlight: '#E39032',
+  background: '#FCFCFC',
 } as const;
 
 /**
@@ -54,11 +53,11 @@ export const HOTPICK_BRAND: BrandConfig = {
   pool_label: 'HotPick',
   primary_color: HOTPICK_BRAND_COLORS.primary,
   secondary_color: HOTPICK_BRAND_COLORS.secondary,
+  highlight_color: HOTPICK_BRAND_COLORS.highlight,
   background_color: HOTPICK_BRAND_COLORS.background,
-  surface_color: HOTPICK_BRAND_COLORS.surface,
-  highlight_color: '#FFFFFF',
-  text_primary: '#FFFFFF',
-  text_secondary: 'rgba(255,255,255,0.65)',
+  surface_color: '#F4F4F4',  // auto-derived: slightly darker than #FCFCFC
+  text_primary: '#1A1A1A',   // dark text on light background
+  text_secondary: '#6B6B6B', // muted dark text
   logo: HOTPICK_LOGOS,
   app_name: 'HotPick',
   invite_slug: '',
