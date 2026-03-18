@@ -36,6 +36,7 @@ export interface DbProfile {
   career_picks_total: number;
   career_hotpick_correct: number;
   career_hotpick_total: number;
+  is_super_admin: boolean;
   created_at: string;
   updated_at: string;
 }

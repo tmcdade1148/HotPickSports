@@ -431,13 +431,16 @@ export function SettingsScreen() {
         <ChevronRight size={18} color={colors.textSecondary} />
       </TouchableOpacity>
 
-      {/* Developer tools — only visible in dev builds */}
-      {__DEV__ && (
+      {/* Super Admin tools — only visible to platform admins */}
+      {userProfile?.is_super_admin && (
         <TouchableOpacity
-          style={[styles.devButton, {borderColor: colors.border}]}
+          style={[styles.linkRow, {backgroundColor: colors.surface}]}
           onPress={() => navigation.navigate('PartnerAdmin')}>
-          <Palette size={18} color={colors.textSecondary} />
-          <Text style={[styles.devButtonText, {color: colors.textSecondary}]}>Partner Admin (Dev)</Text>
+          <View style={styles.linkLeft}>
+            <Palette size={20} color={colors.primary} />
+            <Text style={[styles.linkText, {color: colors.textPrimary}]}>Partner Admin</Text>
+          </View>
+          <ChevronRight size={18} color={colors.textSecondary} />
         </TouchableOpacity>
       )}
 
@@ -671,22 +674,6 @@ const styles = StyleSheet.create({
   },
   linkText: {
     fontSize: 15,
-    fontWeight: '500',
-  },
-  devButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    marginTop: spacing.md,
-    marginBottom: spacing.md,
-  },
-  devButtonText: {
-    fontSize: 14,
     fontWeight: '500',
   },
   signOutButton: {
