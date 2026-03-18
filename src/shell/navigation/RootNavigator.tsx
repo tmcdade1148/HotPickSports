@@ -22,6 +22,7 @@ import {FlaggedMessagesScreen} from '@shell/screens/FlaggedMessagesScreen';
 import {MessageCenterScreen} from '@shell/screens/MessageCenterScreen';
 import {AboutScreen} from '@shell/screens/AboutScreen';
 import {InstructionsScreen} from '@shell/screens/InstructionsScreen';
+import {PrivacyPolicyScreen} from '@shell/screens/PrivacyPolicyScreen';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {Linking} from 'react-native';
 
@@ -122,6 +123,7 @@ export function RootNavigator() {
         <Stack.Screen name="PartnerAdmin" component={PartnerAdminScreen} />
         <Stack.Screen name="About" component={AboutScreen} />
         <Stack.Screen name="Instructions" component={InstructionsScreen} />
+        <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -8,7 +8,6 @@ import {
   StyleSheet,
   Platform,
   Alert,
-  Linking,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {spacing, borderRadius} from '@shared/theme';
@@ -101,11 +100,7 @@ export function WelcomeScreen({navigation}: any) {
           <Text style={styles.tosLink}>Terms of Service</Text> and{' '}
           <Text
             style={styles.tosLink}
-            onPress={() =>
-              Linking.openURL(
-                'https://mzqtrpdiqhopjmxjccwy.supabase.co/storage/v1/object/public/public-data/legal/privacy-policy.html',
-              )
-            }>
+            onPress={() => navigation.navigate('PrivacyPolicy')}>
             Privacy Policy
           </Text>
         </Text>
