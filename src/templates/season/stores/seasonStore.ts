@@ -20,6 +20,22 @@ export interface SeasonLeaderboardEntry {
   weekly_breakdown: Record<number, number>;
 }
 
+/**
+ * Week leaderboard entry — single week scores with HotPick detail.
+ * Populated from season_user_totals + season_picks (HotPick row).
+ */
+export interface WeekLeaderboardEntry {
+  user_id: string;
+  week_points: number;
+  correct_picks: number;
+  total_picks: number;
+  /** HotPick details for this week */
+  hotpick_team: string | null;
+  hotpick_game_label: string | null; // e.g. "KC vs BUF"
+  hotpick_rank: number | null;
+  is_hotpick_correct: boolean | null;
+}
+
 interface SeasonState {
   config: SeasonConfig | null;
   poolId: string;
@@ -28,6 +44,7 @@ interface SeasonState {
   allWeekGames: Record<number, DbSeasonGame[]>;
   weekPicks: DbSeasonPick[];
   leaderboard: SeasonLeaderboardEntry[];
+  weekLeaderboard: WeekLeaderboardEntry[];
   /** Map of user_id -> display_name for leaderboard display */
   userNames: Record<string, string>;
   isLoading: boolean;
@@ -49,6 +66,7 @@ interface SeasonState {
     gameId: string;
   }) => Promise<void>;
   fetchLeaderboard: () => Promise<void>;
+  fetchWeekLeaderboard: (week?: number) => Promise<void>;
 
   // Picks completion
   isWeekComplete: boolean;
@@ -69,6 +87,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
   allWeekGames: {},
   weekPicks: [],
   leaderboard: [],
+  weekLeaderboard: [],
   userNames: {},
   isLoading: false,
   isSaving: false,
@@ -381,6 +400,91 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       userNames: names,
       isLoading: false,
     });
+  },
+
+  fetchWeekLeaderboard: async (week?: number) => {
+    const {config, poolId, currentWeek} = get();
+    if (!config) return;
+
+    const targetWeek = week ?? currentWeek;
+
+    // Step 1: Get pool member user IDs
+    const {data: members} = await supabase
+      .from('pool_members')
+      .select('user_id')
+      .eq('pool_id', poolId);
+
+    const memberIds = (members ?? []).map(m => m.user_id);
+    if (memberIds.length === 0) {
+      set({weekLeaderboard: []});
+      return;
+    }
+
+    // Step 2: Fetch week totals for this week
+    const {data: totals} = await supabase
+      .from('season_user_totals')
+      .select('*')
+      .eq('competition', config.competition)
+      .eq('week', targetWeek)
+      .in('user_id', memberIds);
+
+    const rows = (totals as DbSeasonUserTotal[]) ?? [];
+
+    // Step 3: Fetch HotPick picks for all members this week
+    const {data: hotPicks} = await supabase
+      .from('season_picks')
+      .select('user_id, picked_team, game_id, is_hotpick')
+      .eq('competition', config.competition)
+      .eq('week', targetWeek)
+      .eq('is_hotpick', true)
+      .in('user_id', memberIds);
+
+    // Step 4: Get game details for HotPick games
+    const hotPickGameIds = [...new Set((hotPicks ?? []).map(p => p.game_id))];
+    let gameMap: Record<string, DbSeasonGame> = {};
+    if (hotPickGameIds.length > 0) {
+      const {data: games} = await supabase
+        .from('season_games')
+        .select('*')
+        .in('id', hotPickGameIds);
+      if (games) {
+        for (const g of games as DbSeasonGame[]) {
+          gameMap[g.id] = g;
+        }
+      }
+    }
+
+    // Step 5: Build hotpick lookup by user
+    const hotPickByUser: Record<string, {team: string; gameLabel: string}> = {};
+    for (const hp of hotPicks ?? []) {
+      const game = gameMap[hp.game_id];
+      if (game) {
+        hotPickByUser[hp.user_id] = {
+          team: hp.picked_team,
+          gameLabel: `${game.away_team} @ ${game.home_team}`,
+        };
+      }
+    }
+
+    // Step 6: Build week leaderboard entries
+    const weekEntries: WeekLeaderboardEntry[] = rows.map(row => {
+      const hp = hotPickByUser[row.user_id];
+      return {
+        user_id: row.user_id,
+        week_points: row.week_points,
+        correct_picks: row.correct_picks,
+        total_picks: row.total_picks,
+        hotpick_team: hp?.team ?? null,
+        hotpick_game_label: hp?.gameLabel ?? null,
+        hotpick_rank: row.hotpick_rank,
+        is_hotpick_correct: row.is_hotpick_correct,
+      };
+    });
+
+    // Sort by week_points descending
+    weekEntries.sort((a, b) => b.week_points - a.week_points);
+
+    set({weekLeaderboard: weekEntries});
   },
 
   getPickForGame: (gameId: string) => {

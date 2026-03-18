@@ -11,13 +11,15 @@ import {PoolWelcomeScreen} from '@shell/screens/PoolWelcomeScreen';
 import {PoolSelectionScreen} from '@shell/screens/PoolSelectionScreen';
 import {CreatePoolScreen} from '@shell/screens/CreatePoolScreen';
 import {JoinPoolScreen} from '@shell/screens/JoinPoolScreen';
-import {HomeScreen} from '@shell/screens/HomeScreen';
+import {MainTabNavigator} from './MainTabNavigator';
 import {EventDetailScreen} from '@shell/screens/EventDetailScreen';
 import {ProfileScreen} from '@shell/screens/ProfileScreen';
 import {SettingsScreen} from '@shell/screens/SettingsScreen';
 import {PartnerAdminScreen} from '@shell/screens/PartnerAdminScreen';
 import {PoolMembersScreen} from '@shell/screens/PoolMembersScreen';
 import {PoolSettingsScreen} from '@shell/screens/PoolSettingsScreen';
+import {FlaggedMessagesScreen} from '@shell/screens/FlaggedMessagesScreen';
+import {MessageCenterScreen} from '@shell/screens/MessageCenterScreen';
 import {AboutScreen} from '@shell/screens/AboutScreen';
 import {InstructionsScreen} from '@shell/screens/InstructionsScreen';
 import {useGlobalStore} from '@shell/stores/globalStore';
@@ -109,12 +111,14 @@ export function RootNavigator() {
         <Stack.Screen name="JoinPool" component={JoinPoolScreen} />
 
         {/* Main app */}
-        <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="Home" component={MainTabNavigator} />
         <Stack.Screen name="EventDetail" component={EventDetailScreen} />
+        {/* Settings is now in the MainTabNavigator — no separate stack screen */}
         <Stack.Screen name="Profile" component={ProfileScreen} />
-        <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="PoolMembers" component={PoolMembersScreen} />
         <Stack.Screen name="PoolSettings" component={PoolSettingsScreen} />
+        <Stack.Screen name="FlaggedMessages" component={FlaggedMessagesScreen} />
+        <Stack.Screen name="MessageCenter" component={MessageCenterScreen} />
         <Stack.Screen name="PartnerAdmin" component={PartnerAdminScreen} />
         <Stack.Screen name="About" component={AboutScreen} />
         <Stack.Screen name="Instructions" component={InstructionsScreen} />

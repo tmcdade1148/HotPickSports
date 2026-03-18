@@ -1,6 +1,6 @@
 import React from 'react';
 import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
-import {CheckCircle, Flame} from 'lucide-react-native';
+import {CheckCircle} from 'lucide-react-native';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 
@@ -14,23 +14,21 @@ interface SubmitPicksButtonProps {
   accentColor: string;
 }
 
-type SubmitState = 'incomplete' | 'needs_hotpick' | 'ready' | 'submitted';
+type SubmitState = 'no_picks' | 'in_progress' | 'submitted';
 
 function getSubmitState(props: SubmitPicksButtonProps): SubmitState {
   if (props.isWeekComplete) return 'submitted';
-  if (props.pickCount < props.totalGames) return 'incomplete';
-  if (props.hotPickCount < props.hotPicksRequired) return 'needs_hotpick';
-  return 'ready';
+  if (props.pickCount === 0) return 'no_picks';
+  return 'in_progress';
 }
 
 /**
  * SubmitPicksButton — Fixed bottom button for picks validation.
  *
- * 4 states:
- * - incomplete: not all games picked (disabled, grey)
- * - needs_hotpick: all picked but HotPick missing (disabled, warning)
- * - ready: all picks + HotPicks done (enabled, green)
- * - submitted: user confirmed (disabled, green faded)
+ * 3 states:
+ * - no_picks: no picks made yet (grey, "Start picking your winners")
+ * - in_progress: picks being made or changed (yellow, "Submit your picks" / "Update your picks")
+ * - submitted: picks confirmed (green, "Submitted")
  *
  * Does NOT make any Supabase call — picks are already auto-saved.
  */
@@ -38,32 +36,24 @@ export function SubmitPicksButton(props: SubmitPicksButtonProps) {
   const {colors} = useTheme();
   const styles = createStyles(colors);
   const state = getSubmitState(props);
-  const {pickCount, totalGames, hotPickCount, hotPicksRequired, onSubmit} =
-    props;
-
-  const remaining = hotPicksRequired - hotPickCount;
+  const {onSubmit} = props;
 
   const config: Record<
     SubmitState,
     {label: string; bgColor: string; enabled: boolean}
   > = {
-    incomplete: {
-      label: `Pick all ${totalGames} games (${pickCount}/${totalGames})`,
+    no_picks: {
+      label: 'Start picking your winners',
       bgColor: colors.border,
       enabled: false,
     },
-    needs_hotpick: {
-      label: 'Select Your HotPick',
+    in_progress: {
+      label: 'Submit your picks',
       bgColor: colors.warning,
-      enabled: false,
-    },
-    ready: {
-      label: 'Lock In Picks',
-      bgColor: colors.success,
       enabled: true,
     },
     submitted: {
-      label: 'Picks Locked In',
+      label: 'Submitted',
       bgColor: colors.success,
       enabled: false,
     },
@@ -82,12 +72,6 @@ export function SubmitPicksButton(props: SubmitPicksButtonProps) {
         onPress={onSubmit}
         disabled={!enabled}
         activeOpacity={0.8}>
-        {state === 'needs_hotpick' && (
-          <Flame size={18} color="#FFFFFF" fill="#FFFFFF" strokeWidth={2} />
-        )}
-        {state === 'ready' && (
-          <CheckCircle size={18} color="#FFFFFF" strokeWidth={2} />
-        )}
         {state === 'submitted' && (
           <CheckCircle
             size={18}
@@ -113,7 +97,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderTopColor: colors.border,
     paddingHorizontal: spacing.md,
     paddingTop: spacing.sm,
-    paddingBottom: spacing.lg,
+    paddingBottom: spacing.xs,
   },
   button: {
     flexDirection: 'row',

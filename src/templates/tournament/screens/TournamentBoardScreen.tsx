@@ -5,7 +5,7 @@ import {TournamentProgress} from '../components/TournamentProgress';
 import {KnockoutBracket} from '../components/KnockoutBracket';
 import {useAuth} from '@shared/hooks/useAuth';
 import {spacing, borderRadius} from '@shared/theme';
-import {PoweredByHotPick} from '@shell/components/PoweredByHotPick';
+
 import type {DbTournamentUserTotal} from '@shared/types/database';
 import {useTheme} from '@shell/theme';
 
@@ -79,7 +79,6 @@ export function TournamentBoardScreen() {
       <TournamentProgress config={config} userId={user?.id ?? ''} />
 
       <KnockoutBracket config={config} />
-      <PoweredByHotPick />
 
       <View style={styles.leaderboard}>
         <Text style={styles.sectionTitle}>Leaderboard</Text>

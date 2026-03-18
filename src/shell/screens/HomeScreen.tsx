@@ -8,7 +8,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {Settings} from 'lucide-react-native';
+// Settings icon removed — now in MainTabNavigator bottom tab
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {getDisplayName} from '@shared/utils/displayName';
 import {SeasonEventCard} from '@shell/components/home/SeasonEventCard';
@@ -16,9 +16,10 @@ import {TournamentEventCard} from '@shell/components/home/TournamentEventCard';
 import {SeriesEventCard} from '@shell/components/home/SeriesEventCard';
 import {StandingsBadge} from '@shell/components/home/StandingsBadge';
 import {SmackTalkNudge} from '@shell/components/home/SmackTalkNudge';
+import {MessageCenter} from '@shell/components/home/MessageCenter';
 import {spacing, typography} from '@shared/theme';
 import {useTheme, useBrand} from '@shell/theme';
-import {PoweredByHotPick} from '@shell/components/PoweredByHotPick';
+
 import type {
   AnyEventConfig,
   SeasonConfig,
@@ -46,18 +47,29 @@ export function HomeScreen({navigation}: any) {
   const greeting = getGreeting();
   const firstName = getDisplayName(userProfile);
 
+  // Event name + phase for header
+  const eventName = activeSport
+    ? activeSport.competition.replace(/_/g, ' ').toUpperCase()
+    : '';
+  const currentPhase = (activeSport as any)?.currentPhase;
+  const phaseLabel = currentPhase === 'PLAYOFFS'
+    ? 'Playoffs'
+    : currentPhase === 'SUPERBOWL'
+      ? 'Super Bowl'
+      : 'Regular Season';
+
   const handleCardPress = (config: AnyEventConfig) => {
-    // Set as active sport so EventDetail knows which template to render
+    // Set as active sport so Picks/Leaderboard/SmackTalk tabs render this sport
     setActiveSport(config);
-    navigation.navigate('EventDetail');
+    navigation.navigate('PicksTab');
   };
 
-  /** Navigate to the Board tab in EventDetail (nested screen syntax) */
+  /** Navigate to the Leaderboard tab */
   const handleNavigateToBoard = () => {
     const config = activeEventCards[0] ?? activeSport;
     if (config) {
       setActiveSport(config);
-      navigation.navigate('EventDetail', {screen: 'Season_board'});
+      navigation.navigate('LeaderboardTab');
     }
   };
 
@@ -66,7 +78,7 @@ export function HomeScreen({navigation}: any) {
     const config = activeEventCards[0] ?? activeSport;
     if (config) {
       setActiveSport(config);
-      navigation.navigate('EventDetail', {screen: 'Season_smacktalk'});
+      navigation.navigate('SmackTalkTab');
     }
   };
 
@@ -76,7 +88,7 @@ export function HomeScreen({navigation}: any) {
     const config = activeEventCards[0] ?? activeSport;
     if (config) {
       setActiveSport(config);
-      navigation.navigate('EventDetail', {screen: 'Season_smacktalk'});
+      navigation.navigate('SmackTalkTab');
     }
   };
 
@@ -100,7 +112,7 @@ export function HomeScreen({navigation}: any) {
           />
         ) : (
           <Image
-            source={require('../../assets/hotpick-wordmark.png')}
+            source={require('../../assets/hotpick-wordmark-lt.png')}
             style={styles.wordmark}
             resizeMode="contain"
           />
@@ -113,18 +125,28 @@ export function HomeScreen({navigation}: any) {
           <Text style={styles.greeting}>{greeting},</Text>
           <Text style={styles.name}>{firstName}</Text>
         </View>
-        <TouchableOpacity
-          style={styles.settingsButton}
-          onPress={() => navigation.navigate('Settings')}>
-          <Settings size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        {eventName ? (
+          <View style={styles.headerRight}>
+            <Text style={styles.eventName}>{eventName}</Text>
+            <Text style={styles.phaseLabel}>{phaseLabel}</Text>
+          </View>
+        ) : null}
       </View>
+      <View style={styles.headerDivider} />
 
       {/* Event Cards */}
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
+        {/* Message Center — broadcasts, moderator notes, flagged messages */}
+        <MessageCenter
+          onNavigateToMessageCenter={() => navigation.navigate('MessageCenter')}
+          onNavigateToFlagged={(poolId: string) => {
+            navigation.navigate('FlaggedMessages', {poolId});
+          }}
+        />
+
         {cardsToShow.map(config => (
           <TouchableOpacity
             key={config.competition}
@@ -149,9 +171,6 @@ export function HomeScreen({navigation}: any) {
             onPressPool={handleNavigateToSmackTalkPool}
           />
         )}
-
-        {/* Powered by HotPick — partner pools only */}
-        <PoweredByHotPick />
 
         {cardsToShow.length === 0 && (
           <View style={styles.emptyState}>
@@ -217,6 +236,11 @@ const createStyles = (colors: any) => StyleSheet.create({
     paddingTop: spacing.xs,
     paddingBottom: spacing.md,
   },
+  headerDivider: {
+    height: 2,
+    backgroundColor: colors.secondary,
+    marginHorizontal: spacing.md,
+  },
   greeting: {
     ...typography.caption,
     color: colors.textSecondary,
@@ -224,6 +248,18 @@ const createStyles = (colors: any) => StyleSheet.create({
   name: {
     ...typography.h2,
     color: colors.textPrimary,
+  },
+  headerRight: {
+    alignItems: 'flex-end',
+  },
+  eventName: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+  },
+  phaseLabel: {
+    ...typography.h2,
+    color: colors.primary,
   },
   settingsButton: {
     width: 40,

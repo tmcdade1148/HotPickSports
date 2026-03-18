@@ -30,6 +30,7 @@ import {
   Settings,
   Info,
   BookOpen,
+  Mail,
 } from 'lucide-react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {SYSTEM_AVATARS} from '@shell/components/AvatarSelector';
@@ -60,6 +61,7 @@ export function SettingsScreen() {
   const activeSport = useGlobalStore(s => s.activeSport);
   const joinPool = useGlobalStore(s => s.joinPool);
   const signOut = useGlobalStore(s => s.signOut);
+  const flaggedCounts = useGlobalStore(s => s.flaggedCounts);
 
   // Settings page always uses HotPick colors — never changes for partner pools
   const colors = {
@@ -182,6 +184,17 @@ export function SettingsScreen() {
           </View>
         </View>
         <ChevronRight size={20} color={colors.textSecondary} />
+      </TouchableOpacity>
+
+      {/* Message Center */}
+      <TouchableOpacity
+        style={[styles.linkRow, {backgroundColor: colors.surface}]}
+        onPress={() => navigation.navigate('MessageCenter')}>
+        <View style={styles.linkLeft}>
+          <Mail size={20} color={colors.primary} />
+          <Text style={[styles.linkText, {color: colors.textPrimary}]}>Message Center</Text>
+        </View>
+        <ChevronRight size={18} color={colors.textSecondary} />
       </TouchableOpacity>
 
       {/* Pools section — collapsible */}
@@ -311,6 +324,13 @@ export function SettingsScreen() {
                   </View>
                 </View>
                 <View style={styles.poolActions}>
+                  {(flaggedCounts[pool.id] ?? 0) > 0 && (
+                    <View style={styles.flaggedBanner}>
+                      <Text style={styles.flaggedBannerText}>
+                        {flaggedCounts[pool.id]} flagged
+                      </Text>
+                    </View>
+                  )}
                   {isActive && (
                     <Text style={[styles.activeLabel, {color: isBranded ? pillTextColor : hotpick.primary}]}>
                       Active
@@ -326,7 +346,7 @@ export function SettingsScreen() {
                       <Users size={18} color={pillIconColor} />
                     </TouchableOpacity>
                   )}
-                  {poolRoles[pool.id] === 'organizer' && (
+                  {(poolRoles[pool.id] === 'organizer' || poolRoles[pool.id] === 'admin') && (
                     <TouchableOpacity
                       onPress={() =>
                         navigation.navigate('PoolSettings', {poolId: pool.id})
@@ -583,6 +603,17 @@ const styles = StyleSheet.create({
   activeLabel: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  flaggedBanner: {
+    backgroundColor: '#E53935',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  flaggedBannerText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
   },
   globalBadge: {
     fontSize: 11,

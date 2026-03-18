@@ -11,6 +11,23 @@ import {useBrand, useTheme} from '@shell/theme';
  *
  * Uses "Powered by" text + HotPick wordmark image.
  */
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const wordmarkLight = require('../../assets/hotpick-wordmark-lt.png');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const wordmarkDark = require('../../assets/hotpick-wordmark-dk.png');
+
+/**
+ * Determine if a hex color is "dark" (luminance < 0.5).
+ */
+function isDarkColor(hex: string): boolean {
+  const c = hex.replace('#', '');
+  const r = parseInt(c.substring(0, 2), 16) / 255;
+  const g = parseInt(c.substring(2, 4), 16) / 255;
+  const b = parseInt(c.substring(4, 6), 16) / 255;
+  const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+  return luminance < 0.5;
+}
+
 export function PoweredByHotPick() {
   const {isBranded} = useBrand();
   const {colors} = useTheme();
@@ -19,6 +36,9 @@ export function PoweredByHotPick() {
     return null;
   }
 
+  // Light bg → light wordmark, dark bg → dark wordmark
+  const wordmarkSource = isDarkColor(colors.background) ? wordmarkDark : wordmarkLight;
+
   return (
     <View style={styles.container}>
       <View style={styles.row}>
@@ -26,7 +46,7 @@ export function PoweredByHotPick() {
           Powered by
         </Text>
         <Image
-          source={require('../../assets/hotpick-wordmark-w.png')}
+          source={wordmarkSource}
           style={styles.wordmark}
           resizeMode="contain"
         />
@@ -38,8 +58,8 @@ export function PoweredByHotPick() {
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
-    paddingVertical: 10,
-    paddingBottom: 16,
+    paddingTop: 2,
+    paddingBottom: 6,
   },
   row: {
     flexDirection: 'row',

@@ -99,6 +99,14 @@ export interface DbSmackMessage {
   reply_to: string | null;
   avatar_key: string | null;
   created_at: string;
+  /** Flagging / moderation fields */
+  is_flagged: boolean;
+  flagged_by: string | null;
+  flagged_at: string | null;
+  flag_reason: string | null;
+  moderation_status: 'pending' | 'approved' | 'removed' | null;
+  moderated_by: string | null;
+  moderated_at: string | null;
 }
 
 /** Table: smack_reactions */

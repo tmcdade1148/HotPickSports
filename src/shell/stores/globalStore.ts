@@ -137,6 +137,14 @@ interface GlobalState {
   subscribeSmackUnread: () => void;
   unsubscribeSmackUnread: () => void;
 
+  // Flagged message counts — poolId → pending count (organizer/admin only)
+  flaggedCounts: Record<string, number>;
+  fetchFlaggedCounts: () => Promise<void>;
+
+  // Recent broadcasts — for Message Center on Home Screen
+  recentBroadcasts: {poolId: string; poolName: string; message: string; sentAt: string; senderName: string}[];
+  fetchRecentBroadcasts: () => Promise<void>;
+
   // Global pool auto-enrollment
   ensureGlobalPoolMembership: () => Promise<void>;
 
@@ -378,6 +386,10 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       poolsByCompetition: {...state.poolsByCompetition, [competition]: pools},
       isLoadingPools: false,
     }));
+
+    // Fetch flagged counts for organizer/admin pools + recent broadcasts
+    get().fetchFlaggedCounts();
+    get().fetchRecentBroadcasts();
   },
 
   getPoolsForCompetition: (competition: string) => {
@@ -644,6 +656,29 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       };
     }
 
+    // Fire broadcast email Edge Function (non-blocking — don't await)
+    const profile = get().userProfile;
+    const senderName =
+      profile?.first_name ?? profile?.poolie_name ?? 'Pool Organizer';
+
+    supabase.functions
+      .invoke('send-broadcast-email', {
+        body: {pool_id: poolId, message, sender_name: senderName},
+      })
+      .then(res => {
+        if (res.error) {
+          console.warn('[broadcast-email] Edge Function error:', res.error);
+        } else {
+          console.log('[broadcast-email] Emails dispatched:', res.data);
+        }
+      })
+      .catch(err => {
+        console.warn('[broadcast-email] Failed to invoke:', err);
+      });
+
+    // Refresh broadcasts so MessageCenter shows the new one
+    get().fetchRecentBroadcasts();
+
     return {
       success: true,
       recipients: data.recipients,
@@ -796,6 +831,103 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       supabase.removeChannel(channel);
       set({smackRealtimeChannel: null});
     }
+  },
+
+  // ---------------------------------------------------------------------------
+  // Flagged message counts (organizer/admin pools)
+  // ---------------------------------------------------------------------------
+  flaggedCounts: {},
+
+  fetchFlaggedCounts: async () => {
+    const {userPools, poolRoles} = get();
+    // Only fetch for pools where user is organizer or admin
+    const adminPools = userPools.filter(
+      p => poolRoles[p.id] === 'organizer' || poolRoles[p.id] === 'admin',
+    );
+    if (adminPools.length === 0) {
+      set({flaggedCounts: {}});
+      return;
+    }
+
+    const poolIds = adminPools.map(p => p.id);
+    const {data} = await supabase
+      .from('smack_messages')
+      .select('pool_id')
+      .in('pool_id', poolIds)
+      .eq('is_flagged', true)
+      .eq('moderation_status', 'pending');
+
+    const counts: Record<string, number> = {};
+    for (const row of data ?? []) {
+      counts[row.pool_id] = (counts[row.pool_id] ?? 0) + 1;
+    }
+    set({flaggedCounts: counts});
+  },
+
+  // ---------------------------------------------------------------------------
+  // Recent broadcasts (last 24 hours across user's pools)
+  // ---------------------------------------------------------------------------
+  recentBroadcasts: [],
+
+  fetchRecentBroadcasts: async () => {
+    const {userPools} = get();
+    if (userPools.length === 0) {
+      set({recentBroadcasts: []});
+      return;
+    }
+
+    const poolIds = userPools.map(p => p.id);
+    const twentyFourHoursAgo = new Date(
+      Date.now() - 24 * 60 * 60 * 1000,
+    ).toISOString();
+
+    const {data} = await supabase
+      .from('organizer_notifications')
+      .select('pool_id, message, sent_at, organizer_id, notification_type')
+      .in('pool_id', poolIds)
+      .eq('notification_type', 'broadcast')
+      .gte('sent_at', twentyFourHoursAgo)
+      .order('sent_at', {ascending: false})
+      .limit(10);
+
+    if (!data || data.length === 0) {
+      set({recentBroadcasts: []});
+      return;
+    }
+
+    // Fetch sender names
+    const senderIds = [...new Set(data.map((r: any) => r.organizer_id))];
+    const {data: profiles} = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name, poolie_name, display_name_preference')
+      .in('id', senderIds);
+
+    const nameMap: Record<string, string> = {};
+    for (const p of profiles ?? []) {
+      const pref = p.display_name_preference ?? 'first_name';
+      if (pref === 'poolie_name' && p.poolie_name) {
+        nameMap[p.id] = p.poolie_name;
+      } else {
+        nameMap[p.id] = [p.first_name, p.last_name?.charAt(0)]
+          .filter(Boolean)
+          .join(' ') || 'Organizer';
+      }
+    }
+
+    const poolNameMap: Record<string, string> = {};
+    for (const p of userPools) {
+      poolNameMap[p.id] = p.name;
+    }
+
+    const broadcasts = data.map((r: any) => ({
+      poolId: r.pool_id,
+      poolName: poolNameMap[r.pool_id] ?? 'Pool',
+      message: r.message,
+      sentAt: r.sent_at,
+      senderName: nameMap[r.organizer_id] ?? 'Organizer',
+    }));
+
+    set({recentBroadcasts: broadcasts});
   },
 
   // ---------------------------------------------------------------------------

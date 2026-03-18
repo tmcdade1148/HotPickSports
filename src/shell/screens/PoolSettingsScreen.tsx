@@ -20,6 +20,7 @@ import {
   Globe,
   Award,
   Megaphone,
+  AlertTriangle,
 } from 'lucide-react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {BroadcastComposer} from '@shell/components/BroadcastComposer';
@@ -283,13 +284,21 @@ export function PoolSettingsScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* Broadcast */}
+        {/* Communication & Moderation */}
         <Text style={styles.sectionTitle}>Communication</Text>
         <TouchableOpacity
           style={[styles.broadcastButton, {borderColor: accentColor}]}
           onPress={() => setBroadcastVisible(true)}>
           <Megaphone size={18} color={accentColor} />
           <Text style={[styles.broadcastText, {color: accentColor}]}>Send Broadcast</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.sectionTitle}>Moderation</Text>
+        <TouchableOpacity
+          style={[styles.broadcastButton, {borderColor: colors.warning}]}
+          onPress={() => navigation.navigate('FlaggedMessages', {poolId})}>
+          <AlertTriangle size={18} color={colors.warning} />
+          <Text style={[styles.broadcastText, {color: colors.warning}]}>Flagged Messages</Text>
         </TouchableOpacity>
 
         {/* Danger Zone */}

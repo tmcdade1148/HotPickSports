@@ -186,14 +186,6 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
     fetchUserPickStatus,
   ]);
 
-  // ── Phase label for CardHeader ───────────────────────────────────────
-  const phaseLabel =
-    currentPhase === 'PLAYOFFS'
-      ? 'Playoffs'
-      : currentPhase === 'SUPERBOWL'
-        ? 'Super Bowl'
-        : 'Regular Season';
-
   // ── Kickoff countdown ──────────────────────────────────────────────
   const kickoff = useCountdown(weekFirstKickoff);
 
@@ -205,22 +197,7 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
 
   return (
     <View style={styles.outerWrapper}>
-      {/* Card box — header only */}
-      <View style={[styles.card, {borderTopColor: '#FF8B3D'}]}>
-        <CardHeader
-          eventName={config.competition.replace(/_/g, ' ').toUpperCase()}
-          weekLabel={phaseLabel}
-          poolName={activePool?.name ?? 'Select Pool'}
-          userPools={userPools}
-          activePoolId={activePoolId}
-          onSwitchPool={setActivePoolId}
-          accentColor={config.color}
-          smackUnreadCounts={smackUnreadCounts}
-          activePool={activePool}
-        />
-      </View>
-
-      {/* Score + Kickoff pills row — outside the card box */}
+      {/* Score + Kickoff pills row */}
       <View style={styles.pillRow}>
         {/* Score pill */}
         <View style={styles.scorePill}>
@@ -275,6 +252,15 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
           ? (activePool?.brand_config as any)?.secondary_color || undefined
           : undefined,
       })}
+
+      {/* Pool Switcher — prominent, after week state content */}
+      <PoolSwitcherButton
+        poolName={activePool?.name ?? 'Select Pool'}
+        userPools={userPools}
+        activePoolId={activePoolId}
+        onSwitchPool={setActivePoolId}
+        smackUnreadCounts={smackUnreadCounts}
+      />
     </View>
   );
 }
@@ -352,38 +338,26 @@ function renderWeekState(props: {
 }
 
 // ---------------------------------------------------------------------------
-// Card Header with Pool Switcher dropdown + week/phase label
+// Pool Switcher Button — prominent pill below week state content
 // ---------------------------------------------------------------------------
 
-interface CardHeaderProps {
-  eventName: string;
-  weekLabel: string;
+interface PoolSwitcherButtonProps {
   poolName: string;
   userPools: DbPool[];
   activePoolId: string | null;
   onSwitchPool: (poolId: string | null) => void;
-  accentColor: string;
   smackUnreadCounts: Record<string, number>;
-  activePool?: DbPool | null;
 }
 
-function CardHeader({
-  eventName,
-  weekLabel,
+function PoolSwitcherButton({
   poolName,
   userPools,
   activePoolId,
   onSwitchPool,
-  accentColor,
   smackUnreadCounts,
-  activePool,
-}: CardHeaderProps) {
+}: PoolSwitcherButtonProps) {
   const {colors} = useTheme();
-  const styles = createStyles(colors);
   const [modalVisible, setModalVisible] = useState(false);
-  const isBranded = !!(activePool?.brand_config as any)?.is_branded;
-  const partnerPrimary = isBranded ? (activePool?.brand_config as any)?.primary_color : null;
-  const headerLineColor = partnerPrimary || '#FE843C';
 
   const switchTo = (poolId: string) => {
     onSwitchPool(poolId);
@@ -391,19 +365,23 @@ function CardHeader({
   };
 
   return (
-    <View style={styles.header}>
-      <View style={styles.headerLeft}>
-        <Text style={[styles.eventName, isBranded && {color: '#1A1A1A'}]}>{eventName}</Text>
-        <Text style={styles.weekLabel}>{weekLabel}</Text>
-      </View>
-
+    <>
       <TouchableOpacity
-        style={styles.poolSelector}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginTop: spacing.md,
+          gap: 6,
+        }}
         onPress={() => setModalVisible(true)}>
-        <Text style={styles.poolName} numberOfLines={1}>
+        <Text style={{color: colors.textSecondary, fontSize: 14}}>
+          Switch Pools:
+        </Text>
+        <Text style={{color: colors.secondary, fontSize: 16, fontWeight: '900'}}>
           {poolName}
         </Text>
-        <ChevronDown size={14} color={colors.textSecondary} />
+        <ChevronDown size={16} color={colors.secondary} />
       </TouchableOpacity>
 
       <Modal
@@ -411,16 +389,22 @@ function CardHeader({
         transparent
         animationType="fade"
         onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.overlay}>
-          {/* Background dismiss — sibling, not parent of modal content */}
+        <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)'}}>
           <TouchableOpacity
             style={StyleSheet.absoluteFillObject}
             activeOpacity={1}
             onPress={() => setModalVisible(false)}
           />
-          {/* Modal content — completely decoupled from dismiss handler */}
-          <View style={styles.modal}>
-            <Text style={styles.modalTitle}>Switch Pool</Text>
+          <View style={{
+            width: '80%',
+            maxHeight: '60%',
+            backgroundColor: colors.surface,
+            borderRadius: 12,
+            padding: spacing.lg,
+          }}>
+            <Text style={{fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.md, textAlign: 'center'}}>
+              Switch Pool
+            </Text>
             <ScrollView bounces={false}>
               {[
                 ...userPools.filter(p => !!(p.brand_config as any)?.is_branded),
@@ -432,29 +416,23 @@ function CardHeader({
                 return (
                   <TouchableOpacity
                     key={item.id}
-                    style={styles.poolOption}
+                    style={{paddingVertical: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}
                     onPress={() => switchTo(item.id)}>
-                    <View style={styles.poolOptionRow}>
+                    <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1}}>
                       <Text
                         style={[
-                          styles.poolOptionText,
-                          itemBranded && {fontWeight: '700', color: itemHighlight || '#FFFFFF'},
-                          item.id === activePoolId && !itemBranded && {color: '#FF8B3D'},
+                          {fontSize: 16, color: colors.textPrimary},
+                          itemBranded && {fontWeight: '700', color: itemHighlight || colors.textPrimary},
+                          item.id === activePoolId && !itemBranded && {color: colors.primary},
                         ]}>
                         {item.name}
                       </Text>
                       {unread > 0 && (
-                        <MessageCircle
-                          size={14}
-                          color={colors.primary}
-                          fill={colors.primary}
-                        />
+                        <MessageCircle size={14} color={colors.primary} fill={colors.primary} />
                       )}
                     </View>
                     {item.id === activePoolId && (
-                      <Text style={{color: '#FF8B3D', fontSize: 16}}>
-                        {'\u2713'}
-                      </Text>
+                      <Text style={{color: colors.primary, fontSize: 16}}>{'\u2713'}</Text>
                     )}
                   </TouchableOpacity>
                 );
@@ -463,7 +441,7 @@ function CardHeader({
           </View>
         </View>
       </Modal>
-    </View>
+    </>
   );
 }
 
@@ -475,15 +453,6 @@ const createStyles = (colors: any) => StyleSheet.create({
   outerWrapper: {
     marginHorizontal: spacing.md,
     marginBottom: spacing.md,
-  },
-  card: {
-    backgroundColor: 'transparent',
-    borderTopWidth: 3,
-    shadowColor: 'transparent',
-    shadowOffset: {width: 0, height: 0},
-    shadowOpacity: 0,
-    shadowRadius: 8,
-    elevation: 3,
   },
   pillRow: {
     flexDirection: 'row',
@@ -531,29 +500,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     ...typography.h3,
     color: colors.textSecondary,
     fontWeight: '700',
-    marginTop: 2,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-  },
-  headerLeft: {
-    flex: 1,
-  },
-  eventName: {
-    ...typography.body,
-    fontWeight: '700',
-    fontStyle: 'italic',
-    letterSpacing: 0.5,
-    color: '#FFFFFF',
-  },
-  weekLabel: {
-    ...typography.small,
-    color: colors.textSecondary,
     marginTop: 2,
   },
   poolSelector: {

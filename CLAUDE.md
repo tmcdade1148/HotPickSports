@@ -826,9 +826,9 @@ Do not implement or suggest these unless explicitly asked:
 - Personality profiles / career stats (needs multiple events of data)
 - Achievement tracking (table exists, no triggers)
 - Tier system (needs cross-event data)
-- Advanced pool admin: nudge flow (member list, pool settings, broadcast are built)
+- Advanced pool admin: nudge flow (member list, pool settings, broadcast, moderation, message center are built)
 - Pool discovery / browse
-- SmackTalk reactions and pick-linked auto-messages
+- Pick-linked auto-messages in SmackTalk
 - Exact score predictions
 - Super Bowl enhanced scoring UI (builds November 2026 — Super Bowl is February 2027)
 - Playoff automatic reset UI (builds November 2026 — Wild Card is January 2027)
@@ -903,18 +903,52 @@ ADD COLUMN is_archived BOOLEAN NOT NULL DEFAULT false;
 ```
 /src/shell/screens/
   PoolMembersScreen.tsx     ← FlatList of active members, promote/demote/remove
-  PoolSettingsScreen.tsx    ← Edit name, share invite, archive pool, broadcast
+  PoolSettingsScreen.tsx    ← Edit name, share invite, archive pool, broadcast, moderation
+  FlaggedMessagesScreen.tsx ← Moderation queue: approve/remove flagged messages, send notes
+  MessageCenterScreen.tsx   ← User inbox: broadcasts + moderator notes (last 30 days)
   PartnerAdminScreen.tsx    ← __DEV__-gated partner management (create, edit colors/logo, assign pools)
   AboutScreen.tsx           ← About HotPick Sports (placeholder content)
   InstructionsScreen.tsx    ← How HotPick Works: accordion sections (picks, pools, pricing, phases)
   WelcomeScreen.tsx         ← Login/signup with Privacy Policy link (opens hosted HTML)
 /src/shell/components/
   BroadcastComposer.tsx     ← Modal: 160 char message, 3/day rate limit, send to pool
+  home/MessageCenter.tsx    ← Home Screen module: broadcast previews + flagged message alerts
 ```
 
 Admin screens live in /shell/screens/, never in sport modules.
 Entry points: SettingsScreen pool rows show Users icon (→ PoolMembers)
 and Settings gear (→ PoolSettings) for organizer/admin roles.
+
+### Moderation & Message Center Architecture
+
+**Moderator notes are private — they never appear in SmackTalk.**
+When an organizer or admin sends a "Note to Poster" or "Note to Reporter"
+from the FlaggedMessagesScreen, it writes to `organizer_notifications`
+with `notification_type = 'moderator_note'`. The recipient sees it in
+their Message Center only.
+
+**Broadcasts also send email.** When `broadcastToPool` succeeds, the
+client fires the `send-broadcast-email` Edge Function (non-blocking).
+The Edge Function fetches pool member emails from `profiles` and sends
+individually via Resend API.
+
+**organizer_notifications valid types:**
+`'broadcast' | 'nudge' | 'system' | 'moderator_note'`
+
+**Message Center (Settings):** Shows all broadcasts and moderator notes
+targeted at the user (last 30 days). Queries `organizer_notifications`
+filtered by pool membership (broadcasts) and `recipient_user_ids`
+containing the user's ID (moderator notes).
+
+**MessageCenter (Home Screen module):** Shows last 24h broadcast previews
+and flagged message counts for organizer/admin pools. Tapping broadcasts
+navigates to the full Message Center screen. Tapping flagged navigates to
+FlaggedMessagesScreen.
+
+**Red flags:**
+- Moderator note written to `smack_messages` → must use `organizer_notifications`
+- SmackTalk showing "(Moderator)" messages → moderator notes are private
+- Message Center querying `smack_messages` for mod notes → query `organizer_notifications`
 
 ### Admin Red Flags
 - Intelligence computed in a React component → use pool_pulse table
@@ -927,10 +961,13 @@ and Settings gear (→ PoolSettings) for organizer/admin roles.
 ### What Ships vs What Waits
 Ships: pool CRUD, member list (with promote/demote/remove), pool settings
 (edit name, share invite, archive), broadcast composer (160 char, 3/day
-rate limit), all 4 database tables, compute_pool_intelligence Edge
-Function skeleton.
+rate limit, email delivery), message center (broadcasts + moderator notes),
+flagged message moderation (approve/remove/note), SmackTalk reactions
+(long-press picker, 6 emojis, tap to see who reacted), dual leaderboard
+(season + week with live Realtime updates), all 4 database tables,
+compute_pool_intelligence Edge Function skeleton.
 Deferred: nudge flow, Pulse digest UI, analytics, AI copy,
-advanced moderation, multi-pool management.
+multi-pool management.
 
 ---
 

@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useRef, useCallback} from 'react';
 import {
   View,
   Text,
@@ -38,6 +38,8 @@ export function ProfileScreen({navigation}: any) {
   const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isInitialized = useRef(false);
 
   // Initialize form fields from profile
   useEffect(() => {
@@ -47,6 +49,8 @@ export function ProfileScreen({navigation}: any) {
       setPoolieName(userProfile.poolie_name ?? '');
       setDisplayPref(userProfile.display_name_preference ?? 'first_name');
       setSelectedAvatar(userProfile.avatar_key ?? null);
+      // Mark initialized after first load so auto-save doesn't fire on mount
+      setTimeout(() => { isInitialized.current = true; }, 100);
     }
   }, [userProfile]);
 
@@ -58,6 +62,51 @@ export function ProfileScreen({navigation}: any) {
     selectedAvatar !== (userProfile?.avatar_key ?? null);
 
   const canSave = firstName.trim().length > 0 && hasChanges && !saving;
+
+  // Auto-save: debounce 1.5s after any field change
+  const doAutoSave = useCallback(async () => {
+    if (!user?.id || !isInitialized.current) return;
+    const trimmedFirst = firstName.trim();
+    if (!trimmedFirst) return; // Don't auto-save with empty first name
+
+    const currentHasChanges =
+      trimmedFirst !== (userProfile?.first_name ?? '') ||
+      lastName.trim() !== (userProfile?.last_name ?? '') ||
+      poolieName.trim() !== (userProfile?.poolie_name ?? '') ||
+      displayPref !== (userProfile?.display_name_preference ?? 'first_name') ||
+      selectedAvatar !== (userProfile?.avatar_key ?? null);
+
+    if (!currentHasChanges) return;
+
+    setSaving(true);
+    const avatarData = selectedAvatar
+      ? {avatar_key: selectedAvatar, avatar_type: 'system' as const}
+      : {};
+
+    const ok = await updateProfile(user.id, {
+      first_name: trimmedFirst,
+      last_name: lastName.trim() || null,
+      poolie_name: poolieName.trim() || null,
+      display_name_preference: displayPref,
+      ...avatarData,
+    });
+
+    setSaving(false);
+    if (ok) {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    }
+  }, [firstName, lastName, poolieName, displayPref, selectedAvatar, user?.id, userProfile, updateProfile]);
+
+  // Trigger auto-save on field changes
+  useEffect(() => {
+    if (!isInitialized.current) return;
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(doAutoSave, 1500);
+    return () => {
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    };
+  }, [firstName, lastName, poolieName, displayPref, selectedAvatar, doAutoSave]);
 
   const handleAvatarSelect = (avatar: {
     key: string;

@@ -11,8 +11,10 @@ import {
   ScrollView,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {supabase} from '@shared/config/supabase';
-import {runPostAuthFlow} from '@shell/services/postAuthFlow';
+import {useGlobalStore} from '@shell/stores/globalStore';
+import {getDefaultEvent} from '@sports/registry';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 
@@ -24,6 +26,17 @@ type Mode = 'sign_in' | 'sign_up';
 export function EmailEntryScreen({navigation}: any) {
   const {colors} = useTheme();
   const styles = createStyles(colors);
+
+  const setUser = useGlobalStore(s => s.setUser);
+  const setActiveSport = useGlobalStore(s => s.setActiveSport);
+  const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
+  const acceptTos = useGlobalStore(s => s.acceptTos);
+  const ensureGlobalPoolMembership = useGlobalStore(s => s.ensureGlobalPoolMembership);
+  const fetchProfile = useGlobalStore(s => s.fetchProfile);
+  const fetchUserPools = useGlobalStore(s => s.fetchUserPools);
+  const fetchSmackUnreadCounts = useGlobalStore(s => s.fetchSmackUnreadCounts);
+  const subscribeSmackUnread = useGlobalStore(s => s.subscribeSmackUnread);
+
   const [mode, setMode] = useState<Mode>('sign_in');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
