@@ -17,15 +17,33 @@ const PRIVACY_URL =
 
 /** Strip HTML tags and decode common entities for plain-text rendering */
 function htmlToPlainText(html: string): string {
+  // Extract body content only
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  let text = bodyMatch ? bodyMatch[1] : html;
+
   // Remove style/script blocks
-  let text = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+  text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
   text = text.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
 
-  // Convert block elements to newlines
-  text = text.replace(/<\/?(h[1-6]|p|div|br|li|tr)[^>]*>/gi, '\n');
-  text = text.replace(/<\/?(ul|ol|table|thead|tbody)[^>]*>/gi, '\n');
+  // Headers: add double newline before, newline after
+  text = text.replace(/<h[1-6][^>]*>/gi, '\n\n');
+  text = text.replace(/<\/h[1-6]>/gi, '\n');
 
-  // Strip remaining tags
+  // Paragraphs: double newline between them
+  text = text.replace(/<p[^>]*>/gi, '');
+  text = text.replace(/<\/p>/gi, '\n\n');
+
+  // List items: bullet + space
+  text = text.replace(/<li[^>]*>/gi, '  • ');
+  text = text.replace(/<\/li>/gi, '\n');
+
+  // Line breaks
+  text = text.replace(/<br\s*\/?>/gi, '\n');
+
+  // Remove opening block tags (don't add newlines for opening)
+  text = text.replace(/<\/?(ul|ol|div|table|thead|tbody|tr|td|th|section|article|header|footer|nav|main)[^>]*>/gi, '');
+
+  // Strip remaining tags (spans, links, strong, em, etc.)
   text = text.replace(/<[^>]+>/g, '');
 
   // Decode entities
@@ -38,7 +56,7 @@ function htmlToPlainText(html: string): string {
   text = text.replace(/&ndash;/g, '–');
   text = text.replace(/&mdash;/g, '—');
 
-  // Collapse multiple blank lines
+  // Collapse multiple blank lines to double
   text = text.replace(/\n{3,}/g, '\n\n');
 
   return text.trim();
