@@ -13,14 +13,12 @@ import {
   UIManager,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
-import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import {
   User,
   Plus,
   LogOut,
   ChevronRight,
-  ChevronLeft,
   ChevronDown,
   ChevronUp,
   Users,
@@ -145,17 +143,7 @@ export function SettingsScreen() {
   const activePool = userPools.find(p => p.id === activePoolId);
 
   return (
-    <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]} edges={['top']}>
-      {/* Header — outside ScrollView, matches About/Instructions */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-          <ChevronLeft size={24} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, {color: colors.textPrimary}]}>Settings</Text>
-        <View style={{width: 24}} />
-      </View>
+    <View style={[styles.container, {backgroundColor: colors.background}]}>
     <ScrollView
       style={styles.flex}
       contentContainerStyle={styles.content}
@@ -459,7 +447,7 @@ export function SettingsScreen() {
         <Text style={[styles.signOutText, {color: colors.error}]}>Sign Out</Text>
       </TouchableOpacity>
     </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -473,17 +461,6 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.lg,
     paddingBottom: spacing.xxl,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
   },
   profileCard: {
     flexDirection: 'row',
