@@ -75,7 +75,7 @@ export function WelcomeScreen({navigation}: any) {
         </View>
 
         <Text style={styles.tagline}>
-          Make your picks. Win bragging rights.
+          Your Picks. On the Record.
         </Text>
 
         {/* Auth buttons */}
@@ -158,6 +158,8 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   tagline: {
     fontSize: 16,
+    fontWeight: '700',
+    fontStyle: 'italic',
     color: colors.textSecondary,
     marginBottom: spacing.xxl,
     textAlign: 'center',
