@@ -246,8 +246,8 @@ const headerStyles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   wordmark: {
-    height: 32,
-    width: 180,
+    height: 40,
+    width: 225,
   },
   partnerLogo: {
     height: 30,

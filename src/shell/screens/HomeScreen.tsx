@@ -286,8 +286,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     paddingBottom: 0,
   },
   wordmark: {
-    height: 56,
-    width: 320,
+    height: 70,
+    width: 400,
   },
   partnerLogo: {
     height: 56,
