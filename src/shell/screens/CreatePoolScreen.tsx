@@ -6,11 +6,13 @@ import {
   TouchableOpacity,
   Switch,
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
 } from 'react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
+import {supabase} from '@shared/config/supabase';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 
@@ -30,27 +32,22 @@ export function CreatePoolScreen({navigation}: any) {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleCreate = async () => {
-    const trimmed = poolName.trim();
-    if (trimmed.length < 3) {
-      setError('Pool name must be at least 3 characters.');
-      return;
-    }
-    if (trimmed.length > 30) {
-      setError('Pool name must be 30 characters or less.');
-      return;
-    }
-    if (!user?.id || !activeSport?.competition) {
-      return;
-    }
+  const doCreate = async () => {
+    if (!user?.id || !activeSport?.competition) return;
 
     setCreating(true);
     setError(null);
 
+    // Log organizer acknowledgment
+    await supabase.from('organizer_acknowledgments').insert({
+      user_id: user.id,
+      version: '1.0',
+    });
+
     const result = await createPool({
       userId: user.id,
       competition: activeSport.competition,
-      name: trimmed,
+      name: poolName.trim(),
       isPublic,
     });
 
@@ -65,6 +62,28 @@ export function CreatePoolScreen({navigation}: any) {
     } else {
       setError(result.error ?? 'Failed to create pool. Please try again.');
     }
+  };
+
+  const handleCreate = () => {
+    const trimmed = poolName.trim();
+    if (trimmed.length < 3) {
+      setError('Pool name must be at least 3 characters.');
+      return;
+    }
+    if (trimmed.length > 30) {
+      setError('Pool name must be 30 characters or less.');
+      return;
+    }
+    if (!user?.id || !activeSport?.competition) return;
+
+    Alert.alert(
+      'Before You Create Your Pool',
+      'HotPick Pools are for friendly competition only.\n\nCollecting money from participants — entry fees, prize pots, or any financial arrangement — is prohibited by our Terms of Service and may result in account termination.',
+      [
+        {text: 'Cancel', style: 'cancel'},
+        {text: 'I Understand. Create My Pool', onPress: doCreate},
+      ],
+    );
   };
 
   return (
