@@ -378,10 +378,10 @@ function PoolSwitcherButton({
         <Text style={{color: colors.textSecondary, fontSize: 14}}>
           Switch Pools:
         </Text>
-        <Text style={{color: '#F5C842', fontSize: 16, fontWeight: '900'}}>
+        <Text style={{color: colors.highlight, fontSize: 16, fontWeight: '900'}}>
           {poolName}
         </Text>
-        <ChevronDown size={16} color={'#F5C842'} />
+        <ChevronDown size={16} color={colors.highlight} />
       </TouchableOpacity>
 
       <Modal
@@ -423,7 +423,7 @@ function PoolSwitcherButton({
                         style={[
                           {fontSize: 16, color: colors.textPrimary},
                           itemBranded && {fontWeight: '700', color: itemHighlight || colors.textPrimary},
-                          item.id === activePoolId && !itemBranded && {color: '#F5C842'},
+                          item.id === activePoolId && !itemBranded && {color: colors.highlight},
                         ]}>
                         {item.name}
                       </Text>
@@ -432,7 +432,7 @@ function PoolSwitcherButton({
                       )}
                     </View>
                     {item.id === activePoolId && (
-                      <Text style={{color: '#F5C842', fontSize: 16}}>{'\u2713'}</Text>
+                      <Text style={{color: colors.highlight, fontSize: 16}}>{'\u2713'}</Text>
                     )}
                   </TouchableOpacity>
                 );
