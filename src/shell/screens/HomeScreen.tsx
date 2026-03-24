@@ -131,7 +131,7 @@ export function HomeScreen({navigation}: any) {
         {eventName ? (
           <View style={styles.headerRight}>
             <Text style={styles.phaseLabel}>{phaseLabel}</Text>
-            <Text style={styles.eventName}>{eventName}</Text>
+            <Text style={[styles.eventName, brand.isBranded && {color: colors.highlight}]}>{eventName}</Text>
           </View>
         ) : null}
       </View>
