@@ -98,6 +98,7 @@ per sport or event. Add rows to existing template tables with an
 - `smack_read_state` — tracks last_read_at per user per pool for unread dot computation
 - `competition_config` — per-competition state management
 - `events` — master events registry (id, name, template_type, sport, status, config JSON)
+- `organizer_acknowledgments` — legal log: organizer confirmed no-money-collection terms before pool creation
 
 ---
 
@@ -624,6 +625,13 @@ displays scores; it never computes them.
   notifying past participants
 - No auto-enrollment ever
 - Pool creation is available to any user, not just admins
+
+**Organizer acknowledgment (legal requirement):**
+Every pool creation shows a native Alert requiring the organizer to
+acknowledge that collecting money from participants is prohibited by
+the Terms of Service. Tapping "I Understand. Create My Pool" logs to
+`organizer_acknowledgments` table: `{user_id, timestamp, version: "1.0"}`.
+This popup cannot be skipped or removed without legal approval.
 
 **Pool start date architecture (critical):**
 - Every pool has a `pool_start_date` (DATE, NOT NULL, DEFAULT current_date)
