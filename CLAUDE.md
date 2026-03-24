@@ -33,9 +33,12 @@ Never suggest designs that tie picks or scores to a pool_id.**
 - Edge Functions rebuilt for simplicity and efficiency
 - Scoring rebuild complete — addresses all Season 1 failures
 - Template-first architecture built in React Native
-- Bundle ID: `com.hotpicksports.app` (iOS + Android)
+- Bundle ID: `com.hotpicksports` (iOS + Android)
 - Marketing version: 2.0
+- Auth providers: Apple Sign In (native), Google Sign In (native), Email/Password
+- Password recovery: deep link via `hotpick://auth/reset`, PKCE + implicit flow supported
 - Privacy policy rendered as native ScrollView (no WebView), linked from login + Settings
+- Terms of Service rendered as native ScrollView, linked from login + Settings
 
 **Default event:** `nfl_2026` — this is the active competition.
 Do not default to worldCup2026 or any other event.
@@ -53,7 +56,7 @@ Do not default to worldCup2026 or any other event.
 | Client | React Native (TypeScript) — iOS + Android from one codebase |
 | Backend | Supabase (project: `mzqtrpdiqhopjmxjccwy`) |
 | Database | PostgreSQL via Supabase |
-| Auth | Supabase Auth with persistent sessions |
+| Auth | Supabase Auth (Apple, Google, Email) with persistent sessions |
 | Realtime | Supabase Realtime (SmackTalk, live leaderboards) |
 | Scoring | Supabase Edge Functions (server-side, platform-agnostic) |
 | State | Zustand — sport-scoped stores + shared global store |
@@ -1047,11 +1050,22 @@ first if they ever change — then update app.json and the splash exception.
 
 | Token          | Hex       | Usage                                              |
 |----------------|-----------|----------------------------------------------------|
-| `background`   | `#111414` | App bg, splash bg, adaptive icon bg                |
-| `surface`      | `#474747` | Cards, rows, pick cards, SmackTalk bubbles         |
-| `secondary`    | `#F28B30` | Soft amber — secondary accents, inactive states    |
-| `primary`      | `#FF8B3D` | Hot orange — CTAs, active buttons, highlights      |
+| `primary`      | `#F5620F` | Hot orange — CTAs, active buttons, highlights      |
+| `secondary`    | `#45615E` | Muted teal — inactive accents, secondary states    |
+| `highlight`    | `#F5C842` | Gold — NFL 2026 header, WEEK X, pool name, rank badges, chevrons |
+| `background`   | `#FCFCFC` | App bg (light mode)                                |
+| `surface`      | `#F4F4F4` | Cards, rows, pick cards, SmackTalk bubbles (light) |
 | `glow`         | `#51A1A6` | Glow around active/highlighted elements            |
+
+**Dark mode overrides** (auto-derived, partners don't manage dark mode):
+
+| Token          | Hex       | Usage                                              |
+|----------------|-----------|----------------------------------------------------|
+| `background`   | `#0D1117` | App bg (dark mode)                                 |
+| `surface`      | `#161C26` | Cards, rows, pick cards (dark mode)                |
+| `text_primary` | `#8A97AA` | Headings, names, primary text (dark mode)          |
+| `text_secondary`| `#A0A0A0`| Subtitles, hints, timestamps (dark mode)           |
+| `border`       | `#2C3A52` | Dividers, section separators (dark mode)           |
 
 Source of truth: `src/shell/theme/hotpickDefaults.ts`
 Never copy these hex strings into other files — import from hotpickDefaults.
@@ -1892,6 +1906,26 @@ JSONB on the pools table.
 Partner brand config is copied to pool at creation. Rendering never
 depends on a live join to the partners table. Pools are self-contained.
 
+### Partner Dark Mode Rules
+
+Partners provide light-mode colors only. Dark mode is auto-derived:
+- **Backgrounds/text**: use HotPick dark overrides (`#0D1117`, `#161C26`, `#8A97AA`)
+- **Primary/secondary/highlight**: keep partner's own values (brand recognition)
+- Partners never manage dark mode — `deriveDarkColors()` handles it automatically
+- Active buttons use partner's `primary_color` in both light and dark
+- NFL 2026 header, WEEK X, pool name, chevrons, and rank badges use
+  partner's `highlight_color` in partner pools
+- Bottom navigation selected icons use HotPick colors (not partner colors)
+
+### Highlight Color Usage
+
+The `highlight` color (`#F5C842` for HotPick) is used for:
+- NFL 2026 event header text
+- WEEK X label text
+- Pool name and chevron in pool switcher (Home, Leaderboard, SmackTalk)
+- Rank badges on leaderboard
+- Partner pools use the partner's `highlight_color` for these same elements
+
 ### Key Architecture Decisions
 
 - `BrandConfig` type lives in `src/shell/theme/types.ts` — one definition, never duplicated
@@ -1902,11 +1936,11 @@ depends on a live join to the partners table. Pools are self-contained.
 - Partner Admin is `__DEV__`-gated in Settings screen
 - `PoweredByHotPick` component self-gates on `isBranded` — returns null for non-branded pools
 - `PoweredByHotPick` uses `hotpick-wordmark-w.png` (white wordmark) instead of text for the brand name
-- Home Screen shows HotPick wordmark (`hotpick-wordmark.png`) above greeting; partner logo for branded pools
+- Home Screen shows HotPick wordmark: `hotpick-wordmark-lt.png` (light mode), `hotpick-wordmark-dk.png` (dark mode); partner logo for branded pools
 - Settings page pools section is collapsible (twirly/accordion). Partner pools sorted to top with building icon. Settings page always uses HotPick colors (never changes with active pool).
-- `AboutScreen.tsx` and `InstructionsScreen.tsx` live in `/src/shell/screens/` — linked from Settings
-- Bottom tab bars across all templates (Season, Series, Tournament) use active pool theme colors via `useTheme()`
+- `AboutScreen.tsx`, `InstructionsScreen.tsx`, and `TermsOfServiceScreen.tsx` live in `/src/shell/screens/` — linked from Settings
+- Bottom tab bars across all templates (Season, Series, Tournament) use HotPick theme colors (not partner colors)
 - Home Screen background uses `colors.background` (dynamic per active pool brand)
-- SeasonEventCard header shows "NFL 2026" (derived from competition string) with `#FF8B3D` top border (partner's primary for branded pools)
+- SeasonEventCard header shows "NFL 2026" (derived from competition string) in `highlight` color
 - Score pill and kickoff module rendered outside the card container, between header and week state content
 - Kickoff module label reads "Picks go LIVE in:" (changes contextually, e.g. "Picks are LIVE")
