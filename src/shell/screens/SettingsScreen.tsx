@@ -552,6 +552,7 @@ const styles = StyleSheet.create({
     maxWidth: 140,
   },
   poolsContent: {
+    marginLeft: spacing.lg,
     marginBottom: spacing.md,
   },
   // Pool rows
