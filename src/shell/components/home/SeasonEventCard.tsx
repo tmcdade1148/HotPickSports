@@ -423,7 +423,7 @@ function PoolSwitcherButton({
                         style={[
                           {fontSize: 16, color: colors.textPrimary},
                           itemBranded && {fontWeight: '700', color: itemHighlight || colors.textPrimary},
-                          item.id === activePoolId && !itemBranded && {color: colors.primary},
+                          item.id === activePoolId && !itemBranded && {color: '#0FF5F4'},
                         ]}>
                         {item.name}
                       </Text>
@@ -432,7 +432,7 @@ function PoolSwitcherButton({
                       )}
                     </View>
                     {item.id === activePoolId && (
-                      <Text style={{color: colors.primary, fontSize: 16}}>{'\u2713'}</Text>
+                      <Text style={{color: '#0FF5F4', fontSize: 16}}>{'\u2713'}</Text>
                     )}
                   </TouchableOpacity>
                 );
