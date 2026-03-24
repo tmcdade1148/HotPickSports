@@ -127,8 +127,8 @@ export function HomeScreen({navigation}: any) {
         </View>
         {eventName ? (
           <View style={styles.headerRight}>
-            <Text style={styles.eventName}>{eventName}</Text>
             <Text style={styles.phaseLabel}>{phaseLabel}</Text>
+            <Text style={styles.eventName}>{eventName}</Text>
           </View>
         ) : null}
       </View>
@@ -253,13 +253,15 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'flex-end',
   },
   eventName: {
-    ...typography.caption,
-    color: colors.textSecondary,
+    fontSize: 28,
+    fontWeight: '800' as const,
+    color: colors.textPrimary,
     textTransform: 'uppercase',
   },
   phaseLabel: {
-    ...typography.h2,
-    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '400' as const,
+    color: colors.textSecondary,
   },
   settingsButton: {
     width: 40,
