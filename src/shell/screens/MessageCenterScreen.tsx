@@ -14,7 +14,7 @@ import {ChevronLeft, Megaphone, MessageCircle} from 'lucide-react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {supabase} from '@shared/config/supabase';
 import {spacing, borderRadius} from '@shared/theme';
-import {HOTPICK_DEFAULTS} from '@shell/theme/defaults';
+import {useTheme} from '@shell/theme';
 
 interface MessageItem {
   id: string;
@@ -42,15 +42,7 @@ export function MessageCenterScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   // Settings page always uses HotPick colors
-  const colors = {
-    primary: HOTPICK_DEFAULTS.primary_color,
-    secondary: HOTPICK_DEFAULTS.secondary_color,
-    background: HOTPICK_DEFAULTS.background_color,
-    surface: HOTPICK_DEFAULTS.surface_color,
-    textPrimary: HOTPICK_DEFAULTS.text_primary,
-    textSecondary: HOTPICK_DEFAULTS.text_secondary,
-    border: '#333333',
-  };
+  const {colors} = useTheme();
 
   const poolNameMap: Record<string, string> = {};
   for (const p of userPools) {

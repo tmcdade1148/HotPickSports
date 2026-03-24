@@ -5,18 +5,11 @@ import {TouchableOpacity} from 'react-native';
 import {ChevronLeft} from 'lucide-react-native';
 import {useNavigation} from '@react-navigation/native';
 import {spacing, borderRadius} from '@shared/theme';
-import {HOTPICK_DEFAULTS} from '@shell/theme/defaults';
+import {useTheme} from '@shell/theme';
 
 export function AboutScreen() {
   const navigation = useNavigation<any>();
-
-  const colors = {
-    primary: HOTPICK_DEFAULTS.primary_color,
-    background: HOTPICK_DEFAULTS.background_color,
-    surface: HOTPICK_DEFAULTS.surface_color,
-    textPrimary: HOTPICK_DEFAULTS.text_primary,
-    textSecondary: HOTPICK_DEFAULTS.text_secondary,
-  };
+  const {colors} = useTheme();
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]} edges={['top']}>

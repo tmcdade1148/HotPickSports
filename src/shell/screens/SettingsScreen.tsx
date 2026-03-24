@@ -235,7 +235,7 @@ export function SettingsScreen() {
             const poolBrand = getPoolColors(pool);
             const isBranded = !!(pool.brand_config as any)?.is_branded;
             const isActive = pool.id === activePoolId;
-            const hotpick = {primary: HOTPICK_DEFAULTS.primary_color, secondary: HOTPICK_DEFAULTS.secondary_color, surface: HOTPICK_DEFAULTS.surface_color};
+            const hotpick = {primary: colors.primary, secondary: colors.secondary, surface: colors.surface};
 
             // Partner pills: secondary bg when inactive, primary bg when active
             // HotPick pills: no bg when inactive, primary border when active
