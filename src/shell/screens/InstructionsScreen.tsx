@@ -13,7 +13,8 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {ChevronLeft, ChevronDown, ChevronUp} from 'lucide-react-native';
 import {useNavigation} from '@react-navigation/native';
 import {spacing, borderRadius} from '@shared/theme';
-import {HOTPICK_DEFAULTS} from '@shell/theme/defaults';
+import {useTheme} from '@shell/theme';
+import type {ThemeColors} from '@shell/theme';
 
 if (
   Platform.OS === 'android' &&
@@ -25,17 +26,7 @@ if (
 interface SectionProps {
   title: string;
   children: React.ReactNode;
-  colors: ReturnType<typeof getColors>;
-}
-
-function getColors() {
-  return {
-    primary: HOTPICK_DEFAULTS.primary_color,
-    background: HOTPICK_DEFAULTS.background_color,
-    surface: HOTPICK_DEFAULTS.surface_color,
-    textPrimary: HOTPICK_DEFAULTS.text_primary,
-    textSecondary: HOTPICK_DEFAULTS.text_secondary,
-  };
+  colors: ThemeColors;
 }
 
 function AccordionSection({title, children, colors}: SectionProps) {
@@ -89,7 +80,7 @@ const sectionStyles = StyleSheet.create({
 
 export function InstructionsScreen() {
   const navigation = useNavigation<any>();
-  const colors = getColors();
+  const {colors} = useTheme();
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]} edges={['top']}>
