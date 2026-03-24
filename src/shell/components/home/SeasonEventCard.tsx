@@ -19,7 +19,7 @@ import {LockedCard} from './LockedCard';
 import {LiveCard} from './LiveCard';
 import {SettlingCard} from './SettlingCard';
 import {CompleteCard} from './CompleteCard';
-import {useTheme} from '@shell/theme';
+import {useTheme, useBrand} from '@shell/theme';
 import {useCountdown} from '@shared/hooks/useCountdown';
 
 interface SeasonEventCardProps {
@@ -249,7 +249,7 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
         poolMemberCount,
         onMakePicks: onNavigateToEvent ?? (() => {}),
         weekLabelColor: isBranded
-          ? (activePool?.brand_config as any)?.secondary_color || undefined
+          ? (activePool?.brand_config as any)?.highlight_color || undefined
           : undefined,
       })}
 
@@ -357,7 +357,9 @@ function PoolSwitcherButton({
   smackUnreadCounts,
 }: PoolSwitcherButtonProps) {
   const {colors} = useTheme();
+  const brand = useBrand();
   const [modalVisible, setModalVisible] = useState(false);
+  const accentColor = brand.isBranded ? colors.highlight : colors.primary;
 
   const switchTo = (poolId: string) => {
     onSwitchPool(poolId);
@@ -378,10 +380,10 @@ function PoolSwitcherButton({
         <Text style={{color: colors.textSecondary, fontSize: 14}}>
           Switch Pools:
         </Text>
-        <Text style={{color: colors.primary, fontSize: 16, fontWeight: '900'}}>
+        <Text style={{color: accentColor, fontSize: 16, fontWeight: '900'}}>
           {poolName}
         </Text>
-        <ChevronDown size={16} color={colors.primary} />
+        <ChevronDown size={16} color={accentColor} />
       </TouchableOpacity>
 
       <Modal
