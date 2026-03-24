@@ -23,12 +23,17 @@ import {MessageCenterScreen} from '@shell/screens/MessageCenterScreen';
 import {AboutScreen} from '@shell/screens/AboutScreen';
 import {InstructionsScreen} from '@shell/screens/InstructionsScreen';
 import {PrivacyPolicyScreen} from '@shell/screens/PrivacyPolicyScreen';
+import {ResetPasswordScreen} from '@shell/screens/ResetPasswordScreen';
 import {useGlobalStore} from '@shell/stores/globalStore';
+import {supabase} from '@shared/config/supabase';
 import {Linking} from 'react-native';
 
 const Stack = createNativeStackNavigator();
 
-/** Deep link configuration for invite codes. */
+/** Navigation ref for navigating from outside React components (deep links). */
+const navigationRef = React.createRef<any>();
+
+/** Deep link configuration for invite codes and password reset. */
 const linking = {
   prefixes: ['hotpick://', 'https://hotpick.app'],
   config: {
@@ -51,13 +56,25 @@ const linking = {
 };
 
 /**
- * Handle incoming deep links for invite codes.
+ * Handle incoming deep links for invite codes and password reset.
  *
  * Invite link: hotpick://join?code=XXXX
  * Invite path: https://hotpick.app/join/XXXX
+ * Password reset (PKCE): hotpick://auth/reset?code=XXX
+ * Password reset (implicit): hotpick://auth/reset#access_token=...&type=recovery
  */
 function handleDeepLink(url: string) {
   try {
+    console.log('[DeepLink] Received URL:', url);
+
+    // Password reset — check before invite code parsing to avoid
+    // confusing the PKCE `code` param with an invite code
+    if (url.includes('auth/reset') || url.includes('type=recovery')) {
+      console.log('[DeepLink] Matched password reset URL');
+      handlePasswordResetLink(url);
+      return;
+    }
+
     const parsed = new URL(url);
 
     // Invite code — query param style: hotpick://join?code=XXXX
@@ -81,9 +98,92 @@ function handleDeepLink(url: string) {
   }
 }
 
+/**
+ * Extract auth data from Supabase password reset deep link and set the session.
+ *
+ * Supabase v2 uses PKCE by default for email flows:
+ *   hotpick://auth/reset?code=XXX  (PKCE — most common)
+ *
+ * Fallback for implicit flow:
+ *   hotpick://auth/reset#access_token=XXX&refresh_token=XXX&type=recovery
+ */
+async function handlePasswordResetLink(url: string) {
+  try {
+    console.log('[DeepLink] Processing password reset URL:', url);
+
+    // --- Try PKCE flow first (Supabase v2 default) ---
+    // URL format: hotpick://auth/reset?code=XXX
+    const parsed = new URL(url);
+    const pkceCode = parsed.searchParams.get('code');
+    console.log('[DeepLink] PKCE code:', pkceCode ? 'found' : 'not found');
+
+    if (pkceCode) {
+      console.log('[DeepLink] Exchanging PKCE code for session...');
+      const {data, error} = await supabase.auth.exchangeCodeForSession(pkceCode);
+      console.log('[DeepLink] PKCE exchange result:', error ? error.message : 'success');
+      if (error) {
+        console.warn('Password reset PKCE exchange error:', error.message);
+        return;
+      }
+      navigateToReset();
+      return;
+    }
+
+    // --- Fallback: implicit flow (fragment-based tokens) ---
+    const fragment = url.split('#')[1];
+    console.log('[DeepLink] Fragment:', fragment ? 'found' : 'not found');
+    if (!fragment) {
+      console.log('[DeepLink] No PKCE code and no fragment — cannot process');
+      return;
+    }
+
+    const fragmentParams = new URLSearchParams(fragment);
+    const accessToken = fragmentParams.get('access_token');
+    const refreshToken = fragmentParams.get('refresh_token');
+
+    if (!accessToken || !refreshToken) {
+      console.log('[DeepLink] Missing tokens in fragment');
+      return;
+    }
+
+    const {error} = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+
+    if (error) {
+      console.warn('Password reset session error:', error.message);
+      return;
+    }
+
+    navigateToReset();
+  } catch (err) {
+    console.warn('Password reset deep link error:', err);
+  }
+}
+
+/** Navigate to ResetPassword screen — uses reset to force navigation regardless of current state. */
+function navigateToReset() {
+  console.log('[DeepLink] Navigating to ResetPassword...');
+  setTimeout(() => {
+    const nav = navigationRef.current;
+    if (!nav) {
+      console.warn('[DeepLink] Navigator not ready');
+      return;
+    }
+    // Use reset to force navigation — navigate() may not work if the
+    // current screen stack doesn't allow pushing ResetPassword
+    nav.reset({
+      index: 0,
+      routes: [{name: 'ResetPassword'}],
+    });
+    console.log('[DeepLink] Navigation dispatched');
+  }, 500);
+}
+
 export function RootNavigator() {
   return (
-    <NavigationContainer linking={linking}>
+    <NavigationContainer ref={navigationRef} linking={linking}>
       <Stack.Navigator
         initialRouteName="Loading"
         screenOptions={{headerShown: false}}>
@@ -96,6 +196,10 @@ export function RootNavigator() {
         <Stack.Screen
           name="ForgotPassword"
           component={ForgotPasswordScreen}
+        />
+        <Stack.Screen
+          name="ResetPassword"
+          component={ResetPasswordScreen}
         />
 
         {/* Onboarding */}

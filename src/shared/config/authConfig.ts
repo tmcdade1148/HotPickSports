@@ -13,11 +13,11 @@
 // Google OAuth 2.0 Client IDs
 // The WEB client ID is used by Supabase server-side AND by signInWithIdToken()
 export const GOOGLE_WEB_CLIENT_ID =
-  'YOUR_WEB_CLIENT_ID.apps.googleusercontent.com';
+  '347191789170-l4suedkctpvmh5hpml1sc2vuke6742v9.apps.googleusercontent.com';
 
 // The iOS client ID is used by the Google Sign-In SDK on iOS only
 export const GOOGLE_IOS_CLIENT_ID =
-  'YOUR_IOS_CLIENT_ID.apps.googleusercontent.com';
+  '347191789170-ctt7hgfb07obn4p972eroqsi49kejtaj.apps.googleusercontent.com';
 
 // Apple Service ID (used by Supabase server-side, not in client code)
 // Configured in Supabase Dashboard → Auth → Providers → Apple
