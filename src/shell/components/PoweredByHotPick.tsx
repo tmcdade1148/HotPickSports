@@ -64,6 +64,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginLeft: 30,
   },
   poweredText: {
     fontSize: 12,
