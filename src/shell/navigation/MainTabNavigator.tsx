@@ -158,10 +158,10 @@ function TabHeader({title, showPoolSwitcher}: {title: string; showPoolSwitcher: 
             <Text style={[headerStyles.switchLabel, {color: colors.textSecondary}]}>
               Switch Pools:
             </Text>
-            <Text style={[headerStyles.poolName, {color: colors.primary, fontWeight: '900'}]} numberOfLines={1}>
+            <Text style={[headerStyles.poolName, {color: brand.isBranded ? colors.highlight : colors.primary, fontWeight: '900'}]} numberOfLines={1}>
               {poolName}
             </Text>
-            <ChevronDown size={16} color={colors.primary} />
+            <ChevronDown size={16} color={brand.isBranded ? colors.highlight : colors.primary} />
           </TouchableOpacity>
         ) : (
           <Text style={[headerStyles.message, {color: colors.textSecondary}]}>
