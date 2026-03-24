@@ -35,8 +35,9 @@ import {useGlobalStore} from '@shell/stores/globalStore';
 import {SYSTEM_AVATARS} from '@shell/components/AvatarSelector';
 import {getDisplayName} from '@shared/utils/displayName';
 import {spacing, borderRadius} from '@shared/theme';
+import {useColorScheme} from 'react-native';
 import type {BrandConfig} from '@shell/theme/types';
-import {HOTPICK_DEFAULTS, isLightColor} from '@shell/theme/defaults';
+import {HOTPICK_DEFAULTS, SEMANTIC_COLORS, SEMANTIC_COLORS_DARK, deriveDarkColors, isLightColor} from '@shell/theme/defaults';
 
 // Enable LayoutAnimation on Android
 if (
@@ -62,16 +63,21 @@ export function SettingsScreen() {
   const signOut = useGlobalStore(s => s.signOut);
   const flaggedCounts = useGlobalStore(s => s.flaggedCounts);
 
-  // Settings page always uses HotPick colors — never changes for partner pools
+  // Settings page always uses HotPick colors — never changes for partner pools.
+  // But it must respect system dark/light mode.
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const config = isDark ? deriveDarkColors(HOTPICK_DEFAULTS) : HOTPICK_DEFAULTS;
+  const semantic = isDark ? SEMANTIC_COLORS_DARK : SEMANTIC_COLORS;
   const colors = {
-    primary: HOTPICK_DEFAULTS.primary_color,
-    secondary: HOTPICK_DEFAULTS.secondary_color,
-    background: HOTPICK_DEFAULTS.background_color,
-    surface: HOTPICK_DEFAULTS.surface_color,
-    textPrimary: HOTPICK_DEFAULTS.text_primary,
-    textSecondary: HOTPICK_DEFAULTS.text_secondary,
-    border: '#333333',
-    error: '#EF476F',
+    primary: config.primary_color,
+    secondary: config.secondary_color,
+    background: config.background_color,
+    surface: config.surface_color,
+    textPrimary: config.text_primary,
+    textSecondary: config.text_secondary,
+    border: semantic.border,
+    error: semantic.error,
   };
 
   const [inviteCode, setInviteCode] = useState('');
