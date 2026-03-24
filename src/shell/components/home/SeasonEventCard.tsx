@@ -359,7 +359,7 @@ function PoolSwitcherButton({
   const {colors} = useTheme();
   const brand = useBrand();
   const [modalVisible, setModalVisible] = useState(false);
-  const accentColor = brand.isBranded ? colors.highlight : colors.primary;
+  const accentColor = colors.highlight;
 
   const switchTo = (poolId: string) => {
     onSwitchPool(poolId);

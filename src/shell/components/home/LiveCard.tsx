@@ -131,7 +131,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   label: {
     ...typography.small,
-    color: colors.primary,
+    color: colors.highlight,
     fontWeight: '600',
     letterSpacing: 1,
     marginBottom: spacing.xs,
@@ -166,19 +166,19 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   hotPickLabel: {
     ...typography.small,
-    color: colors.primary,
+    color: colors.highlight,
     fontWeight: '700',
     letterSpacing: 0.5,
   },
   rankBadge: {
-    backgroundColor: colors.primary + '15',
+    backgroundColor: colors.highlight + '15',
     borderRadius: 4,
     paddingHorizontal: spacing.xs + 2,
     paddingVertical: 2,
   },
   rankBadgeText: {
     ...typography.small,
-    color: colors.primary,
+    color: colors.highlight,
     fontWeight: '600',
   },
   matchup: {
