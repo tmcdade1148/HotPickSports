@@ -121,7 +121,11 @@ export function WelcomeScreen({navigation}: any) {
         {/* TOS */}
         <Text style={styles.tosText}>
           By continuing you agree to our{' '}
-          <Text style={styles.tosLink}>Terms of Service</Text> and{' '}
+          <Text
+            style={styles.tosLink}
+            onPress={() => navigation.navigate('TermsOfService')}>
+            Terms of Service
+          </Text> and{' '}
           <Text
             style={styles.tosLink}
             onPress={() => navigation.navigate('PrivacyPolicy')}>

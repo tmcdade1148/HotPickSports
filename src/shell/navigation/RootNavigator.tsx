@@ -23,6 +23,7 @@ import {MessageCenterScreen} from '@shell/screens/MessageCenterScreen';
 import {AboutScreen} from '@shell/screens/AboutScreen';
 import {InstructionsScreen} from '@shell/screens/InstructionsScreen';
 import {PrivacyPolicyScreen} from '@shell/screens/PrivacyPolicyScreen';
+import {TermsOfServiceScreen} from '@shell/screens/TermsOfServiceScreen';
 import {ResetPasswordScreen} from '@shell/screens/ResetPasswordScreen';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {supabase} from '@shared/config/supabase';
@@ -200,6 +201,7 @@ export function RootNavigator() {
         <Stack.Screen name="About" component={AboutScreen} />
         <Stack.Screen name="Instructions" component={InstructionsScreen} />
         <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
+        <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

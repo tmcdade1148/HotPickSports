@@ -11,7 +11,6 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
-  Linking,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import {useNavigation} from '@react-navigation/native';
@@ -452,7 +451,7 @@ export function SettingsScreen() {
 
       <TouchableOpacity
         style={[styles.linkRow, {backgroundColor: colors.surface}]}
-        onPress={() => Linking.openURL('https://hotpicksports.com/terms')}>
+        onPress={() => navigation.navigate('TermsOfService')}>
         <View style={styles.linkLeft}>
           <FileText size={20} color={colors.primary} />
           <Text style={[styles.linkText, {color: colors.textPrimary}]}>Terms of Service</Text>
