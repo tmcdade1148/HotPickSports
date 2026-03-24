@@ -73,6 +73,6 @@ const styles = StyleSheet.create({
   wordmark: {
     height: 28,
     width: 150,
-    marginLeft: -12,
+    marginLeft: -20,
   },
 });
