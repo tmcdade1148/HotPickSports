@@ -151,15 +151,11 @@ export function HomeScreen({navigation}: any) {
         />
 
         {cardsToShow.map(config => (
-          <TouchableOpacity
+          <EventCardForConfig
             key={config.competition}
-            activeOpacity={0.85}
-            onPress={() => handleCardPress(config)}>
-            <EventCardForConfig
-              config={config}
-              onNavigateToEvent={() => handleCardPress(config)}
-            />
-          </TouchableOpacity>
+            config={config}
+            onNavigateToEvent={() => handleCardPress(config)}
+          />
         ))}
 
         {/* StandingsBadge — below event cards */}
