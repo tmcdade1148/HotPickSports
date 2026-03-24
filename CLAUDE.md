@@ -35,7 +35,7 @@ Never suggest designs that tie picks or scores to a pool_id.**
 - Template-first architecture built in React Native
 - Bundle ID: `com.hotpicksports.app` (iOS + Android)
 - Marketing version: 2.0
-- Privacy policy hosted on Supabase Storage, linked from login screen
+- Privacy policy rendered as native ScrollView (no WebView), linked from login + Settings
 
 **Default event:** `nfl_2026` — this is the active competition.
 Do not default to worldCup2026 or any other event.
@@ -566,6 +566,23 @@ Developer Settings screen unlocks non-active sports for dev access. Never remove
 this gate without explicit instruction. NFL Season 2 is the active production
 event — all other sport modules require the developer gate.
 
+### Super Admin
+
+`is_super_admin BOOLEAN NOT NULL DEFAULT false` on `profiles` table.
+Platform-owner-only flag. Currently set for Tom's two accounts only.
+
+**Gates:**
+- Partner Admin screen (visible in production for super admins, invisible to everyone else)
+- Future: competition_config editor, scoring triggers, user lookup
+
+**Partners never get admin tools.** Partner branding is managed by
+HotPick (super admin) on their behalf. Partners interact with
+the app as organizers of their branded pools, nothing more.
+
+**Never gate admin tools on `__DEV__`.** Use `is_super_admin` for
+anything that should work in production. `__DEV__` is only for
+sport module feature flags (NHL, Tournament).
+
 ---
 
 ## 10. RLS Policy Pattern
@@ -906,10 +923,11 @@ ADD COLUMN is_archived BOOLEAN NOT NULL DEFAULT false;
   PoolSettingsScreen.tsx    ← Edit name, share invite, archive pool, broadcast, moderation
   FlaggedMessagesScreen.tsx ← Moderation queue: approve/remove flagged messages, send notes
   MessageCenterScreen.tsx   ← User inbox: broadcasts + moderator notes (last 30 days)
-  PartnerAdminScreen.tsx    ← __DEV__-gated partner management (create, edit colors/logo, assign pools)
+  PartnerAdminScreen.tsx    ← Super admin only (is_super_admin gate). Create partners, edit colors/logo, assign pools
+  PrivacyPolicyScreen.tsx   ← Native ScrollView privacy policy (no WebView/HTML). Linked from login + Settings
   AboutScreen.tsx           ← About HotPick Sports (placeholder content)
   InstructionsScreen.tsx    ← How HotPick Works: accordion sections (picks, pools, pricing, phases)
-  WelcomeScreen.tsx         ← Login/signup with Privacy Policy link (opens hosted HTML)
+  WelcomeScreen.tsx         ← Login/signup with Privacy Policy link (navigates to PrivacyPolicyScreen)
 /src/shell/components/
   BroadcastComposer.tsx     ← Modal: 160 char message, 3/day rate limit, send to pool
   home/MessageCenter.tsx    ← Home Screen module: broadcast previews + flagged message alerts
