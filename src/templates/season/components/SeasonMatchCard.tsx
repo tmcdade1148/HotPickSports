@@ -5,7 +5,7 @@ import type {SeasonConfig} from '@shared/types/templates';
 import type {DbSeasonGame} from '@shared/types/database';
 import {spacing} from '@shared/theme';
 import {useSeasonStore} from '../stores/seasonStore';
-import {useTheme} from '@shell/theme';
+import {useTheme, useBrand} from '@shell/theme';
 
 interface SeasonMatchCardProps {
   game: DbSeasonGame;
@@ -118,7 +118,9 @@ export function SeasonMatchCard({
   userId,
 }: SeasonMatchCardProps) {
   const {colors} = useTheme();
+  const brand = useBrand();
   const styles = createStyles(colors);
+  const rankColor = brand.isBranded ? colors.highlight : colors.primary;
   const existingPick = useSeasonStore(s => s.getPickForGame(game.game_id));
   const savePick = useSeasonStore(s => s.savePick);
   const setHotPick = useSeasonStore(s => s.setHotPick);
@@ -197,7 +199,8 @@ export function SeasonMatchCard({
           <View
             style={[
               styles.rankCircle,
-              isHotPick && styles.rankCircleHotPick,
+              {backgroundColor: rankColor},
+              isHotPick && styles.rankCircleHotPick && {backgroundColor: rankColor},
             ]}>
             <Text style={styles.rankNumber}>{rank}</Text>
           </View>
