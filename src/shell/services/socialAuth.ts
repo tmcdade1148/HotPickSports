@@ -41,7 +41,7 @@ export async function signInWithApple(): Promise<SocialAuthResult> {
     requestedScopes: [appleAuth.Scope.EMAIL, appleAuth.Scope.FULL_NAME],
   });
 
-  const {identityToken, fullName} = appleAuthResponse;
+  const {identityToken, fullName, nonce} = appleAuthResponse;
 
   if (!identityToken) {
     throw new Error('Apple Sign In failed — no identity token received.');
@@ -50,6 +50,7 @@ export async function signInWithApple(): Promise<SocialAuthResult> {
   const {data, error} = await supabase.auth.signInWithIdToken({
     provider: 'apple',
     token: identityToken,
+    nonce: nonce,
   });
 
   if (error) throw error;
