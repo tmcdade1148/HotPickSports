@@ -253,9 +253,10 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'flex-end',
   },
   eventName: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '800' as const,
-    color: colors.textPrimary,
+    fontStyle: 'italic' as const,
+    color: colors.primary,
     textTransform: 'uppercase',
   },
   phaseLabel: {
