@@ -131,7 +131,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   label: {
     ...typography.small,
-    color: '#F5C842',
+    color: colors.highlight,
     fontWeight: '600',
     letterSpacing: 1,
     marginBottom: spacing.xs,

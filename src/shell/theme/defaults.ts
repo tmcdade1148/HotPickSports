@@ -36,63 +36,13 @@ export const HOTPICK_DARK_OVERRIDES = {
  * and text for dark surfaces.
  */
 export function deriveDarkColors(config: BrandConfig): BrandConfig {
-  const darkBg = HOTPICK_DARK_OVERRIDES.background_color;
-
-  // For partner pools, ensure brand colors have enough contrast against dark bg.
-  // If a partner color is too dark to read on #0D1117, lighten it.
-  const primary = ensureContrast(config.primary_color, darkBg);
-  const secondary = ensureContrast(config.secondary_color, darkBg);
-  const highlight = config.highlight_color
-    ? ensureContrast(config.highlight_color, darkBg)
-    : HOTPICK_DARK_OVERRIDES.text_primary;
-
   return {
     ...config,
-    primary_color: primary,
-    secondary_color: secondary,
-    highlight_color: highlight,
-    background_color: darkBg,
+    background_color: HOTPICK_DARK_OVERRIDES.background_color,
     surface_color: HOTPICK_DARK_OVERRIDES.surface_color,
     text_primary: HOTPICK_DARK_OVERRIDES.text_primary,
     text_secondary: HOTPICK_DARK_OVERRIDES.text_secondary,
   };
-}
-
-/**
- * Ensure a color has sufficient contrast against a background.
- * If contrast ratio is below 3:1, progressively lighten until readable.
- */
-function ensureContrast(color: string, background: string): string {
-  let current = color;
-  for (let i = 0; i < 5; i++) {
-    if (contrastRatio(current, background) >= 3.0) return current;
-    current = lightenHex(current, 0.2);
-  }
-  return current;
-}
-
-/**
- * WCAG contrast ratio between two hex colors.
- */
-function contrastRatio(hex1: string, hex2: string): number {
-  const l1 = relativeLuminance(hex1);
-  const l2 = relativeLuminance(hex2);
-  const lighter = Math.max(l1, l2);
-  const darker = Math.min(l1, l2);
-  return (lighter + 0.05) / (darker + 0.05);
-}
-
-function relativeLuminance(hex: string): number {
-  const c = hex.replace('#', '');
-  const srgb = [
-    parseInt(c.substring(0, 2), 16) / 255,
-    parseInt(c.substring(2, 4), 16) / 255,
-    parseInt(c.substring(4, 6), 16) / 255,
-  ];
-  const [r, g, b] = srgb.map(v =>
-    v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4),
-  );
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
 /**
