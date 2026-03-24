@@ -22,9 +22,9 @@ export {
  * Brand primary/secondary stay the same; backgrounds and text flip.
  */
 export const HOTPICK_DARK_OVERRIDES = {
-  background_color: '#121212',
-  surface_color: '#1E1E1E',
-  text_primary: '#F5F5F5',
+  background_color: '#0D1117',
+  surface_color: '#161C26',
+  text_primary: '#F4F7FA',
   text_secondary: '#A0A0A0',
 } as const;
 
@@ -132,6 +132,6 @@ export const SEMANTIC_COLORS_DARK = {
   success: '#06D6A0',
   warning: '#FFD166',
   error: '#EF476F',
-  border: '#333333',
+  border: '#2C3A52',
   glow: '#51A1A6',
 } as const;
