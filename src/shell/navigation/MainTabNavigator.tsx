@@ -430,7 +430,8 @@ function SettingsTabWrapper(props: any) {
  * when an active sport exists, or an empty state when not.
  */
 export function MainTabNavigator() {
-  const {colors} = useTheme();
+  const {colors, isDark} = useTheme();
+  const brand = useBrand();
   const userProfile = useGlobalStore(s => s.userProfile);
   const activeSport = useGlobalStore(s => s.activeSport);
   const activePoolId = useGlobalStore(s => s.activePoolId);
@@ -467,7 +468,7 @@ export function MainTabNavigator() {
       )}
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.primary,
+        tabBarActiveTintColor: brand.isBranded ? colors.highlight : colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarStyle: {
           backgroundColor: colors.background,
