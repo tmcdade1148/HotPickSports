@@ -158,10 +158,10 @@ function TabHeader({title, showPoolSwitcher}: {title: string; showPoolSwitcher: 
             <Text style={[headerStyles.switchLabel, {color: colors.textSecondary}]}>
               Switch Pools:
             </Text>
-            <Text style={[headerStyles.poolName, {color: colors.highlight, fontWeight: '900'}]} numberOfLines={1}>
+            <Text style={[headerStyles.poolName, {color: colors.primary, fontWeight: '900'}]} numberOfLines={1}>
               {poolName}
             </Text>
-            <ChevronDown size={16} color={colors.highlight} />
+            <ChevronDown size={16} color={colors.primary} />
           </TouchableOpacity>
         ) : (
           <Text style={[headerStyles.message, {color: colors.textSecondary}]}>
@@ -430,8 +430,7 @@ function SettingsTabWrapper(props: any) {
  * when an active sport exists, or an empty state when not.
  */
 export function MainTabNavigator() {
-  const {colors, isDark} = useTheme();
-  const brand = useBrand();
+  const {colors} = useTheme();
   const userProfile = useGlobalStore(s => s.userProfile);
   const activeSport = useGlobalStore(s => s.activeSport);
   const activePoolId = useGlobalStore(s => s.activePoolId);
@@ -468,7 +467,7 @@ export function MainTabNavigator() {
       )}
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: brand.isBranded ? colors.highlight : colors.primary,
+        tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarStyle: {
           backgroundColor: colors.background,
