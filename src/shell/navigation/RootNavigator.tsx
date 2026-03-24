@@ -65,12 +65,9 @@ const linking = {
  */
 function handleDeepLink(url: string) {
   try {
-    console.log('[DeepLink] Received URL:', url);
-
     // Password reset — check before invite code parsing to avoid
     // confusing the PKCE `code` param with an invite code
     if (url.includes('auth/reset') || url.includes('type=recovery')) {
-      console.log('[DeepLink] Matched password reset URL');
       handlePasswordResetLink(url);
       return;
     }
@@ -109,75 +106,50 @@ function handleDeepLink(url: string) {
  */
 async function handlePasswordResetLink(url: string) {
   try {
-    console.log('[DeepLink] Processing password reset URL:', url);
-
     // --- Try PKCE flow first (Supabase v2 default) ---
     // URL format: hotpick://auth/reset?code=XXX
     const parsed = new URL(url);
     const pkceCode = parsed.searchParams.get('code');
-    console.log('[DeepLink] PKCE code:', pkceCode ? 'found' : 'not found');
 
     if (pkceCode) {
-      console.log('[DeepLink] Exchanging PKCE code for session...');
-      const {data, error} = await supabase.auth.exchangeCodeForSession(pkceCode);
-      console.log('[DeepLink] PKCE exchange result:', error ? error.message : 'success');
-      if (error) {
-        console.warn('Password reset PKCE exchange error:', error.message);
-        return;
-      }
+      const {error} = await supabase.auth.exchangeCodeForSession(pkceCode);
+      if (error) return;
       navigateToReset();
       return;
     }
 
     // --- Fallback: implicit flow (fragment-based tokens) ---
     const fragment = url.split('#')[1];
-    console.log('[DeepLink] Fragment:', fragment ? 'found' : 'not found');
-    if (!fragment) {
-      console.log('[DeepLink] No PKCE code and no fragment — cannot process');
-      return;
-    }
+    if (!fragment) return;
 
     const fragmentParams = new URLSearchParams(fragment);
     const accessToken = fragmentParams.get('access_token');
     const refreshToken = fragmentParams.get('refresh_token');
 
-    if (!accessToken || !refreshToken) {
-      console.log('[DeepLink] Missing tokens in fragment');
-      return;
-    }
+    if (!accessToken || !refreshToken) return;
 
     const {error} = await supabase.auth.setSession({
       access_token: accessToken,
       refresh_token: refreshToken,
     });
 
-    if (error) {
-      console.warn('Password reset session error:', error.message);
-      return;
-    }
+    if (error) return;
 
     navigateToReset();
-  } catch (err) {
-    console.warn('Password reset deep link error:', err);
+  } catch {
+    // Invalid URL or network error — ignore
   }
 }
 
 /** Navigate to ResetPassword screen — uses reset to force navigation regardless of current state. */
 function navigateToReset() {
-  console.log('[DeepLink] Navigating to ResetPassword...');
   setTimeout(() => {
     const nav = navigationRef.current;
-    if (!nav) {
-      console.warn('[DeepLink] Navigator not ready');
-      return;
-    }
-    // Use reset to force navigation — navigate() may not work if the
-    // current screen stack doesn't allow pushing ResetPassword
+    if (!nav) return;
     nav.reset({
       index: 0,
       routes: [{name: 'ResetPassword'}],
     });
-    console.log('[DeepLink] Navigation dispatched');
   }, 500);
 }
 
