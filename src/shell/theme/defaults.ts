@@ -24,7 +24,7 @@ export {
 export const HOTPICK_DARK_OVERRIDES = {
   background_color: '#0D1117',
   surface_color: '#161C26',
-  text_primary: '#F4F7FA',
+  text_primary: '#8A97AA',
   text_secondary: '#A0A0A0',
 } as const;
 

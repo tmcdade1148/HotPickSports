@@ -36,7 +36,7 @@ import type {
  * template tab navigator for that event.
  */
 export function HomeScreen({navigation}: any) {
-  const {colors} = useTheme();
+  const {colors, isDark} = useTheme();
   const brand = useBrand();
   const styles = createStyles(colors);
   const userProfile = useGlobalStore(s => s.userProfile);
@@ -112,7 +112,10 @@ export function HomeScreen({navigation}: any) {
           />
         ) : (
           <Image
-            source={require('../../assets/hotpick-wordmark-lt.png')}
+            source={isDark
+              ? require('../../assets/hotpick-wordmark-dk.png')
+              : require('../../assets/hotpick-wordmark-lt.png')
+            }
             style={styles.wordmark}
             resizeMode="contain"
           />
