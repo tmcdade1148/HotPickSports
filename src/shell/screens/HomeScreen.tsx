@@ -38,7 +38,7 @@ import type {
 export function HomeScreen({navigation}: any) {
   const {colors, isDark} = useTheme();
   const brand = useBrand();
-  const styles = createStyles(colors, isDark);
+  const styles = createStyles(colors);
   const userProfile = useGlobalStore(s => s.userProfile);
   const activeEventCards = useGlobalStore(s => s.activeEventCards);
   const activeSport = useGlobalStore(s => s.activeSport);
@@ -226,7 +226,7 @@ function getGreeting(): string {
   return 'Good evening';
 }
 
-const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -259,7 +259,7 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     fontSize: 24,
     fontWeight: '800' as const,
     fontStyle: 'italic' as const,
-    color: isDark ? colors.highlight : colors.primary,
+    color: colors.primary,
     textTransform: 'uppercase',
   },
   phaseLabel: {

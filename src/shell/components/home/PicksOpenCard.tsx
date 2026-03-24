@@ -123,7 +123,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   weekLabel: {
     ...typography.h2,
-    color: colors.highlight,
+    color: colors.primary,
     fontWeight: '900',
     fontStyle: 'italic',
     letterSpacing: 1,
