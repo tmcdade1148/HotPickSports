@@ -14,15 +14,15 @@ import type {BrandConfig, BrandLogoSet} from './types';
  *
  * | Token      | Hex       | Usage                                          |
  * |------------|-----------|------------------------------------------------|
- * | primary    | #F66321   | CTAs, active buttons, highlights               |
+ * | primary    | #F5620F   | CTAs, active buttons, highlights               |
  * | secondary  | #45615E   | Accents, inactive states                       |
- * | highlight  | #E39032   | Light color for text/elements on dark backgrounds |
+ * | highlight  | #F5C842   | Light color for text/elements on dark backgrounds |
  * | background | #FCFCFC   | App bg, splash bg, adaptive icon bg            |
  */
 export const HOTPICK_BRAND_COLORS = {
-  primary: '#F66321',
+  primary: '#F5620F',
   secondary: '#45615E',
-  highlight: '#E39032',
+  highlight: '#F5C842',
   background: '#FCFCFC',
 } as const;
 

@@ -11,6 +11,7 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
+  Linking,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import {useNavigation} from '@react-navigation/native';
@@ -30,6 +31,7 @@ import {
   BookOpen,
   Mail,
   Shield,
+  FileText,
 } from 'lucide-react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {SYSTEM_AVATARS} from '@shell/components/AvatarSelector';
@@ -444,6 +446,16 @@ export function SettingsScreen() {
         <View style={styles.linkLeft}>
           <Shield size={20} color={colors.primary} />
           <Text style={[styles.linkText, {color: colors.textPrimary}]}>Privacy Policy</Text>
+        </View>
+        <ChevronRight size={18} color={colors.textSecondary} />
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.linkRow, {backgroundColor: colors.surface}]}
+        onPress={() => Linking.openURL('https://hotpicksports.com/terms')}>
+        <View style={styles.linkLeft}>
+          <FileText size={20} color={colors.primary} />
+          <Text style={[styles.linkText, {color: colors.textPrimary}]}>Terms of Service</Text>
         </View>
         <ChevronRight size={18} color={colors.textSecondary} />
       </TouchableOpacity>
