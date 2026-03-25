@@ -183,16 +183,19 @@ export function SettingsScreen() {
         <ChevronRight size={20} color={colors.textSecondary} />
       </TouchableOpacity>
 
-      {/* Message Center */}
-      <TouchableOpacity
-        style={[styles.linkRow, {backgroundColor: colors.surface}]}
-        onPress={() => navigation.navigate('MessageCenter')}>
-        <View style={styles.linkLeft}>
-          <Mail size={20} color={colors.primary} />
-          <Text style={[styles.linkText, {color: colors.textPrimary}]}>Message Center</Text>
-        </View>
-        <ChevronRight size={18} color={colors.textSecondary} />
-      </TouchableOpacity>
+      {/* Inbox section */}
+      <Text style={[styles.groupLabel, {color: colors.textSecondary}]}>Inbox</Text>
+      <View style={[styles.groupCard, {backgroundColor: colors.surface}]}>
+        <TouchableOpacity
+          style={styles.groupRow}
+          onPress={() => navigation.navigate('MessageCenter')}>
+          <View style={styles.linkLeft}>
+            <Mail size={20} color={colors.primary} />
+            <Text style={[styles.linkText, {color: colors.textPrimary}]}>Message Center</Text>
+          </View>
+          <ChevronRight size={18} color={colors.textSecondary} />
+        </TouchableOpacity>
+      </View>
 
       {/* Pools section — collapsible */}
       <TouchableOpacity
@@ -419,68 +422,75 @@ export function SettingsScreen() {
         </View>
       )}
 
-      {/* Links section */}
-      <TouchableOpacity
-        style={[styles.linkRow, {backgroundColor: colors.surface}]}
-        onPress={() => navigation.navigate('Instructions')}>
-        <View style={styles.linkLeft}>
-          <BookOpen size={20} color={colors.primary} />
-          <Text style={[styles.linkText, {color: colors.textPrimary}]}>How HotPick Works</Text>
-        </View>
-        <ChevronRight size={18} color={colors.textSecondary} />
-      </TouchableOpacity>
+      {/* About & Legal section */}
+      <Text style={[styles.groupLabel, {color: colors.textSecondary}]}>About & Legal</Text>
+      <View style={[styles.groupCard, {backgroundColor: colors.surface}]}>
+        <TouchableOpacity
+          style={styles.groupRow}
+          onPress={() => navigation.navigate('Instructions')}>
+          <View style={styles.linkLeft}>
+            <BookOpen size={20} color={colors.primary} />
+            <Text style={[styles.linkText, {color: colors.textPrimary}]}>How HotPick Works</Text>
+          </View>
+          <ChevronRight size={18} color={colors.textSecondary} />
+        </TouchableOpacity>
+        <View style={[styles.groupDivider, {backgroundColor: colors.border}]} />
+        <TouchableOpacity
+          style={styles.groupRow}
+          onPress={() => navigation.navigate('About')}>
+          <View style={styles.linkLeft}>
+            <Info size={20} color={colors.primary} />
+            <Text style={[styles.linkText, {color: colors.textPrimary}]}>About HotPick Sports</Text>
+          </View>
+          <ChevronRight size={18} color={colors.textSecondary} />
+        </TouchableOpacity>
+        <View style={[styles.groupDivider, {backgroundColor: colors.border}]} />
+        <TouchableOpacity
+          style={styles.groupRow}
+          onPress={() => navigation.navigate('PrivacyPolicy')}>
+          <View style={styles.linkLeft}>
+            <Shield size={20} color={colors.primary} />
+            <Text style={[styles.linkText, {color: colors.textPrimary}]}>Privacy Policy</Text>
+          </View>
+          <ChevronRight size={18} color={colors.textSecondary} />
+        </TouchableOpacity>
+        <View style={[styles.groupDivider, {backgroundColor: colors.border}]} />
+        <TouchableOpacity
+          style={styles.groupRow}
+          onPress={() => navigation.navigate('TermsOfService')}>
+          <View style={styles.linkLeft}>
+            <FileText size={20} color={colors.primary} />
+            <Text style={[styles.linkText, {color: colors.textPrimary}]}>Terms of Service</Text>
+          </View>
+          <ChevronRight size={18} color={colors.textSecondary} />
+        </TouchableOpacity>
+      </View>
 
-      <TouchableOpacity
-        style={[styles.linkRow, {backgroundColor: colors.surface}]}
-        onPress={() => navigation.navigate('About')}>
-        <View style={styles.linkLeft}>
-          <Info size={20} color={colors.primary} />
-          <Text style={[styles.linkText, {color: colors.textPrimary}]}>About HotPick Sports</Text>
-        </View>
-        <ChevronRight size={18} color={colors.textSecondary} />
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[styles.linkRow, {backgroundColor: colors.surface}]}
-        onPress={() => navigation.navigate('PrivacyPolicy')}>
-        <View style={styles.linkLeft}>
-          <Shield size={20} color={colors.primary} />
-          <Text style={[styles.linkText, {color: colors.textPrimary}]}>Privacy Policy</Text>
-        </View>
-        <ChevronRight size={18} color={colors.textSecondary} />
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[styles.linkRow, {backgroundColor: colors.surface}]}
-        onPress={() => navigation.navigate('TermsOfService')}>
-        <View style={styles.linkLeft}>
-          <FileText size={20} color={colors.primary} />
-          <Text style={[styles.linkText, {color: colors.textPrimary}]}>Terms of Service</Text>
-        </View>
-        <ChevronRight size={18} color={colors.textSecondary} />
-      </TouchableOpacity>
-
-      {/* Super Admin tools — only visible to platform admins */}
+      {/* Admin section — super admin only */}
       {userProfile?.is_super_admin && (
         <>
-          <TouchableOpacity
-            style={[styles.linkRow, {backgroundColor: colors.surface}]}
-            onPress={() => navigation.navigate('PartnerAdmin')}>
-            <View style={styles.linkLeft}>
-              <Palette size={20} color={colors.primary} />
-              <Text style={[styles.linkText, {color: colors.textPrimary}]}>Partner Admin</Text>
-            </View>
-            <ChevronRight size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.linkRow, {backgroundColor: colors.surface}]}
-            onPress={() => navigation.navigate('HardwareAdmin')}>
-            <View style={styles.linkLeft}>
-              <Award size={20} color={colors.primary} />
-              <Text style={[styles.linkText, {color: colors.textPrimary}]}>Hardware Admin</Text>
-            </View>
-            <ChevronRight size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
+          <Text style={[styles.groupLabel, {color: colors.textSecondary}]}>Admin</Text>
+          <View style={[styles.groupCard, {backgroundColor: colors.surface}]}>
+            <TouchableOpacity
+              style={styles.groupRow}
+              onPress={() => navigation.navigate('PartnerAdmin')}>
+              <View style={styles.linkLeft}>
+                <Palette size={20} color={colors.primary} />
+                <Text style={[styles.linkText, {color: colors.textPrimary}]}>Partner Admin</Text>
+              </View>
+              <ChevronRight size={18} color={colors.textSecondary} />
+            </TouchableOpacity>
+            <View style={[styles.groupDivider, {backgroundColor: colors.border}]} />
+            <TouchableOpacity
+              style={styles.groupRow}
+              onPress={() => navigation.navigate('HardwareAdmin')}>
+              <View style={styles.linkLeft}>
+                <Award size={20} color={colors.primary} />
+                <Text style={[styles.linkText, {color: colors.textPrimary}]}>Hardware Admin</Text>
+              </View>
+              <ChevronRight size={18} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
         </>
       )}
 
@@ -698,7 +708,33 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
-  // Link rows
+  // Group section
+  groupLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginBottom: spacing.xs,
+    marginTop: spacing.md,
+    marginLeft: spacing.xs,
+  },
+  groupCard: {
+    borderRadius: borderRadius.lg,
+    marginBottom: spacing.sm,
+    overflow: 'hidden',
+  },
+  groupRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing.md,
+    paddingVertical: spacing.md + 2,
+  },
+  groupDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: spacing.md + 20 + spacing.md, // icon width + gap
+  },
+  // Link rows (standalone)
   linkRow: {
     flexDirection: 'row',
     alignItems: 'center',
