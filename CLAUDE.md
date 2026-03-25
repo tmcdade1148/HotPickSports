@@ -42,6 +42,12 @@ Never suggest designs that tie picks or scores to a pool_id.**
 - Game Day Engagement System: live pick splits, HotPick concentration, Path Back narrative
 - History & Hardware System: 11 award types, History tab, Hardware Admin, Player Archetypes
 - Settings page organized into grouped sections (Inbox, My Pools, About & Legal, Admin)
+- Push notifications: expo-notifications SDK, process-notification-queue Edge Function (cron 60s)
+- Notification preferences: 8 toggleable types per user, enforced server-side before delivery
+- Account deletion: two-step confirmation, anonymize_deleted_user() RPC, satisfies Apple/Google
+- TOS checkbox: explicit acceptance required before auth, writes tos_accepted_at + tos_version
+- User blocking: platform-wide via user_blocks table, long-press Block in SmackTalk
+- Community Guidelines screen linked from Settings
 
 **Default event:** `nfl_2026` — this is the active competition.
 Do not default to worldCup2026 or any other event.
