@@ -115,5 +115,9 @@ export async function runPostAuthFlow({
   }
 
   store.subscribeSmackUnread();
+
+  // Load hardware for History tab gate (non-blocking)
+  store.loadUserHardware();
+
   navigation.replace('Home');
 }

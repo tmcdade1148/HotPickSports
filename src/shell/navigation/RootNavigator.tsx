@@ -25,6 +25,7 @@ import {InstructionsScreen} from '@shell/screens/InstructionsScreen';
 import {PrivacyPolicyScreen} from '@shell/screens/PrivacyPolicyScreen';
 import {TermsOfServiceScreen} from '@shell/screens/TermsOfServiceScreen';
 import {ResetPasswordScreen} from '@shell/screens/ResetPasswordScreen';
+import {HardwareAdminScreen} from '@shell/screens/HardwareAdminScreen';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {supabase} from '@shared/config/supabase';
 import {Linking} from 'react-native';
@@ -198,6 +199,7 @@ export function RootNavigator() {
         <Stack.Screen name="FlaggedMessages" component={FlaggedMessagesScreen} />
         <Stack.Screen name="MessageCenter" component={MessageCenterScreen} />
         <Stack.Screen name="PartnerAdmin" component={PartnerAdminScreen} />
+        <Stack.Screen name="HardwareAdmin" component={HardwareAdminScreen} />
         <Stack.Screen name="About" component={AboutScreen} />
         <Stack.Screen name="Instructions" component={InstructionsScreen} />
         <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
