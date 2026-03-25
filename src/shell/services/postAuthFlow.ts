@@ -11,6 +11,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {getDefaultEvent} from '@sports/registry';
+import {registerForPushNotifications} from '@shell/services/pushNotifications';
 import type {User} from '@supabase/supabase-js';
 
 interface ProviderName {
@@ -118,6 +119,9 @@ export async function runPostAuthFlow({
 
   // Load hardware for History tab gate (non-blocking)
   store.loadUserHardware();
+
+  // Register push token for returning users (non-blocking)
+  registerForPushNotifications(user.id).catch(() => {});
 
   navigation.replace('Home');
 }

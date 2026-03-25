@@ -6,6 +6,7 @@ import type {BrandConfig} from '@shell/theme/types';
 import {supabase} from '@shared/config/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {getEventsByPriority} from '@sports/registry';
+import {deactivateDeviceTokens} from '@shell/services/pushNotifications';
 
 const POOL_STORAGE_PREFIX = 'hotpick_active_pool_';
 const DEFAULT_POOL_PREFIX = 'hotpick_default_pool_';
@@ -197,6 +198,12 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   signOut: async () => {
     // Clean up Realtime subscription
     get().unsubscribeSmackUnread();
+
+    // Deactivate push tokens for this device (is_active = false, never DELETE)
+    const userId = get().user?.id;
+    if (userId) {
+      await deactivateDeviceTokens(userId).catch(() => {});
+    }
 
     // Clear all per-competition pool + default pool keys
     const keys = await AsyncStorage.getAllKeys();

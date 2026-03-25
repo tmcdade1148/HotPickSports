@@ -11,6 +11,8 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
+import {useGlobalStore} from '@shell/stores/globalStore';
+import {registerForPushNotifications, seedNotificationPreferences} from '@shell/services/pushNotifications';
 
 const BENEFITS = [
   {icon: '\u{23F0}', text: 'Pick deadline reminders so you never miss a week'},
@@ -22,37 +24,39 @@ export function PushNotificationScreen({navigation}: any) {
   const {colors} = useTheme();
   const styles = createStyles(colors);
   const [requesting, setRequesting] = useState(false);
+  const userId = useGlobalStore(s => s.user?.id);
 
   const handleEnable = async () => {
+    if (!userId) {
+      proceedToNextScreen();
+      return;
+    }
+
     setRequesting(true);
 
-    // On iOS, this will trigger the system permission dialog.
-    // Actual push token registration (Expo Push / APNs / FCM) will be
-    // wired when the push notification dependency is added.
-    // For now, we request the permission and proceed.
-    if (Platform.OS === 'ios') {
-      // iOS: The system dialog can only be shown once. After that, user
-      // must go to Settings. We're using the priming screen to maximize
-      // the grant rate on that single shot.
-      try {
-        // Use the native Notification API when available
-        // For now, just proceed — token registration happens when infra is ready
-        Alert.alert(
-          'Notifications',
-          'Push notification support is being configured. You can enable notifications in Settings later.',
-          [{text: 'OK', onPress: () => proceedToNextScreen()}],
-        );
-      } catch {
-        proceedToNextScreen();
+    try {
+      // Request permission and register the device token
+      const token = await registerForPushNotifications(userId);
+
+      if (token) {
+        // Seed default notification preferences
+        await seedNotificationPreferences(userId);
+        console.log('[Push] Registered and preferences seeded');
+      } else {
+        console.log('[Push] Permission denied or simulator — skipping');
       }
-    } else {
-      // Android: notifications are enabled by default (API < 33) or
-      // require runtime permission (API 33+)
-      proceedToNextScreen();
+    } catch (err) {
+      console.error('[Push] Registration error:', err);
     }
+
+    proceedToNextScreen();
   };
 
   const handleSkip = () => {
+    // Seed preferences even on skip — so the preferences UI has rows to toggle
+    if (userId) {
+      seedNotificationPreferences(userId).catch(() => {});
+    }
     proceedToNextScreen();
   };
 
