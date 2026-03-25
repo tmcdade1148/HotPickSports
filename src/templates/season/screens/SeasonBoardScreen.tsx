@@ -17,6 +17,7 @@ import {spacing, borderRadius} from '@shared/theme';
 import {Flame} from 'lucide-react-native';
 
 import {useTheme} from '@shell/theme';
+import {useNFLStore} from '@sports/nfl/stores/nflStore';
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
@@ -41,6 +42,8 @@ export function SeasonBoardScreen() {
   const fetchLeaderboard = useSeasonStore(s => s.fetchLeaderboard);
   const fetchWeekLeaderboard = useSeasonStore(s => s.fetchWeekLeaderboard);
   const {user} = useAuth();
+
+  const pathBackNarrative = useNFLStore(s => s.pathBackNarrative);
 
   const [activeTab, setActiveTab] = useState<'season' | 'week'>('season');
   const scrollRef = useRef<ScrollView>(null);
@@ -151,6 +154,10 @@ export function SeasonBoardScreen() {
             <Text style={styles.breakdown}>
               Wk {latestWeek}: {latestPoints} pts
             </Text>
+          )}
+          {/* Path Back Narrative — shown only on user's own row */}
+          {isMe && pathBackNarrative && (
+            <Text style={styles.narrativeText}>{pathBackNarrative}</Text>
           )}
         </View>
         <Text style={[styles.totalPoints, isMe && styles.textHighlight]}>
@@ -391,5 +398,12 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
     textAlign: 'center',
+  },
+  narrativeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    fontStyle: 'italic',
+    color: colors.primary,
+    marginTop: 4,
   },
 });
