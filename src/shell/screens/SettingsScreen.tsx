@@ -33,6 +33,7 @@ import {
   FileText,
   Award,
   Trash2,
+  MessageSquare,
 } from 'lucide-react-native';
 import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
@@ -507,6 +508,16 @@ export function SettingsScreen() {
           <View style={styles.linkLeft}>
             <FileText size={20} color={colors.primary} />
             <Text style={[styles.linkText, {color: colors.textPrimary}]}>Terms of Service</Text>
+          </View>
+          <ChevronRight size={18} color={colors.textSecondary} />
+        </TouchableOpacity>
+        <View style={[styles.groupDivider, {backgroundColor: colors.border}]} />
+        <TouchableOpacity
+          style={styles.groupRow}
+          onPress={() => navigation.navigate('CommunityGuidelines')}>
+          <View style={styles.linkLeft}>
+            <MessageSquare size={20} color={colors.primary} />
+            <Text style={[styles.linkText, {color: colors.textPrimary}]}>Community Guidelines</Text>
           </View>
           <ChevronRight size={18} color={colors.textSecondary} />
         </TouchableOpacity>
