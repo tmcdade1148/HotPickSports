@@ -39,6 +39,9 @@ Never suggest designs that tie picks or scores to a pool_id.**
 - Password recovery: deep link via `hotpick://auth/reset`, PKCE + implicit flow supported
 - Privacy policy rendered as native ScrollView (no WebView), linked from login + Settings
 - Terms of Service rendered as native ScrollView, linked from login + Settings
+- Game Day Engagement System: live pick splits, HotPick concentration, Path Back narrative
+- History & Hardware System: 11 award types, History tab, Hardware Admin, Player Archetypes
+- Settings page organized into grouped sections (Inbox, My Pools, About & Legal, Admin)
 
 **Default event:** `nfl_2026` — this is the active competition.
 Do not default to worldCup2026 or any other event.
@@ -851,8 +854,8 @@ SUBSCRIPTION_MODIFIED
 Do not implement or suggest these unless explicitly asked:
 - Power-ups (Double-Down, Lifeline, Bracket Vision)
 - Pick change log UI (table exists, not wired)
-- Personality profiles / career stats (needs multiple events of data)
-- Achievement tracking (table exists, no triggers)
+- Career hardware awards: Veteran, Back-to-Back, Iron Man (Phase 2 — needs multi-season data)
+- AI-generated Player Archetypes (Phase 2 — template-based system ships at launch)
 - Tier system (needs cross-event data)
 - Advanced pool admin: nudge flow (member list, pool settings, broadcast, moderation, message center are built)
 - Pool discovery / browse
@@ -1944,3 +1947,154 @@ The `highlight` color (`#F5C842` for HotPick) is used for:
 - SeasonEventCard header shows "NFL 2026" (derived from competition string) in `highlight` color
 - Score pill and kickoff module rendered outside the card container, between header and week state content
 - Kickoff module label reads "Picks go LIVE in:" (changes contextually, e.g. "Picks are LIVE")
+- Settings page organized into grouped sections: Inbox, My Pools, About & Legal, Admin
+
+---
+
+## 26. Game Day Engagement System
+
+Three connected systems that transform the live game experience:
+
+### game_pick_stats Table
+
+Pre-computed aggregate pick stats per game per pool. Refreshed by
+Edge Function every 60 seconds on game days. Game cards read from
+this table — never from `season_picks` directly.
+
+**Privacy gate:** Stats are ONLY computed for games with
+`status = 'live'` or FINAL. Games in `status = 'scheduled'` are
+never included — picks are sealed until kickoff.
+
+**pool_id is correct here** — this is a display cache, not a
+scoring table. Different pools see different percentages.
+
+### Pool Pick Stats (Game Card Reveal)
+
+At kickoff, each game card reveals:
+- **Pick Split**: percentage bar showing pool pick distribution
+- **HotPick Concentration**: how many poolmates chose this game
+  as HotPick, and which team they picked
+
+### Path Back Narrative
+
+Mathematically honest "you still have a shot" messaging:
+- Shown on LiveCard (Home Screen) and user's own leaderboard row
+- Computes position relative to person above + unsettled HotPick
+- Client-side display logic only — never influences scoring
+- If math says user is locked out, show nothing. Don't rub it in.
+
+### Rival Tracker (Phase 2)
+
+Person directly above you + what it would take to overtake them.
+No additional tables needed — uses same pool standings data.
+
+### Edge Functions
+
+- `refresh-game-pick-stats` — cron every 60s, idle on non-game days
+- Realtime subscription in `nflStore` pushes updates to clients
+
+### nflStore Additions
+
+```typescript
+gamePickStats: Record<string, GamePickStats>;  // gameId → stats
+pathBackNarrative: string | null;
+hotPickGameStatus: 'pending' | 'live' | 'complete' | null;
+loadGamePickStats: (poolId: string) => Promise<void>;
+subscribeToGamePickStats: (poolId: string) => () => void;
+computePathBackNarrative: (userId: string) => void;
+```
+
+### Red Flags: Game Day Engagement Violations
+- Pick percentages shown before kickoff
+- `season_picks` queried directly from game cards (use `game_pick_stats`)
+- Path Back narrative influencing scoring decisions
+- Realtime subscription left open when weekState is not 'live'
+- Client polling ESPN directly (server-side polling only)
+
+---
+
+## 27. History Page & Hardware System
+
+### user_hardware Table
+
+Permanent per-user award record. One row per award earned per instance.
+**Never delete rows** — set `is_visible = false` to hide.
+
+Unique constraint: `(user_id, hardware_slug, competition, week, pool_id)`
+with `NULLS NOT DISTINCT`. All writes use `ON CONFLICT DO NOTHING` —
+idempotent and safe to re-run.
+
+### Hardware Catalog (Launch Awards)
+
+**Weekly** (awarded after each week settles, per pool):
+- `sharpshooter_week` — highest regular pick win rate (min 10 picks)
+- `gunslinger_week` — won Rank 12+ HotPick
+- `contrarian_week` — against majority on 8+ games, top 3, hotpick correct
+- `perfect_week` — 15/15 + hotpick correct (platform scope)
+
+**Season-end** (awarded after `is_season_complete = true`):
+- `pool_champion` / `podium_2nd` / `podium_3rd` — final pool standings
+- `biggest_comeback` — largest rank swing (min 6 weeks)
+- `iron_poolie` — 18/18 weeks submitted
+- `season_sharpshooter` — best regular pick rate (min 15 weeks, platform)
+- `hotpick_artist` — best HotPick win rate (min 15, platform)
+- `season_tactician` — Rank 1-6 HotPick 12+ weeks, positive total (platform)
+
+**Career (Phase 2 — do not build at launch):**
+- `veteran`, `back_to_back`, `iron_man`
+
+### compute-hardware Edge Function
+
+Single function handles all award computation. Triggered by:
+- `weekly_settle` — after all games in a week complete
+- `season_settle` — after `is_season_complete = true`
+- `manual_override` — Tom triggers from Hardware Admin screen
+
+Cron: runs at minutes :05 and :35 (5 min after scoring settles).
+
+### Player Archetypes
+
+Template-based labels computed client-side from career stats:
+- The Closer, The Sharpshooter, The Gunslinger, The Grinder
+- AI-generated archetypes are Phase 2 (no data model changes needed)
+- If no threshold met, show no archetype — never show placeholder
+
+### History Tab
+
+- Hidden from navigation until user has at least one settled week
+- Tab appearing mid-season is itself a moment of delight
+- Three sections: Player Archetype, Hardware Shelf, Season History
+
+### Hardware Module (Home Screen)
+
+Shows latest earned award with total count. Self-hides when empty.
+Taps navigate to History tab.
+
+### Hardware Admin Screen
+
+Super admin only (`is_super_admin`). Manual trigger for weekly/season/full
+award computation. Accessible from Settings → Admin section.
+
+### globalStore Additions
+
+```typescript
+userHardware: UserHardwareItem[];
+hasHistory: boolean;
+historyVisibility: 'private' | 'pools_only' | 'public';
+playerArchetype: PlayerArchetype | null;
+loadUserHardware: () => Promise<void>;
+updateHistoryVisibility: (v) => Promise<void>;
+computePlayerArchetype: () => void;
+```
+
+### Red Flags: History & Hardware Violations
+- Client-side award computation → Edge Function only
+- `DELETE FROM user_hardware` → use `is_visible = false`
+- `INSERT` without `ON CONFLICT DO NOTHING` → duplicates are permanent
+- Renaming a `hardware_slug` → rename `hardware_name` instead
+- Showing Phase 2 career hardware as locked silhouettes at launch
+- Gambling language in award names or archetype descriptions
+
+> **What to say:** "Award computation runs in the compute-hardware
+> Edge Function only. Never delete from user_hardware — use
+> is_visible = false. Hardware slugs are permanent. Please revise."
