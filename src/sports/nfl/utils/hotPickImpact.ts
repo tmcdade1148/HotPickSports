@@ -42,7 +42,7 @@ export type HotPickImpact =
 // ---------------------------------------------------------------------------
 
 /**
- * Compute the live HotPick point impact for the user's staked game.
+ * Compute the live HotPick point impact for the user's designated game.
  *
  * Returns a discriminated union with the current impact status and
  * signed point value based on frozen_rank and the live score.

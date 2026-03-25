@@ -32,7 +32,9 @@ import {
   Shield,
   FileText,
   Award,
+  Trash2,
 } from 'lucide-react-native';
+import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {SYSTEM_AVATARS} from '@shell/components/AvatarSelector';
 import {getDisplayName} from '@shared/utils/displayName';
@@ -146,6 +148,50 @@ export function SettingsScreen() {
         },
       },
     ]);
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'This will permanently remove your name, email, and avatar. Your picks and scores will be retained anonymously for leaderboard integrity.\n\nYou will be signed out immediately. This cannot be undone.',
+      [
+        {text: 'Cancel', style: 'cancel'},
+        {
+          text: 'Delete My Account',
+          style: 'destructive',
+          onPress: () => {
+            // Second confirmation
+            Alert.alert(
+              'Are you absolutely sure?',
+              'Your profile, pool memberships, and notification preferences will be permanently removed.',
+              [
+                {text: 'Go Back', style: 'cancel'},
+                {
+                  text: 'Yes, Delete',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      if (!user?.id) return;
+                      const {error} = await supabase.rpc('anonymize_deleted_user', {
+                        p_user_id: user.id,
+                      });
+                      if (error) {
+                        Alert.alert('Error', 'Failed to delete account. Please try again or contact support@hotpicksports.com.');
+                        return;
+                      }
+                      await signOut();
+                      navigation.reset({index: 0, routes: [{name: 'Welcome'}]});
+                    } catch {
+                      Alert.alert('Error', 'Something went wrong. Please contact support@hotpicksports.com.');
+                    }
+                  },
+                },
+              ],
+            );
+          },
+        },
+      ],
+    );
   };
 
   // Find active pool name for the collapsed summary
@@ -499,6 +545,12 @@ export function SettingsScreen() {
         <LogOut size={18} color={colors.error} />
         <Text style={[styles.signOutText, {color: colors.error}]}>Sign Out</Text>
       </TouchableOpacity>
+
+      {/* Delete account */}
+      <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteAccount}>
+        <Trash2 size={16} color={colors.textSecondary} />
+        <Text style={[styles.deleteText, {color: colors.textSecondary}]}>Delete Account</Text>
+      </TouchableOpacity>
     </ScrollView>
     </View>
   );
@@ -766,5 +818,17 @@ const styles = StyleSheet.create({
   signOutText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.lg,
+    paddingBottom: spacing.md,
+  },
+  deleteText: {
+    fontSize: 13,
+    fontWeight: '400',
   },
 });
