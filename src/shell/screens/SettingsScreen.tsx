@@ -31,6 +31,7 @@ import {
   Mail,
   Shield,
   FileText,
+  Award,
 } from 'lucide-react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {SYSTEM_AVATARS} from '@shell/components/AvatarSelector';
@@ -461,15 +462,26 @@ export function SettingsScreen() {
 
       {/* Super Admin tools — only visible to platform admins */}
       {userProfile?.is_super_admin && (
-        <TouchableOpacity
-          style={[styles.linkRow, {backgroundColor: colors.surface}]}
-          onPress={() => navigation.navigate('PartnerAdmin')}>
-          <View style={styles.linkLeft}>
-            <Palette size={20} color={colors.primary} />
-            <Text style={[styles.linkText, {color: colors.textPrimary}]}>Partner Admin</Text>
-          </View>
-          <ChevronRight size={18} color={colors.textSecondary} />
-        </TouchableOpacity>
+        <>
+          <TouchableOpacity
+            style={[styles.linkRow, {backgroundColor: colors.surface}]}
+            onPress={() => navigation.navigate('PartnerAdmin')}>
+            <View style={styles.linkLeft}>
+              <Palette size={20} color={colors.primary} />
+              <Text style={[styles.linkText, {color: colors.textPrimary}]}>Partner Admin</Text>
+            </View>
+            <ChevronRight size={18} color={colors.textSecondary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.linkRow, {backgroundColor: colors.surface}]}
+            onPress={() => navigation.navigate('HardwareAdmin')}>
+            <View style={styles.linkLeft}>
+              <Award size={20} color={colors.primary} />
+              <Text style={[styles.linkText, {color: colors.textPrimary}]}>Hardware Admin</Text>
+            </View>
+            <ChevronRight size={18} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </>
       )}
 
       {/* Sign out */}

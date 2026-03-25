@@ -8,6 +8,7 @@ import {
   MessageCircle,
   Settings,
   ChevronDown,
+  Trophy,
 } from 'lucide-react-native';
 import {BottomTabBar} from '@react-navigation/bottom-tabs';
 import {HomeScreen} from '@shell/screens/HomeScreen';
@@ -29,6 +30,7 @@ import {TournamentPicksHub} from '@templates/tournament/screens/TournamentPicksH
 import {TournamentBoardScreen} from '@templates/tournament/screens/TournamentBoardScreen';
 import {SeriesPicksScreen} from '@templates/series/screens/SeriesPicksScreen';
 import {SeriesBoardScreen} from '@templates/series/screens/SeriesBoardScreen';
+import {HistoryScreen} from '@shell/screens/HistoryScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -434,6 +436,7 @@ export function MainTabNavigator() {
   const userProfile = useGlobalStore(s => s.userProfile);
   const activeSport = useGlobalStore(s => s.activeSport);
   const activePoolId = useGlobalStore(s => s.activePoolId);
+  const hasHistory = useGlobalStore(s => s.hasHistory);
   const homeLabel = getTabDisplayName(userProfile);
 
   // Initialize sport stores when activeSport or activePoolId changes
@@ -523,6 +526,18 @@ export function MainTabNavigator() {
           ),
         }}
       />
+      {hasHistory && (
+        <Tab.Screen
+          name="HistoryTab"
+          component={HistoryScreen}
+          options={{
+            tabBarLabel: 'History',
+            tabBarIcon: ({color, size}) => (
+              <Trophy size={size} color={color} />
+            ),
+          }}
+        />
+      )}
       <Tab.Screen
         name="SettingsTab"
         component={SettingsTabWrapper}
