@@ -19,8 +19,21 @@ export function WelcomeScreen({navigation}: any) {
   const {colors} = useTheme();
   const styles = createStyles(colors);
   const [loading, setLoading] = useState<string | null>(null);
+  const [tosAccepted, setTosAccepted] = useState(false);
+
+  const requireTos = () => {
+    if (!tosAccepted) {
+      Alert.alert(
+        'Terms Required',
+        'Please agree to the Terms of Service and Privacy Policy to continue.',
+      );
+      return false;
+    }
+    return true;
+  };
 
   const handleApple = async () => {
+    if (!requireTos()) return;
     setLoading('apple');
     try {
       const {user, providerName} = await signInWithApple();
@@ -38,6 +51,7 @@ export function WelcomeScreen({navigation}: any) {
   };
 
   const handleGoogle = async () => {
+    if (!requireTos()) return;
     setLoading('google');
     try {
       const {user, providerName} = await signInWithGoogle();
@@ -59,6 +73,7 @@ export function WelcomeScreen({navigation}: any) {
   };
 
   const handleEmail = () => {
+    if (!requireTos()) return;
     navigation.navigate('EmailEntry');
   };
 
@@ -118,20 +133,32 @@ export function WelcomeScreen({navigation}: any) {
           </TouchableOpacity>
         </View>
 
-        {/* TOS */}
-        <Text style={styles.tosText}>
-          By continuing you agree to our{' '}
-          <Text
-            style={styles.tosLink}
-            onPress={() => navigation.navigate('TermsOfService')}>
-            Terms of Service
-          </Text> and{' '}
-          <Text
-            style={styles.tosLink}
-            onPress={() => navigation.navigate('PrivacyPolicy')}>
-            Privacy Policy
+        {/* TOS checkbox */}
+        <TouchableOpacity
+          style={styles.tosRow}
+          onPress={() => setTosAccepted(!tosAccepted)}
+          activeOpacity={0.7}>
+          <View style={[
+            styles.checkbox,
+            {borderColor: tosAccepted ? colors.primary : colors.textSecondary},
+            tosAccepted && {backgroundColor: colors.primary},
+          ]}>
+            {tosAccepted && <Text style={styles.checkmark}>✓</Text>}
+          </View>
+          <Text style={styles.tosText}>
+            I agree to the{' '}
+            <Text
+              style={styles.tosLink}
+              onPress={() => navigation.navigate('TermsOfService')}>
+              Terms of Service
+            </Text> and{' '}
+            <Text
+              style={styles.tosLink}
+              onPress={() => navigation.navigate('PrivacyPolicy')}>
+              Privacy Policy
+            </Text>
           </Text>
-        </Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -200,13 +227,33 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  tosRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: spacing.xl,
+    paddingHorizontal: spacing.sm,
+    gap: spacing.sm,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  checkmark: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 16,
+  },
   tosText: {
     fontSize: 12,
     color: colors.textSecondary,
-    textAlign: 'center',
-    marginTop: spacing.xl,
     lineHeight: 18,
-    paddingHorizontal: spacing.lg,
+    flex: 1,
   },
   tosLink: {
     color: colors.primary,
