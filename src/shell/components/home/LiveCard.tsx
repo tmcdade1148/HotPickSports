@@ -12,6 +12,14 @@ interface LiveCardProps {
   userHotPick: DbSeasonPick | null;
   userHotPickGame: DbSeasonGame | null;
   liveScores: Record<string, GameScore>;
+  pathBackNarrative?: string | null;
+  hotPickGameStats?: {
+    hotpickTotal: number;
+    hotpickTeamACount: number;
+    hotpickTeamBCount: number;
+    teamA: string;
+    teamB: string;
+  } | null;
 }
 
 /**
@@ -23,6 +31,8 @@ export function LiveCard({
   userHotPick,
   userHotPickGame,
   liveScores,
+  pathBackNarrative,
+  hotPickGameStats,
 }: LiveCardProps) {
   const {colors} = useTheme();
   const styles = createStyles(colors);
@@ -72,9 +82,28 @@ export function LiveCard({
 
           {/* Point impact line */}
           {impact && <ImpactLine impact={impact} />}
+
+          {/* HotPick concentration — how many poolmates chose this game */}
+          {hotPickGameStats && hotPickGameStats.hotpickTotal > 0 && (
+            <View style={styles.concentrationRow}>
+              <Text style={styles.concentrationText}>
+                {hotPickGameStats.hotpickTotal} poolmate{hotPickGameStats.hotpickTotal !== 1 ? 's' : ''} have this as HotPick
+              </Text>
+              <Text style={styles.concentrationSplit}>
+                {hotPickGameStats.teamA} {hotPickGameStats.hotpickTeamACount} / {hotPickGameStats.hotpickTeamBCount} {hotPickGameStats.teamB}
+              </Text>
+            </View>
+          )}
         </View>
       ) : (
         <Text style={styles.body}>Follow your picks live</Text>
+      )}
+
+      {/* Path Back Narrative — shown only for this user */}
+      {pathBackNarrative && (
+        <View style={styles.narrativeRow}>
+          <Text style={styles.narrativeText}>{pathBackNarrative}</Text>
+        </View>
       )}
     </View>
   );
@@ -199,5 +228,33 @@ const createStyles = (colors: any) => StyleSheet.create({
   body: {
     ...typography.body,
     color: colors.textSecondary,
+  },
+  concentrationRow: {
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  concentrationText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginBottom: 2,
+  },
+  concentrationSplit: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  narrativeRow: {
+    marginTop: spacing.sm,
+    backgroundColor: colors.primary + '10',
+    borderRadius: 8,
+    padding: spacing.sm,
+  },
+  narrativeText: {
+    ...typography.caption,
+    color: colors.primary,
+    fontWeight: '600',
+    fontStyle: 'italic',
   },
 });

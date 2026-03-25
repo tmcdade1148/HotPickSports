@@ -7,10 +7,21 @@ import {spacing} from '@shared/theme';
 import {useSeasonStore} from '../stores/seasonStore';
 import {useTheme, useBrand} from '@shell/theme';
 
+interface PickSplitData {
+  teamAPickCount: number;
+  teamBPickCount: number;
+  totalPicks: number;
+  hotpickTotal: number;
+  hotpickTeamACount: number;
+  hotpickTeamBCount: number;
+}
+
 interface SeasonMatchCardProps {
   game: DbSeasonGame;
   config: SeasonConfig;
   userId: string;
+  /** Pool pick split stats — revealed at kickoff only */
+  pickSplit?: PickSplitData | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -116,6 +127,7 @@ export function SeasonMatchCard({
   game,
   config,
   userId,
+  pickSplit,
 }: SeasonMatchCardProps) {
   const {colors} = useTheme();
   const brand = useBrand();
@@ -248,6 +260,48 @@ export function SeasonMatchCard({
           />
         </TouchableOpacity>
       </View>
+
+      {/* ── Pick Split Bar — revealed at kickoff ── */}
+      {(isLive || isFinal) && pickSplit && pickSplit.totalPicks > 0 && (
+        <View style={styles.pickSplitContainer}>
+          {/* Percentage bar */}
+          <View style={styles.pickSplitBar}>
+            <View
+              style={[
+                styles.pickSplitFillA,
+                {
+                  flex: pickSplit.teamAPickCount || 1,
+                  backgroundColor: pickedTeam === game.home_team ? colors.primary : colors.textSecondary,
+                },
+              ]}
+            />
+            <View
+              style={[
+                styles.pickSplitFillB,
+                {
+                  flex: pickSplit.teamBPickCount || 1,
+                  backgroundColor: pickedTeam === game.away_team ? colors.primary : colors.textSecondary,
+                },
+              ]}
+            />
+          </View>
+          {/* Labels */}
+          <View style={styles.pickSplitLabels}>
+            <Text style={[styles.pickSplitPct, pickedTeam === game.home_team && {color: colors.primary}]}>
+              {Math.round((pickSplit.teamAPickCount / pickSplit.totalPicks) * 100)}%
+            </Text>
+            <Text style={styles.pickSplitPct}>
+              {Math.round((pickSplit.teamBPickCount / pickSplit.totalPicks) * 100)}%
+            </Text>
+          </View>
+          {/* HotPick concentration */}
+          {pickSplit.hotpickTotal > 0 && (
+            <Text style={styles.hotpickConcentration}>
+              {'\uD83D\uDD25'} {pickSplit.hotpickTotal} HotPick{pickSplit.hotpickTotal !== 1 ? 's' : ''}: {homeTeamName} {pickSplit.hotpickTeamACount} / {pickSplit.hotpickTeamBCount} {awayTeamName}
+            </Text>
+          )}
+        </View>
+      )}
 
       {/* ── Separator ── */}
       <View style={styles.separator} />
@@ -425,6 +479,46 @@ const createStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center',
     marginRight: 4,
   },
+  // Pick split bar
+  pickSplitContainer: {
+    marginLeft: 56,
+    marginRight: 52,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  pickSplitBar: {
+    flexDirection: 'row',
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: 2,
+  },
+  pickSplitFillA: {
+    borderTopLeftRadius: 3,
+    borderBottomLeftRadius: 3,
+    opacity: 0.6,
+  },
+  pickSplitFillB: {
+    borderTopRightRadius: 3,
+    borderBottomRightRadius: 3,
+    opacity: 0.6,
+  },
+  pickSplitLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  pickSplitPct: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.textSecondary,
+  },
+  hotpickConcentration: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+
   // Separator
   separator: {
     height: StyleSheet.hairlineWidth,

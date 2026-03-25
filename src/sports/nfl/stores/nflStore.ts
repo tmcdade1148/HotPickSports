@@ -38,6 +38,20 @@ export interface Standing {
   rank: number;
 }
 
+/** Pre-computed pick stats per game per pool (from game_pick_stats table) */
+export interface GamePickStats {
+  gameId: string;
+  teamA: string;
+  teamB: string;
+  teamAPickCount: number;
+  teamBPickCount: number;
+  totalPicks: number;
+  hotpickTeamACount: number;
+  hotpickTeamBCount: number;
+  hotpickTotal: number;
+  computedAt: string;
+}
+
 // ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
@@ -68,6 +82,11 @@ interface NFLState {
   // ScoreModule data
   lastWeekNet: number | null; // null in Week 1
 
+  // Game Day Engagement
+  gamePickStats: Record<string, GamePickStats>; // gameId → stats for active pool
+  pathBackNarrative: string | null; // computed narrative for current user
+  hotPickGameStatus: 'pending' | 'live' | 'complete' | null;
+
   // Actions
   initialize: (competition: string) => Promise<void>;
   setWeekState: (state: WeekState) => void;
@@ -81,6 +100,9 @@ interface NFLState {
   fetchUserPickStatus: (userId: string) => Promise<void>;
   fetchPoolStandings: (userId: string, poolId: string) => Promise<void>;
   fetchUserSeasonScore: (userId: string) => Promise<void>;
+  loadGamePickStats: (poolId: string) => Promise<void>;
+  computePathBackNarrative: (userId: string) => void;
+  subscribeToGamePickStats: (poolId: string) => () => void;
 }
 
 export const useNFLStore = create<NFLState>((set, get) => ({
@@ -109,6 +131,11 @@ export const useNFLStore = create<NFLState>((set, get) => ({
   // ScoreModule data
   lastWeekNet: null,
 
+  // Game Day Engagement
+  gamePickStats: {},
+  pathBackNarrative: null,
+  hotPickGameStatus: null,
+
   initialize: async (competition: string) => {
     set({
       competition,
@@ -124,6 +151,9 @@ export const useNFLStore = create<NFLState>((set, get) => ({
       userPoolRank: null,
       activePoolMemberCount: 0,
       lastWeekNet: null,
+      gamePickStats: {},
+      pathBackNarrative: null,
+      hotPickGameStatus: null,
     });
     await get().fetchCompetitionConfig();
     await get().fetchHighestRankedGame();
@@ -381,5 +411,185 @@ export const useNFLStore = create<NFLState>((set, get) => ({
       userSeasonTotal: total,
       lastWeekNet: isFirstWeekOfPhase ? null : lastWeekPoints,
     });
+  },
+
+  // ---------------------------------------------------------------------------
+  // Game Day Engagement
+  // ---------------------------------------------------------------------------
+
+  loadGamePickStats: async (poolId: string) => {
+    const {competition, currentWeek} = get();
+
+    const {data} = await supabase
+      .from('game_pick_stats')
+      .select('*')
+      .eq('pool_id', poolId)
+      .eq('competition', competition)
+      .eq('week', currentWeek);
+
+    if (!data) return;
+
+    const stats: Record<string, GamePickStats> = {};
+    for (const row of data) {
+      stats[row.game_id] = {
+        gameId: row.game_id,
+        teamA: row.team_a,
+        teamB: row.team_b,
+        teamAPickCount: row.team_a_pick_count,
+        teamBPickCount: row.team_b_pick_count,
+        totalPicks: row.total_picks,
+        hotpickTeamACount: row.hotpick_team_a_count,
+        hotpickTeamBCount: row.hotpick_team_b_count,
+        hotpickTotal: row.hotpick_total,
+        computedAt: row.computed_at,
+      };
+    }
+    set({gamePickStats: stats});
+  },
+
+  /**
+   * Subscribe to real-time updates on game_pick_stats for a pool.
+   * Returns an unsubscribe function. Only call when weekState === 'live'.
+   */
+  subscribeToGamePickStats: (poolId: string) => {
+    const channel = supabase
+      .channel(`game-pick-stats-${poolId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'game_pick_stats',
+          filter: `pool_id=eq.${poolId}`,
+        },
+        (payload: any) => {
+          const row = payload.new;
+          if (!row) return;
+          set(state => ({
+            gamePickStats: {
+              ...state.gamePickStats,
+              [row.game_id]: {
+                gameId: row.game_id,
+                teamA: row.team_a,
+                teamB: row.team_b,
+                teamAPickCount: row.team_a_pick_count,
+                teamBPickCount: row.team_b_pick_count,
+                totalPicks: row.total_picks,
+                hotpickTeamACount: row.hotpick_team_a_count,
+                hotpickTeamBCount: row.hotpick_team_b_count,
+                hotpickTotal: row.hotpick_total,
+                computedAt: row.computed_at,
+              },
+            },
+          }));
+        },
+      )
+      .subscribe();
+
+    // Return unsubscribe function
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  },
+
+  /**
+   * Compute path back narrative for the current user.
+   * Client-side display logic only — no scoring decisions made here.
+   * Uses poolStandings + userHotPick + userHotPickGame from store.
+   */
+  computePathBackNarrative: (userId: string) => {
+    const {poolStandings, userHotPick, userHotPickGame, liveScores} = get();
+
+    // No HotPick designated or game already settled → no narrative
+    if (!userHotPick || !userHotPickGame) {
+      set({pathBackNarrative: null, hotPickGameStatus: null});
+      return;
+    }
+
+    const gameStatus = userHotPickGame.status?.toLowerCase() ?? '';
+    const isFinal = gameStatus.includes('final');
+    const isLive = gameStatus === 'live';
+    const isPending = gameStatus === 'scheduled' || gameStatus === 'pre';
+
+    if (isFinal) {
+      // Game settled — check if user won their HotPick
+      const rank = userHotPickGame.frozen_rank ?? userHotPickGame.rank ?? 1;
+      const winnerTeam = userHotPickGame.winner_team;
+      const pickedTeam = userHotPick.picked_team;
+      const won = winnerTeam === pickedTeam;
+
+      if (won) {
+        // Find how many spots user gained
+        const myStanding = poolStandings.find(s => s.userId === userId);
+        const gamesStillLive = Object.values(liveScores).filter(
+          s => s.status === 'live' || s.status === 'in_progress',
+        ).length;
+
+        if (myStanding && myStanding.rank === 1) {
+          set({
+            pathBackNarrative: `Your HotPick hit. +${rank} pts.${gamesStillLive > 0 ? ` ${gamesStillLive} game${gamesStillLive !== 1 ? 's' : ''} still live.` : ''}`,
+            hotPickGameStatus: 'complete',
+          });
+        } else {
+          set({
+            pathBackNarrative: `Your HotPick hit! +${rank} pts.`,
+            hotPickGameStatus: 'complete',
+          });
+        }
+      } else {
+        // Lost — don't rub it in. No narrative.
+        set({pathBackNarrative: null, hotPickGameStatus: 'complete'});
+      }
+      return;
+    }
+
+    const rank = userHotPickGame.frozen_rank ?? userHotPickGame.rank ?? 1;
+    const team = userHotPick.picked_team ?? '';
+
+    // Find user's current rank
+    const currentRankIdx = poolStandings.findIndex(s => s.userId === userId);
+    if (currentRankIdx < 0) {
+      set({pathBackNarrative: null, hotPickGameStatus: isLive ? 'live' : 'pending'});
+      return;
+    }
+
+    const currentPts = poolStandings[currentRankIdx].totalPoints;
+    const winPts = currentPts + rank;
+
+    // Simulate win: count how many spots user would jump
+    const simulated = poolStandings
+      .map(s => (s.userId === userId ? {...s, totalPoints: winPts} : s))
+      .sort((a, b) => b.totalPoints - a.totalPoints);
+    const winRankIdx = simulated.findIndex(s => s.userId === userId);
+    const spotsGained = currentRankIdx - winRankIdx;
+
+    if (isLive) {
+      set({
+        pathBackNarrative:
+          spotsGained > 0
+            ? `Your HotPick on ${team} is live. Win: +${rank} pts, you jump ${spotsGained} spot${spotsGained !== 1 ? 's' : ''}.`
+            : `Your HotPick on ${team} is live. Win: +${rank} pts.`,
+        hotPickGameStatus: 'live',
+      });
+    } else if (isPending) {
+      const personAbove = currentRankIdx > 0 ? poolStandings[currentRankIdx - 1] : null;
+
+      if (personAbove) {
+        const gapAfterWin = personAbove.totalPoints - winPts;
+        const narrative =
+          gapAfterWin <= 0
+            ? `Your HotPick (${team}, Rank ${rank}) kicks off soon. A win puts you ahead of ${personAbove.displayName}.`
+            : `Your HotPick (${team}, Rank ${rank}) kicks off soon. A win puts you ${gapAfterWin} pt${gapAfterWin !== 1 ? 's' : ''} behind ${personAbove.displayName}.`;
+        set({pathBackNarrative: narrative, hotPickGameStatus: 'pending'});
+      } else {
+        // User is in 1st — no "path back" needed, but show confidence
+        set({
+          pathBackNarrative: `You're leading. Your HotPick (${team}, Rank ${rank}) kicks off soon.`,
+          hotPickGameStatus: 'pending',
+        });
+      }
+    } else {
+      set({pathBackNarrative: null, hotPickGameStatus: null});
+    }
   },
 }));
