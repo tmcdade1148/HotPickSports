@@ -55,10 +55,26 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
   const [sending, setSending] = useState(false);
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const [reactorModal, setReactorModal] = useState<ReactionSummary | null>(null);
+  const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set());
   const {user} = useAuth();
   const userProfile = useGlobalStore(s => s.userProfile);
   const markPoolAsRead = useGlobalStore(s => s.markPoolAsRead);
   const flatListRef = useRef<FlatList<DbSmackMessage>>(null);
+
+  // ── Load blocked users ─────────────────────────────────────────────
+  useEffect(() => {
+    if (!user?.id) return;
+    const loadBlocked = async () => {
+      const {data} = await supabase
+        .from('user_blocks')
+        .select('blocked_id')
+        .eq('blocker_id', user.id);
+      if (data) {
+        setBlockedUserIds(new Set(data.map(r => r.blocked_id)));
+      }
+    };
+    loadBlocked();
+  }, [user?.id]);
 
   // ── Fetch messages + reactions ──────────────────────────────────────
   useEffect(() => {
@@ -72,9 +88,13 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
         .order('created_at', {ascending: true});
 
       if (data) {
-        setMessages(data as DbSmackMessage[]);
+        // Filter out messages from blocked users
+        const filtered = (data as DbSmackMessage[]).filter(
+          m => !blockedUserIds.has(m.user_id),
+        );
+        setMessages(filtered);
         // Fetch reactions for all messages
-        const msgIds = data.map((m: any) => m.id);
+        const msgIds = filtered.map(m => m.id);
         if (msgIds.length > 0) {
           await fetchReactions(msgIds);
         }
@@ -96,6 +116,8 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
         },
         payload => {
           const msg = payload.new as DbSmackMessage;
+          // Skip messages from blocked users
+          if (blockedUserIds.has(msg.user_id)) return;
           setMessages(prev => [...prev, msg]);
           markPoolAsRead(poolId);
         },
@@ -142,7 +164,7 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
       supabase.removeChannel(rxnChannel);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [poolId]);
+  }, [poolId, blockedUserIds]);
 
   const fetchReactions = async (messageIds: string[]) => {
     const {data} = await supabase
@@ -297,6 +319,37 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
                 reason: 'inappropriate',
               },
             });
+          },
+        },
+      ],
+    );
+  };
+
+  // ── Block user ─────────────────────────────────────────────────────
+  const handleBlockUser = (messageId: string) => {
+    setSelectedMessageId(null);
+    const msg = messages.find(m => m.id === messageId);
+    if (!msg || !user?.id) return;
+
+    const authorName = msg.author_name || 'this user';
+    Alert.alert(
+      'Block User',
+      `Block ${authorName}? Their messages will be hidden in all your pools. You can unblock from Settings.`,
+      [
+        {text: 'Cancel', style: 'cancel'},
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: async () => {
+            const {error} = await supabase
+              .from('user_blocks')
+              .insert({blocker_id: user.id, blocked_id: msg.user_id});
+
+            if (!error) {
+              // Update local state immediately
+              setBlockedUserIds(prev => new Set([...prev, msg.user_id]));
+              setMessages(prev => prev.filter(m => m.user_id !== msg.user_id));
+            }
           },
         },
       ],
@@ -462,16 +515,25 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
                 </TouchableOpacity>
               ))}
             </View>
-            {/* Report option — only for other people's messages */}
+            {/* Report + Block — only for other people's messages */}
             {selectedMessageId &&
               messages.find(m => m.id === selectedMessageId)?.user_id !== user?.id && (
-                <TouchableOpacity
-                  style={styles.reportButton}
-                  onPress={() =>
-                    selectedMessageId && handleReport(selectedMessageId)
-                  }>
-                  <Text style={styles.reportText}>⚠️ Report Inappropriate</Text>
-                </TouchableOpacity>
+                <>
+                  <TouchableOpacity
+                    style={styles.reportButton}
+                    onPress={() =>
+                      selectedMessageId && handleReport(selectedMessageId)
+                    }>
+                    <Text style={styles.reportText}>⚠️ Report Inappropriate</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.reportButton}
+                    onPress={() =>
+                      selectedMessageId && handleBlockUser(selectedMessageId)
+                    }>
+                    <Text style={styles.reportText}>🚫 Block User</Text>
+                  </TouchableOpacity>
+                </>
               )}
           </View>
         </Pressable>
