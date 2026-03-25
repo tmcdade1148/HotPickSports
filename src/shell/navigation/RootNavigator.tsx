@@ -24,6 +24,7 @@ import {AboutScreen} from '@shell/screens/AboutScreen';
 import {InstructionsScreen} from '@shell/screens/InstructionsScreen';
 import {PrivacyPolicyScreen} from '@shell/screens/PrivacyPolicyScreen';
 import {TermsOfServiceScreen} from '@shell/screens/TermsOfServiceScreen';
+import {CommunityGuidelinesScreen} from '@shell/screens/CommunityGuidelinesScreen';
 import {ResetPasswordScreen} from '@shell/screens/ResetPasswordScreen';
 import {HardwareAdminScreen} from '@shell/screens/HardwareAdminScreen';
 import {useGlobalStore} from '@shell/stores/globalStore';
@@ -204,6 +205,7 @@ export function RootNavigator() {
         <Stack.Screen name="Instructions" component={InstructionsScreen} />
         <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
         <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} />
+        <Stack.Screen name="CommunityGuidelines" component={CommunityGuidelinesScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
