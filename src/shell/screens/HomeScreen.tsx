@@ -17,6 +17,7 @@ import {SeriesEventCard} from '@shell/components/home/SeriesEventCard';
 import {StandingsBadge} from '@shell/components/home/StandingsBadge';
 import {SmackTalkNudge} from '@shell/components/home/SmackTalkNudge';
 import {MessageCenter} from '@shell/components/home/MessageCenter';
+import {HardwareModule} from '@shell/components/home/HardwareModule';
 import {spacing, typography} from '@shared/theme';
 import {useTheme, useBrand} from '@shell/theme';
 
@@ -170,6 +171,9 @@ export function HomeScreen({navigation}: any) {
             onPressPool={handleNavigateToSmackTalkPool}
           />
         )}
+
+        {/* Hardware Module — latest award earned */}
+        <HardwareModule onPress={() => navigation.navigate('HistoryTab')} />
 
         {cardsToShow.length === 0 && (
           <View style={styles.emptyState}>
