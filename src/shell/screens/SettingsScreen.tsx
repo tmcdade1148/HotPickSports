@@ -475,7 +475,10 @@ export function SettingsScreen() {
             style={[styles.createPoolButton, {backgroundColor: colors.surface, borderColor: colors.primary}]}
             onPress={handleCreatePool}>
             <Plus size={18} color={colors.primary} />
-            <Text style={[styles.createPoolText, {color: colors.primary}]}>Create a pool</Text>
+            <View>
+              <Text style={[styles.createPoolText, {color: colors.primary}]}>Create a Pool</Text>
+              <Text style={[styles.createPoolSub, {color: colors.primary}]}>and invite friends</Text>
+            </View>
           </TouchableOpacity>
         </View>
       )}
@@ -781,6 +784,11 @@ const styles = StyleSheet.create({
   createPoolText: {
     fontSize: 15,
     fontWeight: '600',
+  },
+  createPoolSub: {
+    fontSize: 12,
+    opacity: 0.7,
+    marginTop: 1,
   },
   // Group section
   groupLabel: {
