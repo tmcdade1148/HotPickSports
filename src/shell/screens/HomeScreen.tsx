@@ -20,6 +20,7 @@ import {MessageCenter} from '@shell/components/home/MessageCenter';
 import {HardwareModule} from '@shell/components/home/HardwareModule';
 import {spacing, typography} from '@shared/theme';
 import {useTheme, useBrand} from '@shell/theme';
+import {useNFLStore} from '@sports/nfl/stores/nflStore';
 
 import type {
   AnyEventConfig,
@@ -45,7 +46,12 @@ export function HomeScreen({navigation}: any) {
   const activeSport = useGlobalStore(s => s.activeSport);
   const setActiveSport = useGlobalStore(s => s.setActiveSport);
 
-  const greeting = getGreeting();
+  const nflWeekState = useNFLStore(s => s.weekState);
+  const nflCurrentPhase = useNFLStore(s => s.currentPhase);
+  const nflUserPickCount = useNFLStore(s => s.userPickCount);
+  const nflPicksDeadline = useNFLStore(s => s.picksDeadline);
+
+  const greeting = getContextGreeting(nflCurrentPhase, nflWeekState, nflUserPickCount, nflPicksDeadline);
   const firstName = getDisplayName(userProfile);
 
   // Event name + phase for header
@@ -126,7 +132,7 @@ export function HomeScreen({navigation}: any) {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>{greeting},</Text>
+          <Text style={styles.greeting}>{greeting}</Text>
           <Text style={styles.name}>{firstName}</Text>
         </View>
         {eventName ? (
@@ -214,16 +220,61 @@ function EventCardForConfig({
   }
 }
 
-/** Returns a time-appropriate greeting string. */
-function getGreeting(): string {
+/**
+ * Context-aware salutation based on season phase, week state, and pick status.
+ * Deterministic per-hour — picks one greeting from the pool using the hour
+ * as a seed so it doesn't flicker on re-renders but changes throughout the day.
+ */
+function getContextGreeting(
+  phase: string | null,
+  weekState: string,
+  userPickCount: number,
+  picksDeadline: Date | null,
+): string {
   const hour = new Date().getHours();
-  if (hour < 12) {
-    return 'Good morning';
+  const pick = (arr: string[]) => arr[hour % arr.length];
+
+  // Dead period / pre-season
+  if (!phase || phase === 'PRE_SEASON') {
+    return pick(["Nothing on yet. Enjoy it", "Offseason. It won't last", "Season's coming"]);
   }
-  if (hour < 17) {
-    return 'Good afternoon';
+
+  // Season complete
+  if (phase === 'SEASON_COMPLETE') {
+    return pick(["What a ride", "That's a wrap", "See you next season"]);
   }
-  return 'Good evening';
+
+  // Transition phases
+  if (phase === 'REGULAR_COMPLETE' || phase === 'SUPERBOWL_INTRO') {
+    return pick(["Dust settling", "Big things ahead", "Stay sharp"]);
+  }
+
+  // Active season — use week state
+  switch (weekState) {
+    case 'picks_open': {
+      // Check if user has submitted picks
+      if (userPickCount > 0) {
+        return pick(["On record. No edits", "Said what you said", "Locked in"]);
+      }
+      // Check if deadline is within 24 hours
+      if (picksDeadline) {
+        const hoursLeft = (picksDeadline.getTime() - Date.now()) / (1000 * 60 * 60);
+        if (hoursLeft > 0 && hoursLeft <= 24) {
+          return pick(["Last call", "Closing time", "You sure about this?"]);
+        }
+      }
+      return pick(["Picks are open", "Your move", "Clock's running"]);
+    }
+    case 'locked':
+      return pick(["On record. No edits", "Said what you said", "Locked in"]);
+    case 'live':
+      return pick(["It's happening", "Too late to change anything", "Watching or refreshing?"]);
+    case 'settling':
+    case 'complete':
+      return pick(["The record doesn't lie", "It's official", "Week closed"]);
+    default:
+      return pick(["Nothing today", "Rest day", "Back at it soon"]);
+  }
 }
 
 const createStyles = (colors: any) => StyleSheet.create({
