@@ -269,7 +269,7 @@ export function SettingsScreen() {
           </Text>
         </View>
         <View style={styles.poolsHeaderRight}>
-          {!poolsExpanded && activePool && (
+          {!poolsExpanded && activePool && isPoolVisible(activePool) && (
             <Text style={[styles.activePoolHint, {color: colors.primary}]} numberOfLines={1}>
               {activePool.name}
             </Text>
