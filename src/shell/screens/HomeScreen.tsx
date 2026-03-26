@@ -182,16 +182,16 @@ export function HomeScreen({navigation}: any) {
           />
         ))}
 
-        {/* StandingsBadge — below event cards */}
-        {cardsToShow.length > 0 && (
+        {/* StandingsBadge — hidden until user has a private pool */}
+        {cardsToShow.length > 0 && hasPrivatePool && (
           <StandingsBadge onPress={handleNavigateToBoard} />
         )}
 
         {/* Join Pool Module — shown when user has no private pool, hidden during SEASON_COMPLETE */}
         {showJoinModule && <JoinPoolModule />}
 
-        {/* SmackTalkNudge — below standings */}
-        {cardsToShow.length > 0 && (
+        {/* SmackTalkNudge — hidden until user has a private pool */}
+        {cardsToShow.length > 0 && hasPrivatePool && (
           <SmackTalkNudge
             onPress={handleNavigateToSmackTalk}
             onPressPool={handleNavigateToSmackTalkPool}
