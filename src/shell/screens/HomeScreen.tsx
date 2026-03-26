@@ -58,12 +58,20 @@ export function HomeScreen({navigation}: any) {
   const eventName = activeSport
     ? activeSport.competition.replace(/_/g, ' ').toUpperCase()
     : '';
-  const currentPhase = (activeSport as any)?.currentPhase;
-  const phaseLabel = currentPhase === 'PLAYOFFS'
-    ? 'Playoffs'
-    : currentPhase === 'SUPERBOWL'
-      ? 'Super Bowl'
-      : 'Regular Season';
+  const phaseForLabel = nflCurrentPhase || (activeSport as any)?.currentPhase;
+  const phaseLabel = phaseForLabel === 'PRE_SEASON'
+    ? 'The Calm Before...'
+    : phaseForLabel === 'PLAYOFFS'
+      ? 'Playoffs'
+      : phaseForLabel === 'SUPERBOWL'
+        ? 'Super Bowl'
+        : phaseForLabel === 'SUPERBOWL_INTRO'
+          ? 'Super Bowl'
+          : phaseForLabel === 'REGULAR_COMPLETE'
+            ? 'Playoffs Loading...'
+            : phaseForLabel === 'SEASON_COMPLETE'
+              ? 'Season Complete'
+              : 'Regular Season';
 
   const handleCardPress = (config: AnyEventConfig) => {
     // Set as active sport so Picks/Leaderboard/SmackTalk tabs render this sport
