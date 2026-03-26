@@ -471,8 +471,9 @@ const createStyles = (colors: any) => StyleSheet.create({
     paddingVertical: spacing.md,
   },
   scoreTotalLabel: {
-    ...typography.small,
-    color: colors.textSecondary,
+    ...typography.body,
+    fontWeight: '700',
+    color: colors.textPrimary,
     marginBottom: 2,
   },
   scoreRow: {
