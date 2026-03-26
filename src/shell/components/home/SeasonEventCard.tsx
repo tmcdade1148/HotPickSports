@@ -194,6 +194,15 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
     : weekFirstKickoff;
   const kickoff = useCountdown(countdownTarget);
 
+  // Kickoff countdown (first game of the week)
+  const firstGameKickoff = useCountdown(weekFirstKickoff);
+
+  // HotPick game kickoff countdown
+  const hotPickKickoffDate = userHotPickGame?.kickoff_at
+    ? new Date(userHotPickGame.kickoff_at)
+    : null;
+  const hotPickKickoff = useCountdown(hotPickKickoffDate);
+
   // ── Glow color: partner secondary or HotPick teal ─────────────────
   const isBranded = !!(activePool?.brand_config as any)?.is_branded;
   const glowColor = isBranded
@@ -234,6 +243,20 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
               </Text>
               {!kickoff.hasExpired && (
                 <Text style={styles.kickoffValue}>{kickoff.timeLeft}</Text>
+              )}
+              {/* Kickoff countdown — shown when picks are open and games haven't started */}
+              {currentPhase !== 'PRE_SEASON' && firstGameKickoff.timeLeft && !firstGameKickoff.hasExpired && weekState === 'picks_open' && (
+                <View style={styles.subCountdownRow}>
+                  <Text style={styles.subCountdownLabel}>Kickoff in:</Text>
+                  <Text style={styles.subCountdownValue}>{firstGameKickoff.timeLeft}</Text>
+                </View>
+              )}
+              {/* HotPick game kickoff — shown when user has designated a HotPick */}
+              {hotPickKickoff.timeLeft && !hotPickKickoff.hasExpired && userHotPick && weekState === 'picks_open' && (
+                <View style={styles.subCountdownRow}>
+                  <Text style={styles.subCountdownLabel}>Your HotPick kicks off in:</Text>
+                  <Text style={styles.subCountdownValue}>{hotPickKickoff.timeLeft}</Text>
+                </View>
               )}
             </View>
           </View>
@@ -521,6 +544,21 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
     fontWeight: '700',
     marginTop: 2,
+  },
+  subCountdownRow: {
+    marginTop: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: spacing.xs,
+  },
+  subCountdownLabel: {
+    ...typography.small,
+    color: colors.textSecondary,
+  },
+  subCountdownValue: {
+    ...typography.small,
+    fontWeight: '600',
+    color: colors.textPrimary,
   },
   poolSelector: {
     flexDirection: 'row',
