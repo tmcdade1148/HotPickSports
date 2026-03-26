@@ -62,9 +62,17 @@ export function SettingsScreen() {
   const userPools = useGlobalStore(s => s.userPools);
   const poolRoles = useGlobalStore(s => s.poolRoles);
   const activePoolId = useGlobalStore(s => s.activePoolId);
-  const defaultPoolId = useGlobalStore(s => s.defaultPoolId);
+  const rawDefaultPoolId = useGlobalStore(s => s.defaultPoolId);
   const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
   const setDefaultPoolId = useGlobalStore(s => s.setDefaultPoolId);
+
+  // Effective default: manual setting → first partner pool → first created → first joined
+  const visiblePools = userPools.filter(p => isPoolVisible(p));
+  const effectiveDefaultPoolId = rawDefaultPoolId
+    ?? visiblePools.find(p => !!(p.brand_config as any)?.is_branded)?.id
+    ?? visiblePools.find(p => poolRoles[p.id] === 'organizer')?.id
+    ?? visiblePools[0]?.id
+    ?? null;
   const activeSport = useGlobalStore(s => s.activeSport);
   const joinPool = useGlobalStore(s => s.joinPool);
   const signOut = useGlobalStore(s => s.signOut);
@@ -420,11 +428,11 @@ export function SettingsScreen() {
                     <Star
                       size={18}
                       color={
-                        pool.id === defaultPoolId
+                        pool.id === effectiveDefaultPoolId
                           ? (isBranded ? pillTextColor : hotpick.primary)
                           : pillIconColor
                       }
-                      fill={pool.id === defaultPoolId ? (isBranded ? pillTextColor : hotpick.primary) : 'none'}
+                      fill={pool.id === effectiveDefaultPoolId ? (isBranded ? pillTextColor : hotpick.primary) : 'none'}
                     />
                   </TouchableOpacity>
                 </View>
