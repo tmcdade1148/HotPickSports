@@ -48,6 +48,11 @@ Never suggest designs that tie picks or scores to a pool_id.**
 - TOS checkbox: explicit acceptance required before auth, writes tos_accepted_at + tos_version
 - User blocking: platform-wide via user_blocks table, long-press Block in SmackTalk
 - Community Guidelines screen linked from Settings
+- E2E test suite: 48 tests (40 pass, 6 fixed, 2 skipped for full-game-week data)
+- Server-side pick locking: `enforce_pick_lock` trigger (INSERT + UPDATE), `enforce_single_hotpick` trigger
+- ESPN health monitor: `espn-health-check` Edge Function (hourly cron), push alert to super_admin on failure
+- Season simulator: `season-simulator` Edge Function, replays 2025 data through 2026 pipeline
+- Security: RLS on all tables, search_path set on all functions, Postgres 17.6.1.084
 
 **Default event:** `nfl_2026` — this is the active competition.
 Do not default to worldCup2026 or any other event.
@@ -626,6 +631,63 @@ displays scores; it never computes them.
 - Edge Functions use service role key (server only)
 - Client uses anon key with RLS
 - Scoring is triggered by game status changes, not client actions
+
+### Pick Lock Triggers (server-side enforcement)
+
+Two Postgres triggers enforce pick integrity at the database level.
+The client UI also hides locked picks, but these triggers are the
+authoritative enforcement — a direct API call cannot bypass them.
+
+**`enforce_pick_lock`** — fires BEFORE INSERT OR UPDATE OF
+picked_team, is_hotpick ON season_picks. Checks the game's status
+in season_games. If status != 'scheduled', raises exception:
+"Picks are locked for this game (status: X)".
+
+**`enforce_single_hotpick`** — fires AFTER INSERT OR UPDATE ON
+season_picks. If the new row has is_hotpick = true, automatically
+demotes any other is_hotpick = true row for the same
+user/competition/week to is_hotpick = false. Guarantees exactly
+one HotPick per user per week.
+
+### Edge Function Registry
+
+| Function | Trigger | Schedule |
+|----------|---------|----------|
+| `nfl-calculate-scores` | Cron + manual | Every 30 min |
+| `nfl-update-scores` | Cron | Every 5 min (live score fetch from ESPN) |
+| `nfl-import-schedule` | Cron | Tuesdays 5am UTC |
+| `nfl-fetch-odds` | Cron | Tuesdays 7am UTC |
+| `nfl-rank-games` | Cron | Tuesdays 7:15am UTC |
+| `nfl-open-picks` | Cron | Tuesdays 8am UTC |
+| `nfl-finalize-week` | Cron | Tuesdays 6am UTC |
+| `nfl-weekly-transition` | Manual (admin) | On demand |
+| `refresh-game-pick-stats` | Cron | Every 60s |
+| `compute-hardware` | Cron | Minutes :05 and :35 |
+| `process-notification-queue` | Cron | Every 60s |
+| `smack-archive-messages` | Cron | Daily 3am UTC |
+| `espn-health-check` | Cron | Hourly at :17 |
+| `season-simulator` | Manual (admin) | On demand |
+
+### ESPN Health Monitor
+
+`espn-health-check` pings ESPN scoreboard and schedule endpoints
+every hour. Validates HTTP status, response time, and JSON shape.
+Results written to `competition_config` key `espn_health_status`
+(competition = 'global'). If status is 'degraded' or 'down',
+pushes alert to all `is_super_admin` users via `notification_queue`.
+
+### Season Simulator
+
+`season-simulator` replays 2025 season data through the 2026 scoring
+pipeline. Used for pre-launch validation. Commands:
+- `setup` — copies 285 games from nfl_2025 to nfl_2026 (sim- prefix)
+- `run_week` — executes full week lifecycle for one week
+- `run_range` — executes a range of weeks sequentially
+- `run_full_season` — weeks 1-22
+- `cleanup` — removes all simulation data, resets config
+
+Results logged to `simulation_log` table (run_id, week, step,
+expected, actual, passed). Super admins can read via RLS.
 
 ---
 
