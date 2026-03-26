@@ -231,7 +231,7 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
             <View style={{flex: 1}}>
               <Text style={styles.kickoffLabel}>
                 {currentPhase === 'PRE_SEASON'
-                  ? 'Picks open in:'
+                  ? 'Season starts in:'
                   : weekState === 'live'
                     ? 'Picks are LIVE'
                     : weekState === 'settling'
