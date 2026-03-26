@@ -248,8 +248,8 @@ export const useNFLStore = create<NFLState>((set, get) => ({
       .select('*')
       .eq('competition', competition)
       .eq('week', currentWeek)
-      .not('rank', 'is', null)
-      .order('rank', {ascending: false})
+      .not('frozen_rank', 'is', null)
+      .order('frozen_rank', {ascending: false})
       .limit(1)
       .maybeSingle();
 

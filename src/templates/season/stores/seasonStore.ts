@@ -149,7 +149,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       .select('*')
       .eq('competition', config.competition)
       .eq('week', week)
-      .order('rank', {ascending: true});
+      .order('frozen_rank', {ascending: true});
 
     const games = (data as DbSeasonGame[]) ?? [];
 
