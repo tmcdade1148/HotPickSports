@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useRef, useCallback} from 'react';
 import {
   View,
   Text,
@@ -29,8 +29,23 @@ export function ProfileSetupScreen({navigation}: any) {
   const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [firstNameError, setFirstNameError] = useState('');
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const canSubmit = firstName.trim().length > 0 && !saving;
+
+  // Autosave on field blur — saves whatever is filled so far
+  const autosave = useCallback(() => {
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    autosaveTimer.current = setTimeout(async () => {
+      const trimmedFirst = firstName.trim();
+      if (!trimmedFirst || !user?.id) return;
+      await updateProfile(user.id, {
+        first_name: trimmedFirst,
+        last_name: lastName.trim() || null,
+        poolie_name: poolieName.trim() || null,
+      });
+    }, 800);
+  }, [firstName, lastName, poolieName, user?.id, updateProfile]);
 
   const handleAvatarSelect = (avatar: {
     key: string;
@@ -128,6 +143,7 @@ export function ProfileSetupScreen({navigation}: any) {
                 setFirstName(text);
                 if (firstNameError) setFirstNameError('');
               }}
+              onBlur={autosave}
               autoCapitalize="words"
               autoCorrect={false}
               editable={!saving}
@@ -149,6 +165,7 @@ export function ProfileSetupScreen({navigation}: any) {
               placeholderTextColor={colors.textSecondary}
               value={lastName}
               onChangeText={setLastName}
+              onBlur={autosave}
               autoCapitalize="words"
               autoCorrect={false}
               editable={!saving}
@@ -171,6 +188,7 @@ export function ProfileSetupScreen({navigation}: any) {
               placeholderTextColor={colors.textSecondary}
               value={poolieName}
               onChangeText={setPoolieName}
+              onBlur={autosave}
               autoCapitalize="none"
               autoCorrect={false}
               editable={!saving}
