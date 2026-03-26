@@ -152,7 +152,7 @@ function PoolSwitcherHeader({
           <View style={headerStyles.modal}>
             <Text style={headerStyles.modalTitle}>Switch Pool</Text>
             <FlatList
-              data={[...userPools.filter(p => !!(p.brand_config as any)?.is_branded), ...userPools.filter(p => !(p.brand_config as any)?.is_branded)]}
+              data={[...userPools.filter(p => !p.is_global && !!(p.brand_config as any)?.is_branded), ...userPools.filter(p => !p.is_global && !(p.brand_config as any)?.is_branded)]}
               keyExtractor={p => p.id}
               renderItem={({item}) => {
                 const unread = smackUnreadCounts[item.id] ?? 0;

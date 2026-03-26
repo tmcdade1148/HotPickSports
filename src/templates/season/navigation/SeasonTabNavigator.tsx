@@ -149,8 +149,8 @@ function PoolSwitcherHeader({
             <Text style={headerStyles.modalTitle}>Switch Pool</Text>
             <ScrollView bounces={false}>
               {[
-                ...userPools.filter(p => !!(p.brand_config as any)?.is_branded),
-                ...userPools.filter(p => !(p.brand_config as any)?.is_branded),
+                ...userPools.filter(p => !p.is_global && !!(p.brand_config as any)?.is_branded),
+                ...userPools.filter(p => !p.is_global && !(p.brand_config as any)?.is_branded),
               ].map(item => {
                 const unread = smackUnreadCounts[item.id] ?? 0;
                 const itemBranded = !!(item.brand_config as any)?.is_branded;

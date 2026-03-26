@@ -264,7 +264,7 @@ export function SettingsScreen() {
           <Users size={18} color={colors.primary} />
           <Text style={[styles.sectionTitle, {color: colors.textPrimary}]}>My Pools</Text>
           <Text style={[styles.poolCount, {color: colors.textSecondary}]}>
-            ({userPools.length})
+            ({userPools.filter(p => !p.is_global).length})
           </Text>
         </View>
         <View style={styles.poolsHeaderRight}>
@@ -283,14 +283,14 @@ export function SettingsScreen() {
 
       {poolsExpanded && (
         <View style={styles.poolsContent}>
-          {/* Pool list — partner pools first, then HotPick pools */}
+          {/* Pool list — partner pools first, then HotPick pools (global pool hidden) */}
           {[
-            ...userPools.filter(p => !!(p.brand_config as any)?.is_branded),
+            ...userPools.filter(p => !p.is_global && !!(p.brand_config as any)?.is_branded),
             'DIVIDER' as const,
-            ...userPools.filter(p => !(p.brand_config as any)?.is_branded),
+            ...userPools.filter(p => !p.is_global && !(p.brand_config as any)?.is_branded),
           ].map((poolOrDivider) => {
             if (poolOrDivider === 'DIVIDER') {
-              const hasPartner = userPools.some(p => !!(p.brand_config as any)?.is_branded);
+              const hasPartner = userPools.some(p => !p.is_global && !!(p.brand_config as any)?.is_branded);
               if (!hasPartner) return null;
               return <View key="partner-divider" style={{height: 16}} />;
             }
