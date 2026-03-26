@@ -253,10 +253,15 @@ export function PartnerAdminScreen() {
 
   const handleAssignToPool = async (partner: Partner, poolId: string) => {
     const brandConfig = partner.brand_config as unknown as BrandConfig;
+    const partnerSlug = partner.slug;
 
     const {error} = await supabase
       .from('pools')
-      .update({brand_config: brandConfig as unknown, partner_id: partner.id})
+      .update({
+        brand_config: brandConfig as unknown,
+        partner_id: partner.id,
+        invite_slug: partnerSlug,
+      })
       .eq('id', poolId);
 
     if (error) {
@@ -267,7 +272,10 @@ export function PartnerAdminScreen() {
     updatePoolBrandConfig(poolId, brandConfig);
 
     const pool = userPools.find(p => p.id === poolId);
-    Alert.alert('Assigned', `${partner.name} brand applied to ${pool?.name ?? 'pool'}.`);
+    Alert.alert(
+      'Assigned',
+      `${partner.name} brand applied to ${pool?.name ?? 'pool'}.\n\nInvite code for signage: ${partnerSlug.toUpperCase()}`,
+    );
     setExpandedPartnerId(null);
   };
 
@@ -730,6 +738,15 @@ export function PartnerAdminScreen() {
                       })}
                     </View>
 
+                    {/* Invite Code for Signage */}
+                    <View style={styles.signageSection}>
+                      <Text style={styles.poolListLabel}>Invite Code for Signage</Text>
+                      <Text style={styles.signageCode}>{partner.slug.toUpperCase()}</Text>
+                      <Text style={styles.signageHint}>
+                        Users type this code to join the pool. Case-insensitive.
+                      </Text>
+                    </View>
+
                     {/* QR Code */}
                     <View style={styles.qrSection}>
                       <Text style={styles.poolListLabel}>Invite QR Code</Text>
@@ -1061,6 +1078,26 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '600',
+  },
+
+  // Signage invite code
+  signageSection: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    padding: spacing.md,
+    alignItems: 'center' as const,
+  },
+  signageCode: {
+    fontSize: 32,
+    fontWeight: '800' as const,
+    letterSpacing: 3,
+    color: colors.textPrimary,
+    marginVertical: spacing.sm,
+  },
+  signageHint: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    textAlign: 'center' as const,
   },
 
   // QR Code

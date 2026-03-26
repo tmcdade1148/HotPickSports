@@ -18,6 +18,7 @@ import {StandingsBadge} from '@shell/components/home/StandingsBadge';
 import {SmackTalkNudge} from '@shell/components/home/SmackTalkNudge';
 import {MessageCenter} from '@shell/components/home/MessageCenter';
 import {HardwareModule} from '@shell/components/home/HardwareModule';
+import {JoinPoolModule} from '@shell/components/home/JoinPoolModule';
 import {spacing, typography} from '@shared/theme';
 import {useTheme, useBrand} from '@shell/theme';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
@@ -45,6 +46,7 @@ export function HomeScreen({navigation}: any) {
   const activeEventCards = useGlobalStore(s => s.activeEventCards);
   const activeSport = useGlobalStore(s => s.activeSport);
   const setActiveSport = useGlobalStore(s => s.setActiveSport);
+  const userPools = useGlobalStore(s => s.userPools);
 
   const nflWeekState = useNFLStore(s => s.weekState);
   const nflCurrentPhase = useNFLStore(s => s.currentPhase);
@@ -53,6 +55,13 @@ export function HomeScreen({navigation}: any) {
 
   const greeting = getContextGreeting(nflCurrentPhase, nflWeekState, nflUserPickCount, nflPicksDeadline);
   const firstName = getDisplayName(userProfile);
+
+  // Join module: show when user has no private pool, hide during SEASON_COMPLETE
+  const hasPrivatePool = userPools.some(
+    p => !p.is_global && p.competition === (activeSport?.competition ?? 'nfl_2026'),
+  );
+  const isSeasonOver = nflCurrentPhase === 'SEASON_COMPLETE';
+  const showJoinModule = !hasPrivatePool && !isSeasonOver;
 
   // Event name + phase for header
   const eventName = activeSport
@@ -177,6 +186,9 @@ export function HomeScreen({navigation}: any) {
         {cardsToShow.length > 0 && (
           <StandingsBadge onPress={handleNavigateToBoard} />
         )}
+
+        {/* Join Pool Module — shown when user has no private pool, hidden during SEASON_COMPLETE */}
+        {showJoinModule && <JoinPoolModule />}
 
         {/* SmackTalkNudge — below standings */}
         {cardsToShow.length > 0 && (
