@@ -187,7 +187,12 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
   ]);
 
   // ── Kickoff countdown ──────────────────────────────────────────────
-  const kickoff = useCountdown(weekFirstKickoff);
+  // In PRE_SEASON, count down to picks opening (from config.picksOpenDate).
+  // During active weeks, count down to first kickoff.
+  const countdownTarget = currentPhase === 'PRE_SEASON' && !weekFirstKickoff
+    ? new Date(config.picksOpenDate)
+    : weekFirstKickoff;
+  const kickoff = useCountdown(countdownTarget);
 
   // ── Glow color: partner secondary or HotPick teal ─────────────────
   const isBranded = !!(activePool?.brand_config as any)?.is_branded;
@@ -215,15 +220,17 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
           <View style={styles.kickoffPill}>
             <View style={{flex: 1}}>
               <Text style={styles.kickoffLabel}>
-                {weekState === 'live'
-                  ? 'Picks are LIVE'
-                  : weekState === 'settling'
-                    ? 'Scores settling'
-                    : weekState === 'locked'
-                      ? 'Picks are locked'
-                      : kickoff.hasExpired
-                        ? 'Picks are LIVE'
-                        : 'Picks go LIVE in:'}
+                {currentPhase === 'PRE_SEASON'
+                  ? 'Picks open in:'
+                  : weekState === 'live'
+                    ? 'Picks are LIVE'
+                    : weekState === 'settling'
+                      ? 'Scores settling'
+                      : weekState === 'locked'
+                        ? 'Picks are locked'
+                        : kickoff.hasExpired
+                          ? 'Picks are LIVE'
+                          : 'Picks go LIVE in:'}
               </Text>
               {!kickoff.hasExpired && (
                 <Text style={styles.kickoffValue}>{kickoff.timeLeft}</Text>
