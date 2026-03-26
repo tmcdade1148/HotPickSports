@@ -394,6 +394,10 @@ function PoolSwitcherButton({
   const [modalVisible, setModalVisible] = useState(false);
   const accentColor = colors.highlight;
 
+  // Hide pool switcher when user only has the global pool
+  const visiblePools = userPools.filter(p => !p.is_global);
+  if (visiblePools.length === 0) return null;
+
   const switchTo = (poolId: string) => {
     onSwitchPool(poolId);
     setModalVisible(false);
@@ -442,8 +446,8 @@ function PoolSwitcherButton({
             </Text>
             <ScrollView bounces={false}>
               {[
-                ...userPools.filter(p => !!(p.brand_config as any)?.is_branded),
-                ...userPools.filter(p => !(p.brand_config as any)?.is_branded),
+                ...userPools.filter(p => !p.is_global && !!(p.brand_config as any)?.is_branded),
+                ...userPools.filter(p => !p.is_global && !(p.brand_config as any)?.is_branded),
               ].map(item => {
                 const unread = smackUnreadCounts[item.id] ?? 0;
                 const itemBranded = !!(item.brand_config as any)?.is_branded;
