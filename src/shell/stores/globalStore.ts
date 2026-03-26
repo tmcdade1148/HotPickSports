@@ -503,22 +503,12 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     const typedPool = data.pool as DbPool;
     const competition = typedPool.competition;
 
-    // Auto-select and add to both local list and competition cache
-    set(state => {
-      const alreadyInList = state.userPools.some(p => p.id === typedPool.id);
-      const updatedPools = alreadyInList
-        ? state.userPools
-        : [...state.userPools, typedPool];
-      return {
-        userPools: updatedPools,
-        poolsByCompetition: {
-          ...state.poolsByCompetition,
-          [competition]: updatedPools,
-        },
-        activePoolId: typedPool.id,
-      };
-    });
+    // Set active pool immediately for instant UI feedback
+    set({activePoolId: typedPool.id});
     AsyncStorage.setItem(poolStorageKey(competition), typedPool.id);
+
+    // Re-fetch pools from DB — picks up invite_code_used, manualGlobalJoins, etc.
+    await get().fetchUserPools(userId, competition);
 
     return {pool: typedPool};
   },
