@@ -137,6 +137,8 @@ export function PartnerAdminScreen() {
 
   // Create form state
   const [formName, setFormName] = useState('');
+  const [formSlug, setFormSlug] = useState('');
+  const [formSlugError, setFormSlugError] = useState('');
   const [formColors, setFormColors] = useState({
     primary_color: HOTPICK_DEFAULTS.primary_color,
     secondary_color: HOTPICK_DEFAULTS.secondary_color,
@@ -197,9 +199,39 @@ export function PartnerAdminScreen() {
     }
   };
 
+  const validateSlug = (slug: string): string | null => {
+    if (!slug) return null; // optional — will auto-generate from name
+    if (slug.length > 12) return 'Max 12 characters';
+    if (!/^[a-z0-9-]+$/.test(slug)) return 'Letters, numbers, hyphens only';
+    return null;
+  };
+
+  const checkSlugUniqueness = async (slug: string) => {
+    if (!slug) { setFormSlugError(''); return; }
+    const err = validateSlug(slug);
+    if (err) { setFormSlugError(err); return; }
+    const {data} = await supabase
+      .from('pools')
+      .select('id')
+      .eq('invite_slug', slug)
+      .limit(1);
+    if (data && data.length > 0) {
+      setFormSlugError('This code is already taken');
+    } else {
+      setFormSlugError('');
+    }
+  };
+
   const handleCreate = async () => {
     const name = formName.trim();
     if (!name || !user?.id) return;
+
+    const finalSlug = formSlug.trim().toLowerCase() || slugify(name);
+    const slugErr = validateSlug(finalSlug);
+    if (slugErr) {
+      setFormSlugError(slugErr);
+      return;
+    }
 
     setCreating(true);
 
@@ -222,14 +254,14 @@ export function PartnerAdminScreen() {
         mono_dark: '',
       },
       app_name: name,
-      invite_slug: slugify(name),
+      invite_slug: finalSlug,
       is_branded: true,
       powered_by_hotpick: true,
     };
 
     const {error} = await supabase.from('partners').insert({
       name,
-      slug: slugify(name),
+      slug: finalSlug,
       brand_config: brandConfig as unknown,
       created_by: user.id,
     });
@@ -505,11 +537,36 @@ export function PartnerAdminScreen() {
               autoCorrect={false}
             />
 
-            {formName.trim() ? (
-              <Text style={styles.slugPreview}>
-                Slug: {slugify(formName.trim())}
-              </Text>
-            ) : null}
+            {/* Custom invite code */}
+            <View style={styles.slugInputRow}>
+              <Text style={styles.slugLabel}>Invite Code for Signage</Text>
+              <TextInput
+                style={[styles.slugInput, formSlugError ? {borderColor: colors.error} : null]}
+                placeholder={formName.trim() ? slugify(formName.trim()).toUpperCase() : 'AUTO'}
+                placeholderTextColor={colors.textSecondary}
+                value={formSlug}
+                onChangeText={text => {
+                  const cleaned = text.toLowerCase().replace(/[^a-z0-9-]/g, '');
+                  setFormSlug(cleaned);
+                  if (formSlugError) setFormSlugError('');
+                }}
+                onBlur={() => checkSlugUniqueness(formSlug)}
+                autoCapitalize="none"
+                autoCorrect={false}
+                maxLength={12}
+              />
+              <View style={styles.slugMeta}>
+                <Text style={styles.slugCharCount}>{formSlug.length}/12</Text>
+                {formSlug.trim() ? (
+                  <Text style={styles.slugDisplay}>{formSlug.toUpperCase()}</Text>
+                ) : formName.trim() ? (
+                  <Text style={styles.slugDisplay}>{slugify(formName.trim()).toUpperCase()}</Text>
+                ) : null}
+              </View>
+              {formSlugError ? (
+                <Text style={styles.slugError}>{formSlugError}</Text>
+              ) : null}
+            </View>
 
             {/* Logo upload */}
             {formName.trim()
@@ -825,6 +882,47 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 12,
     color: colors.textSecondary,
     marginBottom: spacing.md,
+  },
+  slugInputRow: {
+    marginBottom: spacing.md,
+  },
+  slugLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  slugInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 2,
+    color: colors.textPrimary,
+    backgroundColor: colors.surface,
+  },
+  slugMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: spacing.xs,
+  },
+  slugCharCount: {
+    fontSize: 11,
+    color: colors.textSecondary,
+  },
+  slugDisplay: {
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 2,
+    color: colors.textPrimary,
+  },
+  slugError: {
+    fontSize: 12,
+    color: colors.error,
+    marginTop: spacing.xs,
   },
 
   // Logo
