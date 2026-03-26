@@ -201,10 +201,13 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
       <View style={styles.pillRow}>
         {/* Score pill */}
         <View style={styles.scorePill}>
-          <Text style={styles.scoreValue}>
-            {248 /* PREVIEW: hardcoded for 3-digit test — revert to userSeasonTotal */}
-          </Text>
-          <Text style={styles.scorePtsLabel}>pts</Text>
+          <Text style={styles.scoreTotalLabel}>Season Total</Text>
+          <View style={styles.scoreRow}>
+            <Text style={styles.scoreValue}>
+              {userSeasonTotal ?? 0}
+            </Text>
+            <Text style={styles.scorePtsLabel}>pts</Text>
+          </View>
         </View>
 
         {/* Kickoff pill */}
@@ -466,6 +469,16 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderRadius: borderRadius.lg,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
+  },
+  scoreTotalLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  scoreRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: spacing.xs,
