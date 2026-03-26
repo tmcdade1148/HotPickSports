@@ -138,7 +138,10 @@ export function JoinPoolModule() {
         style={styles.createButton}
         onPress={() => navigation.navigate('CreatePool')}>
         <Plus size={18} color={colors.primary} />
-        <Text style={styles.createButtonText}>Create a Pool</Text>
+        <View>
+          <Text style={styles.createButtonText}>Create a Pool</Text>
+          <Text style={styles.createButtonSub}>and invite friends</Text>
+        </View>
       </TouchableOpacity>
     </View>
   );
@@ -232,5 +235,11 @@ const createStyles = (colors: any) =>
       ...typography.body,
       fontWeight: '600',
       color: colors.primary,
+    },
+    createButtonSub: {
+      ...typography.small,
+      color: colors.primary,
+      opacity: 0.7,
+      marginTop: 1,
     },
   });
