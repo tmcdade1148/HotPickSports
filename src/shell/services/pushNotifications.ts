@@ -25,6 +25,15 @@ async function ensureModules(): Promise<boolean> {
   isInitialized = true;
 
   try {
+    // Check if Expo native modules are linked before requiring.
+    // expo-notifications references ExpoGlobal.EventEmitter at load time —
+    // if the native module isn't linked, require() itself crashes.
+    const {NativeModules} = require('react-native');
+    if (!NativeModules.ExpoNotificationsEmitter && !NativeModules.ExpoPushTokenManager) {
+      console.log('[Push] Expo native modules not linked — skipping');
+      return false;
+    }
+
     Notifications = require('expo-notifications');
     Device = require('expo-device');
 
