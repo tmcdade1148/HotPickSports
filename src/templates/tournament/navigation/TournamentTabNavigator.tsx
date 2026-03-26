@@ -30,6 +30,7 @@ import {TournamentBoardScreen} from '../screens/TournamentBoardScreen';
 import {SmackTalkScreen} from '@shared/components/SmackTalkScreen';
 import {SettingsScreen} from '@shell/screens/SettingsScreen';
 import {useTheme} from '@shell/theme';
+import {isPoolVisible} from '@shared/utils/poolVisibility';
 
 // ---------------------------------------------------------------------------
 // Icon mapping — maps config icon strings to Lucide components
@@ -152,7 +153,7 @@ function PoolSwitcherHeader({
           <View style={headerStyles.modal}>
             <Text style={headerStyles.modalTitle}>Switch Pool</Text>
             <FlatList
-              data={[...userPools.filter(p => !p.is_global && !!(p.brand_config as any)?.is_branded), ...userPools.filter(p => !p.is_global && !(p.brand_config as any)?.is_branded)]}
+              data={[...userPools.filter(p => isPoolVisible(p) && !!(p.brand_config as any)?.is_branded), ...userPools.filter(p => isPoolVisible(p) && !(p.brand_config as any)?.is_branded)]}
               keyExtractor={p => p.id}
               renderItem={({item}) => {
                 const unread = smackUnreadCounts[item.id] ?? 0;

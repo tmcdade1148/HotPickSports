@@ -72,6 +72,7 @@ interface GlobalState {
   defaultPoolId: string | null; // loads on app open (persisted per competition)
   userPools: DbPool[];
   poolRoles: Record<string, string>; // poolId → 'member' | 'admin' | 'organizer'
+  manualGlobalJoins: Record<string, boolean>; // poolId → true if user joined global pool via invite code
   poolsByCompetition: Record<string, DbPool[]>;
   isLoadingPools: boolean;
   setActivePoolId: (poolId: string | null) => void;
@@ -355,6 +356,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   defaultPoolId: null,
   userPools: [],
   poolRoles: {},
+  manualGlobalJoins: {},
   poolsByCompetition: {},
   isLoadingPools: false,
 
@@ -401,7 +403,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     // Join pools with pool_members to get pools this user belongs to
     const {data} = await supabase
       .from('pool_members')
-      .select('pool_id, role, pools!inner(*)')
+      .select('pool_id, role, invite_code_used, pools!inner(*)')
       .eq('user_id', userId)
       .eq('pools.competition', competition)
       .eq('status', 'active');
@@ -409,16 +411,22 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     const pools: DbPool[] =
       data?.map((row: any) => row.pools as DbPool) ?? [];
 
-    // Build poolId → role map
+    // Build poolId → role map and track manual joins
     const roles: Record<string, string> = {};
+    const manualGlobalJoins: Record<string, boolean> = {};
     for (const row of data ?? []) {
       roles[(row as any).pool_id] = (row as any).role;
+      // Track if user manually joined a global pool (has invite_code_used)
+      if ((row as any).pools?.is_global && (row as any).invite_code_used) {
+        manualGlobalJoins[(row as any).pool_id] = true;
+      }
     }
 
     // Cache per competition and set as active list
     set(state => ({
       userPools: pools,
       poolRoles: {...state.poolRoles, ...roles},
+      manualGlobalJoins,
       poolsByCompetition: {...state.poolsByCompetition, [competition]: pools},
       isLoadingPools: false,
     }));
