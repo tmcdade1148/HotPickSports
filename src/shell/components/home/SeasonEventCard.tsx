@@ -20,6 +20,7 @@ import {LiveCard} from './LiveCard';
 import {SettlingCard} from './SettlingCard';
 import {CompleteCard} from './CompleteCard';
 import {useTheme, useBrand} from '@shell/theme';
+import {isPoolVisible} from '@shared/utils/poolVisibility';
 import {useCountdown} from '@shared/hooks/useCountdown';
 
 interface SeasonEventCardProps {
@@ -395,7 +396,7 @@ function PoolSwitcherButton({
   const accentColor = colors.highlight;
 
   // Hide pool switcher when user only has the global pool
-  const visiblePools = userPools.filter(p => !p.is_global);
+  const visiblePools = userPools.filter(p => isPoolVisible(p));
   if (visiblePools.length === 0) return null;
 
   const switchTo = (poolId: string) => {
@@ -446,8 +447,8 @@ function PoolSwitcherButton({
             </Text>
             <ScrollView bounces={false}>
               {[
-                ...userPools.filter(p => !p.is_global && !!(p.brand_config as any)?.is_branded),
-                ...userPools.filter(p => !p.is_global && !(p.brand_config as any)?.is_branded),
+                ...userPools.filter(p => isPoolVisible(p) && !!(p.brand_config as any)?.is_branded),
+                ...userPools.filter(p => isPoolVisible(p) && !(p.brand_config as any)?.is_branded),
               ].map(item => {
                 const unread = smackUnreadCounts[item.id] ?? 0;
                 const itemBranded = !!(item.brand_config as any)?.is_branded;

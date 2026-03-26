@@ -40,6 +40,7 @@ import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {SYSTEM_AVATARS} from '@shell/components/AvatarSelector';
 import {getDisplayName} from '@shared/utils/displayName';
+import {isPoolVisible} from '@shared/utils/poolVisibility';
 import {spacing, borderRadius} from '@shared/theme';
 import {useColorScheme} from 'react-native';
 import type {BrandConfig} from '@shell/theme/types';
@@ -264,7 +265,7 @@ export function SettingsScreen() {
           <Users size={18} color={colors.primary} />
           <Text style={[styles.sectionTitle, {color: colors.textPrimary}]}>My Pools</Text>
           <Text style={[styles.poolCount, {color: colors.textSecondary}]}>
-            ({userPools.filter(p => !p.is_global).length})
+            ({userPools.filter(p => isPoolVisible(p)).length})
           </Text>
         </View>
         <View style={styles.poolsHeaderRight}>
@@ -285,12 +286,12 @@ export function SettingsScreen() {
         <View style={styles.poolsContent}>
           {/* Pool list — partner pools first, then HotPick pools (global pool hidden) */}
           {[
-            ...userPools.filter(p => !p.is_global && !!(p.brand_config as any)?.is_branded),
+            ...userPools.filter(p => isPoolVisible(p) && !!(p.brand_config as any)?.is_branded),
             'DIVIDER' as const,
-            ...userPools.filter(p => !p.is_global && !(p.brand_config as any)?.is_branded),
+            ...userPools.filter(p => isPoolVisible(p) && !(p.brand_config as any)?.is_branded),
           ].map((poolOrDivider) => {
             if (poolOrDivider === 'DIVIDER') {
-              const hasPartner = userPools.some(p => !p.is_global && !!(p.brand_config as any)?.is_branded);
+              const hasPartner = userPools.some(p => isPoolVisible(p) && !!(p.brand_config as any)?.is_branded);
               if (!hasPartner) return null;
               return <View key="partner-divider" style={{height: 16}} />;
             }
