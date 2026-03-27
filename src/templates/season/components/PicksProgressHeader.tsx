@@ -49,28 +49,45 @@ export function PicksProgressHeader({
       ? colors.warning
       : colors.textSecondary;
 
+  const hasHotPick = hotPickCount >= hotPicksRequired;
+
   return (
     <View style={styles.container}>
       {/* Title row */}
       <View style={styles.titleRow}>
         <Text style={styles.weekTitle}>Week {currentWeek} Picks</Text>
-        <View style={styles.countRow}>
-          {hasPicks && (
+        <View style={styles.rightRow}>
+          {/* Pick count */}
+          <View style={styles.countRow}>
+            {hasPicks && (
+              <Flame
+                size={14}
+                color={countColor}
+                fill={allPicked ? countColor : 'none'}
+                strokeWidth={allPicked ? 2 : 1.5}
+              />
+            )}
+            <Text
+              style={[
+                styles.pickCountText,
+                {color: countColor},
+                allPicked && styles.pickCountComplete,
+              ]}>
+              {pickCount}/{totalGames}
+            </Text>
+          </View>
+          {/* HotPick indicator */}
+          <View style={[styles.hotPickBadge, hasHotPick && styles.hotPickBadgeActive]}>
             <Flame
-              size={14}
-              color={countColor}
-              fill={allPicked ? countColor : 'none'}
-              strokeWidth={allPicked ? 2 : 1.5}
+              size={20}
+              color={hasHotPick ? '#FFFFFF' : colors.textSecondary}
+              fill={hasHotPick ? '#FFFFFF' : 'none'}
+              strokeWidth={2}
             />
-          )}
-          <Text
-            style={[
-              styles.pickCountText,
-              {color: countColor},
-              allPicked && styles.pickCountComplete,
-            ]}>
-            {pickCount}/{totalGames}
-          </Text>
+            <Text style={[styles.hotPickText, hasHotPick && styles.hotPickTextActive]}>
+              {hotPickCount}/{hotPicksRequired}
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -106,6 +123,11 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: '600',
     color: colors.textPrimary,
   },
+  rightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
   countRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -117,6 +139,26 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   pickCountComplete: {
     fontWeight: '800',
+  },
+  hotPickBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.border,
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  hotPickBadgeActive: {
+    backgroundColor: '#06D6A0',
+  },
+  hotPickText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textSecondary,
+  },
+  hotPickTextActive: {
+    color: '#FFFFFF',
   },
   progressBar: {
     height: 6,
