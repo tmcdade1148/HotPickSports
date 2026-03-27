@@ -532,20 +532,20 @@ export function MainTabNavigator() {
             <View style={{
               alignItems: 'center',
               justifyContent: 'center',
-              width: 56,
-              height: 56,
-              borderRadius: 28,
+              width: 64,
+              height: 64,
+              borderRadius: 32,
               backgroundColor: focused ? colors.primary : colors.surface,
               borderWidth: 2,
               borderColor: colors.primary,
-              marginBottom: 20,
+              marginBottom: 30,
               shadowColor: focused ? colors.primary : '#000',
               shadowOffset: {width: 0, height: 4},
               shadowOpacity: focused ? 0.35 : 0.15,
               shadowRadius: 8,
               elevation: focused ? 8 : 4,
             }}>
-              <Home size={28} color={focused ? '#FFFFFF' : colors.textSecondary} />
+              <Home size={32} color={focused ? '#FFFFFF' : colors.textSecondary} />
             </View>
           ),
         }}
