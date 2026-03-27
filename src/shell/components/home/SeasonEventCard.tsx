@@ -56,6 +56,7 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
   const highestRankedGame = useNFLStore(s => s.highestRankedGame);
   const weekFirstKickoff = useNFLStore(s => s.weekFirstKickoff);
   const userPickCount = useNFLStore(s => s.userPickCount);
+  const totalGamesThisWeek = useNFLStore(s => s.totalGamesThisWeek);
   const userSeasonTotal = useNFLStore(s => s.userSeasonTotal);
 
   const initialize = useNFLStore(s => s.initialize);
@@ -294,6 +295,8 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
         highestRankedGame,
         weekFirstKickoff,
         userHasSubmitted: userPickCount > 0,
+        userPickCount,
+        totalGames: totalGamesThisWeek,
         poolPicksSubmittedCount,
         poolMemberCount,
         onMakePicks: onNavigateToEvent ?? (() => {}),
@@ -332,6 +335,8 @@ function renderWeekState(props: {
   highestRankedGame: any;
   weekFirstKickoff: Date | null;
   userHasSubmitted: boolean;
+  userPickCount: number;
+  totalGames: number;
   poolPicksSubmittedCount: number;
   poolMemberCount: number;
   onMakePicks: () => void;
@@ -348,6 +353,8 @@ function renderWeekState(props: {
           hotPickKickoff={props.userHotPickGame?.kickoff_at ? new Date(props.userHotPickGame.kickoff_at) : null}
           hotPickTeam={props.userHotPick?.picked_team ?? null}
           userHasSubmitted={props.userHasSubmitted}
+          userPickCount={props.userPickCount}
+          totalGames={props.totalGames}
           poolPicksSubmittedCount={props.poolPicksSubmittedCount}
           weekLabelColor={props.weekLabelColor}
           poolMemberCount={props.poolMemberCount}

@@ -37,6 +37,10 @@ interface PicksOpenCardProps {
   hotPickTeam: string | null;
   /** Whether the current user has submitted at least one pick this week */
   userHasSubmitted: boolean;
+  /** Number of picks the user has made this week */
+  userPickCount: number;
+  /** Total games available to pick this week */
+  totalGames: number;
   /** Number of pool members who have submitted picks this week */
   poolPicksSubmittedCount: number;
   /** Total active members in the current pool */
@@ -64,6 +68,8 @@ export function PicksOpenCard({
   hotPickKickoff,
   hotPickTeam,
   userHasSubmitted,
+  userPickCount,
+  totalGames,
   poolPicksSubmittedCount,
   poolMemberCount,
   onMakePicks,
@@ -75,8 +81,16 @@ export function PicksOpenCard({
   const kickoff = useCountdown(weekFirstKickoff);
   const hotPickCountdown = useCountdown(hotPickKickoff);
 
-  const ctaLabel = userHasSubmitted ? 'Edit Your Picks' : 'Make Your Picks';
-  const lockedInLabel = userHasSubmitted ? 'Your picks are in \u2713' : undefined;
+  const picksComplete = userPickCount >= totalGames && totalGames > 0;
+  const ctaLabel = userHasSubmitted
+    ? (picksComplete ? 'Edit Your Picks' : 'Finish Your Picks')
+    : 'Make Your Picks';
+  const lockedInLabel = picksComplete
+    ? 'Your picks are in \u2713'
+    : userHasSubmitted
+      ? `${userPickCount} of ${totalGames} picked — finish your picks`
+      : undefined;
+  const lockedInColor = picksComplete ? '#1b9a06' : colors.warning;
 
   return (
     <View style={styles.container}>
@@ -111,7 +125,7 @@ export function PicksOpenCard({
         label={ctaLabel}
         onPress={onMakePicks}
         secondaryLabel={lockedInLabel}
-        secondaryColor={'#1b9a06'}
+        secondaryColor={lockedInColor}
       />
     </View>
   );
