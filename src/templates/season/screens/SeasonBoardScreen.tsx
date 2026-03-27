@@ -18,6 +18,7 @@ import {Flame} from 'lucide-react-native';
 
 import {useTheme} from '@shell/theme';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
+import {useGlobalStore} from '@shell/stores/globalStore';
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
@@ -45,16 +46,23 @@ export function SeasonBoardScreen() {
   const {user} = useAuth();
 
   const pathBackNarrative = useNFLStore(s => s.pathBackNarrative);
+  const activePoolId = useGlobalStore(s => s.activePoolId);
 
   const [activeTab, setActiveTab] = useState<'season' | 'week'>('season');
   const scrollRef = useRef<ScrollView>(null);
 
-  // Re-fetch both leaderboards whenever poolId changes
+  // Re-fetch both leaderboards whenever the GLOBAL activePoolId changes
+  // This fires immediately on pool switch — doesn't wait for seasonStore.initialize()
   useEffect(() => {
-    if (!config || !poolId) return;
-    fetchLeaderboard();
-    fetchWeekLeaderboard();
-  }, [poolId]);
+    // Small delay to let initialize() set the new poolId first
+    const timer = setTimeout(() => {
+      const currentPoolId = useSeasonStore.getState().poolId;
+      if (!useSeasonStore.getState().config || !currentPoolId) return;
+      fetchLeaderboard();
+      fetchWeekLeaderboard();
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [activePoolId]);
 
   // Realtime: week leaderboard updates live during games
   useEffect(() => {
