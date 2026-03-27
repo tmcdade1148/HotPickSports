@@ -31,17 +31,23 @@ export function EventDetailScreen({navigation}: any) {
   const userPools = useGlobalStore(s => s.userPools);
   const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
 
-  // Safety net: if we have pools but no active pool, auto-select the first visible one.
-  // Prefer visible pools over hidden global pools.
+  // Safety net: auto-select a visible pool, or clear if active pool is hidden.
   useEffect(() => {
-    if (!activePoolId && userPools.length > 0) {
+    if (userPools.length === 0) return;
+
+    const activePool = activePoolId ? userPools.find(p => p.id === activePoolId) : undefined;
+    const activeIsVisible = activePool ? isPoolVisible(activePool) : false;
+
+    if (!activePoolId || !activeIsVisible) {
       const firstVisible = userPools.find(p => isPoolVisible(p));
       if (firstVisible) {
         setActivePoolId(firstVisible.id);
-      } else {
-        // Fall back to any pool (e.g. hidden global) so we don't get stuck loading
+      } else if (!activePoolId) {
+        // No visible pools — fall back to any pool so we don't get stuck loading
         setActivePoolId(userPools[0].id);
       }
+      // If activePoolId is set but hidden and no visible pools exist,
+      // keep it so tabs can render (header shows "Join or create a pool")
     }
   }, [activePoolId, userPools, setActivePoolId]);
 
