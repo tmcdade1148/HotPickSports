@@ -232,7 +232,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
         picked_team: pickedTeam,
         is_hotpick: isHotPick,
       },
-      {onConflict: 'user_id,competition,game_id'},
+      {onConflict: 'user_id,game_id'},
     );
 
     if (error) {
@@ -277,7 +277,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
           picked_team: oldHotPick.picked_team,
           is_hotpick: false,
         },
-        {onConflict: 'user_id,competition,game_id'},
+        {onConflict: 'user_id,game_id'},
       );
       if (clearError) {
         set({weekPicks: prevWeekPicks, saveError: clearError.message, isSaving: false});
@@ -296,7 +296,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
         picked_team: pick.picked_team,
         is_hotpick: true,
       },
-      {onConflict: 'user_id,competition,game_id'},
+      {onConflict: 'user_id,game_id'},
     );
 
     if (error) {
