@@ -442,10 +442,12 @@ export function MainTabNavigator() {
     if (!activeSport || !activePoolId) return;
 
     if (activeSport.templateType === 'season') {
-      // Only re-initialize if sport or pool changed
+      // Re-initialize if sport, pool, or first init
+      const poolChanged = seasonConfig && useSeasonStore.getState().poolId !== activePoolId;
       if (
         !seasonConfig ||
         seasonConfig.competition !== activeSport.competition ||
+        poolChanged ||
         didInit.current === false
       ) {
         didInit.current = true;
