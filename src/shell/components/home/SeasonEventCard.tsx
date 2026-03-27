@@ -20,7 +20,6 @@ import {LiveCard} from './LiveCard';
 import {SettlingCard} from './SettlingCard';
 import {CompleteCard} from './CompleteCard';
 import {useTheme, useBrand} from '@shell/theme';
-import {isPoolVisible} from '@shared/utils/poolVisibility';
 import {useCountdown} from '@shared/hooks/useCountdown';
 
 interface SeasonEventCardProps {
@@ -66,7 +65,7 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
 
   const userId = useGlobalStore(s => s.user?.id ?? null);
   const activePoolId = useGlobalStore(s => s.activePoolId);
-  const userPools = useGlobalStore(s => s.userPools);
+  const userPools = useGlobalStore(s => s.visiblePools);
   const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
   const smackUnreadCounts = useGlobalStore(s => s.smackUnreadCounts);
   // Subscribe to manualGlobalJoins so isPoolVisible re-evaluates on load
@@ -396,15 +395,9 @@ function PoolSwitcherButton({
   const brand = useBrand();
   const [modalVisible, setModalVisible] = useState(false);
   const accentColor = colors.highlight;
-  // Subscribe directly so this component re-renders when manualGlobalJoins loads
-  const manualGlobalJoins = useGlobalStore(s => s.manualGlobalJoins);
 
-  // Hide pool switcher when user only has the global pool
-  const visiblePools = userPools.filter(p => {
-    if (!p.is_global) return true;
-    return !!manualGlobalJoins[p.id];
-  });
-  if (visiblePools.length === 0) return null;
+  // userPools is already visiblePools from the store
+  if (userPools.length === 0) return null;
 
   const switchTo = (poolId: string) => {
     onSwitchPool(poolId);
@@ -454,8 +447,8 @@ function PoolSwitcherButton({
             </Text>
             <ScrollView bounces={false}>
               {[
-                ...visiblePools.filter(p => !!(p.brand_config as any)?.is_branded),
-                ...visiblePools.filter(p => !(p.brand_config as any)?.is_branded),
+                ...userPools.filter(p => !!(p.brand_config as any)?.is_branded),
+                ...userPools.filter(p => !(p.brand_config as any)?.is_branded),
               ].map(item => {
                 const unread = smackUnreadCounts[item.id] ?? 0;
                 const itemBranded = !!(item.brand_config as any)?.is_branded;

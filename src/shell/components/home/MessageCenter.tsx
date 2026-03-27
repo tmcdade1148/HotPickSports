@@ -27,7 +27,7 @@ export function MessageCenter({
 
   const flaggedCounts = useGlobalStore(s => s.flaggedCounts);
   const recentBroadcasts = useGlobalStore(s => s.recentBroadcasts);
-  const userPools = useGlobalStore(s => s.userPools);
+  const userPools = useGlobalStore(s => s.visiblePools);
 
   // Count of recent direct messages (broadcasts shown in last 24h)
   const directMessageCount = recentBroadcasts.length;

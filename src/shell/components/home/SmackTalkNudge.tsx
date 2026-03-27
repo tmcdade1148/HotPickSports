@@ -27,7 +27,7 @@ export function SmackTalkNudge({onPress, onPressPool}: SmackTalkNudgeProps) {
   const {colors} = useTheme();
   const styles = createStyles(colors);
   const smackUnreadCounts = useGlobalStore(s => s.smackUnreadCounts);
-  const userPools = useGlobalStore(s => s.userPools);
+  const userPools = useGlobalStore(s => s.visiblePools);
   const activePoolId = useGlobalStore(s => s.activePoolId);
 
   const activePool = userPools.find(p => p.id === activePoolId);

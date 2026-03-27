@@ -23,7 +23,7 @@ export function PoolSelectionScreen({navigation}: any) {
   const user = useGlobalStore(s => s.user);
   const activeSport = useGlobalStore(s => s.activeSport);
   const setActiveSport = useGlobalStore(s => s.setActiveSport);
-  const userPools = useGlobalStore(s => s.userPools);
+  const userPools = useGlobalStore(s => s.visiblePools);
   const isLoadingPools = useGlobalStore(s => s.isLoadingPools);
   const fetchUserPools = useGlobalStore(s => s.fetchUserPools);
   const setActivePoolId = useGlobalStore(s => s.setActivePoolId);

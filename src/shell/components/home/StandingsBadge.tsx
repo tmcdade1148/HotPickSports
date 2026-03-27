@@ -41,7 +41,7 @@ export function StandingsBadge({onPress}: StandingsBadgeProps) {
   const activePoolMemberCount = useNFLStore(s => s.activePoolMemberCount);
 
   const activePoolId = useGlobalStore(s => s.activePoolId);
-  const userPools = useGlobalStore(s => s.userPools);
+  const userPools = useGlobalStore(s => s.visiblePools);
   const userProfile = useGlobalStore(s => s.userProfile);
 
   // No pool selected — don't render
