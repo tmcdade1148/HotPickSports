@@ -478,15 +478,14 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
     }
 
     // Step 6: Find users who submitted picks but have no scores yet
-    // This makes them appear on the week leaderboard during picks_open
+    // Uses SECURITY DEFINER RPC to bypass RLS (users can only see own picks)
     const scoredUserIds = new Set(rows.map(r => r.user_id));
     const {data: pickSubmissions} = await supabase
-      .from('season_picks')
-      .select('user_id, updated_at')
-      .eq('competition', config.competition)
-      .eq('week', targetWeek)
-      .eq('is_hotpick', true)
-      .in('user_id', memberIds);
+      .rpc('get_pool_pick_submissions', {
+        p_pool_id: poolId,
+        p_competition: config.competition,
+        p_week: targetWeek,
+      });
 
     // Step 7: Build week leaderboard entries — scored users first
     const weekEntries: WeekLeaderboardEntry[] = rows.map(row => {
@@ -508,16 +507,17 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
     for (const sub of pickSubmissions ?? []) {
       if (!scoredUserIds.has(sub.user_id)) {
         const hp = hotPickByUser[sub.user_id];
+        const game = sub.hotpick_game_id ? gameMap[sub.hotpick_game_id] : null;
         weekEntries.push({
           user_id: sub.user_id,
           week_points: 0,
           correct_picks: 0,
           total_picks: 0,
-          hotpick_team: hp?.team ?? null,
-          hotpick_game_label: hp?.gameLabel ?? null,
+          hotpick_team: sub.hotpick_team ?? hp?.team ?? null,
+          hotpick_game_label: game ? `${game.away_team} @ ${game.home_team}` : hp?.gameLabel ?? null,
           hotpick_rank: null,
           is_hotpick_correct: null,
-          submitted_at: sub.updated_at,
+          submitted_at: sub.submitted_at,
         });
       }
     }
