@@ -33,7 +33,7 @@ export function CardFooter({
   const {colors} = useTheme();
   const styles = createStyles(colors);
   const resolvedAccent = accentColor ?? colors.primary;
-  const resolvedSecondary = secondaryColor ?? colors.success;
+  const resolvedSecondary = secondaryColor ?? '#1b9a06';
   return (
     <View style={styles.container}>
       {secondaryLabel && (
