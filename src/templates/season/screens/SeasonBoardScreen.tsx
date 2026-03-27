@@ -51,18 +51,25 @@ export function SeasonBoardScreen() {
   const [activeTab, setActiveTab] = useState<'season' | 'week'>('season');
   const scrollRef = useRef<ScrollView>(null);
 
-  // Re-fetch both leaderboards whenever the GLOBAL activePoolId changes
-  // This fires immediately on pool switch — doesn't wait for seasonStore.initialize()
+  // Subscribe to poolId changes in the season store via Zustand subscribe
+  // This fires AFTER initialize() sets the new poolId — no race condition
+  const lastFetchedPool = useRef('');
   useEffect(() => {
-    // Small delay to let initialize() set the new poolId first
-    const timer = setTimeout(() => {
-      const currentPoolId = useSeasonStore.getState().poolId;
-      if (!useSeasonStore.getState().config || !currentPoolId) return;
+    const unsub = useSeasonStore.subscribe((state) => {
+      if (state.poolId && state.config && state.poolId !== lastFetchedPool.current) {
+        lastFetchedPool.current = state.poolId;
+        state.fetchLeaderboard();
+        state.fetchWeekLeaderboard();
+      }
+    });
+    // Also fetch on mount
+    if (poolId && config && poolId !== lastFetchedPool.current) {
+      lastFetchedPool.current = poolId;
       fetchLeaderboard();
       fetchWeekLeaderboard();
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [activePoolId]);
+    }
+    return unsub;
+  }, []);
 
   // Realtime: week leaderboard updates live during games
   useEffect(() => {
