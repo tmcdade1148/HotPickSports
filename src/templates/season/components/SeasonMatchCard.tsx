@@ -303,8 +303,6 @@ export function SeasonMatchCard({
         </View>
       )}
 
-      {/* ── Separator ── */}
-      <View style={styles.separator} />
     </View>
   );
 }
