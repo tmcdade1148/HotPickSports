@@ -18,6 +18,7 @@ import {StandingsBadge} from '@shell/components/home/StandingsBadge';
 import {SmackTalkNudge} from '@shell/components/home/SmackTalkNudge';
 import {MessageCenter} from '@shell/components/home/MessageCenter';
 import {HardwareModule} from '@shell/components/home/HardwareModule';
+import {WeekScoreModule} from '@shell/components/home/WeekScoreModule';
 import {JoinPoolModule} from '@shell/components/home/JoinPoolModule';
 import {spacing, typography} from '@shared/theme';
 import {useTheme, useBrand} from '@shell/theme';
@@ -186,6 +187,9 @@ export function HomeScreen({navigation}: any) {
         {cardsToShow.length > 0 && hasPrivatePool && (
           <StandingsBadge onPress={handleNavigateToBoard} />
         )}
+
+        {/* Week Score Module — shows during locked/live/settling states */}
+        {cardsToShow.length > 0 && hasPrivatePool && <WeekScoreModule />}
 
         {/* Join Pool Module — shown when user has no private pool, hidden during SEASON_COMPLETE */}
         {showJoinModule && <JoinPoolModule />}
