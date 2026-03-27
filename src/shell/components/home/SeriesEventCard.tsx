@@ -34,7 +34,7 @@ export function SeriesEventCard({config}: SeriesEventCardProps) {
   const isComplete = useNHLStore(s => s.isComplete);
 
   const activePoolId = useGlobalStore(s => s.activePoolId);
-  const userPools = useGlobalStore(s => s.userPools);
+  const userPools = useGlobalStore(s => s.visiblePools);
   const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
   const smackUnreadCounts = useGlobalStore(s => s.smackUnreadCounts);
 

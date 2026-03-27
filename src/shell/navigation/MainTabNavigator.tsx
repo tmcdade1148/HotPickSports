@@ -118,7 +118,7 @@ function TabHeader({title, showPoolSwitcher}: {title: string; showPoolSwitcher: 
   const {colors} = useTheme();
   const brand = useBrand();
   const [modalVisible, setModalVisible] = useState(false);
-  const userPools = useGlobalStore(s => s.userPools);
+  const userPools = useGlobalStore(s => s.visiblePools);
   const activePoolId = useGlobalStore(s => s.activePoolId);
   const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
   const smackUnreadCounts = useGlobalStore(s => s.smackUnreadCounts);

@@ -40,7 +40,6 @@ import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {SYSTEM_AVATARS} from '@shell/components/AvatarSelector';
 import {getDisplayName} from '@shared/utils/displayName';
-import {isPoolVisible} from '@shared/utils/poolVisibility';
 import {spacing, borderRadius} from '@shared/theme';
 import {useColorScheme} from 'react-native';
 import type {BrandConfig} from '@shell/theme/types';
@@ -59,7 +58,7 @@ export function SettingsScreen() {
 
   const user = useGlobalStore(s => s.user);
   const userProfile = useGlobalStore(s => s.userProfile);
-  const userPools = useGlobalStore(s => s.userPools);
+  const userPools = useGlobalStore(s => s.visiblePools);
   const poolRoles = useGlobalStore(s => s.poolRoles);
   const activePoolId = useGlobalStore(s => s.activePoolId);
   const rawDefaultPoolId = useGlobalStore(s => s.defaultPoolId);
@@ -67,11 +66,10 @@ export function SettingsScreen() {
   const setDefaultPoolId = useGlobalStore(s => s.setDefaultPoolId);
 
   // Effective default: manual setting → first partner pool → first created → first joined
-  const visiblePools = userPools.filter(p => isPoolVisible(p));
   const effectiveDefaultPoolId = rawDefaultPoolId
-    ?? visiblePools.find(p => !!(p.brand_config as any)?.is_branded)?.id
-    ?? visiblePools.find(p => poolRoles[p.id] === 'organizer')?.id
-    ?? visiblePools[0]?.id
+    ?? userPools.find(p => !!(p.brand_config as any)?.is_branded)?.id
+    ?? userPools.find(p => poolRoles[p.id] === 'organizer')?.id
+    ?? userPools[0]?.id
     ?? null;
   const activeSport = useGlobalStore(s => s.activeSport);
   const joinPool = useGlobalStore(s => s.joinPool);
@@ -273,11 +271,11 @@ export function SettingsScreen() {
           <Users size={18} color={colors.primary} />
           <Text style={[styles.sectionTitle, {color: colors.textPrimary}]}>My Pools</Text>
           <Text style={[styles.poolCount, {color: colors.textSecondary}]}>
-            ({userPools.filter(p => isPoolVisible(p)).length})
+            ({userPools.length})
           </Text>
         </View>
         <View style={styles.poolsHeaderRight}>
-          {!poolsExpanded && activePool && isPoolVisible(activePool) && (
+          {!poolsExpanded && activePool && (
             <Text style={[styles.activePoolHint, {color: colors.primary}]} numberOfLines={1}>
               {activePool.name}
             </Text>
@@ -294,12 +292,12 @@ export function SettingsScreen() {
         <View style={styles.poolsContent}>
           {/* Pool list — partner pools first, then HotPick pools (global pool hidden) */}
           {[
-            ...userPools.filter(p => isPoolVisible(p) && !!(p.brand_config as any)?.is_branded),
+            ...userPools.filter(p => !!(p.brand_config as any)?.is_branded),
             'DIVIDER' as const,
-            ...userPools.filter(p => isPoolVisible(p) && !(p.brand_config as any)?.is_branded),
+            ...userPools.filter(p => !(p.brand_config as any)?.is_branded),
           ].map((poolOrDivider) => {
             if (poolOrDivider === 'DIVIDER') {
-              const hasPartner = userPools.some(p => isPoolVisible(p) && !!(p.brand_config as any)?.is_branded);
+              const hasPartner = userPools.some(p => !!(p.brand_config as any)?.is_branded);
               if (!hasPartner) return null;
               return <View key="partner-divider" style={{height: 16}} />;
             }

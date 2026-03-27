@@ -25,7 +25,6 @@ import {SeasonPicksScreen} from '../screens/SeasonPicksScreen';
 import {SeasonBoardScreen} from '../screens/SeasonBoardScreen';
 import {SmackTalkScreen} from '@shared/components/SmackTalkScreen';
 import {useTheme} from '@shell/theme';
-import {isPoolVisible} from '@shared/utils/poolVisibility';
 import {HOTPICK_DEFAULTS} from '@shell/theme/defaults';
 
 // ---------------------------------------------------------------------------
@@ -86,12 +85,9 @@ function PoolSwitcherHeader({
   const headerStyles = createHeaderStyles(colors);
   const [modalVisible, setModalVisible] = useState(false);
   const smackUnreadCounts = useGlobalStore(s => s.smackUnreadCounts);
-  // Subscribe to manualGlobalJoins so isPoolVisible re-evaluates on load
-  useGlobalStore(s => s.manualGlobalJoins);
 
   const isPicksTab = activeTabKey === 'picks';
-  const visiblePools = userPools.filter(p => isPoolVisible(p));
-  const hasVisiblePools = visiblePools.length > 0;
+  const hasVisiblePools = userPools.length > 0;
 
   const switchTo = (poolId: string) => {
     onSwitchPool(poolId);
@@ -162,8 +158,8 @@ function PoolSwitcherHeader({
             <Text style={headerStyles.modalTitle}>Switch Pool</Text>
             <ScrollView bounces={false}>
               {[
-                ...userPools.filter(p => isPoolVisible(p) && !!(p.brand_config as any)?.is_branded),
-                ...userPools.filter(p => isPoolVisible(p) && !(p.brand_config as any)?.is_branded),
+                ...userPools.filter(p => !!(p.brand_config as any)?.is_branded),
+                ...userPools.filter(p => !(p.brand_config as any)?.is_branded),
               ].map(item => {
                 const unread = smackUnreadCounts[item.id] ?? 0;
                 const itemBranded = !!(item.brand_config as any)?.is_branded;

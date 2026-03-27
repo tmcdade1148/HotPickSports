@@ -34,7 +34,7 @@ interface MessageItem {
  */
 export function MessageCenterScreen() {
   const navigation = useNavigation<any>();
-  const userPools = useGlobalStore(s => s.userPools);
+  const userPools = useGlobalStore(s => s.visiblePools);
   const userId = useGlobalStore(s => s.user?.id);
 
   const [messages, setMessages] = useState<MessageItem[]>([]);

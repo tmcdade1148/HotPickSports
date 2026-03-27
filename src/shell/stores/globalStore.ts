@@ -71,6 +71,7 @@ interface GlobalState {
   activePoolId: string | null;
   defaultPoolId: string | null; // loads on app open (persisted per competition)
   userPools: DbPool[];
+  visiblePools: DbPool[]; // userPools filtered: hides auto-enrolled global pools
   poolRoles: Record<string, string>; // poolId → 'member' | 'admin' | 'organizer'
   manualGlobalJoins: Record<string, boolean>; // poolId → true if user joined global pool via invite code
   poolsByCompetition: Record<string, DbPool[]>;
@@ -355,6 +356,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   activePoolId: null,
   defaultPoolId: null,
   userPools: [],
+  visiblePools: [],
   poolRoles: {},
   manualGlobalJoins: {},
   poolsByCompetition: {},
@@ -422,9 +424,16 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       }
     }
 
+    // Compute visible pools: hide global pools unless manually joined
+    const visible = pools.filter(p => {
+      if (!p.is_global) return true;
+      return !!manualGlobalJoins[p.id];
+    });
+
     // Cache per competition and set as active list
     set(state => ({
       userPools: pools,
+      visiblePools: visible,
       poolRoles: {...state.poolRoles, ...roles},
       manualGlobalJoins,
       poolsByCompetition: {...state.poolsByCompetition, [competition]: pools},

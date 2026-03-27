@@ -46,7 +46,7 @@ export function HomeScreen({navigation}: any) {
   const activeEventCards = useGlobalStore(s => s.activeEventCards);
   const activeSport = useGlobalStore(s => s.activeSport);
   const setActiveSport = useGlobalStore(s => s.setActiveSport);
-  const userPools = useGlobalStore(s => s.userPools);
+  const userPools = useGlobalStore(s => s.visiblePools);
 
   const nflWeekState = useNFLStore(s => s.weekState);
   const nflCurrentPhase = useNFLStore(s => s.currentPhase);
