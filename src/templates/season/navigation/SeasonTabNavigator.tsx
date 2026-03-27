@@ -117,8 +117,8 @@ function PoolSwitcherHeader({
           <TouchableOpacity
             style={headerStyles.selector}
             onPress={() => onOpenSettings?.()}>
-            <Text style={[headerStyles.poolName, {color: colors.primary}]} numberOfLines={1}>
-              Join or create a pool
+            <Text style={[headerStyles.poolName, {color: colors.primary, fontWeight: '700'}]} numberOfLines={1}>
+              Join or Create a Pool
             </Text>
           </TouchableOpacity>
         ) : (
