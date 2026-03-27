@@ -394,14 +394,13 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
     if (userIds.length > 0) {
       const {data: profiles} = await supabase
         .from('profiles')
-        .select('id, display_name')
+        .select('id, poolie_name, first_name, last_name')
         .in('id', userIds);
 
       if (profiles) {
         for (const p of profiles) {
-          if (p.display_name) {
-            names[p.id] = p.display_name;
-          }
+          names[p.id] = p.poolie_name
+            || (p.first_name ? `${p.first_name}${p.last_name ? ` ${p.last_name.charAt(0)}.` : ''}` : 'Player');
         }
       }
     }
@@ -532,6 +531,26 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       }
       return 0;
     });
+
+    // Step 8: Fetch display names for all users on week leaderboard
+    const allWeekUserIds = weekEntries.map(e => e.user_id);
+    if (allWeekUserIds.length > 0) {
+      const {data: profiles} = await supabase
+        .from('profiles')
+        .select('id, poolie_name, first_name, last_name')
+        .in('id', allWeekUserIds);
+
+      if (profiles) {
+        const existingNames = get().userNames;
+        const updatedNames = {...existingNames};
+        for (const p of profiles) {
+          updatedNames[p.id] = p.poolie_name
+            || (p.first_name ? `${p.first_name}${p.last_name ? ` ${p.last_name.charAt(0)}.` : ''}` : 'Player');
+        }
+        set({weekLeaderboard: weekEntries, userNames: updatedNames});
+        return;
+      }
+    }
 
     set({weekLeaderboard: weekEntries});
   },
