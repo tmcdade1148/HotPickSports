@@ -68,6 +68,8 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
   const userPools = useGlobalStore(s => s.visiblePools);
   const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
   const smackUnreadCounts = useGlobalStore(s => s.smackUnreadCounts);
+  // Subscribe to manualGlobalJoins so isPoolVisible re-evaluates on load
+  useGlobalStore(s => s.manualGlobalJoins);
 
   const activePool = userPools.find(p => p.id === activePoolId);
 
@@ -394,7 +396,7 @@ function PoolSwitcherButton({
   const [modalVisible, setModalVisible] = useState(false);
   const accentColor = colors.highlight;
 
-  // Hide pool switcher when user has no visible pools
+  // userPools is already visiblePools from the store
   if (userPools.length === 0) return null;
 
   const switchTo = (poolId: string) => {

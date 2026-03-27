@@ -85,6 +85,8 @@ function PoolSwitcherHeader({
   const headerStyles = createHeaderStyles(colors);
   const [modalVisible, setModalVisible] = useState(false);
   const smackUnreadCounts = useGlobalStore(s => s.smackUnreadCounts);
+  // Subscribe to manualGlobalJoins so isPoolVisible re-evaluates on load
+  useGlobalStore(s => s.manualGlobalJoins);
 
   const isPicksTab = activeTabKey === 'picks';
   const hasVisiblePools = userPools.length > 0;
