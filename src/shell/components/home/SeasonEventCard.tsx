@@ -69,6 +69,8 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
   const userPools = useGlobalStore(s => s.userPools);
   const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
   const smackUnreadCounts = useGlobalStore(s => s.smackUnreadCounts);
+  // Subscribe to manualGlobalJoins so isPoolVisible re-evaluates on load
+  useGlobalStore(s => s.manualGlobalJoins);
 
   const activePool = userPools.find(p => p.id === activePoolId);
 
