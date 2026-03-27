@@ -34,6 +34,7 @@ export function SeasonBoardScreen() {
   const {colors} = useTheme();
   const styles = createStyles(colors);
   const config = useSeasonStore(s => s.config);
+  const poolId = useSeasonStore(s => s.poolId);
   const currentWeek = useSeasonStore(s => s.currentWeek);
   const leaderboard = useSeasonStore(s => s.leaderboard);
   const weekLeaderboard = useSeasonStore(s => s.weekLeaderboard);
@@ -48,12 +49,12 @@ export function SeasonBoardScreen() {
   const [activeTab, setActiveTab] = useState<'season' | 'week'>('season');
   const scrollRef = useRef<ScrollView>(null);
 
-  // Initial fetch
+  // Fetch on init and pool switch
   useEffect(() => {
-    if (!config) return;
+    if (!config || !poolId) return;
     fetchLeaderboard();
     fetchWeekLeaderboard();
-  }, [config, fetchLeaderboard, fetchWeekLeaderboard]);
+  }, [config, poolId, fetchLeaderboard, fetchWeekLeaderboard]);
 
   // Realtime: week leaderboard updates live during games
   useEffect(() => {
