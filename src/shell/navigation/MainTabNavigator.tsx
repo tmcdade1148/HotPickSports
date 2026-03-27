@@ -507,9 +507,24 @@ export function MainTabNavigator() {
         name="HomeTab"
         component={HomeScreen}
         options={{
-          tabBarLabel: 'Dashboard',
-          tabBarIcon: ({color, size}) => (
-            <Home size={size} color={color} />
+          tabBarLabel: () => null,
+          tabBarIcon: ({focused}) => (
+            <View style={{
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 56,
+              height: 56,
+              borderRadius: 28,
+              backgroundColor: focused ? colors.primary : colors.surface,
+              marginBottom: 20,
+              shadowColor: focused ? colors.primary : '#000',
+              shadowOffset: {width: 0, height: 4},
+              shadowOpacity: focused ? 0.35 : 0.15,
+              shadowRadius: 8,
+              elevation: focused ? 8 : 4,
+            }}>
+              <Home size={28} color={focused ? '#FFFFFF' : colors.textSecondary} />
+            </View>
           ),
         }}
       />
