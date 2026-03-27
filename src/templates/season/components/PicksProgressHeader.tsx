@@ -110,7 +110,8 @@ const createStyles = (colors: any) => StyleSheet.create({
   rightRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing.sm,
+    paddingRight: spacing.md,
   },
   countRow: {
     flexDirection: 'row',
