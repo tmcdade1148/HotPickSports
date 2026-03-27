@@ -100,19 +100,11 @@ export function MessageCenterScreen() {
     if (senderIdArr.length > 0) {
       const {data: profiles} = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, poolie_name, display_name_preference')
+        .select('id, poolie_name')
         .in('id', senderIdArr);
 
       for (const p of profiles ?? []) {
-        const pref = p.display_name_preference ?? 'first_name';
-        if (pref === 'poolie_name' && p.poolie_name) {
-          nameMap[p.id] = p.poolie_name;
-        } else {
-          nameMap[p.id] =
-            [p.first_name, p.last_name?.charAt(0)]
-              .filter(Boolean)
-              .join(' ') || 'Organizer';
-        }
+        nameMap[p.id] = p.poolie_name || 'Organizer';
       }
     }
 

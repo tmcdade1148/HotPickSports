@@ -32,9 +32,7 @@ export function ProfileScreen({navigation}: any) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [poolieName, setPoolieName] = useState('');
-  const [displayPref, setDisplayPref] = useState<'first_name' | 'poolie_name'>(
-    'first_name',
-  );
+  // display_name_preference always 'poolie_name' — all poolies identified by poolie name
   const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -47,7 +45,7 @@ export function ProfileScreen({navigation}: any) {
       setFirstName(userProfile.first_name ?? '');
       setLastName(userProfile.last_name ?? '');
       setPoolieName(userProfile.poolie_name ?? '');
-      setDisplayPref(userProfile.display_name_preference ?? 'first_name');
+      // display_name_preference always poolie_name
       setSelectedAvatar(userProfile.avatar_key ?? null);
       // Mark initialized after first load so auto-save doesn't fire on mount
       setTimeout(() => { isInitialized.current = true; }, 100);
@@ -58,7 +56,6 @@ export function ProfileScreen({navigation}: any) {
     firstName.trim() !== (userProfile?.first_name ?? '') ||
     lastName.trim() !== (userProfile?.last_name ?? '') ||
     poolieName.trim() !== (userProfile?.poolie_name ?? '') ||
-    displayPref !== (userProfile?.display_name_preference ?? 'first_name') ||
     selectedAvatar !== (userProfile?.avatar_key ?? null);
 
   const canSave = firstName.trim().length > 0 && hasChanges && !saving;
@@ -73,7 +70,6 @@ export function ProfileScreen({navigation}: any) {
       trimmedFirst !== (userProfile?.first_name ?? '') ||
       lastName.trim() !== (userProfile?.last_name ?? '') ||
       poolieName.trim() !== (userProfile?.poolie_name ?? '') ||
-      displayPref !== (userProfile?.display_name_preference ?? 'first_name') ||
       selectedAvatar !== (userProfile?.avatar_key ?? null);
 
     if (!currentHasChanges) return;
@@ -87,7 +83,7 @@ export function ProfileScreen({navigation}: any) {
       first_name: trimmedFirst,
       last_name: lastName.trim() || null,
       poolie_name: poolieName.trim() || null,
-      display_name_preference: displayPref,
+      display_name_preference: 'poolie_name',
       ...avatarData,
     });
 
@@ -96,7 +92,7 @@ export function ProfileScreen({navigation}: any) {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     }
-  }, [firstName, lastName, poolieName, displayPref, selectedAvatar, user?.id, userProfile, updateProfile]);
+  }, [firstName, lastName, poolieName, selectedAvatar, user?.id, userProfile, updateProfile]);
 
   // Trigger auto-save on field changes
   useEffect(() => {
@@ -106,7 +102,7 @@ export function ProfileScreen({navigation}: any) {
     return () => {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     };
-  }, [firstName, lastName, poolieName, displayPref, selectedAvatar, doAutoSave]);
+  }, [firstName, lastName, poolieName, selectedAvatar, doAutoSave]);
 
   const handleAvatarSelect = (avatar: {
     key: string;
@@ -142,7 +138,7 @@ export function ProfileScreen({navigation}: any) {
       first_name: trimmedFirst,
       last_name: lastName.trim() || null,
       poolie_name: poolieName.trim() || null,
-      display_name_preference: displayPref,
+      display_name_preference: 'poolie_name',
       ...avatarData,
     });
 
@@ -256,49 +252,6 @@ export function ProfileScreen({navigation}: any) {
               Your persona in the pool. Fun names welcome. Change anytime.
             </Text>
           </View>
-
-          {/* Display preference toggle */}
-          {poolieName.trim().length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.label}>Show me as</Text>
-              <View style={styles.toggleRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.toggleOption,
-                    displayPref === 'first_name' && styles.toggleActive,
-                  ]}
-                  onPress={() => setDisplayPref('first_name')}
-                  disabled={saving}>
-                  <Text
-                    style={[
-                      styles.toggleText,
-                      displayPref === 'first_name' && styles.toggleTextActive,
-                    ]}>
-                    {firstName.trim()
-                      ? lastName.trim()
-                        ? `${firstName.trim()} ${lastName.trim().charAt(0).toUpperCase()}.`
-                        : firstName.trim()
-                      : 'First name'}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.toggleOption,
-                    displayPref === 'poolie_name' && styles.toggleActive,
-                  ]}
-                  onPress={() => setDisplayPref('poolie_name')}
-                  disabled={saving}>
-                  <Text
-                    style={[
-                      styles.toggleText,
-                      displayPref === 'poolie_name' && styles.toggleTextActive,
-                    ]}>
-                    {poolieName.trim() || 'Poolie name'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
 
           {/* Email (read-only) */}
           <View style={styles.section}>
