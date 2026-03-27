@@ -161,6 +161,11 @@ export function PoolMembersScreen() {
               numberOfLines={1}>
               {isMe ? `${memberName} (You)` : memberName}
             </Text>
+            {item.profile?.first_name && (
+              <Text style={styles.realName} numberOfLines={1}>
+                {item.profile.first_name}{item.profile.last_name ? ` ${item.profile.last_name.charAt(0).toUpperCase()}.` : ''}
+              </Text>
+            )}
             {item.role === 'organizer' && (
               <Crown size={14} color={colors.primary} />
             )}
@@ -212,7 +217,11 @@ export function PoolMembersScreen() {
         </View>
       ) : (
         <FlatList
-          data={poolMembers}
+          data={[...poolMembers].sort((a, b) => {
+            const nameA = (a.profile?.poolie_name || '').toLowerCase();
+            const nameB = (b.profile?.poolie_name || '').toLowerCase();
+            return nameA.localeCompare(nameB);
+          })}
           keyExtractor={item => item.user_id}
           renderItem={renderMember}
           contentContainerStyle={styles.list}
@@ -301,13 +310,19 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   memberName: {
     fontSize: 15,
-    fontWeight: '500',
+    fontWeight: '700',
     color: colors.textPrimary,
     flexShrink: 1,
   },
   memberNameMe: {
     color: colors.primary,
-    fontWeight: '600',
+    fontWeight: '700',
+  },
+  realName: {
+    fontSize: 13,
+    fontWeight: '400',
+    color: colors.textSecondary,
+    flexShrink: 1,
   },
   joinDate: {
     fontSize: 12,
