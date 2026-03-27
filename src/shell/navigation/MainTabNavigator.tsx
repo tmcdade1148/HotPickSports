@@ -177,7 +177,7 @@ function TabHeader({title, showPoolSwitcher}: {title: string; showPoolSwitcher: 
                 'Head to Settings to join a pool with an invite code or create your own.',
                 [
                   {text: 'Cancel', style: 'cancel'},
-                  {text: 'Go to My Pools', onPress: () => navigation.navigate('SettingsTab')},
+                  {text: 'Go to My Pools', onPress: () => navigation.navigate('SettingsTab', {expandPools: true})},
                 ],
               );
             }}>
