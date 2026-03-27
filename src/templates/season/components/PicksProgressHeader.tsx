@@ -76,18 +76,13 @@ export function PicksProgressHeader({
               {pickCount}/{totalGames}
             </Text>
           </View>
-          {/* HotPick indicator */}
-          <View style={[styles.hotPickBadge, hasHotPick && styles.hotPickBadgeActive]}>
-            <Flame
-              size={20}
-              color={hasHotPick ? '#FFFFFF' : colors.textSecondary}
-              fill={hasHotPick ? '#FFFFFF' : 'none'}
-              strokeWidth={2}
-            />
-            <Text style={[styles.hotPickText, hasHotPick && styles.hotPickTextActive]}>
-              {hotPickCount}/{hotPicksRequired}
-            </Text>
-          </View>
+          {/* HotPick indicator — flame only */}
+          <Flame
+            size={36}
+            color={hasHotPick ? '#06D6A0' : colors.textSecondary}
+            fill={hasHotPick ? '#06D6A0' : 'none'}
+            strokeWidth={hasHotPick ? 2.5 : 1.5}
+          />
         </View>
       </View>
 
@@ -134,31 +129,11 @@ const createStyles = (colors: any) => StyleSheet.create({
     gap: 4,
   },
   pickCountText: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 28,
+    fontWeight: '700',
   },
   pickCountComplete: {
     fontWeight: '800',
-  },
-  hotPickBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.border,
-    borderRadius: 16,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  hotPickBadgeActive: {
-    backgroundColor: '#06D6A0',
-  },
-  hotPickText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.textSecondary,
-  },
-  hotPickTextActive: {
-    color: '#FFFFFF',
   },
   progressBar: {
     height: 6,
