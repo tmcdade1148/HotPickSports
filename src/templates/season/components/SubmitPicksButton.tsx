@@ -1,5 +1,5 @@
 import React from 'react';
-import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
+import {View, Text, TouchableOpacity, StyleSheet, Alert} from 'react-native';
 import {CheckCircle} from 'lucide-react-native';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
@@ -51,7 +51,7 @@ export function SubmitPicksButton(props: SubmitPicksButtonProps) {
     needs_hotpick: {
       label: '🔥 Select your HotPick to submit',
       bgColor: colors.primary,
-      enabled: false,
+      enabled: true,
     },
     in_progress: {
       label: 'Submit your picks',
@@ -75,7 +75,17 @@ export function SubmitPicksButton(props: SubmitPicksButtonProps) {
           {backgroundColor: bgColor},
           state === 'submitted' && styles.buttonSubmitted,
         ]}
-        onPress={onSubmit}
+        onPress={() => {
+          if (state === 'needs_hotpick') {
+            Alert.alert(
+              'Choose Your HotPick',
+              'Every week you must designate one game as your HotPick — your bold call. Tap the 🔥 icon on a game card to select it. Get it right for bonus points. Get it wrong and it costs you.',
+              [{text: 'Got it'}],
+            );
+            return;
+          }
+          onSubmit();
+        }}
         disabled={!enabled}
         activeOpacity={0.8}>
         {state === 'submitted' && (
