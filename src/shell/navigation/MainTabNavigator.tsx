@@ -1,5 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {View, Text, Image, StyleSheet, TouchableOpacity, Modal, ScrollView} from 'react-native';
+import {View, Text, Image, StyleSheet, TouchableOpacity, Modal, ScrollView, Alert} from 'react-native';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {useNavigation} from '@react-navigation/native';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -171,9 +171,18 @@ function TabHeader({title, showPoolSwitcher}: {title: string; showPoolSwitcher: 
         ) : showPoolSwitcher && !hasVisiblePools ? (
           <TouchableOpacity
             style={headerStyles.selector}
-            onPress={() => navigation.navigate('Settings')}>
-            <Text style={[headerStyles.poolName, {color: colors.primary}]} numberOfLines={1}>
-              Join or create a pool
+            onPress={() => {
+              Alert.alert(
+                'Join or Create a Pool?',
+                'Head to Settings to join a pool with an invite code or create your own.',
+                [
+                  {text: 'Cancel', style: 'cancel'},
+                  {text: 'Go to My Pools', onPress: () => navigation.navigate('Settings')},
+                ],
+              );
+            }}>
+            <Text style={[headerStyles.poolName, {color: colors.primary, fontWeight: '700'}]} numberOfLines={1}>
+              Join or Create a Pool
             </Text>
           </TouchableOpacity>
         ) : (
