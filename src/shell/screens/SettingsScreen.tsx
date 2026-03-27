@@ -53,8 +53,9 @@ if (
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-export function SettingsScreen() {
+export function SettingsScreen({route}: any) {
   const navigation = useNavigation<any>();
+  const expandPools = route?.params?.expandPools ?? false;
 
   const user = useGlobalStore(s => s.user);
   const userProfile = useGlobalStore(s => s.userProfile);
@@ -96,7 +97,7 @@ export function SettingsScreen() {
   const [inviteCode, setInviteCode] = useState('');
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState('');
-  const [poolsExpanded, setPoolsExpanded] = useState(false);
+  const [poolsExpanded, setPoolsExpanded] = useState(expandPools);
 
   const displayName = getDisplayName(userProfile);
 
