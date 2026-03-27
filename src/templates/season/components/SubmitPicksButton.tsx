@@ -14,11 +14,12 @@ interface SubmitPicksButtonProps {
   accentColor: string;
 }
 
-type SubmitState = 'no_picks' | 'in_progress' | 'submitted';
+type SubmitState = 'no_picks' | 'needs_hotpick' | 'in_progress' | 'submitted';
 
 function getSubmitState(props: SubmitPicksButtonProps): SubmitState {
   if (props.isWeekComplete) return 'submitted';
   if (props.pickCount === 0) return 'no_picks';
+  if (props.hotPickCount < props.hotPicksRequired) return 'needs_hotpick';
   return 'in_progress';
 }
 
@@ -45,6 +46,11 @@ export function SubmitPicksButton(props: SubmitPicksButtonProps) {
     no_picks: {
       label: 'Start picking your winners',
       bgColor: colors.border,
+      enabled: false,
+    },
+    needs_hotpick: {
+      label: '🔥 Select your HotPick to submit',
+      bgColor: colors.primary,
       enabled: false,
     },
     in_progress: {
