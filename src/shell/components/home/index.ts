@@ -9,4 +9,5 @@ export {CompleteCard} from './CompleteCard';
 export {CardFooter} from './CardFooter';
 export {ScoreModule} from './ScoreModule';
 export {StandingsBadge} from './StandingsBadge';
+export {WeekScoreModule} from './WeekScoreModule';
 export {SmackTalkNudge} from './SmackTalkNudge';
