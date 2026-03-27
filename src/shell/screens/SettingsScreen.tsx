@@ -336,11 +336,19 @@ export function SettingsScreen({route}: any) {
                 ]}
                 onPress={() => setActivePoolId(pool.id)}>
                 <View style={styles.poolInfo}>
-                  {isBranded ? (
-                    <Building2 size={18} color={pillIconColor} />
-                  ) : (
-                    <Users size={18} color={pillIconColor} />
-                  )}
+                  <TouchableOpacity
+                    onPress={() => setDefaultPoolId(pool.id)}
+                    hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                    <Star
+                      size={27}
+                      color={
+                        pool.id === effectiveDefaultPoolId
+                          ? (isBranded ? pillTextColor : hotpick.primary)
+                          : pillIconColor
+                      }
+                      fill={pool.id === effectiveDefaultPoolId ? (isBranded ? pillTextColor : hotpick.primary) : 'none'}
+                    />
+                  </TouchableOpacity>
                   <View style={styles.poolNameCol}>
                       <Text
                         style={[
@@ -418,19 +426,6 @@ export function SettingsScreen({route}: any) {
                       <Settings size={18} color={pillIconColor} />
                     </TouchableOpacity>
                   )}
-                  <TouchableOpacity
-                    onPress={() => setDefaultPoolId(pool.id)}
-                    hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-                    <Star
-                      size={18}
-                      color={
-                        pool.id === effectiveDefaultPoolId
-                          ? (isBranded ? pillTextColor : hotpick.primary)
-                          : pillIconColor
-                      }
-                      fill={pool.id === effectiveDefaultPoolId ? (isBranded ? pillTextColor : hotpick.primary) : 'none'}
-                    />
-                  </TouchableOpacity>
                 </View>
               </TouchableOpacity>
             );
