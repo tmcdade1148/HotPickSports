@@ -504,31 +504,6 @@ export function MainTabNavigator() {
         },
       }}>
       <Tab.Screen
-        name="HomeTab"
-        component={HomeScreen}
-        options={{
-          tabBarLabel: () => null,
-          tabBarIcon: ({focused}) => (
-            <View style={{
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 56,
-              height: 56,
-              borderRadius: 28,
-              backgroundColor: focused ? colors.primary : colors.surface,
-              marginBottom: 20,
-              shadowColor: focused ? colors.primary : '#000',
-              shadowOffset: {width: 0, height: 4},
-              shadowOpacity: focused ? 0.35 : 0.15,
-              shadowRadius: 8,
-              elevation: focused ? 8 : 4,
-            }}>
-              <Home size={28} color={focused ? '#FFFFFF' : colors.textSecondary} />
-            </View>
-          ),
-        }}
-      />
-      <Tab.Screen
         name="PicksTab"
         component={PicksTab}
         options={{
@@ -545,6 +520,33 @@ export function MainTabNavigator() {
           tabBarLabel: 'Leaders',
           tabBarIcon: ({color, size}) => (
             <BarChart2 size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="HomeTab"
+        component={HomeScreen}
+        options={{
+          tabBarLabel: () => null,
+          tabBarIcon: ({focused}) => (
+            <View style={{
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 56,
+              height: 56,
+              borderRadius: 28,
+              backgroundColor: focused ? colors.primary : 'transparent',
+              borderWidth: focused ? 0 : 2,
+              borderColor: colors.primary,
+              marginBottom: 20,
+              shadowColor: focused ? colors.primary : '#000',
+              shadowOffset: {width: 0, height: 4},
+              shadowOpacity: focused ? 0.35 : 0.15,
+              shadowRadius: 8,
+              elevation: focused ? 8 : 4,
+            }}>
+              <Home size={28} color={focused ? '#FFFFFF' : colors.primary} />
+            </View>
           ),
         }}
       />
