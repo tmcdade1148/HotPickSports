@@ -535,8 +535,8 @@ export function MainTabNavigator() {
               width: 56,
               height: 56,
               borderRadius: 28,
-              backgroundColor: focused ? colors.primary : 'transparent',
-              borderWidth: focused ? 0 : 2,
+              backgroundColor: focused ? colors.primary : colors.surface,
+              borderWidth: 2,
               borderColor: colors.primary,
               marginBottom: 20,
               shadowColor: focused ? colors.primary : '#000',
@@ -545,7 +545,7 @@ export function MainTabNavigator() {
               shadowRadius: 8,
               elevation: focused ? 8 : 4,
             }}>
-              <Home size={28} color={focused ? '#FFFFFF' : colors.primary} />
+              <Home size={28} color={focused ? '#FFFFFF' : colors.textSecondary} />
             </View>
           ),
         }}
