@@ -220,7 +220,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       ? prevWeekPicks.map(p => (p.game_id === gameId ? optimisticPick : p))
       : [...prevWeekPicks, optimisticPick];
 
-    set({weekPicks: updated, isSaving: true, saveError: null});
+    set({weekPicks: updated, isSaving: true, saveError: null, isWeekComplete: false});
 
     const {error} = await supabase.from('season_picks').upsert(
       {
@@ -260,7 +260,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       ...p,
       is_hotpick: p.game_id === gameId,
     }));
-    set({weekPicks: updated, isSaving: true, saveError: null});
+    set({weekPicks: updated, isSaving: true, saveError: null, isWeekComplete: false});
 
     // Find old hotpick to clear in DB
     const oldHotPick = prevWeekPicks.find(p => p.is_hotpick && p.game_id !== gameId);
