@@ -34,6 +34,8 @@ export interface WeekLeaderboardEntry {
   hotpick_game_label: string | null; // e.g. "KC vs BUF"
   hotpick_rank: number | null;
   is_hotpick_correct: boolean | null;
+  /** When picks were last submitted — used for ordering unscored users */
+  submitted_at: string | null;
 }
 
 interface SeasonState {
@@ -475,7 +477,18 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       }
     }
 
-    // Step 6: Build week leaderboard entries
+    // Step 6: Find users who submitted picks but have no scores yet
+    // This makes them appear on the week leaderboard during picks_open
+    const scoredUserIds = new Set(rows.map(r => r.user_id));
+    const {data: pickSubmissions} = await supabase
+      .from('season_picks')
+      .select('user_id, updated_at')
+      .eq('competition', config.competition)
+      .eq('week', targetWeek)
+      .eq('is_hotpick', true)
+      .in('user_id', memberIds);
+
+    // Step 7: Build week leaderboard entries — scored users first
     const weekEntries: WeekLeaderboardEntry[] = rows.map(row => {
       const hp = hotPickByUser[row.user_id];
       return {
@@ -487,11 +500,38 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
         hotpick_game_label: hp?.gameLabel ?? null,
         hotpick_rank: row.hotpick_rank,
         is_hotpick_correct: row.is_hotpick_correct,
+        submitted_at: null,
       };
     });
 
-    // Sort by week_points descending
-    weekEntries.sort((a, b) => b.week_points - a.week_points);
+    // Add unscored users who have submitted picks (with HotPick)
+    for (const sub of pickSubmissions ?? []) {
+      if (!scoredUserIds.has(sub.user_id)) {
+        const hp = hotPickByUser[sub.user_id];
+        weekEntries.push({
+          user_id: sub.user_id,
+          week_points: 0,
+          correct_picks: 0,
+          total_picks: 0,
+          hotpick_team: hp?.team ?? null,
+          hotpick_game_label: hp?.gameLabel ?? null,
+          hotpick_rank: null,
+          is_hotpick_correct: null,
+          submitted_at: sub.updated_at,
+        });
+      }
+    }
+
+    // Sort: scored users by week_points desc, unscored by submit time desc
+    weekEntries.sort((a, b) => {
+      // Scored users always above unscored
+      if (a.week_points !== b.week_points) return b.week_points - a.week_points;
+      // Among 0-point users, most recent submit first
+      if (a.submitted_at && b.submitted_at) {
+        return new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime();
+      }
+      return 0;
+    });
 
     set({weekLeaderboard: weekEntries});
   },
