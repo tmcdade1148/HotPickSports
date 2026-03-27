@@ -116,17 +116,13 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       allWeekGames: {},
       weekPicks: [],
       leaderboard: [],
-      // Don't clear weekLeaderboard — let the fetch replace it to avoid flash
+      weekLeaderboard: [], // clear to force re-render when new data arrives
       userNames: state.userNames, // preserve — names are user-level, not pool-scoped
       isWeekComplete: false,
     }));
 
-    // Fetch both leaderboards immediately after setting poolId
-    // This ensures data is ready when the user sees the Leaders tab
-    await Promise.all([
-      get().fetchLeaderboard(),
-      get().fetchWeekLeaderboard(),
-    ]);
+    // Leaderboards are fetched by SeasonBoardScreen's useEffect on poolId.
+    // Don't fetch here — it causes a race condition with the component.
   },
 
   setCurrentWeek: (week: number) => {
