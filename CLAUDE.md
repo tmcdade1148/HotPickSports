@@ -697,8 +697,26 @@ expected, actual, passed). Super admins can read via RLS.
 - Users join via invite code only — no pool discovery/browse at launch
 - Organizers can "run it back" to create a new pool for a new event,
   notifying past participants
-- No auto-enrollment ever
 - Pool creation is available to any user, not just admins
+
+**Global pool visibility rules:**
+- Users are auto-enrolled in the global pool at signup (`invite_code_used = NULL`)
+- Auto-enrolled global pools are **hidden** from all UI (Settings, pool switcher,
+  Home Screen, Leaderboard, SmackTalk)
+- If a user joins the global pool via invite code (`invite_code_used IS NOT NULL`),
+  it becomes **visible** — appearing in pool lists and dropdowns like any other pool
+- Visibility is per-user: User A types "GLOBAL" → sees it. User B was auto-enrolled → doesn't.
+- The `visiblePools` computed value in globalStore handles this filtering — components
+  never filter pools themselves
+- When no visible pools exist, Leaderboard and SmackTalk show "Join or Create a Pool"
+  with a link to Settings/My Pools
+
+**Partner invite slug as invite code:**
+- Partner pools use `invite_slug` as their invite code (e.g., "MESQUE")
+- `join_pool_by_invite` RPC checks BOTH `invite_code` AND `UPPER(invite_slug)`
+- Slugs: alphanumeric + hyphens, max 12 chars, stored lowercase, matched case-insensitive
+- Regular pools keep randomly generated invite codes — unchanged
+- Tom (super_admin) can update slugs anytime — existing members unaffected
 
 **Organizer acknowledgment (legal requirement):**
 Every pool creation shows a native Alert requiring the organizer to
@@ -909,11 +927,14 @@ SUBSCRIPTION_MODIFIED
 
 ## 13. User Identity
 
-- Profile stores: `full_name` (private), `poolie_name` (public persona),
-  `display_name_preference` toggle ('first_name' | 'poolie_name')
-- Default display on leaderboards and SmackTalk: first name
-- Users can switch display to poolie_name at any time
-- `display_name` column alone is insufficient — both source fields required
+- Profile stores: `full_name` (private), `poolie_name` (public persona)
+- **Poolie name is the universal display name** — shown on leaderboards,
+  SmackTalk, pool member lists, and all in-app references
+- `display_name_preference` column removed — all users display as poolie_name
+- First name + last initial shown alongside poolie_name in pool member lists
+  (e.g., "McDude_tpm — Tom M.")
+- Both `first_name` and `poolie_name` are required fields (red dot indicator)
+- `last_name` requires at least 1 character (first initial of surname)
 
 ---
 
@@ -1559,7 +1580,7 @@ PRE_SEASON → REGULAR → REGULAR_COMPLETE → PLAYOFFS → SUPERBOWL_INTRO →
 
 | Phase | Duration | Card content | Weekly cycle? |
 |---|---|---|---|
-| `PRE_SEASON` | ~2-3 weeks before opener | Hype card: countdowns to picks opening + season opener, pool creation CTA, invite friends CTA, pool member momentum, quick rules explainer, profile setup prompts | No |
+| `PRE_SEASON` | ~2-3 weeks before opener | "The Calm Before..." header, countdown to season opener, join module (if no private pool), context salutations | No |
 | `REGULAR` | Weeks 1-18 | Weekly cycle card | Yes |
 | `REGULAR_COMPLETE` | ~1-2 days after Week 18 | Awards + "Playoffs are coming" explainer (single combined card) | No |
 | `PLAYOFFS` | Wild Card through Conference Finals | Weekly cycle card | Yes |
@@ -1640,6 +1661,50 @@ chips (sport icon + event name).
 - Visual treatment: sport switcher uses horizontal chips; pool switcher
   uses a dropdown inside the card header — these must be visually
   distinct
+
+### Context-Aware Salutations
+
+The greeting area shows context-aware copy based on week state:
+
+| State | Examples (random per visit) |
+|-------|----------------------------|
+| picks_open, game day | "Picks are open." / "Your move." / "Clock's running." |
+| picks_open, deadline close | "Last call." / "Closing time." / "You sure about this?" |
+| picks submitted, pre-game | "On record. No edits." / "Said what you said." / "Locked in." |
+| games in progress | "It's happening." / "Too late to change anything." |
+| results in, week settled | "The record doesn't lie." / "It's official." |
+| off day, active season | "Nothing today." / "Rest day." / "Back at it soon." |
+| dead period / pre-season | "Nothing on yet. Enjoy it." / "Offseason. It won't last." |
+
+### Join Pool Module (Home Screen)
+
+Self-hiding card below the event card. Shows "Have an invite code?"
+input + "Create a Pool / and invite friends" CTA.
+
+- Renders when user has **no visible private pool** (global auto-enrolled doesn't count)
+- Suppressed during `SEASON_COMPLETE` (nothing to compete in)
+- Self-hides immediately on successful join or pool creation
+- No dismiss/close button — the module IS the CTA
+- Error messages render inline (not Alert/modal)
+- All colors via useTheme()
+
+### Week Score Module
+
+Sits between Season Total/Kickoff pills and the WEEK card.
+Shows current week points + potential points (max assuming all picks correct).
+Only visible after user submits picks.
+
+### Dashboard Tab (Bottom Navigation)
+
+Dashboard is the **center tab** with a **raised circular button** — visually
+prominent, always the default tab on app open. Uses HotPick primary color
+when selected, outlined circle when not selected.
+
+### Pool Members (All Users)
+
+All pool members can view the member list (people icon on pool rows).
+Shows poolie names alphabetically with first name + last initial.
+Organizers/admins see additional tools (settings gear, promote/demote/remove).
 
 ### Red Flags: Home Screen Violations
 - Card priority logic computed inside the React component
@@ -2166,3 +2231,43 @@ computePlayerArchetype: () => void;
 > **What to say:** "Award computation runs in the compute-hardware
 > Edge Function only. Never delete from user_hardware — use
 > is_visible = false. Hardware slugs are permanent. Please revise."
+
+---
+
+## 28. Template Replication Notes (Series & Tournament)
+
+When building the Series template (NHL Playoffs, October 2026) and
+Tournament template (World Cup, TBD), the following Season-template
+patterns must be replicated:
+
+### Store Pattern
+- Each template gets its own Zustand store (`seriesStore.ts`, `tournamentStore.ts`)
+- Store must include: `initialize()`, `fetchLeaderboard()`, `fetchWeekLeaderboard()`
+  (or equivalent: `fetchRoundLeaderboard`, `fetchStageLeaderboard`)
+- `initialize()` sets poolId, clears leaderboard data, preserves userNames
+- Pool member queries ALWAYS include `.eq('status', 'active')`
+
+### Leaderboard Pattern
+- `get_pool_pick_submissions` RPC needs equivalent for each template
+  (`get_pool_series_submissions`, `get_pool_tournament_submissions`)
+- Pre-scoring leaderboard: show users who submitted picks with 0 points
+- Poolie names fetched from profiles table, cached in store `userNames` map
+- Week/round/stage leaderboard updates on pool switch (open bug: see memory)
+
+### UI Pattern
+- Pool switcher uses `visiblePools` from globalStore (never raw `userPools`)
+- "Join or Create a Pool" shown when no visible pools
+- Context-aware salutations adapt to template (replace "picks" with
+  "predictions" for tournament, "series picks" for series)
+- Dashboard is center raised tab in bottom navigation
+- Pool member list accessible to all users (not just organizers)
+- HotPick require before submit — applies to all templates
+
+### Global Pool Visibility
+- Same `visiblePools` logic applies — auto-enrolled globals hidden
+- `join_pool_by_invite` RPC already handles all templates (invite_code + invite_slug)
+
+### Pick Locking
+- `enforce_pick_lock` trigger pattern needed per template table
+- `enforce_single_hotpick` trigger pattern needed per template table
+- Server-side triggers are authoritative — client UI hides but doesn't enforce
