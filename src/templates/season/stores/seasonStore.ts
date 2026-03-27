@@ -116,10 +116,17 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       allWeekGames: {},
       weekPicks: [],
       leaderboard: [],
-      // Don't clear weekLeaderboard — let the fetch replace it to avoid flash
+      weekLeaderboard: [],
       userNames: state.userNames, // preserve — names are user-level, not pool-scoped
       isWeekComplete: false,
     }));
+
+    // Fetch both leaderboards immediately after setting poolId
+    // This ensures data is ready when the user sees the Leaders tab
+    await Promise.all([
+      get().fetchLeaderboard(),
+      get().fetchWeekLeaderboard(),
+    ]);
   },
 
   setCurrentWeek: (week: number) => {
@@ -337,11 +344,12 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       typeof cfgRows?.value === 'string' ? cfgRows.value : 'REGULAR';
     const isPlayoffs = currentPhase !== 'REGULAR';
 
-    // Step 1: Get pool member user IDs
+    // Step 1: Get ACTIVE pool member user IDs (never include removed/left)
     const {data: members} = await supabase
       .from('pool_members')
       .select('user_id')
-      .eq('pool_id', poolId);
+      .eq('pool_id', poolId)
+      .eq('status', 'active');
 
     const memberIds = (members ?? []).map(m => m.user_id);
     if (memberIds.length === 0) {
@@ -419,11 +427,12 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
 
     const targetWeek = week ?? currentWeek;
 
-    // Step 1: Get pool member user IDs
+    // Step 1: Get ACTIVE pool member user IDs (never include removed/left)
     const {data: members} = await supabase
       .from('pool_members')
       .select('user_id')
-      .eq('pool_id', poolId);
+      .eq('pool_id', poolId)
+      .eq('status', 'active');
 
     const memberIds = (members ?? []).map(m => m.user_id);
     if (memberIds.length === 0) {
