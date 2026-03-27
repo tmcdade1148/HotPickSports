@@ -230,28 +230,38 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
         {kickoff.timeLeft && (
           <View style={styles.kickoffPill}>
             <View style={{flex: 1}}>
-              <Text style={styles.kickoffLabel}>
-                {currentPhase === 'PRE_SEASON'
-                  ? 'Season starts in:'
-                  : weekState === 'live'
-                    ? 'Picks are LIVE'
-                    : weekState === 'settling'
-                      ? 'Scores settling'
-                      : weekState === 'locked'
-                        ? 'Picks are locked'
-                        : kickoff.hasExpired
-                          ? 'Picks are LIVE'
-                          : 'Picks go LIVE in:'}
-              </Text>
-              {!kickoff.hasExpired && (
-                <Text style={styles.kickoffValue}>{kickoff.timeLeft}</Text>
-              )}
-              {/* Kickoff countdown — shown when picks are open and games haven't started */}
-              {currentPhase !== 'PRE_SEASON' && firstGameKickoff.timeLeft && !firstGameKickoff.hasExpired && weekState === 'picks_open' && (
-                <View style={styles.subCountdownRow}>
-                  <Text style={styles.subCountdownLabel}>Kickoff in:</Text>
-                  <Text style={styles.subCountdownValue}>{firstGameKickoff.timeLeft}</Text>
-                </View>
+              {currentPhase === 'PRE_SEASON' ? (
+                <>
+                  <Text style={styles.kickoffLabel}>Season starts in:</Text>
+                  {!kickoff.hasExpired && (
+                    <Text style={styles.kickoffValue}>{kickoff.timeLeft}</Text>
+                  )}
+                </>
+              ) : weekState === 'picks_open' ? (
+                <>
+                  <Text style={styles.kickoffLabel}>
+                    PICKS are <Text style={{fontWeight: '900', color: '#06D6A0'}}>LIVE!</Text>
+                  </Text>
+                  {firstGameKickoff.timeLeft && !firstGameKickoff.hasExpired && (
+                    <View style={styles.subCountdownRow}>
+                      <Text style={styles.subCountdownLabel}>Kickoff in:</Text>
+                      <Text style={styles.subCountdownValue}>{firstGameKickoff.timeLeft}</Text>
+                    </View>
+                  )}
+                </>
+              ) : weekState === 'locked' ? (
+                <Text style={styles.kickoffLabel}>Picks are locked</Text>
+              ) : weekState === 'live' ? (
+                <Text style={styles.kickoffLabel}>Games in progress</Text>
+              ) : weekState === 'settling' ? (
+                <Text style={styles.kickoffLabel}>Scores settling</Text>
+              ) : (
+                <>
+                  <Text style={styles.kickoffLabel}>Picks go LIVE in:</Text>
+                  {!kickoff.hasExpired && (
+                    <Text style={styles.kickoffValue}>{kickoff.timeLeft}</Text>
+                  )}
+                </>
               )}
               {/* HotPick game kickoff — shown when user has designated a HotPick */}
               {hotPickKickoff.timeLeft && !hotPickKickoff.hasExpired && userHotPick && weekState === 'picks_open' && (
