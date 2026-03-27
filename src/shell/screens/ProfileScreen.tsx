@@ -58,7 +58,7 @@ export function ProfileScreen({navigation}: any) {
     poolieName.trim() !== (userProfile?.poolie_name ?? '') ||
     selectedAvatar !== (userProfile?.avatar_key ?? null);
 
-  const canSave = firstName.trim().length > 0 && hasChanges && !saving;
+  const canSave = firstName.trim().length > 0 && lastName.trim().length > 0 && poolieName.trim().length > 0 && hasChanges && !saving;
 
   // Auto-save: debounce 1.5s after any field change
   const doAutoSave = useCallback(async () => {
@@ -209,9 +209,11 @@ export function ProfileScreen({navigation}: any) {
             />
           </View>
 
-          {/* Last name */}
+          {/* Last name (required) */}
           <View style={styles.section}>
-            <Text style={styles.label}>Last name</Text>
+            <Text style={styles.label}>
+              Last name <Text style={styles.required}>*</Text>
+            </Text>
             <TextInput
               style={styles.input}
               placeholder="Your last name"
@@ -227,9 +229,11 @@ export function ProfileScreen({navigation}: any) {
             </Text>
           </View>
 
-          {/* Poolie name */}
+          {/* Poolie name (required) */}
           <View style={styles.section}>
-            <Text style={styles.label}>Poolie name</Text>
+            <Text style={styles.label}>
+              Poolie name <Text style={styles.required}>*</Text>
+            </Text>
             <TextInput
               style={styles.input}
               placeholder={
