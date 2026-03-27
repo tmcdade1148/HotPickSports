@@ -437,7 +437,7 @@ function PoolSwitcherButton({
         }}
         onPress={() => setModalVisible(true)}>
         <Text style={{color: colors.textSecondary, fontSize: 14}}>
-          Switch Pools:
+          Current Pool:
         </Text>
         <Text style={{color: accentColor, fontSize: 16, fontWeight: '900'}}>
           {poolName}
