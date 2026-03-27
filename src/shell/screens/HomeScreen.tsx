@@ -175,6 +175,9 @@ export function HomeScreen({navigation}: any) {
           }}
         />
 
+        {/* Week Score Module — above event card, shows after picks submitted */}
+        {cardsToShow.length > 0 && hasPrivatePool && <WeekScoreModule />}
+
         {cardsToShow.map(config => (
           <EventCardForConfig
             key={config.competition}
@@ -187,9 +190,6 @@ export function HomeScreen({navigation}: any) {
         {cardsToShow.length > 0 && hasPrivatePool && (
           <StandingsBadge onPress={handleNavigateToBoard} />
         )}
-
-        {/* Week Score Module — shows during locked/live/settling states */}
-        {cardsToShow.length > 0 && hasPrivatePool && <WeekScoreModule />}
 
         {/* Join Pool Module — shown when user has no private pool, hidden during SEASON_COMPLETE */}
         {showJoinModule && <JoinPoolModule />}
