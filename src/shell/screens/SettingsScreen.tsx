@@ -410,13 +410,6 @@ export function SettingsScreen({route}: any) {
                       Active
                     </Text>
                   )}
-                  <TouchableOpacity
-                    onPress={() =>
-                      navigation.navigate('PoolMembers', {poolId: pool.id})
-                    }
-                    hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-                    <Users size={18} color={pillIconColor} />
-                  </TouchableOpacity>
                   {(poolRoles[pool.id] === 'organizer' || poolRoles[pool.id] === 'admin') && (
                     <TouchableOpacity
                       onPress={() =>
@@ -426,6 +419,13 @@ export function SettingsScreen({route}: any) {
                       <Settings size={18} color={pillIconColor} />
                     </TouchableOpacity>
                   )}
+                  <TouchableOpacity
+                    onPress={() =>
+                      navigation.navigate('PoolMembers', {poolId: pool.id})
+                    }
+                    hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                    <Users size={18} color={pillIconColor} />
+                  </TouchableOpacity>
                 </View>
               </TouchableOpacity>
             );
