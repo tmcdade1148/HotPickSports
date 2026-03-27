@@ -66,10 +66,10 @@ export function SettingsScreen({route}: any) {
   const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
   const setDefaultPoolId = useGlobalStore(s => s.setDefaultPoolId);
 
-  // Effective default: manual setting → first partner pool → first created → first joined
+  // Effective default: manual setting → first created → first partner pool → first joined
   const effectiveDefaultPoolId = rawDefaultPoolId
-    ?? userPools.find(p => !!(p.brand_config as any)?.is_branded)?.id
     ?? userPools.find(p => poolRoles[p.id] === 'organizer')?.id
+    ?? userPools.find(p => !!(p.brand_config as any)?.is_branded)?.id
     ?? userPools[0]?.id
     ?? null;
   const activeSport = useGlobalStore(s => s.activeSport);
