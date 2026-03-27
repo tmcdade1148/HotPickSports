@@ -538,7 +538,7 @@ export function MainTabNavigator() {
               backgroundColor: focused ? colors.primary : colors.surface,
               borderWidth: 2,
               borderColor: colors.primary,
-              marginBottom: 30,
+              marginBottom: 10,
               shadowColor: focused ? colors.primary : '#000',
               shadowOffset: {width: 0, height: 4},
               shadowOpacity: focused ? 0.35 : 0.15,
