@@ -346,7 +346,7 @@ export function SeasonTabNavigator({
     <View style={{flex: 1}}>
       {onSwitchPool && userPools && (
         <PoolSwitcherHeader
-          poolName={poolName ?? 'Pool'}
+          poolName={poolName ?? ''}
           userPools={userPools}
           onSwitchPool={onSwitchPool}
           activePoolId={poolId}

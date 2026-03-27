@@ -1,6 +1,7 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {View, Text, Image, StyleSheet, TouchableOpacity, Modal, ScrollView} from 'react-native';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
+import {useNavigation} from '@react-navigation/native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {
   CheckCircle,
@@ -124,8 +125,10 @@ function TabHeader({title, showPoolSwitcher}: {title: string; showPoolSwitcher: 
   const smackUnreadCounts = useGlobalStore(s => s.smackUnreadCounts);
   const flaggedCounts = useGlobalStore(s => s.flaggedCounts);
 
+  const navigation = useNavigation<any>();
   const activePool = userPools.find(p => p.id === activePoolId);
-  const poolName = activePool?.name ?? 'Pool';
+  const poolName = activePool?.name ?? '';
+  const hasVisiblePools = userPools.length > 0;
 
   const switchTo = (poolId: string) => {
     setActivePoolId(poolId);
@@ -153,7 +156,7 @@ function TabHeader({title, showPoolSwitcher}: {title: string; showPoolSwitcher: 
         )}
       </View>
       <View style={headerStyles.row}>
-        {showPoolSwitcher ? (
+        {showPoolSwitcher && hasVisiblePools ? (
           <TouchableOpacity
             style={headerStyles.selector}
             onPress={() => setModalVisible(true)}>
@@ -164,6 +167,14 @@ function TabHeader({title, showPoolSwitcher}: {title: string; showPoolSwitcher: 
               {poolName}
             </Text>
             <ChevronDown size={16} color={colors.highlight} />
+          </TouchableOpacity>
+        ) : showPoolSwitcher && !hasVisiblePools ? (
+          <TouchableOpacity
+            style={headerStyles.selector}
+            onPress={() => navigation.navigate('Settings')}>
+            <Text style={[headerStyles.poolName, {color: colors.primary}]} numberOfLines={1}>
+              Join or create a pool
+            </Text>
           </TouchableOpacity>
         ) : (
           <Text style={[headerStyles.message, {color: colors.textSecondary}]}>
