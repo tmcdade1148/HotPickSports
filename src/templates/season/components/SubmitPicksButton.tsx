@@ -60,7 +60,7 @@ export function SubmitPicksButton(props: SubmitPicksButtonProps) {
     },
     submitted: {
       label: 'Submitted',
-      bgColor: colors.success,
+      bgColor: '#1B9A06',
       enabled: false,
     },
   };
