@@ -60,8 +60,8 @@ export function PicksProgressHeader({
           {/* HotPick flame + pick count */}
           <Flame
             size={36}
-            color={hasHotPick ? '#06D6A0' : colors.textSecondary}
-            fill={hasHotPick ? '#06D6A0' : 'none'}
+            color={hasHotPick ? '#1B9A06' : colors.textSecondary}
+            fill={hasHotPick ? '#1B9A06' : 'none'}
             strokeWidth={hasHotPick ? 2.5 : 1.5}
           />
           <Text
