@@ -116,7 +116,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       allWeekGames: {},
       weekPicks: [],
       leaderboard: [],
-      weekLeaderboard: [],
+      // Don't clear weekLeaderboard — let the fetch replace it to avoid flash
       userNames: state.userNames, // preserve — names are user-level, not pool-scoped
       isWeekComplete: false,
     }));
