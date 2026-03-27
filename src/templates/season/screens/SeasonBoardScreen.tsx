@@ -50,7 +50,8 @@ export function SeasonBoardScreen() {
   const [activeTab, setActiveTab] = useState<'season' | 'week'>('season');
   const scrollRef = useRef<ScrollView>(null);
 
-  // Fetch on init, pool switch, AND every time this tab gets focus
+  // initialize() fetches both leaderboards on pool switch.
+  // useFocusEffect is a safety net — re-fetches when tab gets focus.
   useFocusEffect(
     useCallback(() => {
       if (!config || !poolId) return;
