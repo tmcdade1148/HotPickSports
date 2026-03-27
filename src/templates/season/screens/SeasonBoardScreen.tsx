@@ -1,4 +1,4 @@
-import React, {useEffect, useState, useRef, useCallback} from 'react';
+import React, {useEffect, useState, useRef} from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,6 @@ import {
   Dimensions,
   StyleSheet,
 } from 'react-native';
-import {useFocusEffect} from '@react-navigation/native';
 import {useSeasonStore} from '../stores/seasonStore';
 import type {SeasonLeaderboardEntry, WeekLeaderboardEntry} from '../stores/seasonStore';
 import {SeasonProgress} from '../components/SeasonProgress';
@@ -50,15 +49,12 @@ export function SeasonBoardScreen() {
   const [activeTab, setActiveTab] = useState<'season' | 'week'>('season');
   const scrollRef = useRef<ScrollView>(null);
 
-  // initialize() fetches both leaderboards on pool switch.
-  // useFocusEffect is a safety net — re-fetches when tab gets focus.
-  useFocusEffect(
-    useCallback(() => {
-      if (!config || !poolId) return;
-      fetchLeaderboard();
-      fetchWeekLeaderboard();
-    }, [config, poolId, fetchLeaderboard, fetchWeekLeaderboard]),
-  );
+  // Re-fetch both leaderboards whenever poolId changes
+  useEffect(() => {
+    if (!config || !poolId) return;
+    fetchLeaderboard();
+    fetchWeekLeaderboard();
+  }, [poolId]);
 
   // Realtime: week leaderboard updates live during games
   useEffect(() => {
