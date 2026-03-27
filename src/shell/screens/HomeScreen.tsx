@@ -174,9 +174,6 @@ export function HomeScreen({navigation}: any) {
           }}
         />
 
-        {/* Week Score Module — above event card, shows after picks submitted */}
-        {cardsToShow.length > 0 && hasPrivatePool && <WeekScoreModule />}
-
         {cardsToShow.map(config => (
           <EventCardForConfig
             key={config.competition}
