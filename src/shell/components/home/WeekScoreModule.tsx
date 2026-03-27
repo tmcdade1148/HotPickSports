@@ -2,6 +2,7 @@ import React from 'react';
 import {View, Text, StyleSheet} from 'react-native';
 import {spacing, borderRadius, typography} from '@shared/theme';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
+import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {useTheme} from '@shell/theme';
 
 /**
@@ -22,16 +23,16 @@ export function WeekScoreModule() {
   const weekState = useNFLStore(s => s.weekState);
   const currentWeek = useNFLStore(s => s.currentWeek);
   const weekResult = useNFLStore(s => s.weekResult);
-  const weekPicks = useNFLStore(s => s.weekPicks);
-  const isWeekComplete = useNFLStore(s => s.isWeekComplete);
+  const weekPicks = useSeasonStore(s => s.weekPicks);
 
   // Hide when no state, or week is fully complete (final scores in StandingsBadge)
   if (!weekState || weekState === 'complete') {
     return null;
   }
 
-  // During picks_open, only show if user has submitted picks
-  if (weekState === 'picks_open' && !isWeekComplete) {
+  // During picks_open, only show if user has submitted picks (has any picks in DB)
+  const hasSubmittedPicks = weekPicks && weekPicks.length > 0;
+  if (weekState === 'picks_open' && !hasSubmittedPicks) {
     return null;
   }
 
