@@ -36,34 +36,7 @@ import {HistoryScreen} from '@shell/screens/HistoryScreen';
 
 const Tab = createBottomTabNavigator();
 
-/**
- * Get display name for the Home tab label.
- * Uses poolie_name if preference is set, otherwise first name.
- */
-function getTabDisplayName(profile: any): string {
-  if (!profile) return 'Home';
-  // Respect user's display_name_preference
-  const pref = profile.display_name_preference;
-  let name: string;
-  if (pref === 'poolie_name' && profile.poolie_name) {
-    name = profile.poolie_name;
-  } else {
-    // Build display from first_name + last initial
-    const firstName = profile.first_name;
-    const lastName = profile.last_name;
-    if (firstName) {
-      name = lastName ? `${firstName} ${lastName.charAt(0)}.` : firstName;
-    } else {
-      // first_name not set — fall back to poolie_name
-      name = profile.poolie_name || 'Home';
-    }
-  }
-  // Truncate long names to fit tab bar (max 10 chars)
-  if (name.length > 10) {
-    return name.substring(0, 9) + '…';
-  }
-  return name;
-}
+// Dashboard tab no longer shows user name — all poolies identified by poolie_name in-app
 
 /**
  * EmptyTabScreen — Shown when no active sport is selected.
@@ -458,7 +431,7 @@ export function MainTabNavigator() {
   const activeSport = useGlobalStore(s => s.activeSport);
   const activePoolId = useGlobalStore(s => s.activePoolId);
   const hasHistory = useGlobalStore(s => s.hasHistory);
-  const homeLabel = getTabDisplayName(userProfile);
+  // homeLabel removed — Dashboard tab uses icon only
 
   // Initialize sport stores when activeSport or activePoolId changes
   const seasonInitialize = useSeasonStore(s => s.initialize);

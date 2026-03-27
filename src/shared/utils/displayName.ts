@@ -1,21 +1,13 @@
 import type {DbProfile} from '@shared/types/database';
 
 /**
- * Resolve what name to show based on user's display preference.
- * Never store a computed display name — always resolve at render time.
+ * Resolve display name — always poolie_name.
+ * All poolies are identified by their poolie name within the app.
+ * First/last name is for account identity only, never shown in UI.
  */
 export function getDisplayName(profile: DbProfile | null): string {
   if (!profile) return 'Poolie';
-  if (
-    profile.display_name_preference === 'poolie_name' &&
-    profile.poolie_name
-  ) {
-    return profile.poolie_name;
-  }
-  if (profile.first_name && profile.last_name) {
-    return `${profile.first_name} ${profile.last_name.charAt(0).toUpperCase()}.`;
-  }
-  return profile.first_name || 'Poolie';
+  return profile.poolie_name || 'Poolie';
 }
 
 /**
