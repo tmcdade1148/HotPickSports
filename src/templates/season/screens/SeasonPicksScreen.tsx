@@ -116,9 +116,6 @@ export function SeasonPicksScreen() {
           keyExtractor={item => item.game_id}
           renderItem={renderGame}
           contentContainerStyle={styles.list}
-          ItemSeparatorComponent={() => (
-            <View style={[styles.separator, {backgroundColor: colors.border}]} />
-          )}
         />
       )}
 
