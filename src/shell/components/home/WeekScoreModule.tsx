@@ -7,10 +7,12 @@ import {useTheme} from '@shell/theme';
 /**
  * WeekScoreModule — Current week score + potential max score.
  *
- * Shows the user's current week points and the maximum points they
- * could still earn from unsettled picks. Only visible during active
- * week states (locked, live, settling). Hidden during picks_open
- * (no scores yet) and complete (scores are final — shown in StandingsBadge).
+ * Shows once user has submitted picks. Potential = max score if
+ * every pick is correct (HotPick adds frozen_rank, standard adds 1).
+ * During live/settling, actual points replace potential for settled games.
+ *
+ * Visible: picks_open (after submit), locked, live, settling.
+ * Hidden: picks_open (before submit), complete, no weekState.
  *
  * Pool-independent: week scores are user-level, not pool-scoped.
  */
@@ -21,16 +23,22 @@ export function WeekScoreModule() {
   const currentWeek = useNFLStore(s => s.currentWeek);
   const weekResult = useNFLStore(s => s.weekResult);
   const weekPicks = useNFLStore(s => s.weekPicks);
+  const isWeekComplete = useNFLStore(s => s.isWeekComplete);
 
-  // Only show during active game states
-  if (!weekState || weekState === 'picks_open' || weekState === 'complete') {
+  // Hide when no state, or week is fully complete (final scores in StandingsBadge)
+  if (!weekState || weekState === 'complete') {
+    return null;
+  }
+
+  // During picks_open, only show if user has submitted picks
+  if (weekState === 'picks_open' && !isWeekComplete) {
     return null;
   }
 
   const weekPoints = weekResult?.weekPoints ?? 0;
 
-  // Calculate potential: sum of frozen_rank for unsettled picks
-  const potentialPoints = calculatePotential(weekPicks, weekPoints);
+  // Calculate potential: assume every pick wins
+  const potentialPoints = calculatePotential(weekPicks, weekPoints, weekState);
 
   return (
     <View style={styles.container}>
@@ -61,25 +69,44 @@ export function WeekScoreModule() {
 }
 
 /**
- * Calculate potential remaining points from unsettled picks.
- * Potential = current week points + sum of frozen_rank for picks
- * whose games haven't settled yet.
+ * Calculate potential score assuming every pick is correct.
+ *
+ * Before games start (picks_open/locked): potential = sum of all picks
+ * as if every one wins. HotPick correct = +frozen_rank, standard = +1.
+ *
+ * During live/settling: settled picks use actual result, unsettled
+ * picks assume correct.
  */
 function calculatePotential(
   weekPicks: any[] | null,
   currentPoints: number,
+  weekState: string,
 ): number {
-  if (!weekPicks || weekPicks.length === 0) return currentPoints;
+  if (!weekPicks || weekPicks.length === 0) return 0;
 
+  // Before games start — every pick assumed correct
+  if (weekState === 'picks_open' || weekState === 'locked') {
+    let total = 0;
+    for (const pick of weekPicks) {
+      const rank = pick.frozen_rank ?? pick.rank ?? 1;
+      if (pick.is_hotpick) {
+        total += rank; // HotPick correct = +rank
+      } else {
+        total += 1; // Standard correct = +1
+      }
+    }
+    return total;
+  }
+
+  // During live/settling — actual points + unsettled picks assumed correct
   let unsettledPotential = 0;
   for (const pick of weekPicks) {
-    // If pick hasn't been scored yet (game not final), add its potential
     if (pick.is_correct === null || pick.is_correct === undefined) {
       const rank = pick.frozen_rank ?? pick.rank ?? 1;
       if (pick.is_hotpick) {
-        unsettledPotential += rank; // HotPick correct = +rank
+        unsettledPotential += rank;
       } else {
-        unsettledPotential += 1; // Standard correct = +1
+        unsettledPotential += 1;
       }
     }
   }
