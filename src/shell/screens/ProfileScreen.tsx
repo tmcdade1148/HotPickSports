@@ -209,12 +209,9 @@ export function ProfileScreen({navigation}: any) {
             />
           </View>
 
-          {/* Last name (optional) */}
+          {/* Last name */}
           <View style={styles.section}>
-            <View style={styles.labelRow}>
-              <Text style={styles.label}>Last name</Text>
-              <Text style={styles.optional}>Optional</Text>
-            </View>
+            <Text style={styles.label}>Last name</Text>
             <TextInput
               style={styles.input}
               placeholder="Your last name"
@@ -226,16 +223,13 @@ export function ProfileScreen({navigation}: any) {
               editable={!saving}
             />
             <Text style={styles.hint}>
-              Shown as "Tom M." — never your full surname.
+              Full surnames are never displayed publicly. We'll only use the initial.
             </Text>
           </View>
 
-          {/* Poolie name (optional) */}
+          {/* Poolie name */}
           <View style={styles.section}>
-            <View style={styles.labelRow}>
-              <Text style={styles.label}>Poolie name</Text>
-              <Text style={styles.optional}>Optional</Text>
-            </View>
+            <Text style={styles.label}>Poolie name</Text>
             <TextInput
               style={styles.input}
               placeholder={
@@ -249,7 +243,7 @@ export function ProfileScreen({navigation}: any) {
               editable={!saving}
             />
             <Text style={styles.hint}>
-              Your persona in the pool. Fun names welcome. Change anytime.
+              Pick your Poolie name. This is how you'll be identified in the leaderboard and SmackTalk. Change anytime.
             </Text>
           </View>
 
