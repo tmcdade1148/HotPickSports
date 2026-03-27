@@ -135,7 +135,7 @@ function TabHeader({title, showPoolSwitcher}: {title: string; showPoolSwitcher: 
             style={headerStyles.selector}
             onPress={() => setModalVisible(true)}>
             <Text style={[headerStyles.switchLabel, {color: colors.textSecondary}]}>
-              Switch Pools:
+              Current Pool:
             </Text>
             <Text style={[headerStyles.poolName, {color: colors.highlight, fontWeight: '900'}]} numberOfLines={1}>
               {poolName}
