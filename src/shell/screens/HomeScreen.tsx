@@ -18,7 +18,6 @@ import {StandingsBadge} from '@shell/components/home/StandingsBadge';
 import {SmackTalkNudge} from '@shell/components/home/SmackTalkNudge';
 import {MessageCenter} from '@shell/components/home/MessageCenter';
 import {HardwareModule} from '@shell/components/home/HardwareModule';
-import {WeekScoreModule} from '@shell/components/home/WeekScoreModule';
 import {JoinPoolModule} from '@shell/components/home/JoinPoolModule';
 import {spacing, typography} from '@shared/theme';
 import {useTheme, useBrand} from '@shell/theme';

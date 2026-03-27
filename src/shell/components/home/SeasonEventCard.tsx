@@ -19,6 +19,7 @@ import {LockedCard} from './LockedCard';
 import {LiveCard} from './LiveCard';
 import {SettlingCard} from './SettlingCard';
 import {CompleteCard} from './CompleteCard';
+import {WeekScoreModule} from './WeekScoreModule';
 import {useTheme, useBrand} from '@shell/theme';
 import {useCountdown} from '@shared/hooks/useCountdown';
 
@@ -274,6 +275,9 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
           </View>
         )}
       </View>
+
+      {/* Week Score — between pills and week state card */}
+      <WeekScoreModule />
 
       {/* Week state content — outside the card box */}
       {renderWeekState({
