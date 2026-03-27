@@ -67,12 +67,17 @@ export function SeasonPicksScreen() {
     );
   }
 
-  const renderGame = ({item}: {item: DbSeasonGame}) => (
-    <SeasonMatchCard
-      game={item}
-      config={config}
-      userId={user?.id ?? ''}
-    />
+  const renderGame = ({item, index}: {item: DbSeasonGame; index: number}) => (
+    <View style={[
+      styles.cardWrapper,
+      index % 2 === 1 && {backgroundColor: colors.surface},
+    ]}>
+      <SeasonMatchCard
+        game={item}
+        config={config}
+        userId={user?.id ?? ''}
+      />
+    </View>
   );
 
   return (
@@ -111,6 +116,9 @@ export function SeasonPicksScreen() {
           keyExtractor={item => item.game_id}
           renderItem={renderGame}
           contentContainerStyle={styles.list}
+          ItemSeparatorComponent={() => (
+            <View style={[styles.separator, {backgroundColor: colors.border}]} />
+          )}
         />
       )}
 
@@ -137,6 +145,14 @@ const createStyles = (colors: any) => StyleSheet.create({
   list: {
     paddingTop: 0,
     paddingBottom: 100,
+  },
+  cardWrapper: {
+    paddingVertical: spacing.sm,
+  },
+  separator: {
+    height: 1,
+    marginHorizontal: spacing.md,
+    opacity: 0.5,
   },
   centered: {
     flex: 1,
