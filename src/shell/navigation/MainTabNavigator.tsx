@@ -10,6 +10,7 @@ import {
   Settings,
   ChevronDown,
   Trophy,
+  Home,
 } from 'lucide-react-native';
 import {BottomTabBar} from '@react-navigation/bottom-tabs';
 import {HomeScreen} from '@shell/screens/HomeScreen';
@@ -506,13 +507,9 @@ export function MainTabNavigator() {
         name="HomeTab"
         component={HomeScreen}
         options={{
-          tabBarLabel: homeLabel,
+          tabBarLabel: 'Dashboard',
           tabBarIcon: ({color, size}) => (
-            <Image
-              source={require('../../assets/icon-home.png')}
-              style={{width: size, height: size, tintColor: color}}
-              resizeMode="contain"
-            />
+            <Home size={size} color={color} />
           ),
         }}
       />
