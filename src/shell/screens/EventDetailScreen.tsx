@@ -1,7 +1,7 @@
 import React, {useEffect} from 'react';
 import {View, Text, ActivityIndicator, StyleSheet} from 'react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
-import {isPoolVisible} from '@shared/utils/poolVisibility';
+// visiblePools from store already filters hidden globals
 import {spacing, borderRadius} from '@shared/theme';
 import {TournamentTabNavigator} from '@templates/tournament/navigation/TournamentTabNavigator';
 import {SeasonTabNavigator} from '@templates/season/navigation/SeasonTabNavigator';
@@ -28,26 +28,18 @@ export function EventDetailScreen({navigation}: any) {
   const styles = createStyles(colors);
   const activeSport = useGlobalStore(s => s.activeSport);
   const activePoolId = useGlobalStore(s => s.activePoolId);
-  const userPools = useGlobalStore(s => s.userPools);
+  const userPools = useGlobalStore(s => s.visiblePools);
   const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
 
   // Safety net: auto-select a visible pool, or clear if active pool is hidden.
   useEffect(() => {
     if (userPools.length === 0) return;
 
-    const activePool = activePoolId ? userPools.find(p => p.id === activePoolId) : undefined;
-    const activeIsVisible = activePool ? isPoolVisible(activePool) : false;
+    const activeInList = activePoolId ? userPools.find(p => p.id === activePoolId) : undefined;
 
-    if (!activePoolId || !activeIsVisible) {
-      const firstVisible = userPools.find(p => isPoolVisible(p));
-      if (firstVisible) {
-        setActivePoolId(firstVisible.id);
-      } else if (!activePoolId) {
-        // No visible pools — fall back to any pool so we don't get stuck loading
-        setActivePoolId(userPools[0].id);
-      }
-      // If activePoolId is set but hidden and no visible pools exist,
-      // keep it so tabs can render (header shows "Join or create a pool")
+    if (!activePoolId || !activeInList) {
+      // Active pool is missing or hidden — pick first visible
+      setActivePoolId(userPools[0].id);
     }
   }, [activePoolId, userPools, setActivePoolId]);
 
