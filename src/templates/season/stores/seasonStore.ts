@@ -173,7 +173,12 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       .eq('competition', config.competition)
       .eq('week', week);
 
-    set({weekPicks: (data as DbSeasonPick[]) ?? []});
+    const picks = (data as DbSeasonPick[]) ?? [];
+    const hasHotPick = picks.some(p => p.is_hotpick);
+    set({
+      weekPicks: picks,
+      isWeekComplete: picks.length > 0 && hasHotPick,
+    });
   },
 
   savePick: async ({userId, gameId, pickedTeam, isHotPick}) => {

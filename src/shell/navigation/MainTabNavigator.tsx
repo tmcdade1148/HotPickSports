@@ -456,6 +456,7 @@ export function MainTabNavigator() {
 
   return (
     <Tab.Navigator
+      initialRouteName="HomeTab"
       tabBar={(props) => (
         <View style={{backgroundColor: colors.background}}>
           <PoweredByHotPick />
