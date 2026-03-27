@@ -88,6 +88,8 @@ function PoolSwitcherHeader({
   const smackUnreadCounts = useGlobalStore(s => s.smackUnreadCounts);
 
   const isPicksTab = activeTabKey === 'picks';
+  const visiblePools = userPools.filter(p => isPoolVisible(p));
+  const hasVisiblePools = visiblePools.length > 0;
 
   const switchTo = (poolId: string) => {
     onSwitchPool(poolId);
@@ -111,6 +113,14 @@ function PoolSwitcherHeader({
           <Text style={headerStyles.picksMessage}>
             Pick once. Play every pool.
           </Text>
+        ) : !hasVisiblePools ? (
+          <TouchableOpacity
+            style={headerStyles.selector}
+            onPress={() => onOpenSettings?.()}>
+            <Text style={[headerStyles.poolName, {color: colors.primary}]} numberOfLines={1}>
+              Join or create a pool
+            </Text>
+          </TouchableOpacity>
         ) : (
           <TouchableOpacity
             style={headerStyles.selector}

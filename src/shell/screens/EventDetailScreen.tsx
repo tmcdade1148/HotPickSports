@@ -1,6 +1,7 @@
 import React, {useEffect} from 'react';
 import {View, Text, ActivityIndicator, StyleSheet} from 'react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
+import {isPoolVisible} from '@shared/utils/poolVisibility';
 import {spacing, borderRadius} from '@shared/theme';
 import {TournamentTabNavigator} from '@templates/tournament/navigation/TournamentTabNavigator';
 import {SeasonTabNavigator} from '@templates/season/navigation/SeasonTabNavigator';
@@ -30,12 +31,17 @@ export function EventDetailScreen({navigation}: any) {
   const userPools = useGlobalStore(s => s.userPools);
   const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
 
-  // Safety net: if we have pools but no active pool, auto-select the first one.
-  // This prevents a permanent loading screen from competition string mismatches
-  // or race conditions during navigation.
+  // Safety net: if we have pools but no active pool, auto-select the first visible one.
+  // Prefer visible pools over hidden global pools.
   useEffect(() => {
     if (!activePoolId && userPools.length > 0) {
-      setActivePoolId(userPools[0].id);
+      const firstVisible = userPools.find(p => isPoolVisible(p));
+      if (firstVisible) {
+        setActivePoolId(firstVisible.id);
+      } else {
+        // Fall back to any pool (e.g. hidden global) so we don't get stuck loading
+        setActivePoolId(userPools[0].id);
+      }
     }
   }, [activePoolId, userPools, setActivePoolId]);
 
