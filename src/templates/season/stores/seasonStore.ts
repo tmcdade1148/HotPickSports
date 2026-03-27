@@ -236,6 +236,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
     );
 
     if (error) {
+      console.error('[savePick] ERROR:', error.message, error.details, error.hint, JSON.stringify(error));
       set({weekPicks: prevWeekPicks, saveError: error.message});
     }
 
