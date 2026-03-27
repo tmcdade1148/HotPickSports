@@ -57,32 +57,21 @@ export function PicksProgressHeader({
       <View style={styles.titleRow}>
         <Text style={styles.weekTitle}>Week {currentWeek} Picks</Text>
         <View style={styles.rightRow}>
-          {/* Pick count */}
-          <View style={styles.countRow}>
-            {hasPicks && (
-              <Flame
-                size={14}
-                color={countColor}
-                fill={allPicked ? countColor : 'none'}
-                strokeWidth={allPicked ? 2 : 1.5}
-              />
-            )}
-            <Text
-              style={[
-                styles.pickCountText,
-                {color: countColor},
-                allPicked && styles.pickCountComplete,
-              ]}>
-              {pickCount}/{totalGames}
-            </Text>
-          </View>
-          {/* HotPick indicator — flame only */}
+          {/* HotPick flame + pick count */}
           <Flame
             size={36}
             color={hasHotPick ? '#06D6A0' : colors.textSecondary}
             fill={hasHotPick ? '#06D6A0' : 'none'}
             strokeWidth={hasHotPick ? 2.5 : 1.5}
           />
+          <Text
+            style={[
+              styles.pickCountText,
+              {color: countColor},
+              allPicked && styles.pickCountComplete,
+            ]}>
+            {pickCount}/{totalGames}
+          </Text>
         </View>
       </View>
 
