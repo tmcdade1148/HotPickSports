@@ -396,9 +396,14 @@ function PoolSwitcherButton({
   const brand = useBrand();
   const [modalVisible, setModalVisible] = useState(false);
   const accentColor = colors.highlight;
+  // Subscribe directly so this component re-renders when manualGlobalJoins loads
+  const manualGlobalJoins = useGlobalStore(s => s.manualGlobalJoins);
 
   // Hide pool switcher when user only has the global pool
-  const visiblePools = userPools.filter(p => isPoolVisible(p));
+  const visiblePools = userPools.filter(p => {
+    if (!p.is_global) return true;
+    return !!manualGlobalJoins[p.id];
+  });
   if (visiblePools.length === 0) return null;
 
   const switchTo = (poolId: string) => {
@@ -449,8 +454,8 @@ function PoolSwitcherButton({
             </Text>
             <ScrollView bounces={false}>
               {[
-                ...userPools.filter(p => isPoolVisible(p) && !!(p.brand_config as any)?.is_branded),
-                ...userPools.filter(p => isPoolVisible(p) && !(p.brand_config as any)?.is_branded),
+                ...visiblePools.filter(p => !!(p.brand_config as any)?.is_branded),
+                ...visiblePools.filter(p => !(p.brand_config as any)?.is_branded),
               ].map(item => {
                 const unread = smackUnreadCounts[item.id] ?? 0;
                 const itemBranded = !!(item.brand_config as any)?.is_branded;
