@@ -2,7 +2,6 @@ import React from 'react';
 import {View, Text, StyleSheet} from 'react-native';
 import {spacing, borderRadius, typography} from '@shared/theme';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
-import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {useTheme} from '@shell/theme';
 
 /**
@@ -23,23 +22,29 @@ export function WeekScoreModule() {
   const weekState = useNFLStore(s => s.weekState);
   const currentWeek = useNFLStore(s => s.currentWeek);
   const weekResult = useNFLStore(s => s.weekResult);
-  const weekPicks = useSeasonStore(s => s.weekPicks);
+  const userPickCount = useNFLStore(s => s.userPickCount);
+  const totalGamesThisWeek = useNFLStore(s => s.totalGamesThisWeek);
+  const userHotPick = useNFLStore(s => s.userHotPick);
 
   // Hide when no state, or week is fully complete (final scores in StandingsBadge)
   if (!weekState || weekState === 'complete') {
     return null;
   }
 
-  // During picks_open, only show if user has submitted picks (has any picks in DB)
-  const hasSubmittedPicks = weekPicks && weekPicks.length > 0;
-  if (weekState === 'picks_open' && !hasSubmittedPicks) {
+  // During picks_open, only show if user has submitted picks
+  if (weekState === 'picks_open' && userPickCount === 0) {
     return null;
   }
 
   const weekPoints = weekResult?.weekPoints ?? 0;
 
   // Calculate potential: assume every pick wins
-  const potentialPoints = calculatePotential(weekPicks, weekPoints, weekState);
+  // Standard picks = +1 each, HotPick = +frozen_rank
+  const hotPickRank = userHotPick?.frozen_rank ?? userHotPick?.rank ?? 1;
+  const standardPickCount = Math.max(0, userPickCount - (userHotPick ? 1 : 0));
+  const potentialPoints = weekState === 'picks_open' || weekState === 'locked'
+    ? standardPickCount + (userHotPick ? hotPickRank : 0)
+    : weekPoints; // During live/settling, show actual points (potential calculation needs weekPicks)
 
   return (
     <View style={styles.container}>
@@ -67,52 +72,6 @@ export function WeekScoreModule() {
       )}
     </View>
   );
-}
-
-/**
- * Calculate potential score assuming every pick is correct.
- *
- * Before games start (picks_open/locked): potential = sum of all picks
- * as if every one wins. HotPick correct = +frozen_rank, standard = +1.
- *
- * During live/settling: settled picks use actual result, unsettled
- * picks assume correct.
- */
-function calculatePotential(
-  weekPicks: any[] | null,
-  currentPoints: number,
-  weekState: string,
-): number {
-  if (!weekPicks || weekPicks.length === 0) return 0;
-
-  // Before games start — every pick assumed correct
-  if (weekState === 'picks_open' || weekState === 'locked') {
-    let total = 0;
-    for (const pick of weekPicks) {
-      const rank = pick.frozen_rank ?? pick.rank ?? 1;
-      if (pick.is_hotpick) {
-        total += rank; // HotPick correct = +rank
-      } else {
-        total += 1; // Standard correct = +1
-      }
-    }
-    return total;
-  }
-
-  // During live/settling — actual points + unsettled picks assumed correct
-  let unsettledPotential = 0;
-  for (const pick of weekPicks) {
-    if (pick.is_correct === null || pick.is_correct === undefined) {
-      const rank = pick.frozen_rank ?? pick.rank ?? 1;
-      if (pick.is_hotpick) {
-        unsettledPotential += rank;
-      } else {
-        unsettledPotential += 1;
-      }
-    }
-  }
-
-  return currentPoints + unsettledPotential;
 }
 
 const createStyles = (colors: any) => StyleSheet.create({
