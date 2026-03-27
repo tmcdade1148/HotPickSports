@@ -111,7 +111,7 @@ export function PicksOpenCard({
         label={ctaLabel}
         onPress={onMakePicks}
         secondaryLabel={lockedInLabel}
-        secondaryColor={colors.success}
+        secondaryColor={'#1b9a06'}
       />
     </View>
   );

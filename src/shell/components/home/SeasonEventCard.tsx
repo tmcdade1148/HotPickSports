@@ -241,7 +241,7 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
               ) : weekState === 'picks_open' ? (
                 <>
                   <Text style={styles.kickoffLabel}>
-                    PICKS are <Text style={{fontWeight: '900', color: '#06D6A0'}}>LIVE!</Text>
+                    PICKS are <Text style={{fontWeight: '900', color: '#1b9a06'}}>LIVE!</Text>
                   </Text>
                   {firstGameKickoff.timeLeft && !firstGameKickoff.hasExpired && (
                     <View style={styles.subCountdownRow}>
