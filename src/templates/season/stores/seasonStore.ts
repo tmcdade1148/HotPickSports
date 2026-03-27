@@ -108,7 +108,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
     const currentWeek =
       typeof cfgRow?.value === 'number' ? cfgRow.value : 1;
 
-    set({
+    set(state => ({
       config,
       poolId,
       currentWeek,
@@ -116,9 +116,10 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       allWeekGames: {},
       weekPicks: [],
       leaderboard: [],
-      userNames: {},
+      weekLeaderboard: [],
+      userNames: state.userNames, // preserve — names are user-level, not pool-scoped
       isWeekComplete: false,
-    });
+    }));
   },
 
   setCurrentWeek: (week: number) => {
