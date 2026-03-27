@@ -226,6 +226,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       {
         user_id: userId,
         competition: config.competition,
+        season_year: config.seasonYear ?? 2026,
         game_id: gameId,
         week: currentWeek,
         picked_team: pickedTeam,
@@ -269,6 +270,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
         {
           user_id: userId,
           competition: config.competition,
+          season_year: config.seasonYear ?? 2026,
           game_id: oldHotPick.game_id,
           week: currentWeek,
           picked_team: oldHotPick.picked_team,
@@ -287,6 +289,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       {
         user_id: userId,
         competition: config.competition,
+        season_year: config.seasonYear ?? 2026,
         game_id: gameId,
         week: currentWeek,
         picked_team: pick.picked_team,
