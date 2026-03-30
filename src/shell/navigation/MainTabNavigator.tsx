@@ -7,6 +7,7 @@ import {
   CheckCircle,
   BarChart2,
   MessageCircle,
+  Settings,
   Trophy,
   Home,
 } from 'lucide-react-native';
