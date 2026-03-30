@@ -305,14 +305,7 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
           : undefined,
       })}
 
-      {/* Pool Switcher — prominent, after week state content */}
-      <PoolSwitcherButton
-        poolName={activePool?.name ?? 'Select Pool'}
-        userPools={userPools}
-        activePoolId={activePoolId}
-        onSwitchPool={setActivePoolId}
-        smackUnreadCounts={smackUnreadCounts}
-      />
+      {/* Pool Switcher moved to shared PoolSwitcherBar in MainTabNavigator */}
     </View>
   );
 }
@@ -397,114 +390,7 @@ function renderWeekState(props: {
 // Pool Switcher Button — prominent pill below week state content
 // ---------------------------------------------------------------------------
 
-interface PoolSwitcherButtonProps {
-  poolName: string;
-  userPools: DbPool[];
-  activePoolId: string | null;
-  onSwitchPool: (poolId: string | null) => void;
-  smackUnreadCounts: Record<string, number>;
-}
-
-function PoolSwitcherButton({
-  poolName,
-  userPools,
-  activePoolId,
-  onSwitchPool,
-  smackUnreadCounts,
-}: PoolSwitcherButtonProps) {
-  const {colors} = useTheme();
-  const brand = useBrand();
-  const [modalVisible, setModalVisible] = useState(false);
-  const accentColor = colors.highlight;
-
-  // userPools is already visiblePools from the store
-  if (userPools.length === 0) return null;
-
-  const switchTo = (poolId: string) => {
-    onSwitchPool(poolId);
-    setModalVisible(false);
-  };
-
-  return (
-    <>
-      <TouchableOpacity
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginTop: spacing.md,
-          gap: 6,
-        }}
-        onPress={() => setModalVisible(true)}>
-        <Text style={{color: colors.textSecondary, fontSize: 14}}>
-          Current Pool:
-        </Text>
-        <Text style={{color: accentColor, fontSize: 16, fontWeight: '900'}}>
-          {poolName}
-        </Text>
-        <ChevronDown size={16} color={accentColor} />
-      </TouchableOpacity>
-
-      <Modal
-        visible={modalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setModalVisible(false)}>
-        <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)'}}>
-          <TouchableOpacity
-            style={StyleSheet.absoluteFillObject}
-            activeOpacity={1}
-            onPress={() => setModalVisible(false)}
-          />
-          <View style={{
-            width: '80%',
-            maxHeight: '60%',
-            backgroundColor: colors.surface,
-            borderRadius: 12,
-            padding: spacing.lg,
-          }}>
-            <Text style={{fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.md, textAlign: 'center'}}>
-              Switch Pool
-            </Text>
-            <ScrollView bounces={false}>
-              {[
-                ...userPools.filter(p => !!(p.brand_config as any)?.is_branded),
-                ...userPools.filter(p => !(p.brand_config as any)?.is_branded),
-              ].map(item => {
-                const unread = smackUnreadCounts[item.id] ?? 0;
-                const itemBranded = !!(item.brand_config as any)?.is_branded;
-                const itemHighlight = itemBranded ? (item.brand_config as any)?.highlight_color : null;
-                return (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={{paddingVertical: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}
-                    onPress={() => switchTo(item.id)}>
-                    <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1}}>
-                      <Text
-                        style={[
-                          {fontSize: 16, color: colors.textPrimary},
-                          itemBranded && {fontWeight: '700', color: itemHighlight || colors.textPrimary},
-                          item.id === activePoolId && !itemBranded && {color: colors.primary},
-                        ]}>
-                        {item.name}
-                      </Text>
-                      {unread > 0 && (
-                        <MessageCircle size={14} color={colors.primary} fill={colors.primary} />
-                      )}
-                    </View>
-                    {item.id === activePoolId && (
-                      <Text style={{color: colors.primary, fontSize: 16}}>{'\u2713'}</Text>
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-    </>
-  );
-}
+// PoolSwitcherButton removed — unified in PoolSwitcherBar
 
 // ---------------------------------------------------------------------------
 // Styles

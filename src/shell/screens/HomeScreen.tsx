@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
+// SafeAreaView now handled by HomeTab wrapper in MainTabNavigator
 // Settings icon removed — now in MainTabNavigator bottom tab
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {getDisplayName} from '@shared/utils/displayName';
@@ -125,28 +125,8 @@ export function HomeScreen({navigation}: any) {
         : [];
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Brand wordmark / partner logo */}
-      <View style={styles.logoContainer}>
-        {brand.isBranded && brand.logo.full ? (
-          <Image
-            source={{uri: brand.logo.full}}
-            style={styles.partnerLogo}
-            resizeMode="contain"
-          />
-        ) : (
-          <Image
-            source={isDark
-              ? require('../../assets/hotpick-wordmark-dk.png')
-              : require('../../assets/hotpick-wordmark-lt.png')
-            }
-            style={styles.wordmark}
-            resizeMode="contain"
-          />
-        )}
-      </View>
-
-      {/* Header */}
+    <View style={styles.container}>
+      {/* Header — logo/pool switcher now in PoolSwitcherBar above */}
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>{greeting}</Text>
@@ -210,7 +190,7 @@ export function HomeScreen({navigation}: any) {
           </View>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
