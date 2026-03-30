@@ -1,7 +1,8 @@
 import React, {useEffect} from 'react';
 import {View, Text, ActivityIndicator, StyleSheet} from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import {useGlobalStore} from '@shell/stores/globalStore';
-// visiblePools from store already filters hidden globals
+import {PoolSwitcherBar} from '@shell/components/PoolSwitcherBar';
 import {spacing, borderRadius} from '@shared/theme';
 import {TournamentTabNavigator} from '@templates/tournament/navigation/TournamentTabNavigator';
 import {SeasonTabNavigator} from '@templates/season/navigation/SeasonTabNavigator';
@@ -70,47 +71,25 @@ export function EventDetailScreen({navigation}: any) {
     );
   }
 
-  const activePool = userPools.find(p => p.id === activePoolId);
   const goHome = () => navigation.goBack();
 
-  switch (activeSport.templateType) {
-    case 'tournament':
-      return (
-        <TournamentTabNavigator
-          config={activeSport as TournamentConfig}
-          poolId={activePoolId}
-          poolName={activePool?.name}
-          userPools={userPools}
-          onSwitchPool={setActivePoolId}
-          onOpenSettings={() => navigation.navigate('Settings')}
-          onGoHome={goHome}
-        />
-      );
-    case 'season':
-      return (
-        <SeasonTabNavigator
-          config={activeSport as SeasonConfig}
-          poolId={activePoolId}
-          poolName={activePool?.name}
-          userPools={userPools}
-          onSwitchPool={setActivePoolId}
-          onOpenSettings={() => navigation.navigate('Settings')}
-          onGoHome={goHome}
-        />
-      );
-    case 'series':
-      return (
-        <SeriesTabNavigator
-          config={activeSport as SeriesConfig}
-          poolId={activePoolId}
-          poolName={activePool?.name}
-          userPools={userPools}
-          onSwitchPool={setActivePoolId}
-          onOpenSettings={() => navigation.navigate('Settings')}
-          onGoHome={goHome}
-        />
-      );
-  }
+  const templateNav = (() => {
+    switch (activeSport.templateType) {
+      case 'tournament':
+        return <TournamentTabNavigator config={activeSport as TournamentConfig} poolId={activePoolId} />;
+      case 'season':
+        return <SeasonTabNavigator config={activeSport as SeasonConfig} poolId={activePoolId} />;
+      case 'series':
+        return <SeriesTabNavigator config={activeSport as SeriesConfig} poolId={activePoolId} />;
+    }
+  })();
+
+  return (
+    <SafeAreaView style={{flex: 1, backgroundColor: colors.background}} edges={['top']}>
+      <PoolSwitcherBar mode="pool" onGoBack={goHome} />
+      {templateNav}
+    </SafeAreaView>
+  );
 }
 
 const createStyles = (colors: any) => StyleSheet.create({

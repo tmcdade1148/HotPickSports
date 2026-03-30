@@ -1,5 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {View, Text, Image, StyleSheet, TouchableOpacity, Modal, ScrollView, Alert} from 'react-native';
+import {View, Text, Image, StyleSheet} from 'react-native';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {useNavigation} from '@react-navigation/native';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -7,8 +7,6 @@ import {
   CheckCircle,
   BarChart2,
   MessageCircle,
-  Settings,
-  ChevronDown,
   Trophy,
   Home,
 } from 'lucide-react-native';
@@ -19,6 +17,7 @@ import {useTheme} from '@shell/theme';
 import {useBrand} from '@shell/theme';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {PoweredByHotPick} from '@shell/components/PoweredByHotPick';
+import {PoolSwitcherBar} from '@shell/components/PoolSwitcherBar';
 import {spacing, typography, borderRadius} from '@shared/theme';
 
 // Sport store imports for initialization
@@ -72,10 +71,6 @@ const emptyStyles = StyleSheet.create({
   },
 });
 
-/**
- * TabHeader — Displays a header with pool switcher for pool-scoped tabs
- * or a static message for picks (which are pool-independent).
- */
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const wordmarkLight = require('../../assets/hotpick-wordmark-lt.png');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -89,230 +84,7 @@ function isDarkBg(hex: string): boolean {
   return 0.299 * r + 0.587 * g + 0.114 * b < 0.5;
 }
 
-function TabHeader({title, showPoolSwitcher}: {title: string; showPoolSwitcher: boolean}) {
-  const {colors} = useTheme();
-  const brand = useBrand();
-  const [modalVisible, setModalVisible] = useState(false);
-  const userPools = useGlobalStore(s => s.visiblePools);
-  const activePoolId = useGlobalStore(s => s.activePoolId);
-  const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
-  const smackUnreadCounts = useGlobalStore(s => s.smackUnreadCounts);
-  const flaggedCounts = useGlobalStore(s => s.flaggedCounts);
-
-  const navigation = useNavigation<any>();
-  const activePool = userPools.find(p => p.id === activePoolId);
-  const poolName = activePool?.name ?? '';
-  const hasVisiblePools = userPools.length > 0;
-
-  const switchTo = (poolId: string) => {
-    setActivePoolId(poolId);
-    setModalVisible(false);
-  };
-
-  const wordmark = isDarkBg(colors.background) ? wordmarkDark : wordmarkLight;
-
-  return (
-    <View style={[headerStyles.container, {backgroundColor: colors.background, borderBottomColor: colors.surface}]}>
-      {/* Logo */}
-      <View style={headerStyles.logoRow}>
-        {brand.isBranded && brand.logo.full ? (
-          <Image
-            source={{uri: brand.logo.full}}
-            style={headerStyles.partnerLogo}
-            resizeMode="contain"
-          />
-        ) : (
-          <Image
-            source={wordmark}
-            style={headerStyles.wordmark}
-            resizeMode="contain"
-          />
-        )}
-      </View>
-      <View style={headerStyles.row}>
-        {showPoolSwitcher && hasVisiblePools ? (
-          <TouchableOpacity
-            style={headerStyles.selector}
-            onPress={() => setModalVisible(true)}>
-            <Text style={[headerStyles.switchLabel, {color: colors.textSecondary}]}>
-              Current Pool:
-            </Text>
-            <Text style={[headerStyles.poolName, {color: colors.highlight, fontWeight: '900'}]} numberOfLines={1}>
-              {poolName}
-            </Text>
-            <ChevronDown size={16} color={colors.highlight} />
-          </TouchableOpacity>
-        ) : showPoolSwitcher && !hasVisiblePools ? (
-          <TouchableOpacity
-            style={headerStyles.selector}
-            onPress={() => {
-              Alert.alert(
-                'Join or Create a Pool?',
-                'Head to Settings to join a pool with an invite code or create your own.',
-                [
-                  {text: 'Cancel', style: 'cancel'},
-                  {text: 'Go to My Pools', onPress: () => navigation.navigate('SettingsTab', {expandPools: true})},
-                ],
-              );
-            }}>
-            <Text style={[headerStyles.poolName, {color: colors.primary, fontWeight: '700'}]} numberOfLines={1}>
-              Join or Create a Pool
-            </Text>
-          </TouchableOpacity>
-        ) : (
-          <Text style={[headerStyles.message, {color: colors.textSecondary}]}>
-            Pick once. Play every pool.
-          </Text>
-        )}
-      </View>
-
-      {showPoolSwitcher && (
-        <Modal
-          visible={modalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setModalVisible(false)}>
-          <View style={headerStyles.overlay}>
-            <TouchableOpacity
-              style={StyleSheet.absoluteFillObject}
-              activeOpacity={1}
-              onPress={() => setModalVisible(false)}
-            />
-            <View style={[headerStyles.modal, {backgroundColor: colors.surface}]}>
-              <Text style={[headerStyles.modalTitle, {color: colors.textPrimary}]}>Switch Pool</Text>
-              <ScrollView bounces={false}>
-                {[
-                  ...userPools.filter(p => !!(p.brand_config as any)?.is_branded),
-                  ...userPools.filter(p => !(p.brand_config as any)?.is_branded),
-                ].map(item => {
-                  const unread = smackUnreadCounts[item.id] ?? 0;
-                  const itemBranded = !!(item.brand_config as any)?.is_branded;
-                  const itemHighlight = itemBranded ? (item.brand_config as any)?.highlight_color : null;
-                  return (
-                    <TouchableOpacity
-                      key={item.id}
-                      style={[headerStyles.poolOption, {borderBottomColor: colors.border}]}
-                      onPress={() => switchTo(item.id)}>
-                      <View style={headerStyles.poolOptionRow}>
-                        <Text
-                          style={[
-                            headerStyles.poolOptionText,
-                            {color: colors.textPrimary},
-                            itemBranded && {fontWeight: '700', color: itemHighlight || colors.textPrimary},
-                            item.id === activePoolId && !itemBranded && {color: colors.primary},
-                          ]}>
-                          {item.name}
-                        </Text>
-                        {(flaggedCounts[item.id] ?? 0) > 0 && (
-                          <View style={headerStyles.flaggedDot}>
-                            <Text style={headerStyles.flaggedDotText}>
-                              {flaggedCounts[item.id]}
-                            </Text>
-                          </View>
-                        )}
-                        {unread > 0 && (
-                          <MessageCircle
-                            size={14}
-                            color={colors.primary}
-                            fill={colors.primary}
-                          />
-                        )}
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
-      )}
-    </View>
-  );
-}
-
-const headerStyles = StyleSheet.create({
-  container: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xs,
-    paddingBottom: spacing.sm,
-    borderBottomWidth: 1,
-  },
-  logoRow: {
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-  },
-  wordmark: {
-    height: 40,
-    width: 225,
-  },
-  partnerLogo: {
-    height: 30,
-    width: 160,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  selector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  switchLabel: {
-    fontSize: 14,
-  },
-  poolName: {
-    fontSize: 16,
-  },
-  message: {
-    fontSize: 14,
-    fontStyle: 'italic',
-  },
-  overlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modal: {
-    width: '80%',
-    maxHeight: '60%',
-    borderRadius: 12,
-    padding: spacing.lg,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: spacing.md,
-    textAlign: 'center',
-  },
-  poolOption: {
-    paddingVertical: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  poolOptionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  poolOptionText: {
-    fontSize: 16,
-  },
-  flaggedDot: {
-    backgroundColor: '#E53935',
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    minWidth: 20,
-    alignItems: 'center',
-  },
-  flaggedDotText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '700',
-  },
-});
+// TabHeader removed — replaced by shared PoolSwitcherBar component
 
 /**
  * PicksTab — Renders the correct picks screen based on active sport template.
@@ -333,7 +105,7 @@ function PicksTab() {
 
   return (
     <SafeAreaView style={{flex: 1, backgroundColor: colors.background}} edges={['top']}>
-      <TabHeader title="Picks" showPoolSwitcher={false} />
+      <PoolSwitcherBar mode="picks" />
       {screen}
     </SafeAreaView>
   );
@@ -358,7 +130,7 @@ function LeaderboardTab() {
 
   return (
     <SafeAreaView style={{flex: 1, backgroundColor: colors.background}} edges={['top']}>
-      <TabHeader title="Leaders" showPoolSwitcher={true} />
+      <PoolSwitcherBar mode="pool" />
       {screen}
     </SafeAreaView>
   );
@@ -376,7 +148,7 @@ function SmackTalkTab() {
   }
   return (
     <SafeAreaView style={{flex: 1, backgroundColor: colors.background}} edges={['top']}>
-      <TabHeader title="SmackTalk" showPoolSwitcher={true} />
+      <PoolSwitcherBar mode="pool" />
       <SmackTalkScreen poolId={activePoolId} />
     </SafeAreaView>
   );
@@ -392,22 +164,35 @@ function SettingsTabWrapper(props: any) {
 
   return (
     <SafeAreaView style={{flex: 1, backgroundColor: colors.background}} edges={['top']}>
-      <View style={headerStyles.logoRow}>
+      <View style={{alignItems: 'center', marginBottom: spacing.xs, paddingTop: spacing.xs}}>
         {brand.isBranded && brand.logo.full ? (
           <Image
             source={{uri: brand.logo.full}}
-            style={headerStyles.partnerLogo}
+            style={{height: 30, width: 160}}
             resizeMode="contain"
           />
         ) : (
           <Image
             source={wordmark}
-            style={headerStyles.wordmark}
+            style={{height: 40, width: 225}}
             resizeMode="contain"
           />
         )}
       </View>
       <SettingsScreen {...props} />
+    </SafeAreaView>
+  );
+}
+
+/**
+ * HomeTab — Home screen with unified pool switcher bar.
+ */
+function HomeTab(props: any) {
+  const {colors} = useTheme();
+  return (
+    <SafeAreaView style={{flex: 1, backgroundColor: colors.background}} edges={['top']}>
+      <PoolSwitcherBar mode="pool" />
+      <HomeScreen {...props} />
     </SafeAreaView>
   );
 }
@@ -501,7 +286,7 @@ export function MainTabNavigator() {
       />
       <Tab.Screen
         name="HomeTab"
-        component={HomeScreen}
+        component={HomeTab}
         options={{
           tabBarLabel: () => null,
           tabBarIcon: ({focused}) => (
