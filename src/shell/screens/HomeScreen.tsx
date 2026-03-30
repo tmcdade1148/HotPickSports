@@ -136,6 +136,11 @@ export function HomeScreen({navigation}: any) {
           <View style={styles.headerRight}>
             <Text style={styles.phaseLabel}>{phaseLabel}</Text>
             <Text style={[styles.eventName, {color: colors.highlight}]}>{eventName}</Text>
+            {nflCurrentPhase === 'REGULAR' || nflCurrentPhase === 'PLAYOFFS' || nflCurrentPhase === 'SUPERBOWL' ? (
+              <Text style={[styles.weekLabel, {color: colors.highlight}]}>
+                WEEK {useNFLStore.getState().currentWeek}
+              </Text>
+            ) : null}
           </View>
         ) : null}
       </View>
@@ -317,6 +322,11 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 12,
     fontWeight: '400' as const,
     color: colors.textSecondary,
+  },
+  weekLabel: {
+    fontSize: 18,
+    fontWeight: '800' as const,
+    fontStyle: 'italic' as const,
   },
   settingsButton: {
     width: 40,
