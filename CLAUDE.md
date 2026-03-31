@@ -656,9 +656,9 @@ one HotPick per user per week.
 | `nfl-calculate-scores` | Cron + manual | Every 30 min |
 | `nfl-update-scores` | Cron | Every 5 min (live score fetch from ESPN) |
 | `nfl-import-schedule` | Cron | Tuesdays 5am UTC |
-| `nfl-fetch-odds` | Cron | Tuesdays 7am UTC |
-| `nfl-rank-games` | Cron | Tuesdays 7:15am UTC |
-| `nfl-open-picks` | Cron | Tuesdays 8am UTC |
+| `nfl-fetch-odds` | Cron | Tuesdays 10am UTC (5am ET) |
+| `nfl-rank-games` | Cron | Tuesdays 10:15am UTC (5:15am ET) |
+| `nfl-open-picks` | Cron | Tuesdays 11am UTC (6am ET) |
 | `nfl-finalize-week` | Cron | Tuesdays 6am UTC |
 | `nfl-weekly-transition` | Manual (admin) | On demand |
 | `refresh-game-pick-stats` | Cron | Every 60s |
