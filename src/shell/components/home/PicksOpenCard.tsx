@@ -94,9 +94,6 @@ export function PicksOpenCard({
 
   return (
     <View style={styles.container}>
-      {/* Week label */}
-      <Text style={[styles.weekLabel, weekLabelColor ? {color: weekLabelColor} : undefined]}>WEEK {currentWeek}</Text>
-
       {/* Countdown to deadline */}
       {timeLeft && (
         <View style={styles.countdownRow}>
@@ -113,12 +110,7 @@ export function PicksOpenCard({
         </View>
       )}
 
-      {/* Social pressure line */}
-      {poolMemberCount > 0 && (
-        <Text style={styles.socialLine}>
-          {poolPicksSubmittedCount} of {poolMemberCount} poolies have locked in
-        </Text>
-      )}
+      {/* Social pressure line moved to Picks are LIVE module in SeasonEventCard */}
 
       {/* CTA footer */}
       <CardFooter

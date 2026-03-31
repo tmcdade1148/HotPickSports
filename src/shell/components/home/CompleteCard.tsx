@@ -1,101 +1,138 @@
 import React from 'react';
 import {View, Text, StyleSheet} from 'react-native';
 import {spacing, typography} from '@shared/theme';
-import type {Standing} from '@sports/nfl/stores/nflStore';
 import {useTheme} from '@shell/theme';
 
 interface CompleteCardProps {
   currentWeek: number;
-  totalWeeks: number;
-  poolStandings: Standing[];
-  userId: string | null;
+  weekPoints: number;
+  correctPicks: number;
+  totalPicks: number;
+  hotPickCorrect: boolean | null;
+  hotpickRank: number | null;
 }
 
 /**
  * Shown when weekState === 'complete'.
- * Season standings framed as a race — points behind leader, weeks remaining.
+ * Displays a user-level observation about their week performance.
+ * Pool-independent — no pool name or pool rank shown.
  */
 export function CompleteCard({
   currentWeek,
-  totalWeeks,
-  poolStandings,
-  userId,
+  weekPoints,
+  correctPicks,
+  totalPicks,
+  hotPickCorrect,
+  hotpickRank,
 }: CompleteCardProps) {
   const {colors} = useTheme();
   const styles = createStyles(colors);
-  const weeksLeft = totalWeeks - currentWeek;
-  const myStanding = userId
-    ? poolStandings.find(s => s.userId === userId)
-    : null;
-  const leader = poolStandings[0];
-  const pointsBehind =
-    myStanding && leader && myStanding.userId !== leader.userId
-      ? leader.totalPoints - myStanding.totalPoints
-      : 0;
+
+  const observation = getObservation(weekPoints, correctPicks, totalPicks, hotPickCorrect, hotpickRank);
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>WEEK {currentWeek} — FINAL</Text>
       <Text style={styles.headline}>Week scored</Text>
-
-      {myStanding ? (
-        <View style={styles.standingsSection}>
-          <Text style={styles.rank}>
-            #{myStanding.rank} in your pool
-          </Text>
-          {pointsBehind > 0 ? (
-            <Text style={styles.chase}>
-              {pointsBehind} pts behind 1st. {weeksLeft} weeks left.
-            </Text>
-          ) : (
-            <Text style={styles.leading}>
-              You're in the lead! {weeksLeft} weeks left.
-            </Text>
-          )}
-        </View>
-      ) : (
-        <Text style={styles.body}>
-          Next week's picks open soon
-        </Text>
-      )}
+      <Text style={styles.pointsLine}>
+        {weekPoints > 0 ? '+' : ''}{weekPoints} pts
+      </Text>
+      <Text style={styles.accuracyLine}>
+        {correctPicks} of {totalPicks} correct
+      </Text>
+      <Text style={styles.observation}>{observation}</Text>
     </View>
   );
+}
+
+/**
+ * Deterministic observation templates — first matching rule wins.
+ * No AI, no pool references. Pure user-level performance narrative.
+ */
+function getObservation(
+  weekPoints: number,
+  correctPicks: number,
+  totalPicks: number,
+  hotPickCorrect: boolean | null,
+  hotpickRank: number | null,
+): string {
+  const rank = hotpickRank ?? 0;
+
+  // Perfect week + HotPick
+  if (correctPicks === totalPicks && hotPickCorrect) {
+    return `Perfect week. ${totalPicks} for ${totalPicks} plus the HotPick. Flawless.`;
+  }
+
+  // Perfect picks but HotPick missed
+  if (correctPicks === totalPicks && hotPickCorrect === false) {
+    return `${correctPicks} for ${totalPicks} on picks but the HotPick didn't land. So close.`;
+  }
+
+  // Bold HotPick win (high rank)
+  if (hotPickCorrect && rank >= 12) {
+    return `Bold call. +${rank} on the Rank ${rank} HotPick. That's how it's done.`;
+  }
+
+  // Standard HotPick win
+  if (hotPickCorrect && rank > 0) {
+    return `HotPick landed. +${rank} added to the total.`;
+  }
+
+  // Bold HotPick loss (high rank)
+  if (hotPickCorrect === false && rank >= 12) {
+    return `Rank ${rank} HotPick gone wrong. -${rank} pts. Ouch.`;
+  }
+
+  // Standard HotPick loss
+  if (hotPickCorrect === false && rank > 0) {
+    return `HotPick missed. -${rank} pts. Shake it off.`;
+  }
+
+  // Big week
+  if (weekPoints > 15) {
+    return `Big week. +${weekPoints} pts. The leaderboard noticed.`;
+  }
+
+  // Positive week
+  if (weekPoints > 0) {
+    return `+${weekPoints} pts this week. Building momentum.`;
+  }
+
+  // Break even
+  if (weekPoints === 0) {
+    return `Broke even. Wins cancelled the HotPick loss. Reset.`;
+  }
+
+  // Tough week
+  return `Tough week. ${weekPoints} pts. Long season ahead.`;
 }
 
 const createStyles = (colors: any) => StyleSheet.create({
   container: {
     padding: spacing.md,
   },
-  label: {
-    ...typography.small,
-    color: colors.highlight,
-    fontWeight: '600',
-    letterSpacing: 1,
-    marginBottom: spacing.xs,
-  },
   headline: {
-    ...typography.h3,
+    fontSize: 16,
+    fontWeight: '700',
     color: colors.textPrimary,
+    marginBottom: spacing.sm,
+  },
+  pointsLine: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: colors.textPrimary,
+    marginBottom: 2,
+  },
+  accuracyLine: {
+    fontSize: 14,
+    color: colors.textSecondary,
     marginBottom: spacing.md,
   },
-  standingsSection: {
-    gap: spacing.sm,
-  },
-  rank: {
-    ...typography.h2,
-    color: colors.textPrimary,
-  },
-  chase: {
-    ...typography.body,
-    color: colors.textSecondary,
-  },
-  leading: {
-    ...typography.body,
-    color: colors.success,
-    fontWeight: '600',
-  },
-  body: {
-    ...typography.body,
-    color: colors.textSecondary,
+  observation: {
+    fontSize: 20,
+    fontWeight: '700',
+    fontStyle: 'italic',
+    color: colors.highlight,
+    lineHeight: 28,
+    letterSpacing: 0.3,
   },
 });

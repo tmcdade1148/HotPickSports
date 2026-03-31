@@ -6,6 +6,8 @@ import {useTheme} from '@shell/theme';
 interface WeekSelectorProps {
   totalWeeks: number;
   currentWeek: number;
+  /** The actual active week from competition_config — doesn't change when user browses */
+  activeWeek?: number;
   onSelectWeek: (week: number) => void;
   accentColor: string;
   playoffStartWeek?: number;
@@ -22,10 +24,13 @@ const CHIP_GAP = spacing.xs;
 export function WeekSelector({
   totalWeeks,
   currentWeek,
+  activeWeek,
   onSelectWeek,
   accentColor,
   playoffStartWeek,
 }: WeekSelectorProps) {
+  // activeWeek = the real week from DB. currentWeek = the viewed week.
+  const realWeek = activeWeek ?? currentWeek;
   const {colors} = useTheme();
   const styles = createStyles(colors);
   const scrollRef = useRef<ScrollView>(null);
@@ -45,7 +50,10 @@ export function WeekSelector({
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.container}>
       {weeks.map(week => {
-        const isSelected = week === currentWeek;
+        const isActiveWeek = week === realWeek; // the DB current week
+        const isViewedWeek = week === currentWeek && week !== realWeek; // user browsed here
+        const isPast = week < realWeek && !isViewedWeek;
+        const isFuture = week > realWeek && !isViewedWeek;
         const isPlayoff = playoffStartWeek != null && week >= playoffStartWeek;
         const label = isPlayoff
           ? `PO${week - (playoffStartWeek! - 1)}`
@@ -56,13 +64,22 @@ export function WeekSelector({
             key={week}
             style={[
               styles.chip,
-              isSelected && {backgroundColor: accentColor},
+              realWeek === 0 && {opacity: 0.4},
+              isActiveWeek && {backgroundColor: colors.highlight, opacity: 1},
+              isViewedWeek && {backgroundColor: colors.highlight + '66'},
+              isPast && {backgroundColor: colors.highlight + '4D'},
+              isFuture && {backgroundColor: colors.surface, borderColor: colors.border + '80'},
             ]}
-            onPress={() => onSelectWeek(week)}>
+            disabled={realWeek === 0}
+            onPress={() => onSelectWeek(week)}
+            activeOpacity={realWeek === 0 ? 1 : 0.7}>
             <Text
               style={[
                 styles.chipText,
-                isSelected && styles.chipTextSelected,
+                isActiveWeek && styles.chipTextSelected,
+                isViewedWeek && {color: '#333333', fontWeight: '700'},
+                isPast && {color: colors.textPrimary},
+                isFuture && {color: colors.textSecondary + '80'},
               ]}>
               {label}
             </Text>
@@ -76,7 +93,8 @@ export function WeekSelector({
 const createStyles = (colors: any) => StyleSheet.create({
   container: {
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
     gap: CHIP_GAP,
   },
   chip: {
@@ -95,6 +113,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
   },
   chipTextSelected: {
-    color: '#FFFFFF',
+    color: '#1A1A1A',
   },
 });

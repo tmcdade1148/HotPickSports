@@ -16,7 +16,6 @@ export function LockedCard({currentWeek}: LockedCardProps) {
   const styles = createStyles(colors);
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>WEEK {currentWeek}</Text>
       <Text style={styles.headline}>Picks locked in</Text>
       <Text style={styles.body}>
         Your picks are set. Games kick off soon.

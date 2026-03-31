@@ -122,7 +122,7 @@ export function PoolSwitcherBar({mode, onGoBack}: PoolSwitcherBarProps) {
               numberOfLines={1}>
               {poolName}
             </Text>
-            <ChevronDown size={16} color={colors.highlight} />
+            <ChevronDown size={22} color={colors.highlight} />
           </TouchableOpacity>
         ) : (
           <TouchableOpacity style={styles.selector} onPress={goToSettings}>
@@ -249,10 +249,12 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   switchLabel: {
-    fontSize: 14,
+    fontSize: 15,
+    fontWeight: '500',
   },
   poolName: {
-    fontSize: 16,
+    fontSize: 20,
+    fontWeight: '900',
   },
   message: {
     fontSize: 14,

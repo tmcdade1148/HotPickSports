@@ -18,7 +18,6 @@ export function SettlingCard({currentWeek, weekResult}: SettlingCardProps) {
   const styles = createStyles(colors);
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>WEEK {currentWeek} — RESULTS</Text>
       <Text style={styles.headline}>Week complete</Text>
 
       {weekResult ? (

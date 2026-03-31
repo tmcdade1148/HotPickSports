@@ -1,6 +1,6 @@
 import React from 'react';
 import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
-import {Flame} from 'lucide-react-native';
+import {Flame, Lock} from 'lucide-react-native';
 import type {SeasonConfig} from '@shared/types/templates';
 import type {DbSeasonGame} from '@shared/types/database';
 import {spacing} from '@shared/theme';
@@ -146,9 +146,9 @@ export function SeasonMatchCard({
   const isFinal =
     status === 'FINAL' || status === 'STATUS_FINAL' || status === 'COMPLETED';
   const isLive = status === 'IN_PROGRESS' || status === 'LIVE';
-  const isLocked = isFinal || isLive;
-
   const kickoffDate = new Date(game.kickoff_at);
+  const kickoffPassed = kickoffDate.getTime() <= Date.now();
+  const isLocked = isFinal || isLive || kickoffPassed;
   const rank = game.frozen_rank ?? game.rank ?? 0;
 
   // Flame is tappable if this game has a pick and isn't already the hotpick
@@ -176,11 +176,14 @@ export function SeasonMatchCard({
     isHotPick && !isFinal ? `+/-${rank} pts` : null;
 
   return (
-    <View style={styles.container}>
-      {/* ── Header: day/time | status | points ── */}
+    <View style={[styles.container, isLocked && !isLive && styles.containerLocked]}>
+      {/* ── Header: day/time | status | lock | points ── */}
       <View style={styles.header}>
         {!isFinal && !isLive ? (
-          <Text style={styles.kickoffText}>{formatKickoff(kickoffDate)}</Text>
+          <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
+            <Text style={styles.kickoffText}>{formatKickoff(kickoffDate)}</Text>
+            {isLocked && <Lock size={12} color={colors.textSecondary} />}
+          </View>
         ) : null}
 
         {isLive ? (
@@ -314,6 +317,9 @@ export function SeasonMatchCard({
 const createStyles = (colors: any) => StyleSheet.create({
   container: {
     paddingHorizontal: 12,
+  },
+  containerLocked: {
+    opacity: 0.5,
   },
 
   // Header

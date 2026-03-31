@@ -421,7 +421,33 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
     const {config, poolId, currentWeek} = get();
     if (!config) return;
 
-    const targetWeek = week ?? currentWeek;
+    let targetWeek = week ?? currentWeek;
+
+    // If no explicit week requested, check if current week has any live/final games
+    // If not, show previous week's leaderboard until games kick off
+    if (!week && currentWeek > 1) {
+      const {data: liveGames} = await supabase
+        .from('season_games')
+        .select('game_id')
+        .eq('competition', config.competition)
+        .eq('week', currentWeek)
+        .in('status', ['in_progress', 'final', 'live'])
+        .limit(1);
+
+      if (!liveGames || liveGames.length === 0) {
+        // Also check if anyone has scores for current week
+        const {data: weekScores} = await supabase
+          .from('season_user_totals')
+          .select('id')
+          .eq('competition', config.competition)
+          .eq('week', currentWeek)
+          .limit(1);
+
+        if (!weekScores || weekScores.length === 0) {
+          targetWeek = currentWeek - 1;
+        }
+      }
+    }
 
     // Step 1: Get ACTIVE pool member user IDs (never include removed/left)
     const {data: members} = await supabase
@@ -462,10 +488,11 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       const {data: games} = await supabase
         .from('season_games')
         .select('*')
-        .in('id', hotPickGameIds);
+        .in('game_id', hotPickGameIds);
       if (games) {
         for (const g of games as DbSeasonGame[]) {
-          gameMap[g.id] = g;
+          gameMap[g.game_id] = g;
+          gameMap[g.id] = g; // fallback for UUID lookups
         }
       }
     }

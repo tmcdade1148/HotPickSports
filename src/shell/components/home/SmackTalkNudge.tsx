@@ -58,7 +58,7 @@ export function SmackTalkNudge({onPress, onPressPool}: SmackTalkNudgeProps) {
       {/* Header row — always visible */}
       <View style={styles.headerRow}>
         <View style={styles.headerContent}>
-          <Text style={styles.labelText}>SmackTalk</Text>
+          <Text style={styles.labelText}>New SmackTalk Messages</Text>
           {!hasNudges && (
             <Text style={styles.subtitleText}>Talk trash to your pool</Text>
           )}

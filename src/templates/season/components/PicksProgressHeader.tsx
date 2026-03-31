@@ -57,13 +57,13 @@ export function PicksProgressHeader({
     <View style={styles.container}>
       {/* Title row */}
       <View style={styles.titleRow}>
-        <Text style={styles.weekTitle}>Week {currentWeek} Picks</Text>
+        <Text style={styles.weekTitle}>WEEK {currentWeek} PICKS</Text>
         <View style={styles.rightRow}>
           {/* HotPick flame + pick count */}
           <Flame
             size={36}
-            color={hasHotPick ? '#1B9A06' : colors.textSecondary}
-            fill={hasHotPick ? '#1B9A06' : 'none'}
+            color={hasHotPick ? '#F5620F' : colors.textSecondary}
+            fill={hasHotPick ? '#F5620F' : 'none'}
             strokeWidth={hasHotPick ? 2.5 : 1.5}
           />
           <Text
@@ -96,6 +96,7 @@ export function PicksProgressHeader({
 const createStyles = (colors: any) => StyleSheet.create({
   container: {
     paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
     paddingBottom: spacing.sm,
   },
   titleRow: {
@@ -106,8 +107,9 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   weekTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: colors.textPrimary,
+    fontWeight: '800',
+    fontStyle: 'italic',
+    color: colors.highlight,
   },
   rightRow: {
     flexDirection: 'row',

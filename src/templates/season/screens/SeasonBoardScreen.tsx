@@ -208,18 +208,38 @@ export function SeasonBoardScreen() {
             numberOfLines={1}>
             {isMe ? 'You' : (userNames[item.user_id] ?? `Player ${rank}`)}
           </Text>
-          {item.hotpick_team && (
+          {item.hotpick_team && item.hotpick_game_label && (
             <View style={styles.hotpickRow}>
-              <Flame size={12} color={colors.primary} fill={colors.primary} />
-              <Text style={styles.hotpickDetail}>
-                {item.hotpick_team}
-                {item.hotpick_game_label ? ` (${item.hotpick_game_label})` : ''}
-              </Text>
               {item.hotpick_rank != null && (
-                <Text style={[styles.hotpickPoints, {color: hotPickColor}]}>
-                  {hotPickSign}{item.hotpick_rank}
-                </Text>
+                <View style={styles.hotpickRankCircle}>
+                  <Text style={styles.hotpickRankNumber}>{item.hotpick_rank}</Text>
+                </View>
               )}
+              {(() => {
+                const parts = item.hotpick_game_label!.split(' @ ');
+                const away = parts[0] ?? '';
+                const home = parts[1] ?? '';
+                const picked = item.hotpick_team;
+                return (
+                  <View style={styles.hotpickMatchupRow}>
+                    {picked === away ? (
+                      <View style={styles.hotpickPickedBox}>
+                        <Text style={styles.hotpickPickedText}>{away}</Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.hotpickTeamText}>{away}</Text>
+                    )}
+                    <Text style={styles.hotpickAtText}>@</Text>
+                    {picked === home ? (
+                      <View style={styles.hotpickPickedBox}>
+                        <Text style={styles.hotpickPickedText}>{home}</Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.hotpickTeamText}>{home}</Text>
+                    )}
+                  </View>
+                );
+              })()}
             </View>
           )}
         </View>
@@ -236,8 +256,6 @@ export function SeasonBoardScreen() {
         style={{flex: 1}}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-        <SeasonProgress config={config} userId={user?.id ?? ''} />
-
         {/* Toggle */}
         <View style={styles.toggleContainer}>
           <TouchableOpacity
@@ -302,6 +320,32 @@ export function SeasonBoardScreen() {
           </View>
         </ScrollView>
       </ScrollView>
+
+      {/* Pinned "You" row — shows when user is ranked below visible area */}
+      {(() => {
+        const activeList = activeTab === 'season' ? leaderboard : weekLeaderboard;
+        const myIndex = activeList.findIndex(e => e.user_id === user?.id);
+        // Pin if user exists and is beyond 5th position (likely off-screen)
+        if (myIndex < 5 || myIndex === -1) return null;
+        const myEntry = activeList[myIndex];
+        const rank = myIndex + 1;
+        const points = activeTab === 'season'
+          ? (myEntry as SeasonLeaderboardEntry).total_points
+          : (myEntry as WeekLeaderboardEntry).week_points;
+        return (
+          <View style={[styles.pinnedRow, {borderTopColor: colors.border}]}>
+            <Text style={[styles.rank, styles.textHighlight]}>{rank}</Text>
+            <View style={styles.userInfo}>
+              <Text style={[styles.userName, styles.textHighlight]} numberOfLines={1}>
+                You
+              </Text>
+            </View>
+            <Text style={[styles.totalPoints, styles.textHighlight]}>
+              {points} pts
+            </Text>
+          </View>
+        );
+      })()}
     </View>
   );
 }
@@ -362,6 +406,15 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.primary,
   },
+  pinnedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderRadius: 0,
+    marginHorizontal: 0,
+  },
   rank: {
     width: 32,
     fontSize: 16,
@@ -387,15 +440,46 @@ const createStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginTop: 2,
+    marginTop: 3,
   },
-  hotpickDetail: {
-    fontSize: 12,
+  hotpickRankCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hotpickRankNumber: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  hotpickMatchupRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  hotpickTeamText: {
+    fontSize: 11,
+    fontWeight: '600',
     color: colors.textSecondary,
   },
-  hotpickPoints: {
-    fontSize: 12,
+  hotpickAtText: {
+    fontSize: 10,
+    color: colors.textSecondary,
+  },
+  hotpickPickedBox: {
+    borderWidth: 1.5,
+    borderColor: colors.highlight,
+    borderRadius: 3,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  hotpickPickedText: {
+    fontSize: 11,
     fontWeight: '700',
+    color: colors.highlight,
   },
   totalPoints: {
     fontSize: 16,

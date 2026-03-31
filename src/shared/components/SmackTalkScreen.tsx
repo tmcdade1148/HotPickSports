@@ -45,6 +45,39 @@ interface ReactionSummary {
  * - Tap a reaction badge → see who reacted
  * - Report → flags message, greys it out, notifies organizer/admins
  */
+
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+function formatSmackTime(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  const timeStr = date.toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'});
+
+  // Today
+  const isToday = date.toDateString() === now.toDateString();
+  if (isToday) return `Today @ ${timeStr}`;
+
+  // Yesterday
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) return `Yesterday @ ${timeStr}`;
+
+  // Within this week (2-6 days ago)
+  if (diffDays < 7) {
+    return `${DAY_NAMES[date.getDay()]} @ ${timeStr}`;
+  }
+
+  // Within last week (7-13 days ago)
+  if (diffDays < 14) {
+    return `Last ${DAY_NAMES[date.getDay()]} @ ${timeStr}`;
+  }
+
+  // Beyond 14 days
+  return 'More than a week ago';
+}
+
 export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
   const {colors} = useTheme();
   const styles = createStyles(colors);
@@ -376,10 +409,7 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
   // ── Render message ──────────────────────────────────────────────────
   const renderMessage = ({item}: {item: DbSmackMessage}) => {
     const isMe = item.user_id === user?.id;
-    const time = new Date(item.created_at).toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    const time = formatSmackTime(new Date(item.created_at));
     const isFlagged = item.is_flagged && item.moderation_status !== 'approved';
     const isRemoved = item.moderation_status === 'removed';
     const summaries = getReactionSummaries(item.id);

@@ -7,8 +7,9 @@ import {
   CheckCircle,
   BarChart2,
   MessageCircle,
+  Settings,
   Trophy,
-  Home,
+  Target,
 } from 'lucide-react-native';
 import {BottomTabBar} from '@react-navigation/bottom-tabs';
 import {HomeScreen} from '@shell/screens/HomeScreen';
@@ -189,9 +190,25 @@ function SettingsTabWrapper(props: any) {
  */
 function HomeTab(props: any) {
   const {colors} = useTheme();
+  const brand = useBrand();
+  const wordmark = isDarkBg(colors.background) ? wordmarkDark : wordmarkLight;
   return (
     <SafeAreaView style={{flex: 1, backgroundColor: colors.background}} edges={['top']}>
-      <PoolSwitcherBar mode="pool" />
+      <View style={{alignItems: 'center', paddingTop: spacing.sm, paddingBottom: spacing.xs}}>
+        {brand.isBranded && brand.logo.full ? (
+          <Image
+            source={{uri: brand.logo.full}}
+            style={{height: 36, width: 190}}
+            resizeMode="contain"
+          />
+        ) : (
+          <Image
+            source={wordmark}
+            style={{height: 50, width: 280}}
+            resizeMode="contain"
+          />
+        )}
+      </View>
       <HomeScreen {...props} />
     </SafeAreaView>
   );
@@ -245,10 +262,10 @@ export function MainTabNavigator() {
     <Tab.Navigator
       initialRouteName="HomeTab"
       tabBar={(props) => (
-        <View style={{backgroundColor: colors.background}}>
+        <SafeAreaView style={{backgroundColor: colors.background}} edges={['bottom']}>
           <PoweredByHotPick />
           <BottomTabBar {...props} />
-        </View>
+        </SafeAreaView>
       )}
       screenOptions={{
         headerShown: false,
@@ -290,24 +307,7 @@ export function MainTabNavigator() {
         options={{
           tabBarLabel: () => null,
           tabBarIcon: ({focused}) => (
-            <View style={{
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 64,
-              height: 64,
-              borderRadius: 32,
-              backgroundColor: focused ? colors.primary : colors.surface,
-              borderWidth: 2,
-              borderColor: colors.primary,
-              marginBottom: 10,
-              shadowColor: focused ? colors.primary : '#000',
-              shadowOffset: {width: 0, height: 4},
-              shadowOpacity: focused ? 0.35 : 0.15,
-              shadowRadius: 8,
-              elevation: focused ? 8 : 4,
-            }}>
-              <Home size={32} color={focused ? '#FFFFFF' : colors.textSecondary} />
-            </View>
+            <Target size={52} color={focused ? colors.primary : colors.textSecondary} strokeWidth={focused ? 2.5 : 1.5} style={{marginBottom: -14}} />
           ),
         }}
       />

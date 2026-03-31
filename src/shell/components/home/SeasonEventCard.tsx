@@ -250,11 +250,16 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
                       <Text style={styles.subCountdownValue}>{firstGameKickoff.timeLeft}</Text>
                     </View>
                   )}
+                  {poolMemberCount > 0 && (
+                    <Text style={styles.socialLine}>
+                      {poolPicksSubmittedCount} of {poolMemberCount} poolies have locked in
+                    </Text>
+                  )}
                 </>
               ) : weekState === 'locked' ? (
                 <Text style={styles.kickoffLabel}>Picks are locked</Text>
               ) : weekState === 'live' ? (
-                <Text style={styles.kickoffLabel}>Games in progress</Text>
+                <Text style={[styles.kickoffLabel, {color: '#1b9a06', fontWeight: '700', fontStyle: 'italic'}]}>Games in progress</Text>
               ) : weekState === 'settling' ? (
                 <Text style={styles.kickoffLabel}>Scores settling</Text>
               ) : (
@@ -265,11 +270,28 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
                   )}
                 </>
               )}
-              {/* HotPick game kickoff — shown when user has designated a HotPick */}
-              {hotPickKickoff.timeLeft && !hotPickKickoff.hasExpired && userHotPick && weekState === 'picks_open' && (
-                <View style={styles.subCountdownRow}>
-                  <Text style={styles.subCountdownLabel}>Your HotPick kicks off in:</Text>
-                  <Text style={styles.subCountdownValue}>{hotPickKickoff.timeLeft}</Text>
+              {/* HotPick game card — only during picks_open (LiveCard handles live state) */}
+              {weekState === 'picks_open' && userHotPick && userHotPickGame && (
+                <View style={styles.hotPickCard}>
+                  <View style={styles.hotPickHeader}>
+                    <Text style={styles.hotPickBadge}>
+                      HotPick {userHotPickGame.frozen_rank ?? userHotPickGame.rank ?? 0} pts
+                    </Text>
+                  </View>
+                  <Text style={styles.hotPickMatchup}>
+                    {userHotPickGame.away_team} @ {userHotPickGame.home_team}
+                  </Text>
+                  <View style={styles.hotPickPickedRow}>
+                    <Text style={styles.hotPickPickedLabel}>Your pick:</Text>
+                    <View style={styles.hotPickPickedBox}>
+                      <Text style={styles.hotPickPickedTeam}>{userHotPick.picked_team}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.hotPickKickoffTime}>
+                    {new Date(userHotPickGame.kickoff_at).toLocaleDateString([], {weekday: 'long'})}
+                    {', '}
+                    {new Date(userHotPickGame.kickoff_at).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'})}
+                  </Text>
                 </View>
               )}
             </View>
@@ -277,11 +299,11 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
         )}
       </View>
 
-      {/* Week Score — between pills and week state card */}
-      <WeekScoreModule />
+      {/* Week Score — between pills and week state card (hidden in PRE_SEASON) */}
+      {currentPhase !== 'PRE_SEASON' && <WeekScoreModule />}
 
-      {/* Week state content — outside the card box */}
-      {renderWeekState({
+      {/* Week state content — outside the card box (hidden in PRE_SEASON) */}
+      {currentPhase !== 'PRE_SEASON' && renderWeekState({
         weekState,
         currentWeek,
         picksDeadline,
@@ -376,9 +398,11 @@ function renderWeekState(props: {
       return (
         <CompleteCard
           currentWeek={props.currentWeek}
-          totalWeeks={props.totalWeeks}
-          poolStandings={props.poolStandings}
-          userId={props.userId}
+          weekPoints={props.weekResult?.weekPoints ?? 0}
+          correctPicks={props.weekResult?.correctPicks ?? 0}
+          totalPicks={props.weekResult?.totalPicks ?? 0}
+          hotPickCorrect={props.weekResult?.hotPickCorrect ?? null}
+          hotpickRank={props.userHotPickGame?.frozen_rank ?? props.userHotPickGame?.rank ?? null}
         />
       );
     default:
@@ -471,6 +495,65 @@ const createStyles = (colors: any) => StyleSheet.create({
     ...typography.small,
     fontWeight: '600',
     color: colors.textPrimary,
+  },
+  socialLine: {
+    ...typography.small,
+    color: colors.textSecondary,
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  hotPickCard: {
+    marginTop: spacing.sm,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    borderRadius: 8,
+    padding: spacing.sm,
+  },
+  hotPickHeader: {
+    flexDirection: 'row',
+    marginBottom: 4,
+  },
+  hotPickBadge: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    backgroundColor: colors.primary,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  hotPickMatchup: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  hotPickPickedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  hotPickPickedLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+  hotPickPickedBox: {
+    borderWidth: 1.5,
+    borderColor: colors.highlight,
+    borderRadius: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  hotPickPickedTeam: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.highlight,
+  },
+  hotPickKickoffTime: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 4,
   },
   poolSelector: {
     flexDirection: 'row',

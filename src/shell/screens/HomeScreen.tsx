@@ -61,7 +61,7 @@ export function HomeScreen({navigation}: any) {
     p => !p.is_global && p.competition === (activeSport?.competition ?? 'nfl_2026'),
   );
   const isSeasonOver = nflCurrentPhase === 'SEASON_COMPLETE';
-  const showJoinModule = !hasPrivatePool && !isSeasonOver;
+  const showJoinModule = (!hasPrivatePool || nflCurrentPhase === 'PRE_SEASON') && !isSeasonOver;
 
   // Event name + phase for header
   const eventName = activeSport
@@ -136,6 +136,17 @@ export function HomeScreen({navigation}: any) {
           <View style={styles.headerRight}>
             <Text style={styles.phaseLabel}>{phaseLabel}</Text>
             <Text style={[styles.eventName, {color: colors.highlight}]}>{eventName}</Text>
+            {(nflCurrentPhase === 'REGULAR' || nflCurrentPhase === 'PLAYOFFS' || nflCurrentPhase === 'SUPERBOWL') ? (
+              <Text style={[
+                styles.weekLabel,
+                {color: nflWeekState === 'picks_open' ? colors.highlight : colors.textSecondary},
+                nflWeekState !== 'picks_open' && {opacity: 0.5},
+              ]}>
+                WEEK {nflWeekState === 'complete' || nflWeekState === 'settling'
+                  ? useNFLStore.getState().currentWeek + 1
+                  : useNFLStore.getState().currentWeek}
+              </Text>
+            ) : null}
           </View>
         ) : null}
       </View>
@@ -162,13 +173,13 @@ export function HomeScreen({navigation}: any) {
           />
         ))}
 
+        {/* Join Pool Module — shown during PRE_SEASON or when user has no private pool */}
+        {showJoinModule && <JoinPoolModule />}
+
         {/* StandingsBadge — hidden until user has a private pool */}
         {cardsToShow.length > 0 && hasPrivatePool && (
           <StandingsBadge onPress={handleNavigateToBoard} />
         )}
-
-        {/* Join Pool Module — shown when user has no private pool, hidden during SEASON_COMPLETE */}
-        {showJoinModule && <JoinPoolModule />}
 
         {/* SmackTalkNudge — hidden until user has a private pool */}
         {cardsToShow.length > 0 && hasPrivatePool && (
@@ -317,6 +328,11 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 12,
     fontWeight: '400' as const,
     color: colors.textSecondary,
+  },
+  weekLabel: {
+    fontSize: 18,
+    fontWeight: '800' as const,
+    fontStyle: 'italic' as const,
   },
   settingsButton: {
     width: 40,

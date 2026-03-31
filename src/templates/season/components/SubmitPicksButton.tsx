@@ -10,13 +10,15 @@ interface SubmitPicksButtonProps {
   hotPickCount: number;
   hotPicksRequired: number;
   isWeekComplete: boolean;
+  allGamesLocked?: boolean;
   onSubmit: () => void;
   accentColor: string;
 }
 
-type SubmitState = 'no_picks' | 'needs_hotpick' | 'in_progress' | 'submitted';
+type SubmitState = 'locked' | 'no_picks' | 'needs_hotpick' | 'in_progress' | 'submitted';
 
 function getSubmitState(props: SubmitPicksButtonProps): SubmitState {
+  if (props.allGamesLocked) return 'locked';
   if (props.isWeekComplete) return 'submitted';
   if (props.pickCount === 0) return 'no_picks';
   if (props.hotPickCount < props.hotPicksRequired) return 'needs_hotpick';
@@ -43,6 +45,11 @@ export function SubmitPicksButton(props: SubmitPicksButtonProps) {
     SubmitState,
     {label: string; bgColor: string; enabled: boolean}
   > = {
+    locked: {
+      label: "THIS WEEK'S PICKS ARE LOCKED",
+      bgColor: colors.border,
+      enabled: false,
+    },
     no_picks: {
       label: 'Start picking your winners',
       bgColor: colors.border,
@@ -96,7 +103,7 @@ export function SubmitPicksButton(props: SubmitPicksButtonProps) {
             strokeWidth={2}
           />
         )}
-        <Text style={styles.buttonText}>{label}</Text>
+        <Text style={[styles.buttonText, state === 'in_progress' && {color: '#1A1A1A'}]}>{label}</Text>
       </TouchableOpacity>
     </View>
   );
