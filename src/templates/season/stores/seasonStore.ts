@@ -79,6 +79,10 @@ interface SeasonState {
   getPickCount: () => number;
   getHotPickCount: () => number;
   getUserScore: (userId: string) => SeasonLeaderboardEntry | undefined;
+
+  /** Subscribe to live score updates for the current week's games.
+   *  Patches individual game rows in place. Returns an unsubscribe fn. */
+  subscribeToGameScores: () => () => void;
 }
 
 export const useSeasonStore = create<SeasonState>((set, get) => ({
@@ -97,6 +101,11 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
   isWeekComplete: false,
 
   initialize: async (config, poolId) => {
+    // Skip if already initialized for this competition + pool
+    const state = get();
+    if (state.config?.competition === config.competition && state.poolId === poolId && state.currentWeek > 0) {
+      return;
+    }
     // Read current_week from competition_config (never hardcode)
     const {data: cfgRow} = await supabase
       .from('competition_config')
@@ -142,9 +151,13 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       return;
     }
 
-    // Return cached if available
+    // Return cached if available, unless any game is in progress (scores are live)
     const cached = get().allWeekGames[week];
-    if (cached) {
+    const hasLiveGame = cached?.some(g => {
+      const s = (g.status ?? '').toUpperCase();
+      return s === 'IN_PROGRESS' || s === 'LIVE';
+    });
+    if (cached && !hasLiveGame) {
       set({games: cached});
       return;
     }
@@ -328,17 +341,31 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
     // Regular season and playoffs are separate leaderboards.
     // Determine current phase from competition_config.
 
-    // Step 0: Read current_phase from competition_config
+    // Step 0: Read current_phase and week_state from competition_config
     const {data: cfgRows} = await supabase
       .from('competition_config')
-      .select('value')
+      .select('key, value')
       .eq('competition', config.competition)
-      .eq('key', 'current_phase')
-      .maybeSingle();
+      .in('key', ['current_phase', 'week_state', 'current_week']);
+
+    const cfgMap = Object.fromEntries(
+      (cfgRows ?? []).map((r: any) => [r.key, r.value]),
+    );
 
     const currentPhase =
-      typeof cfgRows?.value === 'string' ? cfgRows.value : 'REGULAR';
+      typeof cfgMap.current_phase === 'string' ? cfgMap.current_phase : 'REGULAR';
     const isPlayoffs = currentPhase !== 'REGULAR';
+
+    const weekState =
+      typeof cfgMap.week_state === 'string' ? cfgMap.week_state : null;
+    const weekInProgress =
+      weekState === 'picks_open' || weekState === 'locked' || weekState === 'live';
+
+    // Use the store's currentWeek (set during initialize) as the authoritative value.
+    // Fall back to competition_config current_week if the store hasn't initialised yet.
+    const currentWeek =
+      get().currentWeek ||
+      (typeof cfgMap.current_week === 'number' ? cfgMap.current_week : 1);
 
     // Step 1: Get ACTIVE pool member user IDs (never include removed/left)
     const {data: members} = await supabase
@@ -364,6 +391,11 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       query = query.neq('phase', 'REGULAR');
     } else {
       query = query.eq('phase', 'REGULAR');
+    }
+    // Exclude the current week while games are in progress.
+    // Season total only reflects fully settled weeks.
+    if (weekInProgress) {
+      query = query.neq('week', currentWeek);
     }
 
     const {data: totals} = await query;
@@ -472,17 +504,26 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
 
     const rows = (totals as DbSeasonUserTotal[]) ?? [];
 
-    // Step 3: Fetch HotPick picks for all members this week
-    const {data: hotPicks} = await supabase
-      .from('season_picks')
-      .select('user_id, picked_team, game_id, is_hotpick')
-      .eq('competition', config.competition)
-      .eq('week', targetWeek)
-      .eq('is_hotpick', true)
-      .in('user_id', memberIds);
+    // Step 3: Get HotPick data for ALL pool members via SECURITY DEFINER RPC.
+    // Direct season_picks query is blocked by RLS (SELECT WHERE user_id = auth.uid()),
+    // which means a plain .from('season_picks') call only returns the current user's
+    // picks — other members' HotPick rows are silently filtered out. The RPC bypasses
+    // RLS and returns every active member's hotpick pick for this week.
+    const {data: pickSubmissions} = await supabase
+      .rpc('get_pool_pick_submissions', {
+        p_pool_id: poolId,
+        p_competition: config.competition,
+        p_week: targetWeek,
+      });
 
-    // Step 4: Get game details for HotPick games
-    const hotPickGameIds = [...new Set((hotPicks ?? []).map(p => p.game_id))];
+    // Step 4: Fetch game details for all HotPick games from the RPC results
+    const hotPickGameIds = [
+      ...new Set(
+        (pickSubmissions ?? [])
+          .map((p: any) => p.hotpick_game_id)
+          .filter(Boolean),
+      ),
+    ];
     let gameMap: Record<string, DbSeasonGame> = {};
     if (hotPickGameIds.length > 0) {
       const {data: games} = await supabase
@@ -492,34 +533,35 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       if (games) {
         for (const g of games as DbSeasonGame[]) {
           gameMap[g.game_id] = g;
-          gameMap[g.id] = g; // fallback for UUID lookups
         }
       }
     }
 
-    // Step 5: Build hotpick lookup by user
-    const hotPickByUser: Record<string, {team: string; gameLabel: string}> = {};
-    for (const hp of hotPicks ?? []) {
-      const game = gameMap[hp.game_id];
+    // Step 5: Build hotpick lookup for ALL members from the RPC results.
+    // gameRank = frozen_rank (locked at pick deadline) ?? live rank — used as the
+    // badge number for users whose week hasn't scored yet (hotpick_rank in
+    // season_user_totals is only written during scoring).
+    const hotPickByUser: Record<
+      string,
+      {team: string; gameLabel: string; gameRank: number | null}
+    > = {};
+    for (const sub of pickSubmissions ?? []) {
+      if (!sub.hotpick_team || !sub.hotpick_game_id) continue;
+      const game = gameMap[sub.hotpick_game_id];
       if (game) {
-        hotPickByUser[hp.user_id] = {
-          team: hp.picked_team,
+        hotPickByUser[sub.user_id] = {
+          team: sub.hotpick_team,
           gameLabel: `${game.away_team} @ ${game.home_team}`,
+          gameRank: game.frozen_rank ?? game.rank ?? null,
         };
       }
     }
 
-    // Step 6: Find users who submitted picks but have no scores yet
-    // Uses SECURITY DEFINER RPC to bypass RLS (users can only see own picks)
+    // Step 6: Build week leaderboard entries — scored users first.
+    // hotpick_rank: prefer the value written by the scoring function
+    // (season_user_totals.hotpick_rank); fall back to the game's rank for
+    // weeks that haven't scored yet so the badge always shows.
     const scoredUserIds = new Set(rows.map(r => r.user_id));
-    const {data: pickSubmissions} = await supabase
-      .rpc('get_pool_pick_submissions', {
-        p_pool_id: poolId,
-        p_competition: config.competition,
-        p_week: targetWeek,
-      });
-
-    // Step 7: Build week leaderboard entries — scored users first
     const weekEntries: WeekLeaderboardEntry[] = rows.map(row => {
       const hp = hotPickByUser[row.user_id];
       return {
@@ -529,25 +571,24 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
         total_picks: row.total_picks,
         hotpick_team: hp?.team ?? null,
         hotpick_game_label: hp?.gameLabel ?? null,
-        hotpick_rank: row.hotpick_rank,
+        hotpick_rank: row.hotpick_rank ?? hp?.gameRank ?? null,
         is_hotpick_correct: row.is_hotpick_correct,
         submitted_at: null,
       };
     });
 
-    // Add unscored users who have submitted picks (with HotPick)
+    // Add unscored users who have submitted picks (present in RPC but not yet scored)
     for (const sub of pickSubmissions ?? []) {
       if (!scoredUserIds.has(sub.user_id)) {
         const hp = hotPickByUser[sub.user_id];
-        const game = sub.hotpick_game_id ? gameMap[sub.hotpick_game_id] : null;
         weekEntries.push({
           user_id: sub.user_id,
           week_points: 0,
           correct_picks: 0,
           total_picks: 0,
-          hotpick_team: sub.hotpick_team ?? hp?.team ?? null,
-          hotpick_game_label: game ? `${game.away_team} @ ${game.home_team}` : hp?.gameLabel ?? null,
-          hotpick_rank: null,
+          hotpick_team: hp?.team ?? null,
+          hotpick_game_label: hp?.gameLabel ?? null,
+          hotpick_rank: hp?.gameRank ?? null,
           is_hotpick_correct: null,
           submitted_at: sub.submitted_at,
         });
@@ -606,5 +647,40 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
   getUserScore: (userId: string) => {
     const {leaderboard} = get();
     return leaderboard.find(s => s.user_id === userId);
+  },
+
+  subscribeToGameScores: () => {
+    const {config, currentWeek} = get();
+    if (!config) return () => {};
+
+    const channel = supabase
+      .channel(`game-scores-${config.competition}-week${currentWeek}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'season_games',
+          filter: `competition=eq.${config.competition}`,
+        },
+        (payload: any) => {
+          const updated = payload.new as DbSeasonGame;
+          if (updated.week !== currentWeek) return;
+          set(state => {
+            const newGames = state.games.map(g =>
+              g.game_id === updated.game_id ? {...g, ...updated} : g,
+            );
+            return {
+              games: newGames,
+              allWeekGames: {...state.allWeekGames, [currentWeek]: newGames},
+            };
+          });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   },
 }));

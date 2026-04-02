@@ -1,203 +1,192 @@
 import React, {useState, useEffect} from 'react';
 import {View, Text, StyleSheet} from 'react-native';
-import {spacing, borderRadius, typography} from '@shared/theme';
+import {spacing, borderRadius} from '@shared/theme';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useTheme} from '@shell/theme';
 import {supabase} from '@shared/config/supabase';
 import {useAuth} from '@shared/hooks/useAuth';
 
+
 /**
- * WeekScoreModule — Current week score + potential max score.
+ * WeekScoreModule — Pts. Target (left) + PTS. EARNED (right).
  *
- * Shows previous week's finalized score until the current week has picks/scores.
- * During picks_open with no picks: shows last week's result.
- * During picks_open with picks: shows potential.
- * During live/settling: shows actual scored points.
+ * Mirrors the two-widget layout on the Picks page. PTS. EARNED subscribes
+ * to Realtime so it updates live as the scoring Edge Function writes each
+ * game result. Hidden during PRE_SEASON (gated by SeasonEventCard) and
+ * when weekState is complete (standings card covers that state).
  */
 export function WeekScoreModule() {
   const {colors} = useTheme();
   const styles = createStyles(colors);
   const weekState = useNFLStore(s => s.weekState);
   const currentWeek = useNFLStore(s => s.currentWeek);
+  const competition = useNFLStore(s => s.competition);
   const {user} = useAuth();
 
   const [potential, setPotential] = useState(0);
-  const [actualPoints, setActualPoints] = useState<number | null>(null);
   const [pickCount, setPickCount] = useState(0);
-  const [prevWeekPoints, setPrevWeekPoints] = useState<number | null>(null);
-  const [prevWeek, setPrevWeek] = useState(0);
+  const [weekEarned, setWeekEarned] = useState<number | null>(null);
 
+  // Fetch picks + games for Pts. Target, and initial weekEarned
   useEffect(() => {
-    if (!user?.id || !currentWeek || currentWeek === 0) return;
+    if (!user?.id || !currentWeek || currentWeek === 0 || !competition) return;
 
     const load = async () => {
-      // Fetch current week picks + games + scores
       const [{data: picks}, {data: games}, {data: totals}] = await Promise.all([
         supabase
           .from('season_picks')
           .select('game_id, is_hotpick')
           .eq('user_id', user.id)
-          .eq('competition', 'nfl_2026')
+          .eq('competition', competition)
           .eq('week', currentWeek),
         supabase
           .from('season_games')
           .select('game_id, rank, frozen_rank')
-          .eq('competition', 'nfl_2026')
+          .eq('competition', competition)
           .eq('week', currentWeek),
         supabase
           .from('season_user_totals')
           .select('week_points')
           .eq('user_id', user.id)
-          .eq('competition', 'nfl_2026')
+          .eq('competition', competition)
           .eq('week', currentWeek)
           .maybeSingle(),
       ]);
 
       setPickCount(picks?.length ?? 0);
-      setActualPoints(totals?.week_points ?? null);
+      setWeekEarned(totals?.week_points ?? null);
 
-      // Calculate potential from current picks
       let total = 0;
       for (const pick of picks ?? []) {
         const game = games?.find(g => g.game_id === pick.game_id);
         const rank = game?.frozen_rank ?? game?.rank ?? 1;
-        if (pick.is_hotpick) {
-          total += rank;
-        } else {
-          total += 1;
-        }
+        total += pick.is_hotpick ? rank : 1;
       }
       setPotential(total);
-
-      // If no current week picks, fetch previous week's score
-      if ((!picks || picks.length === 0) && currentWeek > 1) {
-        const {data: prevTotals} = await supabase
-          .from('season_user_totals')
-          .select('week_points, week')
-          .eq('user_id', user.id)
-          .eq('competition', 'nfl_2026')
-          .eq('week', currentWeek - 1)
-          .maybeSingle();
-
-        setPrevWeekPoints(prevTotals?.week_points ?? null);
-        setPrevWeek(currentWeek - 1);
-      } else {
-        setPrevWeekPoints(null);
-      }
     };
 
     load();
-  }, [user?.id, currentWeek, weekState]);
+  }, [user?.id, currentWeek, weekState, competition]);
 
-  // Hide when no state or PRE_SEASON
-  if (!weekState || currentWeek === 0) {
+  // Realtime: keep PTS. EARNED current as scoring Edge Function writes results
+  useEffect(() => {
+    if (!user?.id || !currentWeek || currentWeek === 0 || !competition) return;
+
+    const channel = supabase
+      .channel(`home_week_earned_${user.id}_${competition}_${currentWeek}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'season_user_totals',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload: any) => {
+          const row = payload.new;
+          if (row.competition === competition && row.week === currentWeek) {
+            setWeekEarned(row.week_points ?? null);
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, currentWeek, competition]);
+
+  // Hide when no week state, no week, no picks, or week is fully complete
+  if (!weekState || currentWeek === 0 || pickCount === 0 || weekState === 'complete') {
     return null;
   }
 
-  // Show previous week's score if no current week activity
-  if (pickCount === 0 && prevWeekPoints != null) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.row}>
-          <View style={styles.column}>
-            <Text style={styles.label}>WEEK {prevWeek} FINAL</Text>
-            <Text style={styles.scoreValue}>
-              {prevWeekPoints > 0 ? '+' : ''}{prevWeekPoints}
-              <Text style={styles.ptsLabel}> pts</Text>
+  const isSettled = weekState === 'settling';
+
+  return (
+    <>
+      <View style={styles.widgetRow}>
+        {/* Left — Pts. Target (switches to Final Score when settling) */}
+        <View style={styles.widget}>
+          <Text style={styles.widgetLabel}>
+            {isSettled && weekEarned != null ? 'Final Score' : 'Pts. Target'}
+          </Text>
+          <View style={styles.widgetValueRow}>
+            <Text style={[
+              styles.widgetValue,
+              isSettled && weekEarned != null
+                ? {color: weekEarned >= 0 ? '#1b9a06' : colors.error}
+                : pickCount > 0
+                  ? {color: colors.primary}
+                  : undefined,
+            ]}>
+              {isSettled && weekEarned != null
+                ? `${weekEarned >= 0 ? '+' : ''}${weekEarned}`
+                : `+${potential}`}
             </Text>
+            <Text style={styles.widgetPts}>pts</Text>
+          </View>
+        </View>
+
+        {/* Right — PTS. EARNED (live via Realtime) */}
+        <View style={styles.widget}>
+          <Text style={styles.widgetLabel}>PTS. EARNED</Text>
+          <View style={styles.widgetValueRow}>
+            <Text style={[
+              styles.widgetValue,
+              weekEarned != null && weekEarned > 0 && {color: '#1b9a06'},
+              weekEarned != null && weekEarned < 0 && {color: colors.error},
+            ]}>
+              {weekEarned == null
+                ? '0'
+                : weekEarned > 0
+                  ? `+${weekEarned}`
+                  : `${weekEarned}`}
+            </Text>
+            <Text style={styles.widgetPts}>pts</Text>
           </View>
         </View>
       </View>
-    );
-  }
 
-  // Hide during complete (scores in StandingsBadge) or no picks
-  if (weekState === 'complete' || pickCount === 0) {
-    return null;
-  }
-
-  const isScored = weekState === 'settling' || weekState === 'live';
-  const weekPoints = isScored && actualPoints != null ? actualPoints : 0;
-  const showPotential = weekState === 'picks_open' || weekState === 'locked';
-
-  return (
-    <View style={styles.container}>
-      <View style={styles.row}>
-        <View style={styles.column}>
-          <Text style={styles.label}>WEEK {currentWeek}</Text>
-          <Text style={styles.scoreValue}>
-            {weekPoints > 0 ? '+' : ''}{weekPoints}
-            <Text style={styles.ptsLabel}> pts</Text>
-          </Text>
-        </View>
-        <View style={[styles.column, styles.rightColumn]}>
-          <Text style={styles.label}>{showPotential ? 'POTENTIAL' : 'SCORED'}</Text>
-          <Text style={[styles.scoreValue, showPotential ? {color: colors.textSecondary} : {color: weekPoints >= 0 ? '#1b9a06' : colors.error}]}>
-            {showPotential ? `+${potential}` : weekPoints >= 0 ? `+${weekPoints}` : `${weekPoints}`}
-            <Text style={styles.ptsLabel}> pts</Text>
-          </Text>
-        </View>
-      </View>
-      {weekState === 'live' && (
-        <View style={styles.liveIndicator}>
-          <View style={[styles.liveDot, {backgroundColor: '#1b9a06'}]} />
-          <Text style={[styles.liveText, {color: '#1b9a06'}]}>Live</Text>
-        </View>
-      )}
-    </View>
+    </>
   );
 }
 
 const createStyles = (colors: any) => StyleSheet.create({
-  container: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
+  widgetRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
     marginTop: spacing.sm,
     marginBottom: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 4,
   },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  widget: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    padding: spacing.sm + 2,
     alignItems: 'center',
   },
-  column: {
-    flex: 1,
-  },
-  rightColumn: {
-    alignItems: 'flex-end',
-  },
-  label: {
+  widgetLabel: {
     fontSize: 11,
     fontWeight: '600',
-    letterSpacing: 0.5,
     color: colors.textSecondary,
+    letterSpacing: 0.5,
     marginBottom: 2,
+    textTransform: 'uppercase',
   },
-  scoreValue: {
+  widgetValueRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 3,
+  },
+  widgetValue: {
     fontSize: 22,
     fontWeight: '700',
     color: colors.textPrimary,
   },
-  ptsLabel: {
-    fontSize: 14,
+  widgetPts: {
+    fontSize: 13,
     fontWeight: '400',
     color: colors.textSecondary,
-  },
-  liveIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 4,
-  },
-  liveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  liveText: {
-    fontSize: 11,
-    fontWeight: '600',
   },
 });

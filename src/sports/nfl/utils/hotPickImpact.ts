@@ -68,8 +68,15 @@ export function getHotPickImpact(
   const userScore = userPickedHome ? score.homeScore : score.awayScore;
   const opponentScore = userPickedHome ? score.awayScore : score.homeScore;
 
-  // Check for final game status
-  if (score.status === 'STATUS_FINAL') {
+  // Check for final game status — normalize to lowercase to handle 'final', 'FINAL', 'status_final', etc.
+  // fetchLiveScores normalizes to lowercase, but guard here covers any future callers too.
+  const normalizedStatus = (score.status ?? '').toLowerCase();
+  const isFinalStatus =
+    normalizedStatus === 'final' ||
+    normalizedStatus === 'status_final' ||
+    normalizedStatus === 'completed' ||
+    normalizedStatus === 'status_final_overtime';
+  if (isFinalStatus) {
     const isCorrect = userScore > opponentScore;
     return {
       status: 'final',

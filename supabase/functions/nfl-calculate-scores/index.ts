@@ -8,7 +8,16 @@ const supabase = createClient(
 
 const BASE_WIN_POINTS = 1;
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { status: 200, headers: CORS_HEADERS });
+  }
   try {
     const body = await req.json().catch(() => ({}));
     const competition = body.competition ?? "nfl_2026";
@@ -115,6 +124,23 @@ async function scoreWeek(competition: string, seasonYear: number, week: number) 
   }
 
   const userAggs = Array.from(aggByUser.values());
+
+  // Write 0-rows for users who submitted picks this week but none match any final game yet.
+  // Without this, their season_user_totals row isn't created until one of their picked games
+  // becomes final — causing the pts-earned widget on the home screen to show "—" (null)
+  // for the entire time before their first game settles.
+  const scoredUserIds = new Set(userAggs.map((u) => u.user_id));
+  const picksUserIds = new Set((picks ?? []).map((p) => p.user_id));
+  for (const uid of picksUserIds) {
+    if (!scoredUserIds.has(uid)) {
+      userAggs.push({
+        user_id: uid, week_points: 0, correct_picks: 0,
+        total_picks: 0, is_hotpick_correct: null, hotpick_rank: null,
+        double_down_used: false, double_down_delta: 0,
+      });
+    }
+  }
+
   if (userAggs.length === 0) return { users_scored: 0, final_games: games.length };
 
   const userIds = userAggs.map((u) => u.user_id);
@@ -133,7 +159,7 @@ async function scoreWeek(competition: string, seasonYear: number, week: number) 
         week_points: u.week_points,
         playoff_points: week >= 19 ? u.week_points : 0,
         correct_picks: u.correct_picks, total_picks: u.total_picks,
-        is_hotpick_correct: u.is_hotpick_correct ?? false,
+        is_hotpick_correct: u.is_hotpick_correct,
         hotpick_rank: u.hotpick_rank, is_no_show: false,
         double_down_used: u.double_down_used, double_down_delta: u.double_down_delta,
         mulligan_used: mulliganMap.get(u.user_id) ?? false,
@@ -143,9 +169,12 @@ async function scoreWeek(competition: string, seasonYear: number, week: number) 
     );
 
   if (upsertError) return { users_scored: 0, final_games: games.length, error: upsertError.message };
-  return { users_scored: userAggs.length, final_games: games.length };
+  return { users_scored: scoredUserIds.size, final_games: games.length };
 }
 
 function json(body: unknown, status: number) {
-  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+  });
 }

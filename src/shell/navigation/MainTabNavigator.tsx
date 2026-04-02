@@ -1,6 +1,7 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {View, Text, Image, StyleSheet} from 'react-native';
+import {View, Text, Image, StyleSheet, TouchableOpacity} from 'react-native';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
+import type {BottomTabBarProps} from '@react-navigation/bottom-tabs';
 import {useNavigation} from '@react-navigation/native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {
@@ -214,6 +215,144 @@ function HomeTab(props: any) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// GroupedTabBar — custom tab bar that wraps Leaders + SmackTalk in one box
+// ---------------------------------------------------------------------------
+
+function GroupedTabBar({state, descriptors, navigation}: BottomTabBarProps) {
+  const {colors} = useTheme();
+  const s = groupedTabStyles(colors);
+
+  const onTabPress = (route: typeof state.routes[number], index: number) => {
+    const event = navigation.emit({
+      type: 'tabPress',
+      target: route.key,
+      canPreventDefault: true,
+    });
+    if (state.index !== index && !event.defaultPrevented) {
+      navigation.navigate(route.name as any);
+    }
+  };
+
+  const renderTabContent = (route: typeof state.routes[number], index: number) => {
+    const {options} = descriptors[route.key];
+    const isFocused = state.index === index;
+    const color = isFocused ? colors.primary : colors.textSecondary;
+
+    const icon = options.tabBarIcon?.({focused: isFocused, color, size: 24});
+
+    const labelDef = options.tabBarLabel;
+    const label = (() => {
+      if (!labelDef) return null;
+      if (typeof labelDef === 'string') return labelDef;
+      if (typeof labelDef === 'function') {
+        const r = labelDef({focused: isFocused, color, position: 'below-icon', children: ''});
+        return typeof r === 'string' ? r : null;
+      }
+      return null;
+    })();
+
+    return (
+      <>
+        {icon}
+        {label ? <Text style={[s.label, {color}]}>{label}</Text> : null}
+      </>
+    );
+  };
+
+  // Tab indices: 0=Home, 1=Games, 2=Leaders, 3=SmackTalk, 4+=History/Settings
+  const leading = state.routes.slice(0, 2);
+  const grouped = state.routes.slice(2, 4);   // Leaders + SmackTalk — always indices 2 & 3
+  const trailing = state.routes.slice(4);
+
+  return (
+    <View style={[s.bar, {backgroundColor: colors.background, borderTopColor: colors.border}]}>
+      {leading.map((route, i) => (
+        <TouchableOpacity
+          key={route.key}
+          onPress={() => onTabPress(route, i)}
+          style={i === 0 ? s.tabHome : s.tab}
+          accessibilityRole="button"
+          accessibilityState={state.index === i ? {selected: true} : {}}>
+          {renderTabContent(route, i)}
+        </TouchableOpacity>
+      ))}
+
+      {/* Underline spanning Leaders + SmackTalk */}
+      <View style={[s.groupBox, {borderBottomColor: colors.border}]}>
+        {grouped.map((route, i) => {
+          const index = i + 2;
+          return (
+            <TouchableOpacity
+              key={route.key}
+              onPress={() => onTabPress(route, index)}
+              style={s.groupTab}
+              accessibilityRole="button"
+              accessibilityState={state.index === index ? {selected: true} : {}}>
+              {renderTabContent(route, index)}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {trailing.map((route, i) => {
+        const index = i + 4;
+        return (
+          <TouchableOpacity
+            key={route.key}
+            onPress={() => onTabPress(route, index)}
+            style={s.tab}
+            accessibilityRole="button"
+            accessibilityState={state.index === index ? {selected: true} : {}}>
+            {renderTabContent(route, index)}
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+const groupedTabStyles = (colors: any) => StyleSheet.create({
+  bar: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    borderTopWidth: 1,
+    height: 56,
+  },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: 10,
+    paddingBottom: 4,
+  },
+  tabHome: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingLeft: 8,
+    paddingBottom: 6,
+  },
+  groupBox: {
+    flex: 2,
+    flexDirection: 'row',
+    borderBottomWidth: 3,
+    marginHorizontal: 2,
+  },
+  groupTab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: 10,
+    paddingBottom: 4,
+  },
+  label: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+});
+
 /**
  * MainTabNavigator — Persistent bottom tab bar across the entire app.
  *
@@ -256,7 +395,7 @@ export function MainTabNavigator() {
         seasonInitialize(activeSport, activePoolId);
       }
     }
-  }, [activeSport, activePoolId, seasonInitialize, seasonConfig]);
+  }, [activeSport?.competition, activePoolId, seasonInitialize, seasonConfig?.competition]);
 
   return (
     <Tab.Navigator
@@ -264,7 +403,7 @@ export function MainTabNavigator() {
       tabBar={(props) => (
         <SafeAreaView style={{backgroundColor: colors.background}} edges={['bottom']}>
           <PoweredByHotPick />
-          <BottomTabBar {...props} />
+          <GroupedTabBar {...props} />
         </SafeAreaView>
       )}
       screenOptions={{
@@ -282,10 +421,20 @@ export function MainTabNavigator() {
         },
       }}>
       <Tab.Screen
+        name="HomeTab"
+        component={HomeTab}
+        options={{
+          tabBarLabel: () => null,
+          tabBarIcon: ({focused}) => (
+            <Target size={65} color={focused ? colors.primary : colors.textSecondary} strokeWidth={focused ? 2.5 : 1.5} style={{marginBottom: 0}} />
+          ),
+        }}
+      />
+      <Tab.Screen
         name="PicksTab"
         component={PicksTab}
         options={{
-          tabBarLabel: 'Picks',
+          tabBarLabel: 'Games',
           tabBarIcon: ({color, size}) => (
             <CheckCircle size={size} color={color} />
           ),
@@ -298,16 +447,6 @@ export function MainTabNavigator() {
           tabBarLabel: 'Leaders',
           tabBarIcon: ({color, size}) => (
             <BarChart2 size={size} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="HomeTab"
-        component={HomeTab}
-        options={{
-          tabBarLabel: () => null,
-          tabBarIcon: ({focused}) => (
-            <Target size={52} color={focused ? colors.primary : colors.textSecondary} strokeWidth={focused ? 2.5 : 1.5} style={{marginBottom: -14}} />
           ),
         }}
       />

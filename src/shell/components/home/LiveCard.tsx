@@ -53,6 +53,26 @@ export function LiveCard({
   const isHotPickLive = hotPickStatus === 'IN_PROGRESS' || hotPickStatus === 'LIVE';
   const isHotPickFinal = hotPickStatus === 'FINAL' || hotPickStatus === 'COMPLETED';
 
+  // When game is final but live scores subscription has dropped it,
+  // fall back to scores stored on the game record itself.
+  const awayScoreDisplay: number | null =
+    hotPickScore?.awayScore ?? (isHotPickFinal ? (userHotPickGame?.away_score ?? null) : null);
+  const homeScoreDisplay: number | null =
+    hotPickScore?.homeScore ?? (isHotPickFinal ? (userHotPickGame?.home_score ?? null) : null);
+  const hasDisplayScores = awayScoreDisplay != null || homeScoreDisplay != null;
+
+  // Winning team: from liveScores status or from winner_team on the game record
+  const awayWinner = isHotPickFinal && userHotPickGame
+    ? (userHotPickGame.winner_team
+        ? userHotPickGame.winner_team === userHotPickGame.away_team
+        : (awayScoreDisplay ?? 0) > (homeScoreDisplay ?? 0))
+    : false;
+  const homeWinner = isHotPickFinal && userHotPickGame
+    ? (userHotPickGame.winner_team
+        ? userHotPickGame.winner_team === userHotPickGame.home_team
+        : (homeScoreDisplay ?? 0) > (awayScoreDisplay ?? 0))
+    : false;
+
   const [minutesUntilKickoff, setMinutesUntilKickoff] = useState<number | null>(null);
   useEffect(() => {
     if (!kickoffAt) return;
@@ -65,79 +85,126 @@ export function LiveCard({
     return () => clearInterval(interval);
   }, [kickoffAt?.getTime()]);
 
-  // Compute point impact when all data is available
-  const impact: HotPickImpact | null =
+  // Compute point impact — prefer live score data, fall back to game record for final games
+  const liveImpact: HotPickImpact | null =
     userHotPick && userHotPickGame
       ? getHotPickImpact(userHotPick, userHotPickGame, hotPickScore ?? undefined)
       : null;
 
+  // When game is final and live scores are gone, compute outcome directly from game record
+  const gameRecordImpact: HotPickImpact | null = (() => {
+    if (!isHotPickFinal || !userHotPick || !userHotPickGame) return null;
+    if (!userHotPickGame.frozen_rank) return null;
+    const rank = userHotPickGame.frozen_rank;
+    if (userHotPickGame.winner_team) {
+      const isCorrect = userHotPickGame.winner_team === userHotPick.picked_team;
+      return {status: 'final', points: isCorrect ? rank : -rank, isCorrect};
+    }
+    if (awayScoreDisplay != null && homeScoreDisplay != null) {
+      const userPickedHome = userHotPick.picked_team === userHotPickGame.home_team;
+      const userScore = userPickedHome ? homeScoreDisplay : awayScoreDisplay;
+      const oppScore = userPickedHome ? awayScoreDisplay : homeScoreDisplay;
+      const isCorrect = userScore > oppScore;
+      return {status: 'final', points: isCorrect ? rank : -rank, isCorrect};
+    }
+    return null;
+  })();
+
+  const impact = (liveImpact?.status !== 'unavailable' ? liveImpact : null) ?? gameRecordImpact;
+
   return (
     <View style={styles.container}>
-      <View style={styles.liveIndicator}>
-        <View style={styles.liveDot} />
-        <Text style={styles.liveText}>Games in progress</Text>
-      </View>
-
       {userHotPick && userHotPickGame ? (
         <View style={[styles.hotPickSection, isHotPickLive && styles.hotPickSectionLive]}>
           {/* Header */}
-          <Text style={styles.hotPickLabel}>Your HotPick</Text>
-
-          {/* Matchup: rank AWAY @ HOME with picked team boxed */}
-          <View style={styles.matchupRow}>
-            <View style={styles.rankCircle}>
-              <Text style={styles.rankNumber}>
-                {userHotPickGame.frozen_rank ?? userHotPickGame.rank ?? 0}
-              </Text>
+          <View style={styles.hotPickHeader}>
+            <View style={styles.hotPickLabelRow}>
+              <Text style={styles.hotPickLabel}>Your HotPick</Text>
+              {isHotPickLive && (
+                <Text style={styles.inProgressBadge}>LIVE</Text>
+              )}
             </View>
-            {userHotPick.picked_team === userHotPickGame.away_team ? (
-              <View style={styles.pickedBox}>
-                <Text style={styles.pickedBoxText}>{getTeamName(userHotPickGame.away_team)}</Text>
+            {impact && <ImpactLine impact={impact} />}
+          </View>
+
+          {/* Matchup + clock: left side has rank + teams/scores, right side has clock anchored to bottom */}
+          <View style={styles.matchupWithImpact}>
+            <View style={styles.matchupRow}>
+              <View style={styles.rankCircle}>
+                <Text style={styles.rankNumber}>
+                  {userHotPickGame.frozen_rank ?? userHotPickGame.rank ?? 0}
+                </Text>
               </View>
-            ) : (
-              <Text style={styles.matchupTeam}>{getTeamName(userHotPickGame.away_team)}</Text>
-            )}
-            <Text style={styles.matchupAt}>@</Text>
-            {userHotPick.picked_team === userHotPickGame.home_team ? (
-              <View style={styles.pickedBox}>
-                <Text style={styles.pickedBoxText}>{getTeamName(userHotPickGame.home_team)}</Text>
+              <View style={styles.teamsStack}>
+                {/* Names column */}
+                <View style={styles.teamNamesCol}>
+                  {userHotPick.picked_team === userHotPickGame.away_team ? (
+                    <View style={styles.pickedBox}>
+                      <Text style={styles.pickedBoxText}>{getTeamName(userHotPickGame.away_team)}</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.matchupTeam}>{getTeamName(userHotPickGame.away_team)}</Text>
+                  )}
+                  {userHotPick.picked_team === userHotPickGame.home_team ? (
+                    <View style={styles.pickedBox}>
+                      <Text style={styles.pickedBoxText}>{getTeamName(userHotPickGame.home_team)}</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.matchupTeam}>{getTeamName(userHotPickGame.home_team)}</Text>
+                  )}
+                </View>
+                {/* Scores column — live scores or final game scores */}
+                {(hotPickScore || hasDisplayScores) && (
+                  <View style={styles.scoresCol}>
+                    <Text style={[
+                      styles.inlineScore,
+                      awayWinner && styles.inlineScoreWinner,
+                    ]}>
+                      {awayScoreDisplay ?? '—'}
+                    </Text>
+                    <Text style={[
+                      styles.inlineScore,
+                      homeWinner && styles.inlineScoreWinner,
+                    ]}>
+                      {homeScoreDisplay ?? '—'}
+                    </Text>
+                  </View>
+                )}
+                {/* Game clock — right of scores during live, FINAL badge after */}
+                {isHotPickLive && hotPickScore?.currentPeriod != null && hotPickScore ? (
+                  <Text style={styles.inProgressClock}>
+                    Q{hotPickScore.currentPeriod}{hotPickScore.gameClock ? ` ${hotPickScore.gameClock}` : ''}
+                  </Text>
+                ) : isHotPickFinal ? (
+                  <Text style={styles.finalLabel}>FINAL</Text>
+                ) : null}
               </View>
-            ) : (
-              <Text style={styles.matchupTeam}>{getTeamName(userHotPickGame.home_team)}</Text>
+            </View>
+
+            {/* Game clock fallback — bottom-right when liveScores not yet populated */}
+            {isHotPickLive && !hotPickScore && userHotPickGame.current_period != null && (
+              <View style={styles.impactCorner}>
+                <Text style={styles.inProgressClock}>
+                  Q{userHotPickGame.current_period}{userHotPickGame.game_clock ? ` ${userHotPickGame.game_clock}` : ''}
+                </Text>
+              </View>
             )}
           </View>
 
-          {/* Kickoff status / countdown */}
-          {isHotPickLive ? (
-            <Text style={styles.inProgressText}>IN PROGRESS</Text>
-          ) : minutesUntilKickoff != null && minutesUntilKickoff > 0 && minutesUntilKickoff <= 60 ? (
-            <Text style={styles.countdownText}>
-              Kickoff in {minutesUntilKickoff} min
-            </Text>
-          ) : (
-            <Text style={styles.kickoffTime}>
-              {new Date(userHotPickGame.kickoff_at).toLocaleDateString([], {weekday: 'long'})}
-              {', '}
-              {new Date(userHotPickGame.kickoff_at).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'})}
-            </Text>
+          {/* Kickoff status / countdown — hide when live or final (FINAL shown inline) */}
+          {!isHotPickLive && !isHotPickFinal && (
+            minutesUntilKickoff != null && minutesUntilKickoff > 0 && minutesUntilKickoff <= 60 ? (
+              <Text style={styles.countdownText}>
+                Kickoff in {minutesUntilKickoff} min
+              </Text>
+            ) : (
+              <Text style={styles.kickoffTime}>
+                {new Date(userHotPickGame.kickoff_at).toLocaleDateString([], {weekday: 'long'})}
+                {', '}
+                {new Date(userHotPickGame.kickoff_at).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'})}
+              </Text>
+            )
           )}
-
-          {/* Live score */}
-          {hotPickScore && (
-            <Text style={styles.liveScore}>
-              {getTeamName(userHotPickGame.away_team)} {hotPickScore.awayScore ?? '—'} — {hotPickScore.homeScore ?? '—'} {getTeamName(userHotPickGame.home_team)}
-            </Text>
-          )}
-
-          {/* Game clock */}
-          {hotPickScore?.gameClock && (
-            <Text style={styles.clock}>
-              Q{hotPickScore.currentPeriod} {hotPickScore.gameClock}
-            </Text>
-          )}
-
-          {/* Point impact line */}
-          {impact && <ImpactLine impact={impact} />}
 
           {/* HotPick concentration — how many poolmates chose this game */}
           {hotPickGameStats && hotPickGameStats.hotpickTotal > 0 && (
@@ -175,7 +242,7 @@ function ImpactLine({impact}: {impact: HotPickImpact}) {
   switch (impact.status) {
     case 'winning':
       return (
-        <Text style={[styles.impactText, {color: colors.success}]}>
+        <Text style={[styles.impactText, {color: '#1B9A06'}]}>
           +{impact.points} if this holds {'\uD83D\uDD25'}
         </Text>
       );
@@ -189,15 +256,15 @@ function ImpactLine({impact}: {impact: HotPickImpact}) {
 
     case 'tied':
       return (
-        <Text style={[styles.impactText, {color: colors.warning}]}>
-          +{impact.points} or {'\u2212'}{impact.points} — game tied {'\u2696\uFE0F'}
+        <Text style={[styles.impactText, {color: colors.textPrimary}]}>
+          It's still a tossup!
         </Text>
       );
 
     case 'final':
       return (
-        <Text style={[styles.impactText, {color: colors.textSecondary}]}>
-          Game final — scoring shortly {'\u23F3'}
+        <Text style={[styles.impactText, {color: impact.isCorrect ? '#1B9A06' : colors.error}]}>
+          {impact.isCorrect ? `+${impact.points} \u2705` : `\u2212${impact.points} \u274C`}
         </Text>
       );
 
@@ -212,7 +279,8 @@ function ImpactLine({impact}: {impact: HotPickImpact}) {
 
 const createStyles = (colors: any) => StyleSheet.create({
   container: {
-    padding: spacing.md,
+    paddingTop: 0,
+    paddingBottom: spacing.xs,
   },
   label: {
     ...typography.small,
@@ -221,27 +289,11 @@ const createStyles = (colors: any) => StyleSheet.create({
     letterSpacing: 1,
     marginBottom: spacing.xs,
   },
-  liveIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  liveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.error,
-  },
-  liveText: {
-    ...typography.caption,
-    color: colors.error,
-    fontWeight: '600',
-  },
   hotPickSection: {
     backgroundColor: colors.surface,
-    borderRadius: 8,
-    padding: spacing.md,
+    borderRadius: 12,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
   },
   hotPickSectionLive: {
     borderWidth: 2,
@@ -253,11 +305,32 @@ const createStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.xs,
   },
+  hotPickHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
   hotPickLabel: {
     fontSize: 16,
     fontWeight: '700',
     color: colors.textPrimary,
-    marginBottom: spacing.sm,
+  },
+  hotPickLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  inProgressBadge: {
+    fontSize: 18,
+    fontWeight: '800',
+    fontStyle: 'italic',
+    color: colors.primary,
+  },
+  inProgressClock: {
+    fontSize: 16,
+    fontWeight: '400',
+    color: colors.textSecondary,
   },
   rankBadge: {
     backgroundColor: colors.highlight + '15',
@@ -270,36 +343,69 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.highlight,
     fontWeight: '600',
   },
+  matchupWithImpact: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    marginBottom: 2,
+  },
   matchupRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 4,
+    flex: 1,
+  },
+  impactCorner: {
+    alignItems: 'flex-end',
+  },
+  teamsStack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  teamNamesCol: {
+    gap: 2,
+  },
+  scoresCol: {
+    gap: 2,
+    alignItems: 'flex-end',
   },
   rankCircle: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   rankNumber: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '900',
     color: '#FFFFFF',
   },
   matchupTeam: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: colors.textPrimary,
     textTransform: 'uppercase',
   },
-  matchupAt: {
-    fontSize: 14,
+  inlineScore: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    fontVariant: ['tabular-nums'],
+  },
+  inlineScoreWinner: {
+    color: '#1B9A06',
+  },
+  finalLabel: {
+    fontSize: 13,
+    fontWeight: '700',
     color: colors.textSecondary,
+    letterSpacing: 0.5,
   },
   pickedBox: {
+    alignSelf: 'flex-start',
     borderWidth: 2,
     borderColor: colors.highlight,
     borderRadius: 4,
@@ -307,7 +413,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     paddingVertical: 2,
   },
   pickedBoxText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: colors.highlight,
     textTransform: 'uppercase',
@@ -324,26 +430,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontStyle: 'italic',
     color: '#1b9a06',
     marginLeft: 38,
-    marginBottom: spacing.sm,
-  },
-  inProgressText: {
-    fontSize: 16,
-    fontWeight: '700',
-    fontStyle: 'italic',
-    color: colors.primary,
-    marginLeft: 38,
-    marginBottom: spacing.sm,
-  },
-  liveScore: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    textAlign: 'center',
-    marginBottom: 2,
-  },
-  clock: {
-    ...typography.caption,
-    color: colors.textSecondary,
     marginBottom: spacing.sm,
   },
   impactText: {

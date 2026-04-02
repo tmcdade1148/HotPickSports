@@ -1,18 +1,12 @@
 import React, {useState, useEffect} from 'react';
-import {View, Text, TouchableOpacity, StyleSheet, LayoutAnimation, Platform, UIManager} from 'react-native';
+import {View, Text, TouchableOpacity, StyleSheet, LayoutAnimation} from 'react-native';
 import {ChevronRight, ChevronDown, ChevronUp} from 'lucide-react-native';
 import {spacing, borderRadius, typography} from '@shared/theme';
 import {useGlobalStore} from '@shell/stores/globalStore';
+import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useTheme} from '@shell/theme';
 import {useAuth} from '@shared/hooks/useAuth';
 import {supabase} from '@shared/config/supabase';
-
-if (
-  Platform.OS === 'android' &&
-  UIManager.setLayoutAnimationEnabledExperimental
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 interface PoolRankData {
   rank: number;
@@ -36,6 +30,9 @@ export function StandingsBadge({onPress}: StandingsBadgeProps) {
   const styles = createStyles(colors);
   const {user} = useAuth();
 
+  const competition = useNFLStore(s => s.competition);
+  const currentWeek = useNFLStore(s => s.currentWeek);
+  const weekState = useNFLStore(s => s.weekState);
   const visiblePools = useGlobalStore(s => s.visiblePools);
   const activePoolId = useGlobalStore(s => s.activePoolId);
   const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
@@ -63,12 +60,22 @@ export function StandingsBadge({onPress}: StandingsBadgeProps) {
 
         const memberIds = members.map(m => m.user_id);
 
-        // Get season totals for all members
-        const {data: totals} = await supabase
+        // Exclude the current week while games are in progress —
+        // season rank only reflects fully settled weeks.
+        const weekInProgress =
+          weekState === 'picks_open' || weekState === 'locked' || weekState === 'live';
+
+        let totalsQuery = supabase
           .from('season_user_totals')
           .select('user_id, week_points')
-          .eq('competition', 'nfl_2026')
+          .eq('competition', competition)
           .in('user_id', memberIds);
+
+        if (weekInProgress) {
+          totalsQuery = totalsQuery.neq('week', currentWeek);
+        }
+
+        const {data: totals} = await totalsQuery;
 
         // Sum points per user
         const pointsByUser: Record<string, number> = {};
@@ -76,11 +83,16 @@ export function StandingsBadge({onPress}: StandingsBadgeProps) {
           pointsByUser[t.user_id] = (pointsByUser[t.user_id] ?? 0) + t.week_points;
         }
 
-        // Sort by points descending to determine rank
-        const sorted = Object.entries(pointsByUser)
-          .sort(([, a], [, b]) => b - a);
+        // No scores yet (picks just opened) — leave undefined so "TBD" shows
+        const anyScored = Object.values(pointsByUser).some(p => p > 0);
+        if (!anyScored) continue;
 
-        const myIndex = sorted.findIndex(([uid]) => uid === user.id);
+        // Build full standings including members with 0 points
+        const sorted = memberIds
+          .map(uid => ({uid, pts: pointsByUser[uid] ?? 0}))
+          .sort((a, b) => b.pts - a.pts);
+
+        const myIndex = sorted.findIndex(e => e.uid === user.id);
         const myPoints = pointsByUser[user.id] ?? 0;
 
         ranks[pool.id] = {
@@ -94,7 +106,7 @@ export function StandingsBadge({onPress}: StandingsBadgeProps) {
     };
 
     fetchRanks();
-  }, [user?.id, visiblePools.length]);
+  }, [user?.id, visiblePools.length, competition, currentWeek, weekState]);
 
   if (visiblePools.length === 0) return null;
 
@@ -212,7 +224,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: colors.textPrimary,
-    marginBottom: spacing.sm,
+    marginBottom: 4,
   },
   poolRow: {
     flexDirection: 'row',

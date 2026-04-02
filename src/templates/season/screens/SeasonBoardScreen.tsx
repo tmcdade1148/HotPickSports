@@ -46,6 +46,7 @@ export function SeasonBoardScreen() {
   const {user} = useAuth();
 
   const pathBackNarrative = useNFLStore(s => s.pathBackNarrative);
+  const weekState = useNFLStore(s => s.weekState);
   const activePoolId = useGlobalStore(s => s.activePoolId);
 
   const [activeTab, setActiveTab] = useState<'season' | 'week'>('season');
@@ -237,6 +238,12 @@ export function SeasonBoardScreen() {
                     ) : (
                       <Text style={styles.hotpickTeamText}>{home}</Text>
                     )}
+                    {item.is_hotpick_correct === true && (
+                      <Text style={styles.hotpickResult}>{'\u2705'}</Text>
+                    )}
+                    {item.is_hotpick_correct === false && (
+                      <Text style={styles.hotpickResult}>{'\u274C'}</Text>
+                    )}
                   </View>
                 );
               })()}
@@ -295,7 +302,10 @@ export function SeasonBoardScreen() {
               {leaderboard.length === 0 ? (
                 <View style={styles.emptyState}>
                   <Text style={styles.emptyText}>
-                    Scores will appear here once games are completed.
+                    {currentWeek === 1 &&
+                      (weekState === 'picks_open' || weekState === 'locked' || weekState === 'live')
+                      ? 'The season leaderboard updates after all Week 1 scores are in.'
+                      : 'Scores will appear here once games are completed.'}
                   </Text>
                 </View>
               ) : (
@@ -395,7 +405,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     padding: spacing.md,
     backgroundColor: colors.surface,
     borderRadius: borderRadius.md,
@@ -408,7 +418,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   pinnedRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     padding: spacing.md,
     backgroundColor: colors.surface,
     borderTopWidth: 1,
@@ -421,6 +431,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: '700',
     color: colors.primary,
     textAlign: 'center',
+    paddingTop: 2,
   },
   userInfo: {
     flex: 1,
@@ -469,6 +480,10 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 10,
     color: colors.textSecondary,
   },
+  hotpickResult: {
+    fontSize: 12,
+    marginLeft: 3,
+  },
   hotpickPickedBox: {
     borderWidth: 1.5,
     borderColor: colors.highlight,
@@ -485,6 +500,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: colors.textPrimary,
+    paddingTop: 2,
   },
   textHighlight: {
     color: colors.primary,

@@ -137,11 +137,7 @@ export function HomeScreen({navigation}: any) {
             <Text style={styles.phaseLabel}>{phaseLabel}</Text>
             <Text style={[styles.eventName, {color: colors.highlight}]}>{eventName}</Text>
             {(nflCurrentPhase === 'REGULAR' || nflCurrentPhase === 'PLAYOFFS' || nflCurrentPhase === 'SUPERBOWL') ? (
-              <Text style={[
-                styles.weekLabel,
-                {color: nflWeekState === 'picks_open' ? colors.highlight : colors.textSecondary},
-                nflWeekState !== 'picks_open' && {opacity: 0.5},
-              ]}>
+              <Text style={[styles.weekLabel, {color: colors.highlight}]}>
                 WEEK {nflWeekState === 'complete' || nflWeekState === 'settling'
                   ? useNFLStore.getState().currentWeek + 1
                   : useNFLStore.getState().currentWeek}
@@ -165,6 +161,9 @@ export function HomeScreen({navigation}: any) {
           }}
         />
 
+        {/* Hardware Module — directly above the event card / picks CTA */}
+        <HardwareModule onPress={() => navigation.navigate('HistoryTab')} />
+
         {cardsToShow.map(config => (
           <EventCardForConfig
             key={config.competition}
@@ -176,8 +175,8 @@ export function HomeScreen({navigation}: any) {
         {/* Join Pool Module — shown during PRE_SEASON or when user has no private pool */}
         {showJoinModule && <JoinPoolModule />}
 
-        {/* StandingsBadge — hidden until user has a private pool */}
-        {cardsToShow.length > 0 && hasPrivatePool && (
+        {/* StandingsBadge — hidden during PRE_SEASON and until user has a private pool */}
+        {cardsToShow.length > 0 && hasPrivatePool && nflCurrentPhase !== 'PRE_SEASON' && (
           <StandingsBadge onPress={handleNavigateToBoard} />
         )}
 
@@ -188,9 +187,6 @@ export function HomeScreen({navigation}: any) {
             onPressPool={handleNavigateToSmackTalkPool}
           />
         )}
-
-        {/* Hardware Module — latest award earned */}
-        <HardwareModule onPress={() => navigation.navigate('HistoryTab')} />
 
         {cardsToShow.length === 0 && (
           <View style={styles.emptyState}>
@@ -296,7 +292,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xs,
     paddingBottom: spacing.md,
@@ -325,7 +321,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     textTransform: 'uppercase',
   },
   phaseLabel: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '400' as const,
     color: colors.textSecondary,
   },

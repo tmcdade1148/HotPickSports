@@ -45,7 +45,7 @@ Never suggest designs that tie picks or scores to a pool_id.**
 - Push notifications: expo-notifications SDK, process-notification-queue Edge Function (cron 60s)
 - Notification preferences: 8 toggleable types per user, enforced server-side before delivery
 - Account deletion: two-step confirmation, anonymize_deleted_user() RPC, satisfies Apple/Google
-- TOS checkbox: explicit acceptance required before auth, writes tos_accepted_at + tos_version
+- TOS: implied-consent text on login screen (no checkbox), rpc_accept_tos called once for new users post-auth, TOS Version Gate screen for returning users when current_tos_version is bumped
 - User blocking: platform-wide via user_blocks table, long-press Block in SmackTalk
 - Community Guidelines screen linked from Settings
 - E2E test suite: 48 tests (40 pass, 6 fixed, 2 skipped for full-game-week data)
@@ -53,6 +53,13 @@ Never suggest designs that tie picks or scores to a pool_id.**
 - ESPN health monitor: `espn-health-check` Edge Function (hourly cron), push alert to super_admin on failure
 - Season simulator: `season-simulator` Edge Function, replays 2025 data through 2026 pipeline
 - Security: RLS on all tables, search_path set on all functions, Postgres 17.6.1.084
+- Season total frozen during active week: `seasonStore.fetchLeaderboard`, `nflStore.fetchPoolStandings`, `nflStore.fetchUserSeasonScore`, and `StandingsBadge.fetchRanks` all exclude `currentWeek` when `weekState` is `picks_open | locked | live`. Season total only reflects fully settled weeks.
+- `fetchUserPickStatus` effective total: denominator = picked games + unpicked scheduled games only. Unpicked locked/live/final games are excluded so "X of Y picked" never shows an unachievable target.
+- `nfl-calculate-scores` v12: `is_hotpick_correct` written as `null` until the hotpick game reaches FINAL. Previous `?? false` fallback was coercing null → false on every upsert, causing ❌ to appear on unplayed games.
+- Bottom nav bar: Dashboard (Target icon) is **far left tab**. "Picks" tab renamed to "Games". Leaders + SmackTalk share a single underline via custom `GroupedTabBar` component in `MainTabNavigator.tsx`. `GroupedTabBar` replaces `BottomTabBar` to allow the shared underline grouping.
+- Week-side leaderboard: ✅/❌ shown next to each user's hotpick game only when `is_hotpick_correct` is `true`/`false` (never when `null` — game not yet final).
+- Season leaderboard Week 1 empty state: shows "The season leaderboard updates after all Week 1 scores are in." when `currentWeek === 1` and week is in progress.
+- Home screen header: `alignItems: 'flex-start'` so greeting aligns with phase label and user name aligns with event name. Both first-line labels are `fontSize: 14`.
 
 **Default event:** `nfl_2026` — this is the active competition.
 Do not default to worldCup2026 or any other event.
@@ -179,6 +186,7 @@ paid_small_max_members    → integer (25)
 paid_medium_max_members   → integer (50)
 paid_large_max_members    → null (unlimited)
 founding_pools_remaining  → integer (starts at 100, decrements on creation)
+current_tos_version       → string (e.g. "1.0"). Bump to trigger TOS re-acceptance gate for all users.
 briefing_gate_active      → boolean
 maintenance_mode          → boolean
 ```
@@ -1696,9 +1704,10 @@ Only visible after user submits picks.
 
 ### Dashboard Tab (Bottom Navigation)
 
-Dashboard is the **center tab** with a **raised circular button** — visually
+Dashboard is the **far left tab** with a **raised circular Target icon** — visually
 prominent, always the default tab on app open. Uses HotPick primary color
-when selected, outlined circle when not selected.
+when selected, muted when not selected. Tab order: Dashboard | Games | Leaders | SmackTalk | (History) | Settings.
+Leaders and SmackTalk share a single underline rendered via custom `GroupedTabBar` in `MainTabNavigator.tsx`.
 
 ### Pool Members (All Users)
 
@@ -2259,7 +2268,7 @@ patterns must be replicated:
 - "Join or Create a Pool" shown when no visible pools
 - Context-aware salutations adapt to template (replace "picks" with
   "predictions" for tournament, "series picks" for series)
-- Dashboard is center raised tab in bottom navigation
+- Dashboard is far left tab in bottom navigation
 - Pool member list accessible to all users (not just organizers)
 - HotPick require before submit — applies to all templates
 

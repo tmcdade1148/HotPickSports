@@ -62,6 +62,12 @@ interface NFLState {
   currentPhase: string;
   weekState: WeekState;
   picksDeadline: Date | null;
+  /** When Week 1 picks open — drives PRE_SEASON "Picks open in:" countdown. */
+  picksOpenAt: Date | null;
+  /** Opening game kickoff date — drives PRE_SEASON "Season starts in:" countdown. */
+  seasonOpenerAt: Date | null;
+  /** First Sunday 1pm ET kickoff this week — all Sunday+ games lock at this time. */
+  sundayLockAnchor: Date | null;
   userHotPick: DbSeasonPick | null;
   userHotPickGame: DbSeasonGame | null;
   liveScores: Record<string, GameScore>;
@@ -86,6 +92,8 @@ interface NFLState {
   gamePickStats: Record<string, GamePickStats>; // gameId → stats for active pool
   pathBackNarrative: string | null; // computed narrative for current user
   hotPickGameStatus: 'pending' | 'live' | 'complete' | null;
+  /** Kickoff time of the next scheduled game this week — drives gap countdown in the kickoff pill */
+  nextKickoff: Date | null;
 
   // Actions
   initialize: (competition: string) => Promise<void>;
@@ -102,7 +110,11 @@ interface NFLState {
   fetchUserSeasonScore: (userId: string) => Promise<void>;
   loadGamePickStats: (poolId: string) => Promise<void>;
   computePathBackNarrative: (userId: string) => void;
+  fetchLiveScores: () => Promise<void>;
+  fetchNextKickoff: () => Promise<void>;
   subscribeToGamePickStats: (poolId: string) => () => void;
+  subscribeToLiveScores: () => () => void;
+  subscribeToCompetitionConfig: () => () => void;
 }
 
 export const useNFLStore = create<NFLState>((set, get) => ({
@@ -111,6 +123,9 @@ export const useNFLStore = create<NFLState>((set, get) => ({
   currentPhase: 'REGULAR',
   weekState: 'picks_open',
   picksDeadline: null,
+  picksOpenAt: null,
+  seasonOpenerAt: null,
+  sundayLockAnchor: null,
   userHotPick: null,
   userHotPickGame: null,
   liveScores: {},
@@ -135,28 +150,41 @@ export const useNFLStore = create<NFLState>((set, get) => ({
   gamePickStats: {},
   pathBackNarrative: null,
   hotPickGameStatus: null,
+  nextKickoff: null,
 
   initialize: async (competition: string) => {
-    set({
-      competition,
-      userHotPickGame: null,
-      liveScores: {},
-      weekResult: null,
-      poolStandings: [],
-      highestRankedGame: null,
-      weekFirstKickoff: null,
-      userPickCount: 0,
-      totalGamesThisWeek: 0,
-      userSeasonTotal: 0,
-      userPoolRank: null,
-      activePoolMemberCount: 0,
-      lastWeekNet: null,
-      gamePickStats: {},
-      pathBackNarrative: null,
-      hotPickGameStatus: null,
-    });
+    const alreadyInitialized = get().competition === competition && get().currentWeek > 0;
+    if (!alreadyInitialized) {
+      // Full state reset on first init or competition change
+      set({
+        competition,
+        userHotPickGame: null,
+        liveScores: {},
+        weekResult: null,
+        poolStandings: [],
+        highestRankedGame: null,
+        weekFirstKickoff: null,
+        userPickCount: 0,
+        totalGamesThisWeek: 0,
+        userSeasonTotal: 0,
+        userPoolRank: null,
+        activePoolMemberCount: 0,
+        lastWeekNet: null,
+        gamePickStats: {},
+        pathBackNarrative: null,
+        hotPickGameStatus: null,
+      });
+    }
+    // Always fetch competition config — even when already initialized.
+    // The store default values (competition: 'nfl_2026', currentWeek: 1) match
+    // the skip guard, meaning fetchCompetitionConfig() was never called on first
+    // app open. This left weekState stuck at the default 'picks_open' instead
+    // of reading the actual DB state (e.g. 'live'). Fetching every time here
+    // ensures weekState, currentWeek, and currentPhase are always fresh.
     await get().fetchCompetitionConfig();
-    await get().fetchHighestRankedGame();
+    if (!alreadyInitialized) {
+      await get().fetchHighestRankedGame();
+    }
   },
 
   setWeekState: (weekState: WeekState) => set({weekState}),
@@ -204,11 +232,27 @@ export const useNFLStore = create<NFLState>((set, get) => ({
       picksDeadline = new Date(cfg.picks_deadline);
     }
 
+    // Parse PRE_SEASON countdown targets
+    let picksOpenAt: Date | null = null;
+    if (cfg.season_picks_open_at && typeof cfg.season_picks_open_at === 'string') {
+      picksOpenAt = new Date(cfg.season_picks_open_at);
+    }
+    let seasonOpenerAt: Date | null = null;
+    if (cfg.season_opener_date && typeof cfg.season_opener_date === 'string') {
+      seasonOpenerAt = new Date(cfg.season_opener_date);
+    }
+
+    // Parse Sunday lock anchor — first Sunday 1pm ET kickoff this week
+    let sundayLockAnchor: Date | null = null;
+    if (cfg.sunday_lock_anchor && typeof cfg.sunday_lock_anchor === 'string') {
+      sundayLockAnchor = new Date(cfg.sunday_lock_anchor);
+    }
+
     // Parse current phase (REGULAR | PLAYOFFS | SUPERBOWL)
     const currentPhase =
       typeof cfg.current_phase === 'string' ? cfg.current_phase : 'REGULAR';
 
-    set({currentWeek, weekState, picksDeadline, currentPhase});
+    set({currentWeek, weekState, picksDeadline, picksOpenAt, seasonOpenerAt, sundayLockAnchor, currentPhase});
   },
 
   fetchUserHotPick: async (userId: string) => {
@@ -241,7 +285,7 @@ export const useNFLStore = create<NFLState>((set, get) => ({
   },
 
   fetchHighestRankedGame: async () => {
-    const {competition, currentWeek} = get();
+    const {competition, currentWeek, currentPhase} = get();
 
     const {data} = await supabase
       .from('season_games')
@@ -254,6 +298,10 @@ export const useNFLStore = create<NFLState>((set, get) => ({
       .maybeSingle();
 
     set({highestRankedGame: (data as DbSeasonGame) ?? null});
+
+    // Don't set weekFirstKickoff during PRE_SEASON — game kickoff_at values
+    // are stale 2025 dates and would corrupt the countdown target logic.
+    if (currentPhase === 'PRE_SEASON') return;
 
     // Fetch earliest kickoff this week for countdown
     const {data: earliest} = await supabase
@@ -276,30 +324,48 @@ export const useNFLStore = create<NFLState>((set, get) => ({
   fetchUserPickStatus: async (userId: string) => {
     const {competition, currentWeek} = get();
 
-    // Count user's picks for this week
-    const {count: pickCount} = await supabase
+    // Fetch all games for this week (need status to compute effective total)
+    const {data: games} = await supabase
+      .from('season_games')
+      .select('game_id, status')
+      .eq('competition', competition)
+      .eq('week', currentWeek);
+
+    // Fetch this user's pick game IDs for this week
+    const {data: picks} = await supabase
       .from('season_picks')
-      .select('id', {count: 'exact', head: true})
+      .select('game_id')
       .eq('user_id', userId)
       .eq('competition', competition)
       .eq('week', currentWeek);
 
-    // Count total games this week
-    const {count: gameCount} = await supabase
-      .from('season_games')
-      .select('game_id', {count: 'exact', head: true})
-      .eq('competition', competition)
-      .eq('week', currentWeek);
+    const pickedGameIds = new Set((picks ?? []).map(p => p.game_id));
+    const pickCount = pickedGameIds.size;
+
+    // Effective total = picked games + games still scheduled (unpicked)
+    // Unpicked games that are locked/in-progress/final are excluded — it's
+    // impossible to pick them, so they shouldn't inflate the denominator
+    // in messages like "15 of 16 picked".
+    const scheduledUnpickedCount = (games ?? []).filter(
+      g =>
+        (g.status ?? '').toLowerCase() === 'scheduled' &&
+        !pickedGameIds.has(g.game_id),
+    ).length;
 
     set({
-      userPickCount: pickCount ?? 0,
-      totalGamesThisWeek: gameCount ?? 0,
+      userPickCount: pickCount,
+      totalGamesThisWeek: pickCount + scheduledUnpickedCount,
     });
   },
 
   fetchPoolStandings: async (userId: string, poolId: string) => {
-    const {competition, currentPhase} = get();
+    const {competition, currentWeek, currentPhase, weekState} = get();
     const isPlayoffs = currentPhase !== 'REGULAR';
+    // During an active week, exclude the current week's partial scores from
+    // the season total. Points accumulate in WeekScoreModule separately.
+    // Include the current week only once it's settling/complete (all games done).
+    const weekInProgress =
+      weekState === 'picks_open' || weekState === 'locked' || weekState === 'live';
 
     // 1. Get active pool member user IDs (pool-independent pattern)
     const {data: members} = await supabase
@@ -328,6 +394,9 @@ export const useNFLStore = create<NFLState>((set, get) => ({
       query = query.neq('phase', 'REGULAR');
     } else {
       query = query.eq('phase', 'REGULAR');
+    }
+    if (weekInProgress) {
+      query = query.neq('week', currentWeek);
     }
 
     const {data: totalsData} = await query;
@@ -372,8 +441,13 @@ export const useNFLStore = create<NFLState>((set, get) => ({
   },
 
   fetchUserSeasonScore: async (userId: string) => {
-    const {competition, currentWeek, currentPhase} = get();
+    const {competition, currentWeek, currentPhase, weekState} = get();
     const isPlayoffs = currentPhase !== 'REGULAR';
+    // Exclude the current week's partial scores while games are in progress.
+    // The season total reflects only completed weeks; WeekScoreModule shows
+    // the current week's live earned points separately.
+    const weekInProgress =
+      weekState === 'picks_open' || weekState === 'locked' || weekState === 'live';
 
     // Pool-independent: query user's own season_user_totals
     // Filtered to current season phase (regular vs playoffs are separate)
@@ -387,6 +461,9 @@ export const useNFLStore = create<NFLState>((set, get) => ({
       query = query.neq('phase', 'REGULAR');
     } else {
       query = query.eq('phase', 'REGULAR');
+    }
+    if (weekInProgress) {
+      query = query.neq('week', currentWeek);
     }
 
     const {data} = await query;
@@ -448,6 +525,53 @@ export const useNFLStore = create<NFLState>((set, get) => ({
   },
 
   /**
+   * Fetch current scores for all games this week and populate liveScores.
+   * Call once on entering 'live' state; Realtime subscription handles updates.
+   */
+  fetchLiveScores: async () => {
+    const {competition, currentWeek} = get();
+    const {data} = await supabase
+      .from('season_games')
+      .select('game_id, home_score, away_score, current_period, game_clock, status')
+      .eq('competition', competition)
+      .eq('week', currentWeek)
+      .in('status', ['IN_PROGRESS', 'LIVE', 'FINAL', 'COMPLETED', 'STATUS_FINAL']);
+
+    const scores: Record<string, GameScore> = {};
+    for (const row of data ?? []) {
+      scores[row.game_id] = {
+        homeScore: row.home_score ?? 0,
+        awayScore: row.away_score ?? 0,
+        currentPeriod: row.current_period ?? null,
+        gameClock: row.game_clock ?? null,
+        status: (row.status ?? '').toLowerCase(),
+      };
+    }
+    set({liveScores: scores});
+    await get().fetchNextKickoff();
+  },
+
+  /**
+   * Fetch the kickoff time of the next scheduled game this week.
+   * Called once when the week goes live and again whenever all in-progress
+   * games finish (gap between game waves). Drives the gap countdown in the
+   * kickoff pill.
+   */
+  fetchNextKickoff: async () => {
+    const {competition, currentWeek} = get();
+    const {data} = await supabase
+      .from('season_games')
+      .select('kickoff_at')
+      .eq('competition', competition)
+      .eq('week', currentWeek)
+      .ilike('status', 'scheduled')
+      .order('kickoff_at', {ascending: true})
+      .limit(1)
+      .maybeSingle();
+    set({nextKickoff: data?.kickoff_at ? new Date(data.kickoff_at) : null});
+  },
+
+  /**
    * Subscribe to real-time updates on game_pick_stats for a pool.
    * Returns an unsubscribe function. Only call when weekState === 'live'.
    */
@@ -487,6 +611,125 @@ export const useNFLStore = create<NFLState>((set, get) => ({
       .subscribe();
 
     // Return unsubscribe function
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  },
+
+  /**
+   * Subscribe to real-time score updates on season_games for the current week.
+   * Maps home_score/away_score/current_period/game_clock into liveScores.
+   * Returns an unsubscribe function. Only call when weekState === 'live'.
+   */
+  subscribeToLiveScores: () => {
+    const {competition, currentWeek} = get();
+    const channel = supabase
+      .channel(`live-scores-${competition}-week${currentWeek}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'season_games',
+          filter: `competition=eq.${competition}`,
+        },
+        (payload: any) => {
+          const row = payload.new;
+          if (!row || row.week !== currentWeek) return;
+          // If game reverted to scheduled (e.g. simulator reset), remove it from liveScores
+          const status = (row.status ?? '').toLowerCase();
+          if (status === 'scheduled' || status === 'pre') {
+            set(state => {
+              const next = {...state.liveScores};
+              delete next[row.game_id];
+              return {liveScores: next};
+            });
+            return;
+          }
+          const prevScores = get().liveScores;
+          const updatedScores = {
+            ...prevScores,
+            [row.game_id]: {
+              homeScore: row.home_score ?? 0,
+              awayScore: row.away_score ?? 0,
+              currentPeriod: row.current_period ?? null,
+              gameClock: row.game_clock ?? null,
+              status,
+            },
+          };
+          // Also keep userHotPickGame in sync — LiveCard reads .status off it
+          // to determine isHotPickFinal, which won't update otherwise.
+          const {userHotPickGame} = get();
+          const nextState: Partial<NFLState> = {liveScores: updatedScores};
+          if (userHotPickGame && userHotPickGame.game_id === row.game_id) {
+            nextState.userHotPickGame = {
+              ...userHotPickGame,
+              status: row.status ?? userHotPickGame.status,
+              home_score: row.home_score ?? userHotPickGame.home_score,
+              away_score: row.away_score ?? userHotPickGame.away_score,
+              winner_team: row.winner_team ?? userHotPickGame.winner_team,
+              current_period: row.current_period ?? null,
+              game_clock: row.game_clock ?? null,
+            };
+          }
+          set(nextState);
+          // When the last in-progress game goes final, refresh the next scheduled kickoff
+          // so the kickoff pill can show a gap countdown to the next wave.
+          const wasAnyLive = Object.values(prevScores).some(
+            s => s.status === 'in_progress' || s.status === 'live',
+          );
+          const isAnyLive = Object.values(updatedScores).some(
+            s => s.status === 'in_progress' || s.status === 'live',
+          );
+          if (wasAnyLive && !isAnyLive) {
+            get().fetchNextKickoff();
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  },
+
+  /**
+   * Subscribe to competition_config changes so week_state and current_phase
+   * updates (e.g. from the season simulator) propagate to the app instantly
+   * without requiring a reload. Returns an unsubscribe function.
+   */
+  subscribeToCompetitionConfig: () => {
+    const {competition} = get();
+    const channel = supabase
+      .channel(`competition-config-${competition}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'competition_config',
+          filter: `competition=eq.${competition}`,
+        },
+        () => {
+          // Re-fetch config first, then clear stale per-user data so
+          // SeasonEventCard's useEffects re-fetch based on the new state.
+          // This handles simulator resets and admin phase transitions.
+          get().fetchCompetitionConfig();
+          set({
+            userHotPick: null,
+            userHotPickGame: null,
+            userPickCount: 0,
+            weekResult: null,
+            poolStandings: [],
+            liveScores: {},
+            highestRankedGame: null,
+            weekFirstKickoff: null,
+            sundayLockAnchor: null,
+          });
+        },
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
     };
