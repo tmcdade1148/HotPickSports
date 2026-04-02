@@ -1,4 +1,5 @@
 import React, {useEffect, useState} from 'react';
+import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {
   View,
   Text,
@@ -141,13 +142,14 @@ export function SeasonTabNavigator({
 }: SeasonTabNavigatorProps) {
   const {colors} = useTheme();
   const initialize = useSeasonStore(s => s.initialize);
+  const nflCurrentWeek = useNFLStore(s => s.currentWeek);
   const [activeTabKey, setActiveTabKey] = useState(
     config.tabs[0]?.key ?? 'picks',
   );
 
   useEffect(() => {
-    initialize(config, poolId);
-  }, [config.competition, poolId, initialize]);
+    initialize(config, poolId, nflCurrentWeek);
+  }, [config.competition, poolId, nflCurrentWeek, initialize]);
 
   const initialRouteName = `Season_${config.tabs[0]?.key ?? 'picks'}`;
 

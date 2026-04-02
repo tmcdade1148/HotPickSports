@@ -54,7 +54,7 @@ interface SeasonState {
   isSaving: boolean;
   saveError: string | null;
 
-  initialize: (config: SeasonConfig, poolId: string) => Promise<void>;
+  initialize: (config: SeasonConfig, poolId: string, forceWeek?: number) => Promise<void>;
   setCurrentWeek: (week: number) => void;
   fetchWeekGames: (week: number) => Promise<void>;
   fetchUserPicks: (userId: string, week: number) => Promise<void>;
@@ -102,10 +102,15 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
   saveError: null,
   isWeekComplete: false,
 
-  initialize: async (config, poolId) => {
-    // Skip if already initialized for this competition + pool
+  initialize: async (config, poolId, forceWeek?: number) => {
+    // Skip if already initialized for this competition + pool + same week
     const state = get();
-    if (state.config?.competition === config.competition && state.poolId === poolId && state.currentWeek > 0) {
+    if (
+      state.config?.competition === config.competition &&
+      state.poolId === poolId &&
+      state.currentWeek > 0 &&
+      (!forceWeek || state.currentWeek >= forceWeek)
+    ) {
       return;
     }
     // Read current_week and season_year from competition_config (never hardcode)

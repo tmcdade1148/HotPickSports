@@ -347,7 +347,9 @@ async function api(path, method = 'GET', body = null, useServiceRole = true) {
 // Upsert a competition_config row (creates if missing, updates if exists)
 async function upsertConfig(competition, key, value, description) {
   const svcKey = getServiceKey();
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/competition_config`, {
+  // value column is jsonb NOT NULL — coerce null/undefined to empty string
+  const safeValue = value ?? '';
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/competition_config?on_conflict=competition,key`, {
     method: 'POST',
     headers: {
       'apikey': svcKey,
@@ -355,7 +357,7 @@ async function upsertConfig(competition, key, value, description) {
       'Content-Type': 'application/json',
       'Prefer': 'resolution=merge-duplicates,return=minimal',
     },
-    body: JSON.stringify({ competition, key, value, description }),
+    body: JSON.stringify({ competition, key, value: safeValue, description }),
   });
   if (!res.ok) {
     const err = await res.text();
@@ -723,16 +725,14 @@ async function finalizeWave(wave) {
 }
 
 async function endWeek() {
-  // Ensure all games finalized before scoring
+  // Force ALL games to FINAL — catches any game stuck as IN_PROGRESS or scheduled
   for (const g of weekGames) {
-    if (!g.winner_team) {
-      const winner = g.home_score >= g.away_score ? g.home_team : g.away_team;
-      await api(
-        `season_games?game_id=eq.${g.simGameId}&competition=eq.${COMPETITION}`,
-        'PATCH',
-        { status: 'FINAL', home_score: g.home_score, away_score: g.away_score, winner_team: winner, is_finalized: true }
-      );
-    }
+    const winner = g.winner_team || (g.home_score >= g.away_score ? g.home_team : g.away_team);
+    await api(
+      `season_games?game_id=eq.${g.simGameId}&competition=eq.${COMPETITION}`,
+      'PATCH',
+      { status: 'FINAL', home_score: g.home_score ?? 0, away_score: g.away_score ?? 0, winner_team: winner, is_finalized: true }
+    );
   }
 
   log('🧮 All games final — calling nfl-calculate-scores...', 'info');
@@ -1094,10 +1094,17 @@ async function resetWeek() {
   document.getElementById('btnStart').disabled = true;
   document.getElementById('btnPause').disabled = true;
   document.getElementById('statusText').textContent = 'Resetting…';
-  log('↺ Resetting Week ' + currentWeek + ' in DB…', 'warn');
 
   if (validateKey()) {
     try {
+      // Read current_week from DB so we reset the right week (not the stale JS default)
+      const cfgRows = await api(
+        `competition_config?competition=eq.${COMPETITION}&key=eq.current_week&select=value`
+      );
+      if (cfgRows?.[0]?.value && typeof cfgRows[0].value === 'number') {
+        currentWeek = cfgRows[0].value;
+      }
+      log('↺ Resetting Week ' + currentWeek + ' in DB…', 'warn');
       // Reset all sim games for this week
       await api(
         `season_games?competition=eq.${COMPETITION}&week=eq.${currentWeek}`,
@@ -1122,7 +1129,7 @@ async function resetWeek() {
       await api(`competition_config?competition=eq.${COMPETITION}&key=eq.current_phase`, 'PATCH', { value: 'PRE_SEASON' });
       await api(`competition_config?competition=eq.${COMPETITION}&key=eq.week_state`, 'PATCH', { value: 'complete' });
       await api(`competition_config?competition=eq.${COMPETITION}&key=eq.current_week`, 'PATCH', { value: currentWeek });
-      await upsertConfig(COMPETITION, 'sunday_lock_anchor', null,
+      await upsertConfig(COMPETITION, 'sunday_lock_anchor', '',
         'ISO timestamp of the Sunday 1pm ET anchor kickoff. All games lock at this time.');
       log('✓ DB reset complete — ready to Start Week', 'success');
     } catch (err) {
