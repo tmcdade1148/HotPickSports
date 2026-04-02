@@ -100,14 +100,16 @@ export function InstructionsScreen() {
             count across all your pools simultaneously.
           </Text>
           <Text style={[styles.body, {color: colors.textSecondary, marginTop: spacing.sm}]}>
-            Picks open a few days before the first game of the week. Each game locks
-            individually at its own kickoff — so Thursday's game locks Thursday night,
-            while Sunday games stay open until Sunday. You can edit any pick as many
-            times as you want right up until that game kicks off.
+            Picks open a few days before the first game of the week. Games lock in two waves:
+          </Text>
+          <Text style={[styles.bulletItem, {color: colors.textSecondary}]}>
+            {'\u2022'} Any game before the Sunday 1pm ET window (Thursday night, Saturday, early Sunday) locks at its own kickoff.
+          </Text>
+          <Text style={[styles.bulletItem, {color: colors.textSecondary}]}>
+            {'\u2022'} All remaining games lock together at the Sunday 1pm ET kickoff.
           </Text>
           <Text style={[styles.body, {color: colors.textSecondary, marginTop: spacing.sm}]}>
-            Once a game kicks off, that pick is locked. You can still submit or change
-            picks for any game that hasn't started yet, even mid-week.
+            You can edit any unlocked pick as many times as you want right up until it locks.
           </Text>
         </AccordionSection>
 
