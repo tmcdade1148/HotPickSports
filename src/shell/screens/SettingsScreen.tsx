@@ -9,8 +9,6 @@ import {
   ActivityIndicator,
   StyleSheet,
   LayoutAnimation,
-  Platform,
-  UIManager,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import {useNavigation} from '@react-navigation/native';
@@ -45,13 +43,6 @@ import {useColorScheme} from 'react-native';
 import type {BrandConfig} from '@shell/theme/types';
 import {HOTPICK_DEFAULTS, SEMANTIC_COLORS, SEMANTIC_COLORS_DARK, deriveDarkColors, isLightColor} from '@shell/theme/defaults';
 
-// Enable LayoutAnimation on Android
-if (
-  Platform.OS === 'android' &&
-  UIManager.setLayoutAnimationEnabledExperimental
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 export function SettingsScreen({route}: any) {
   const navigation = useNavigation<any>();

@@ -31,20 +31,14 @@ interface PicksOpenCardProps {
   highestRankedGame: DbSeasonGame | null;
   /** Earliest kickoff time this week */
   weekFirstKickoff: Date | null;
-  /** User's HotPick game kickoff time (null if no HotPick selected) */
-  hotPickKickoff: Date | null;
-  /** User's HotPick team name (null if no HotPick selected) */
-  hotPickTeam: string | null;
   /** Whether the current user has submitted at least one pick this week */
   userHasSubmitted: boolean;
   /** Number of picks the user has made this week */
   userPickCount: number;
   /** Total games available to pick this week */
   totalGames: number;
-  /** Number of pool members who have submitted picks this week */
-  poolPicksSubmittedCount: number;
-  /** Total active members in the current pool */
-  poolMemberCount: number;
+  /** Whether picks have been submitted (confirmed) this week */
+  isWeekComplete: boolean;
   /** Navigate to make/edit picks */
   onMakePicks: () => void;
   /** Override color for WEEK label (partner secondary color) */
@@ -56,22 +50,17 @@ interface PicksOpenCardProps {
  *
  * Full spec (top to bottom):
  *   1. Ticking countdown to deadline (useCountdown) — warning color, red when urgent
- *   2. Social pressure: "{X} of {Y} poolies have locked in"
- *   3. Countdown to kickoff + HotPick kickoff (if selected)
- *   4. CardFooter CTA: "Make Your Picks" or "Edit Your Picks"
+ *   2. CardFooter CTA: "Make Your Picks" or "Edit Your Picks"
  */
 export function PicksOpenCard({
   deadline,
   currentWeek,
   highestRankedGame,
   weekFirstKickoff,
-  hotPickKickoff,
-  hotPickTeam,
   userHasSubmitted,
   userPickCount,
   totalGames,
-  poolPicksSubmittedCount,
-  poolMemberCount,
+  isWeekComplete,
   onMakePicks,
   weekLabelColor,
 }: PicksOpenCardProps) {
@@ -79,18 +68,24 @@ export function PicksOpenCard({
   const styles = createStyles(colors);
   const {timeLeft, isUrgent, hasExpired} = useCountdown(deadline);
   const kickoff = useCountdown(weekFirstKickoff);
-  const hotPickCountdown = useCountdown(hotPickKickoff);
 
   const picksComplete = userPickCount >= totalGames && totalGames > 0;
-  const ctaLabel = userHasSubmitted
-    ? (picksComplete ? 'Edit Your Picks' : 'Finish Your Picks')
-    : 'Make Your Picks';
-  const lockedInLabel = picksComplete
+  // Mirror the picks screen: yellow "Submit your picks" when user has
+  // unsubmitted changes (picks exist but isWeekComplete is false).
+  const needsSubmit = userHasSubmitted && !isWeekComplete;
+  const ctaLabel = needsSubmit
+    ? 'Submit your picks'
+    : userHasSubmitted
+      ? (picksComplete ? 'Edit Your Picks' : 'Finish Your Picks')
+      : 'Make Your Picks';
+  const ctaAccent = needsSubmit ? colors.warning : undefined;
+  const ctaTextDark = needsSubmit; // dark text on yellow background
+  const lockedInLabel = picksComplete && isWeekComplete
     ? 'Your picks are in \u2713'
     : userHasSubmitted
-      ? `${userPickCount} of ${totalGames} picked — finish your picks`
+      ? `${userPickCount} of ${totalGames} picked — you\u2019re not done yet`
       : undefined;
-  const lockedInColor = picksComplete ? '#1b9a06' : colors.warning;
+  const lockedInColor = (picksComplete && isWeekComplete) ? '#1b9a06' : colors.warning;
 
   return (
     <View style={styles.container}>
@@ -116,8 +111,11 @@ export function PicksOpenCard({
       <CardFooter
         label={ctaLabel}
         onPress={onMakePicks}
+        accentColor={ctaAccent}
+        darkText={ctaTextDark}
         secondaryLabel={lockedInLabel}
         secondaryColor={lockedInColor}
+        secondaryLarge={picksComplete && isWeekComplete}
       />
     </View>
   );
@@ -150,12 +148,5 @@ const createStyles = (colors: any) => StyleSheet.create({
   countdownSuffix: {
     ...typography.caption,
     color: colors.textSecondary,
-  },
-  socialLine: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    fontStyle: 'italic',
-    marginBottom: spacing.md,
-    paddingHorizontal: spacing.md,
   },
 });

@@ -1,5 +1,5 @@
 import React from 'react';
-import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
+import {View, Text, TouchableOpacity, Alert, StyleSheet} from 'react-native';
 import {Flame, Lock} from 'lucide-react-native';
 import type {SeasonConfig} from '@shared/types/templates';
 import type {DbSeasonGame} from '@shared/types/database';
@@ -22,6 +22,17 @@ interface SeasonMatchCardProps {
   userId: string;
   /** Pool pick split stats — revealed at kickoff only */
   pickSplit?: PickSplitData | null;
+  /**
+   * Whether picks are currently open for this week. When false, the card is
+   * always locked regardless of kickoff time. Defaults to true for backwards
+   * compatibility (live/settling views still show interactive-looking cards).
+   */
+  picksAreOpen?: boolean;
+  /**
+   * Earliest kickoff (ms) of any live/final game this week. When set, any
+   * scheduled game at or after this time is wave-locked — even if lock_at is null.
+   */
+  liveAnchorTime?: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -48,41 +59,51 @@ function formatKickoff(date: Date): string {
 interface TeamRowProps {
   teamName: string;
   record: string | null | undefined;
-  score: number | null | undefined;
-  opponentScore: number | null | undefined;
   isSelected: boolean;
-  hasSelection: boolean; // whether ANY team is selected on this game
-  isFinal: boolean;
+  hasSelection: boolean;
   isLocked: boolean;
+  isFinal: boolean;
+  isLive: boolean;
+  lockAtPassed: boolean;
   onPress: () => void;
 }
 
 function TeamRow({
   teamName,
   record,
-  score,
-  opponentScore,
   isSelected,
   hasSelection,
-  isFinal,
   isLocked,
+  isFinal,
+  isLive,
+  lockAtPassed,
   onPress,
 }: TeamRowProps) {
   const {colors} = useTheme();
   const styles = createStyles(colors);
-  const isWinner =
-    isFinal && score != null && opponentScore != null && score > opponentScore;
-
-  // Dimmed when another team is selected and this one isn't
   const isDimmed = hasSelection && !isSelected;
 
+  const handlePress = () => {
+    if (!isLocked) {
+      onPress();
+      return;
+    }
+    // Don't show lock explanation for games that are live or final
+    if (isFinal || isLive) return;
+
+    Alert.alert(
+      'Game Locked',
+      'Games lock in two waves:\n\n\u2022 Any game before the 1pm (ET) window locks at its own kickoff.\n\n\u2022 All remaining games lock together at the 1pm (ET) kickoff.',
+      [{text: 'Got it'}],
+    );
+  };
+
   return (
-    <View style={styles.teamRow}>
-      <TouchableOpacity
-        style={[styles.teamButton, isSelected && styles.teamButtonSelected]}
-        onPress={onPress}
-        disabled={isLocked}
-        activeOpacity={0.6}>
+    <TouchableOpacity
+      style={styles.teamButton}
+      onPress={handlePress}
+      activeOpacity={isLocked ? 1 : 0.6}>
+      <View style={[styles.teamNameBox, isSelected && (isLocked ? styles.teamNameBoxSelectedLocked : styles.teamNameBoxSelected)]}>
         <Text
           style={[
             styles.teamName,
@@ -92,21 +113,9 @@ function TeamRow({
           numberOfLines={1}>
           {teamName.toUpperCase()}
         </Text>
-        {record ? <Text style={styles.recordText}>{record}</Text> : null}
-      </TouchableOpacity>
-
-      {/* Score column — visible during live/final */}
-      <View style={styles.scoreColumn}>
-        {score != null ? (
-          <View style={styles.scoreInner}>
-            <Text style={[styles.scoreText, isWinner && styles.scoreWinner]}>
-              {score}
-            </Text>
-            {isWinner ? <Text style={styles.winnerTriangle}>◀</Text> : null}
-          </View>
-        ) : null}
+        {record ? <Text style={[styles.recordText, isDimmed && styles.teamNameDimmed]}>{record}</Text> : null}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -128,6 +137,8 @@ export function SeasonMatchCard({
   config,
   userId,
   pickSplit,
+  picksAreOpen = true,
+  liveAnchorTime,
 }: SeasonMatchCardProps) {
   const {colors} = useTheme();
   const brand = useBrand();
@@ -147,8 +158,16 @@ export function SeasonMatchCard({
     status === 'FINAL' || status === 'STATUS_FINAL' || status === 'COMPLETED';
   const isLive = status === 'IN_PROGRESS' || status === 'LIVE';
   const kickoffDate = new Date(game.kickoff_at);
-  const kickoffPassed = kickoffDate.getTime() <= Date.now();
-  const isLocked = isFinal || isLive || kickoffPassed;
+  // Two-wave locking: games before Sunday 1pm ET lock at kickoff; all others
+  // lock at the Sunday 1pm anchor. lock_at is set by nfl-open-picks and
+  // enforced server-side by the enforce_pick_lock trigger. Client mirrors
+  // that check here for display.
+  const lockAtPassed = !!game.lock_at && new Date(game.lock_at) <= new Date();
+  // Wave-lock fallback: if this game has no lock_at (simulator) and a game at
+  // or before this kickoff is already live/final, lock this game too.
+  // Only applies when lock_at is missing — when lock_at is set, it's authoritative.
+  const waveLocked = !game.lock_at && liveAnchorTime != null && kickoffDate.getTime() <= liveAnchorTime;
+  const isLocked = !picksAreOpen || isFinal || isLive || lockAtPassed || waveLocked;
   const rank = game.frozen_rank ?? game.rank ?? 0;
 
   // Flame is tappable if this game has a pick and isn't already the hotpick
@@ -181,20 +200,15 @@ export function SeasonMatchCard({
       <View style={styles.header}>
         {!isFinal && !isLive ? (
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
-            <Text style={styles.kickoffText}>{formatKickoff(kickoffDate)}</Text>
-            {isLocked && <Lock size={12} color={colors.textSecondary} />}
+            <Text style={[styles.kickoffText, isLocked && styles.kickoffTextLocked]}>{formatKickoff(kickoffDate)}</Text>
+            {isLocked && <Lock size={12} color={'#FFFFFF'} />}
           </View>
         ) : null}
 
         {isLive ? (
           <View style={styles.liveRow}>
             <Text style={styles.liveText}>LIVE</Text>
-            {game.current_period ? (
-              <Text style={styles.periodText}>Q{game.current_period}</Text>
-            ) : null}
-            {game.game_clock ? (
-              <Text style={styles.clockText}>{game.game_clock}</Text>
-            ) : null}
+            {isLocked && <Lock size={14} color={colors.primary} />}
           </View>
         ) : null}
 
@@ -225,43 +239,84 @@ export function SeasonMatchCard({
 
         {/* Team buttons — away on top, home on bottom */}
         <View style={styles.teamsColumn}>
-          <TeamRow
-            teamName={awayTeamName}
-            record={game.away_record}
-            score={isLive || isFinal ? game.away_score : null}
-            opponentScore={isLive || isFinal ? game.home_score : null}
-            isSelected={pickedTeam === game.away_team}
-            hasSelection={pickedTeam != null}
-            isFinal={isFinal}
-            isLocked={isLocked}
-            onPress={() => selectTeam(game.away_team)}
-          />
-          <TeamRow
-            teamName={homeTeamName}
-            record={game.home_record}
-            score={isLive || isFinal ? game.home_score : null}
-            opponentScore={isLive || isFinal ? game.away_score : null}
-            isSelected={pickedTeam === game.home_team}
-            hasSelection={pickedTeam != null}
-            isFinal={isFinal}
-            isLocked={isLocked}
-            onPress={() => selectTeam(game.home_team)}
-          />
+          <View style={styles.teamsWithScores}>
+            {/* Names column (tappable rows) */}
+            <View style={styles.teamNamesCol}>
+              <TeamRow
+                teamName={awayTeamName}
+                record={game.away_record}
+                isSelected={pickedTeam === game.away_team}
+                hasSelection={pickedTeam != null}
+                isLocked={isLocked}
+                isFinal={isFinal}
+                isLive={isLive}
+                lockAtPassed={lockAtPassed}
+                onPress={() => selectTeam(game.away_team)}
+              />
+              <TeamRow
+                teamName={homeTeamName}
+                record={game.home_record}
+                isSelected={pickedTeam === game.home_team}
+                hasSelection={pickedTeam != null}
+                isLocked={isLocked}
+                isFinal={isFinal}
+                isLive={isLive}
+                lockAtPassed={lockAtPassed}
+                onPress={() => selectTeam(game.home_team)}
+              />
+            </View>
+
+            {/* Scores + clock — fixed-width container so scores stay aligned between LIVE and FINAL */}
+            {(isLive || isFinal) && (
+              <View style={styles.scoreClockContainer}>
+                <View style={styles.scoresCol}>
+                  <Text style={[
+                    styles.inlineScore,
+                    isFinal && game.away_score != null && game.home_score != null && game.away_score > game.home_score && styles.inlineScoreWinner,
+                  ]}>
+                    {game.away_score ?? '—'}
+                  </Text>
+                  <Text style={[
+                    styles.inlineScore,
+                    isFinal && game.home_score != null && game.away_score != null && game.home_score > game.away_score && styles.inlineScoreWinner,
+                  ]}>
+                    {game.home_score ?? '—'}
+                  </Text>
+                </View>
+                {isLive && (game.current_period || game.game_clock) && (
+                  <Text style={styles.liveClockInline}>
+                    {game.current_period ? `Q${game.current_period}` : ''}
+                    {game.game_clock ? ` ${game.game_clock}` : ''}
+                  </Text>
+                )}
+              </View>
+            )}
+          </View>
         </View>
 
         {/* Flame icon — outline when inactive, filled orange when HotPick */}
-        <TouchableOpacity
-          style={styles.flameColumn}
-          onPress={handleFlamePress}
-          disabled={isLocked || isSaving || !canSetHotPick}
-          activeOpacity={0.6}>
-          <Flame
-            size={48}
-            color={isHotPick ? '#FF8C00' : '#555555'}
-            fill={isHotPick ? '#FF8C00' : 'none'}
-            strokeWidth={isHotPick ? 2.5 : 1.2}
-          />
-        </TouchableOpacity>
+        <View style={styles.flameColumn}>
+          {isFinal && existingPick?.points != null && (
+            <Text style={[
+              styles.pointsEarned,
+              existingPick.points > 0 && styles.pointsEarnedPositive,
+              existingPick.points < 0 && styles.pointsEarnedNegative,
+            ]}>
+              {existingPick.points > 0 ? `+${existingPick.points}` : `${existingPick.points}`}
+            </Text>
+          )}
+          <TouchableOpacity
+            onPress={handleFlamePress}
+            disabled={isLocked || isSaving || !canSetHotPick}
+            activeOpacity={0.6}>
+            <Flame
+              size={48}
+              color={isHotPick ? '#FF8C00' : '#555555'}
+              fill={isHotPick ? '#FF8C00' : 'none'}
+              strokeWidth={isHotPick ? 2.5 : 1.2}
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* ── Pick Split Bar — revealed at kickoff ── */}
@@ -319,14 +374,14 @@ const createStyles = (colors: any) => StyleSheet.create({
     paddingHorizontal: 12,
   },
   containerLocked: {
-    opacity: 0.5,
+    opacity: 0.7,
   },
 
   // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 1,
+    marginBottom: 0,
     marginLeft: 56, // align over left edge of team pills (rankColumn 44 + gap 12)
   },
   kickoffText: {
@@ -334,27 +389,21 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: '600',
     color: colors.textSecondary,
   },
+  kickoffTextLocked: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
   liveRow: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 6,
+    alignItems: 'center',
+    gap: 5,
   },
   liveText: {
     fontSize: 14,
     fontWeight: '900',
     fontStyle: 'italic',
-    color: colors.success,
-  },
-  periodText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.textPrimary,
-  },
-  clockText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    fontVariant: ['tabular-nums'],
+    color: '#1B9A06',
   },
   finalText: {
     fontSize: 14,
@@ -370,13 +419,24 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: '700',
     color: '#FFB800',
   },
+  pointsEarned: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.textSecondary,
+  },
+  pointsEarnedPositive: {
+    color: '#1B9A06',
+  },
+  pointsEarnedNegative: {
+    color: colors.error,
+  },
 
   // Main row
   mainRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingVertical: 4,
+    gap: 4,
+    paddingBottom: 4,
   },
 
   // Rank circle
@@ -410,32 +470,55 @@ const createStyles = (colors: any) => StyleSheet.create({
   // Teams
   teamsColumn: {
     flex: 1,
-    gap: 3,
   },
-  teamRow: {
+  teamsWithScores: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 36,
+    gap: 6,
+  },
+  teamNamesCol: {
+    flex: 1,
+  },
+  scoreClockContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: 95,
+    gap: 6,
+  },
+  scoresCol: {
+    gap: 2,
+    alignItems: 'flex-end',
   },
   teamButton: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    minHeight: 32,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  teamNameBox: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
     borderRadius: 4,
     borderWidth: 2,
     borderColor: 'transparent',
-    backgroundColor: 'rgba(0, 0, 0, 0.03)',
+    flexShrink: 1,
   },
-  teamButtonSelected: {
+  teamNameBoxSelected: {
     borderColor: colors.primary,
     backgroundColor: 'rgba(255, 107, 53, 0.08)',
+  },
+  teamNameBoxSelectedLocked: {
+    borderColor: colors.textPrimary,
+    backgroundColor: 'transparent',
   },
   teamName: {
     fontSize: 16,
     fontWeight: '800',
     color: colors.textPrimary,
+    flexShrink: 1,
   },
   teamNameSelected: {
     color: colors.primary,
@@ -447,32 +530,36 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: colors.textSecondary,
-    marginLeft: 8,
+    marginLeft: 10,
   },
-
-  // Scores
-  scoreColumn: {
-    width: 55,
-    alignItems: 'flex-start',
-    marginLeft: 8,
-  },
-  scoreInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  scoreText: {
+  inlineScore: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '900',
     color: colors.textPrimary,
     fontVariant: ['tabular-nums'],
   },
-  scoreWinner: {
-    color: colors.textPrimary,
+  inlineScoreWinner: {
+    color: '#1B9A06',
   },
-  winnerTriangle: {
-    fontSize: 16,
-    color: colors.success,
+
+  // @ separator row between teams
+  teamsSeparator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 18,
+  },
+  atSymbol: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  liveClockInline: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    fontVariant: ['tabular-nums'],
   },
 
   // Flame
@@ -482,6 +569,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 4,
+    flexDirection: 'column',
   },
   // Pick split bar
   pickSplitContainer: {

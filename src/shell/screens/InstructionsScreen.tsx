@@ -94,7 +94,7 @@ export function InstructionsScreen() {
           Everything you need to know about playing, managing pools, and pricing.
         </Text>
 
-        <AccordionSection title="Making Picks" colors={colors}>
+        <AccordionSection title="Making Picks & Game Locks" colors={colors}>
           <Text style={[styles.body, {color: colors.textSecondary}]}>
             Each week, pick the winner of every NFL game. Your picks are made once and
             count across all your pools simultaneously.

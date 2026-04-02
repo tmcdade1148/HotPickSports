@@ -1,4 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
+import {supabase} from '@shared/config/supabase';
 import {View, Text, Image, StyleSheet, TouchableOpacity} from 'react-native';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import type {BottomTabBarProps} from '@react-navigation/bottom-tabs';
@@ -24,6 +25,7 @@ import {spacing, typography, borderRadius} from '@shared/theme';
 
 // Sport store imports for initialization
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
+import {useNFLStore} from '@sports/nfl/stores/nflStore';
 
 // Lazy imports for sport-specific screens
 import {SeasonPicksScreen} from '@templates/season/screens/SeasonPicksScreen';
@@ -252,10 +254,14 @@ function GroupedTabBar({state, descriptors, navigation}: BottomTabBarProps) {
       return null;
     })();
 
+    // Grey out label for disabled History tab (icon is greyed via tabBarIcon option)
+    const isDisabled = (options as any).tabBarDisabled === true;
+    const labelColor = isDisabled && !isFocused ? colors.border : color;
+
     return (
       <>
         {icon}
-        {label ? <Text style={[s.label, {color}]}>{label}</Text> : null}
+        {label ? <Text style={[s.label, {color: labelColor}]}>{label}</Text> : null}
       </>
     );
   };
@@ -371,7 +377,30 @@ export function MainTabNavigator() {
   const userProfile = useGlobalStore(s => s.userProfile);
   const activeSport = useGlobalStore(s => s.activeSport);
   const activePoolId = useGlobalStore(s => s.activePoolId);
-  const hasHistory = useGlobalStore(s => s.hasHistory);
+  const hasHistoryFromStore = useGlobalStore(s => s.hasHistory);
+  const nflCompetition = useNFLStore(s => s.competition);
+  const loadUserHardware = useGlobalStore(s => s.loadUserHardware);
+  const userId = useGlobalStore(s => s.user?.id);
+
+  const nflCurrentWeek = useNFLStore(s => s.currentWeek);
+  // Direct check: does this user have any fully completed weeks?
+  const [hasHistoryDirect, setHasHistoryDirect] = useState(false);
+  useEffect(() => {
+    if (!userId || !nflCurrentWeek) return;
+    supabase
+      .from('season_user_totals')
+      .select('id', {count: 'exact', head: true})
+      .eq('user_id', userId)
+      .eq('competition', nflCompetition)
+      .eq('is_no_show', false)
+      .lt('week', nflCurrentWeek)
+      .then(({count}) => {
+        setHasHistoryDirect((count ?? 0) > 0);
+      });
+    loadUserHardware().catch(() => {});
+  }, [userId, nflCompetition, nflCurrentWeek, loadUserHardware]);
+
+  const hasHistory = hasHistoryDirect;
   // homeLabel removed — Dashboard tab uses icon only
 
   // Initialize sport stores when activeSport or activePoolId changes
@@ -460,18 +489,24 @@ export function MainTabNavigator() {
           ),
         }}
       />
-      {hasHistory && (
-        <Tab.Screen
-          name="HistoryTab"
-          component={HistoryScreen}
-          options={{
-            tabBarLabel: 'History',
-            tabBarIcon: ({color, size}) => (
-              <Trophy size={size} color={color} />
-            ),
-          }}
-        />
-      )}
+      <Tab.Screen
+        name="HistoryTab"
+        component={HistoryScreen}
+        options={{
+          tabBarLabel: 'History',
+          tabBarDisabled: !hasHistory,
+          tabBarIcon: ({color, size}) => (
+            <Trophy size={size} color={hasHistory ? color : colors.border} />
+          ),
+        } as any}
+        listeners={{
+          tabPress: (e) => {
+            if (!hasHistory) {
+              e.preventDefault();
+            }
+          },
+        }}
+      />
       <Tab.Screen
         name="SettingsTab"
         component={SettingsTabWrapper}

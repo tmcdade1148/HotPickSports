@@ -1,6 +1,8 @@
-import React, {useState, useEffect} from 'react';
-import {View, Text, StyleSheet} from 'react-native';
-import {spacing, borderRadius} from '@shared/theme';
+import React, {useState, useEffect, useCallback} from 'react';
+import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
+import {useNavigation} from '@react-navigation/native';
+import {useFocusEffect} from '@react-navigation/native';
+import {spacing, borderRadius, typography} from '@shared/theme';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useTheme} from '@shell/theme';
 import {supabase} from '@shared/config/supabase';
@@ -18,30 +20,34 @@ import {useAuth} from '@shared/hooks/useAuth';
 export function WeekScoreModule() {
   const {colors} = useTheme();
   const styles = createStyles(colors);
+  const navigation = useNavigation<any>();
   const weekState = useNFLStore(s => s.weekState);
   const currentWeek = useNFLStore(s => s.currentWeek);
   const competition = useNFLStore(s => s.competition);
   const {user} = useAuth();
 
-  const [potential, setPotential] = useState(0);
   const [pickCount, setPickCount] = useState(0);
   const [weekEarned, setWeekEarned] = useState<number | null>(null);
+  const [lastWeekEarned, setLastWeekEarned] = useState<number | null>(null);
+  const [focusCount, setFocusCount] = useState(0);
 
-  // Fetch picks + games for Pts. Target, and initial weekEarned
+  // Re-fetch when Home tab regains focus (e.g. after making picks)
+  useFocusEffect(
+    useCallback(() => {
+      setFocusCount(c => c + 1);
+    }, []),
+  );
+
+  // Fetch current week picks + earned, and previous week's final score
   useEffect(() => {
     if (!user?.id || !currentWeek || currentWeek === 0 || !competition) return;
 
     const load = async () => {
-      const [{data: picks}, {data: games}, {data: totals}] = await Promise.all([
+      const queries: Promise<any>[] = [
         supabase
           .from('season_picks')
           .select('game_id, is_hotpick')
           .eq('user_id', user.id)
-          .eq('competition', competition)
-          .eq('week', currentWeek),
-        supabase
-          .from('season_games')
-          .select('game_id, rank, frozen_rank')
           .eq('competition', competition)
           .eq('week', currentWeek),
         supabase
@@ -51,22 +57,35 @@ export function WeekScoreModule() {
           .eq('competition', competition)
           .eq('week', currentWeek)
           .maybeSingle(),
-      ]);
+      ];
+
+      // Fetch previous week's final score for Week 2+
+      if (currentWeek > 1) {
+        queries.push(
+          supabase
+            .from('season_user_totals')
+            .select('week_points')
+            .eq('user_id', user.id)
+            .eq('competition', competition)
+            .eq('week', currentWeek - 1)
+            .maybeSingle(),
+        );
+      }
+
+      const results = await Promise.all(queries);
+      const picks = results[0].data;
+      const totals = results[1].data;
 
       setPickCount(picks?.length ?? 0);
       setWeekEarned(totals?.week_points ?? null);
 
-      let total = 0;
-      for (const pick of picks ?? []) {
-        const game = games?.find(g => g.game_id === pick.game_id);
-        const rank = game?.frozen_rank ?? game?.rank ?? 1;
-        total += pick.is_hotpick ? rank : 1;
+      if (currentWeek > 1 && results[2]) {
+        setLastWeekEarned(results[2].data?.week_points ?? null);
       }
-      setPotential(total);
     };
 
     load();
-  }, [user?.id, currentWeek, weekState, competition]);
+  }, [user?.id, currentWeek, weekState, competition, focusCount]);
 
   // Realtime: keep PTS. EARNED current as scoring Edge Function writes results
   useEffect(() => {
@@ -96,59 +115,89 @@ export function WeekScoreModule() {
     };
   }, [user?.id, currentWeek, competition]);
 
-  // Hide when no week state, no week, no picks, or week is fully complete
-  if (!weekState || currentWeek === 0 || pickCount === 0 || weekState === 'complete') {
+  // Hide when no week state, no week, or no picks
+  if (!weekState || currentWeek === 0 || pickCount === 0) {
     return null;
   }
 
-  const isSettled = weekState === 'settling';
+  const isSettled = weekState === 'settling' || weekState === 'complete';
 
-  return (
-    <>
-      <View style={styles.widgetRow}>
-        {/* Left — Pts. Target (switches to Final Score when settling) */}
+  if (isSettled && weekEarned != null) {
+    // Single full-width Final Score widget — taps to Picks screen
+    return (
+      <TouchableOpacity
+        style={styles.widgetRow}
+        activeOpacity={0.7}
+        onPress={() => navigation.navigate('PicksTab' as never)}>
         <View style={styles.widget}>
           <Text style={styles.widgetLabel}>
-            {isSettled && weekEarned != null ? 'Final Score' : 'Pts. Target'}
+            Week {currentWeek} {'\u2022'} FINAL SCORE
           </Text>
           <View style={styles.widgetValueRow}>
             <Text style={[
               styles.widgetValue,
-              isSettled && weekEarned != null
-                ? {color: weekEarned >= 0 ? '#1b9a06' : colors.error}
-                : pickCount > 0
-                  ? {color: colors.primary}
-                  : undefined,
+              {color: weekEarned >= 0 ? '#1b9a06' : colors.error},
             ]}>
-              {isSettled && weekEarned != null
-                ? `${weekEarned >= 0 ? '+' : ''}${weekEarned}`
-                : `+${potential}`}
+              {weekEarned >= 0 ? '+' : ''}{weekEarned}
             </Text>
-            <Text style={styles.widgetPts}>pts</Text>
-          </View>
-        </View>
-
-        {/* Right — PTS. EARNED (live via Realtime) */}
-        <View style={styles.widget}>
-          <Text style={styles.widgetLabel}>PTS. EARNED</Text>
-          <View style={styles.widgetValueRow}>
             <Text style={[
-              styles.widgetValue,
-              weekEarned != null && weekEarned > 0 && {color: '#1b9a06'},
-              weekEarned != null && weekEarned < 0 && {color: colors.error},
-            ]}>
-              {weekEarned == null
-                ? '0'
-                : weekEarned > 0
-                  ? `+${weekEarned}`
-                  : `${weekEarned}`}
-            </Text>
-            <Text style={styles.widgetPts}>pts</Text>
+              styles.widgetPts,
+              {color: weekEarned >= 0 ? '#1b9a06' : colors.error},
+            ]}>pts</Text>
           </View>
         </View>
+      </TouchableOpacity>
+    );
+  }
+
+  const earnedDisplay = weekEarned == null
+    ? '0'
+    : weekEarned > 0
+      ? `+${weekEarned}`
+      : `${weekEarned}`;
+
+  return (
+    <View style={styles.widgetRow}>
+      {/* Left — Previous week FINAL (Week 2+) or TBD (Week 1) */}
+      <View style={styles.widget}>
+        {currentWeek > 1 && lastWeekEarned != null ? (
+          <>
+            <Text style={styles.widgetLabel}>
+              Week {currentWeek - 1} {'\u2022'} FINAL
+            </Text>
+            <View style={styles.widgetValueRow}>
+              <Text style={[
+                styles.widgetValue,
+                {color: lastWeekEarned >= 0 ? '#1b9a06' : colors.error},
+              ]}>
+                {lastWeekEarned >= 0 ? '+' : ''}{lastWeekEarned}
+              </Text>
+              <Text style={[
+                styles.widgetPts,
+                {color: lastWeekEarned >= 0 ? '#1b9a06' : colors.error},
+              ]}>pts</Text>
+            </View>
+          </>
+        ) : (
+          <Text style={styles.widgetLabel}>{' '}</Text>
+        )}
       </View>
 
-    </>
+      {/* Right — WEEK X score */}
+      <View style={styles.widget}>
+        <Text style={styles.widgetLabel}>WEEK {currentWeek}</Text>
+        <View style={styles.widgetValueRow}>
+          <Text style={[
+            styles.widgetValue,
+            weekEarned != null && weekEarned > 0 && {color: '#1b9a06'},
+            weekEarned != null && weekEarned < 0 && {color: colors.error},
+          ]}>
+            {earnedDisplay}
+          </Text>
+          <Text style={styles.widgetPts}>pts</Text>
+        </View>
+      </View>
+    </View>
   );
 }
 
@@ -167,12 +216,11 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
   },
   widgetLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.textSecondary,
-    letterSpacing: 0.5,
+    ...typography.body,
+    fontWeight: '700',
+    fontStyle: 'italic',
+    color: colors.textPrimary,
     marginBottom: 2,
-    textTransform: 'uppercase',
   },
   widgetValueRow: {
     flexDirection: 'row',
@@ -186,6 +234,11 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   widgetPts: {
     fontSize: 13,
+    fontWeight: '400',
+    color: colors.textSecondary,
+  },
+  widgetTarget: {
+    fontSize: 14,
     fontWeight: '400',
     color: colors.textSecondary,
   },

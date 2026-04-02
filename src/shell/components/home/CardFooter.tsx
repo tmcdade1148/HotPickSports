@@ -14,6 +14,12 @@ interface CardFooterProps {
   secondaryLabel?: string;
   /** Color for the secondary label — falls back to success */
   secondaryColor?: string;
+  /** Render the secondary label at a larger, bolder size — for celebration states */
+  secondaryLarge?: boolean;
+  /** Use dark text on the button (e.g. for yellow/warning background) */
+  darkText?: boolean;
+  /** Grey out and disable the button — picks can no longer be changed */
+  disabled?: boolean;
 }
 
 /**
@@ -27,8 +33,11 @@ export function CardFooter({
   label,
   onPress,
   accentColor,
+  darkText,
   secondaryLabel,
   secondaryColor,
+  secondaryLarge,
+  disabled,
 }: CardFooterProps) {
   const {colors} = useTheme();
   const styles = createStyles(colors);
@@ -37,15 +46,19 @@ export function CardFooter({
   return (
     <View style={styles.container}>
       {secondaryLabel && (
-        <Text style={[styles.secondaryLabel, {color: resolvedSecondary}]}>
+        <Text style={[
+          secondaryLarge ? styles.secondaryLabelLarge : styles.secondaryLabel,
+          {color: resolvedSecondary},
+        ]}>
           {secondaryLabel}
         </Text>
       )}
       <TouchableOpacity
-        style={[styles.button, {backgroundColor: resolvedAccent}]}
+        style={[styles.button, {backgroundColor: resolvedAccent}, disabled && styles.buttonDisabled]}
         activeOpacity={0.8}
-        onPress={onPress}>
-        <Text style={styles.buttonText}>{label}</Text>
+        onPress={onPress}
+        disabled={disabled}>
+        <Text style={[styles.buttonText, darkText && {color: '#1A1A1A'}]}>{label}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -63,11 +76,22 @@ const createStyles = (colors: any) => StyleSheet.create({
     textAlign: 'center',
     marginBottom: spacing.sm,
   },
+  secondaryLabelLarge: {
+    fontSize: 20,
+    fontWeight: '800',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+    letterSpacing: 0.3,
+  },
   button: {
     borderRadius: borderRadius.md,
     paddingVertical: spacing.sm + 2,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  buttonDisabled: {
+    opacity: 0.4,
   },
   buttonText: {
     ...typography.body,

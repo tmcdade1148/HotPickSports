@@ -7,6 +7,7 @@ import {supabase} from '@shared/config/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {getEventsByPriority} from '@sports/registry';
 import {deactivateDeviceTokens} from '@shell/services/pushNotifications';
+import {nflSeason} from '@sports/nfl/config';
 
 const POOL_STORAGE_PREFIX = 'hotpick_active_pool_';
 const DEFAULT_POOL_PREFIX = 'hotpick_default_pool_';
@@ -61,6 +62,10 @@ interface GlobalState {
   needsProfileSetup: () => boolean;
   needsTosAcceptance: () => boolean;
   acceptTos: (userId: string) => Promise<boolean>;
+  /** Fetch current_tos_version from competition_config */
+  fetchCurrentTosVersion: () => Promise<string | null>;
+  /** Check if user's tos_version matches current_tos_version */
+  needsTosUpdate: (currentTosVersion: string) => boolean;
 
   // Invite code — stored in memory for deep link flow
   pendingInviteCode: string | null;
@@ -299,8 +304,18 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   },
 
   acceptTos: async (userId: string) => {
+    // Read current TOS version from competition_config
+    const {data: configRow} = await supabase
+      .from('competition_config')
+      .select('value')
+      .eq('competition', 'global')
+      .eq('key', 'current_tos_version')
+      .single();
+
+    const tosVersion = configRow?.value ?? '1.0';
+
     const {error} = await supabase.rpc('rpc_accept_tos', {
-      p_tos_version: '1.0',
+      p_tos_version: tosVersion,
     });
 
     if (error) {
@@ -313,11 +328,27 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
         ? {
             ...state.userProfile,
             tos_accepted_at: new Date().toISOString(),
-            tos_version: '1.0',
+            tos_version: tosVersion,
           }
         : null,
     }));
     return true;
+  },
+
+  fetchCurrentTosVersion: async () => {
+    const {data} = await supabase
+      .from('competition_config')
+      .select('value')
+      .eq('competition', 'global')
+      .eq('key', 'current_tos_version')
+      .single();
+    return data?.value ?? null;
+  },
+
+  needsTosUpdate: (currentTosVersion: string) => {
+    const profile = get().userProfile;
+    if (!profile || !profile.tos_version) return true;
+    return profile.tos_version !== currentTosVersion;
   },
 
   // ---------------------------------------------------------------------------
@@ -1037,11 +1068,13 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       isVisible: r.is_visible,
     }));
 
-    // Check if user has any history (non-no-show week in season_user_totals)
-    const {count} = await supabase
+    // Check if user has any history (non-no-show week in current competition)
+    const competition = nflSeason.competition;
+    const {count, error: countError} = await supabase
       .from('season_user_totals')
       .select('id', {count: 'exact', head: true})
       .eq('user_id', userId)
+      .eq('competition', competition)
       .eq('is_no_show', false);
 
     // Read visibility preference from profile

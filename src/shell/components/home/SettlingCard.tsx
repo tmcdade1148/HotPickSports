@@ -10,48 +10,44 @@ interface SettlingCardProps {
 }
 
 /**
- * Shown when weekState === 'settling'.
- * Games ended within last 24 hours — shows weekly result + rank movement.
+ * Shown when weekState === 'settling' or 'complete'.
+ * Games ended — shows weekly result + rank movement.
  */
 export function SettlingCard({currentWeek, weekResult}: SettlingCardProps) {
   const {colors} = useTheme();
   const styles = createStyles(colors);
+  if (!weekResult) return null;
+
   return (
     <View style={styles.container}>
-      <Text style={styles.headline}>Week complete</Text>
-
-      {weekResult ? (
-        <View style={styles.resultSection}>
-          <View style={styles.statRow}>
-            <Text style={styles.statValue}>
-              {weekResult.weekPoints > 0 ? '+' : ''}
-              {weekResult.weekPoints}
-            </Text>
-            <Text style={styles.statLabel}>points this week</Text>
-          </View>
-          <View style={styles.statRow}>
-            <Text style={styles.statValue}>
-              {weekResult.correctPicks}/{weekResult.totalPicks}
-            </Text>
-            <Text style={styles.statLabel}>picks correct</Text>
-          </View>
-          {weekResult.rankDelta !== 0 && (
-            <Text
-              style={[
-                styles.rankDelta,
-                weekResult.rankDelta < 0
-                  ? styles.rankUp
-                  : styles.rankDown,
-              ]}>
-              {weekResult.rankDelta < 0
-                ? `Moved up ${Math.abs(weekResult.rankDelta)} spot${Math.abs(weekResult.rankDelta) !== 1 ? 's' : ''}`
-                : `Dropped ${weekResult.rankDelta} spot${weekResult.rankDelta !== 1 ? 's' : ''}`}
-            </Text>
-          )}
+      <View style={styles.resultSection}>
+        <View style={styles.statRow}>
+          <Text style={styles.statValue}>
+            {weekResult.weekPoints > 0 ? '+' : ''}
+            {weekResult.weekPoints}
+          </Text>
+          <Text style={styles.statLabel}>points this week</Text>
         </View>
-      ) : (
-        <Text style={styles.body}>Scores are being finalized...</Text>
-      )}
+        <View style={styles.statRow}>
+          <Text style={styles.statValue}>
+            {weekResult.correctPicks}/{weekResult.totalPicks}
+          </Text>
+          <Text style={styles.statLabel}>picks correct</Text>
+        </View>
+        {weekResult.rankDelta !== 0 && (
+          <Text
+            style={[
+              styles.rankDelta,
+              weekResult.rankDelta < 0
+                ? styles.rankUp
+                : styles.rankDown,
+            ]}>
+            {weekResult.rankDelta < 0
+              ? `Moved up ${Math.abs(weekResult.rankDelta)} spot${Math.abs(weekResult.rankDelta) !== 1 ? 's' : ''}`
+              : `Dropped ${weekResult.rankDelta} spot${weekResult.rankDelta !== 1 ? 's' : ''}`}
+          </Text>
+        )}
+      </View>
     </View>
   );
 }
@@ -59,18 +55,6 @@ export function SettlingCard({currentWeek, weekResult}: SettlingCardProps) {
 const createStyles = (colors: any) => StyleSheet.create({
   container: {
     padding: spacing.md,
-  },
-  label: {
-    ...typography.small,
-    color: colors.highlight,
-    fontWeight: '600',
-    letterSpacing: 1,
-    marginBottom: spacing.xs,
-  },
-  headline: {
-    ...typography.h3,
-    color: colors.textPrimary,
-    marginBottom: spacing.md,
   },
   resultSection: {
     gap: spacing.sm,
@@ -98,9 +82,5 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   rankDown: {
     color: colors.error,
-  },
-  body: {
-    ...typography.body,
-    color: colors.textSecondary,
   },
 });

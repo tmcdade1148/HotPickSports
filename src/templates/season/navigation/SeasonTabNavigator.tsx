@@ -147,7 +147,7 @@ export function SeasonTabNavigator({
 
   useEffect(() => {
     initialize(config, poolId);
-  }, [config, poolId, initialize]);
+  }, [config.competition, poolId, initialize]);
 
   const initialRouteName = `Season_${config.tabs[0]?.key ?? 'picks'}`;
 

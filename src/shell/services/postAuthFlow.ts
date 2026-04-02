@@ -2,8 +2,8 @@
  * Unified post-auth pipeline.
  *
  * Called by all three auth methods (email, Apple, Google) after successful
- * authentication. Handles TOS acceptance, global pool enrollment, profile
- * check, pool selection restoration, and navigation.
+ * authentication. Handles TOS acceptance (new users only), global pool
+ * enrollment, profile check, pool selection restoration, and navigation.
  *
  * This eliminates duplicated post-auth logic across auth screens.
  */
@@ -31,11 +31,12 @@ interface PostAuthOptions {
  *
  * Flow:
  * 1. Set user + active sport in store
- * 2. Accept TOS (idempotent — safe to call every time)
- * 3. Ensure global pool membership
- * 4. Fetch profile
- * 5. If profile incomplete → ProfileSetup (with optional provider name)
- * 6. If profile complete → load pools, restore selection, navigate Home
+ * 2. Ensure global pool membership
+ * 3. Fetch profile
+ * 4. If new user (no tos_accepted_at) → accept TOS, then ProfileSetup
+ * 5. If returning user with outdated TOS → TosVersionGate
+ * 6. If profile incomplete → ProfileSetup
+ * 7. If profile complete → load pools, restore selection, navigate Home
  */
 export async function runPostAuthFlow({
   user,
@@ -49,24 +50,37 @@ export async function runPostAuthFlow({
   store.setUser(user);
   store.setActiveSport(defaultEvent);
 
-  // Step 2: Accept TOS (idempotent — RPC no-ops if already accepted)
-  await store.acceptTos(user.id);
-
-  // Step 3: Ensure user is in global pool
+  // Step 2: Ensure user is in global pool
   await store.ensureGlobalPoolMembership();
 
-  // Step 4: Fetch profile
+  // Step 3: Fetch profile
   const profile = await store.fetchProfile(user.id);
 
-  // Step 5: Check if profile is complete
-  if (!profile || !profile.first_name) {
+  // Step 4: New user — accept TOS then proceed to profile setup
+  if (!profile || !profile.tos_accepted_at) {
+    await store.acceptTos(user.id);
     navigation.replace('ProfileSetup', {
       providerName: providerName ?? undefined,
     });
     return;
   }
 
-  // Step 6: Load pools and restore selection
+  // Step 5: Returning user — check TOS version
+  const currentTosVersion = await store.fetchCurrentTosVersion();
+  if (currentTosVersion && store.needsTosUpdate(currentTosVersion)) {
+    navigation.replace('TosVersionGate');
+    return;
+  }
+
+  // Step 6: Check if profile is complete
+  if (!profile.first_name) {
+    navigation.replace('ProfileSetup', {
+      providerName: providerName ?? undefined,
+    });
+    return;
+  }
+
+  // Step 7: Load pools and restore selection
   await store.fetchUserPools(user.id, defaultEvent.competition);
   const pools = useGlobalStore.getState().userPools;
 

@@ -1,5 +1,6 @@
-import React, {useEffect, useCallback, useState} from 'react';
+import React, {useEffect, useCallback, useMemo, useState} from 'react';
 import {View, Text, FlatList, ActivityIndicator, Alert, StyleSheet} from 'react-native';
+import {useFocusEffect} from '@react-navigation/native';
 import {useSeasonStore} from '../stores/seasonStore';
 import {WeekSelector} from '../components/WeekSelector';
 import {SeasonMatchCard} from '../components/SeasonMatchCard';
@@ -34,9 +35,12 @@ export function SeasonPicksScreen() {
   const fetchUserPicks = useSeasonStore(s => s.fetchUserPicks);
   const weekPicks = useSeasonStore(s => s.weekPicks);
   const {user} = useAuth();
-  const userSeasonTotal = useNFLStore(s => s.userSeasonTotal);
   const dbCurrentWeek = useNFLStore(s => s.currentWeek);
+  const weekState = useNFLStore(s => s.weekState);
+  const currentPhase = useNFLStore(s => s.currentPhase);
+  const picksOpenAt = useNFLStore(s => s.picksOpenAt);
   const activePoolId = useGlobalStore(s => s.activePoolId);
+  const subscribeToGameScores = useSeasonStore(s => s.subscribeToGameScores);
 
   // Check if all games are final for this week
   const allGamesFinal = games.length > 0 && games.every(g => {
@@ -44,14 +48,17 @@ export function SeasonPicksScreen() {
     return status === 'FINAL' || status === 'COMPLETED' || status === 'STATUS_FINAL';
   });
 
-  // Fetch finalized week score
-  const [finalScore, setFinalScore] = useState<number | null>(null);
+  // Live week earned points — fetched on mount and kept current via Realtime.
+  // The scoring Edge Function writes to season_user_totals as each game finalizes,
+  // so this updates progressively throughout the week rather than only at the end.
+  const [weekEarned, setWeekEarned] = useState<number | null>(null);
   useEffect(() => {
-    if (!user?.id || !config || !allGamesFinal) {
-      setFinalScore(null);
+    if (!user?.id || !config) {
+      setWeekEarned(null);
       return;
     }
-    const fetchScore = async () => {
+
+    const fetchEarned = async () => {
       const {data} = await supabase
         .from('season_user_totals')
         .select('week_points')
@@ -59,10 +66,34 @@ export function SeasonPicksScreen() {
         .eq('competition', config.competition)
         .eq('week', currentWeek)
         .maybeSingle();
-      setFinalScore(data?.week_points ?? null);
+      setWeekEarned(data?.week_points ?? null);
     };
-    fetchScore();
-  }, [user?.id, config?.competition, currentWeek, allGamesFinal]);
+    fetchEarned();
+
+    // Subscribe to scoring updates for this user's week row
+    const channel = supabase
+      .channel(`week_earned_${user.id}_${config.competition}_${currentWeek}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'season_user_totals',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload: any) => {
+          const row = payload.new;
+          if (row.competition === config.competition && row.week === currentWeek) {
+            setWeekEarned(row.week_points ?? null);
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, config?.competition, currentWeek]);
 
   // Pick split stats per game (from game_pick_stats table)
   const [pickStats, setPickStats] = useState<Record<string, any>>({});
@@ -91,7 +122,7 @@ export function SeasonPicksScreen() {
       }
     };
     fetchStats();
-  }, [config, activePoolId, currentWeek, games.length]);
+  }, [config?.competition, activePoolId, currentWeek, games.length]);
 
   // Compute potential week score from current picks
   const potentialWeekScore = (() => {
@@ -109,6 +140,18 @@ export function SeasonPicksScreen() {
     return total;
   })();
 
+  // When the DB advances to a new week (week transition), auto-advance the
+  // viewing week so seasonStore.currentWeek stays in sync with nflStore.currentWeek.
+  // Without this, picksAreOpen = (weekState_open && currentWeek === dbCurrentWeek)
+  // evaluates to false for the new week — locking all games after every transition.
+  // Only fire when dbCurrentWeek changes (not when user manually navigates back).
+  useEffect(() => {
+    const viewingWeek = useSeasonStore.getState().currentWeek;
+    if (dbCurrentWeek > viewingWeek) {
+      setCurrentWeek(dbCurrentWeek);
+    }
+  }, [dbCurrentWeek, setCurrentWeek]);
+
   useEffect(() => {
     if (!config) {
       return;
@@ -120,7 +163,25 @@ export function SeasonPicksScreen() {
       }
     };
     load();
-  }, [config, currentWeek, user?.id, fetchWeekGames, fetchUserPicks]);
+  }, [config?.competition, currentWeek, weekState, user?.id, fetchWeekGames, fetchUserPicks]);
+
+  // Re-fetch games when Picks tab regains focus so lock_at changes are picked up
+  // even if weekState hasn't changed (e.g. new wave kicks off during 'live')
+  useFocusEffect(
+    useCallback(() => {
+      if (!config) return;
+      fetchWeekGames(currentWeek);
+    }, [config?.competition, currentWeek, fetchWeekGames]),
+  );
+
+  // Subscribe to live game updates (scores, status, lock_at) whenever the
+  // screen is mounted — not just during 'live'. lock_at changes from the
+  // simulator can arrive during any weekState.
+  useEffect(() => {
+    if (!config) return;
+    const unsub = subscribeToGameScores();
+    return unsub;
+  }, [config?.competition, subscribeToGameScores]);
 
   // Block week navigation if user has picks but no HotPick
   const handleSelectWeek = useCallback(
@@ -145,6 +206,41 @@ export function SeasonPicksScreen() {
     );
   }
 
+  // PRE_SEASON: no picks yet — show a holding screen
+  if (currentPhase === 'PRE_SEASON') {
+    const picksOpenLabel = picksOpenAt
+      ? picksOpenAt.toLocaleDateString([], {weekday: 'long', month: 'long', day: 'numeric'})
+      : null;
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.emptyTitle}>Picks aren't open yet.</Text>
+        <Text style={styles.emptyText}>
+          {picksOpenLabel
+            ? `Picks open ${picksOpenLabel}. The schedule is loaded — come back then.`
+            : 'The schedule is set. Check back when the season kicks off.'}
+        </Text>
+      </View>
+    );
+  }
+
+  // Picks remain interactive through 'live' — individual games lock per-card via
+  // status, lock_at, or wave inference. 'locked' state and beyond are fully locked.
+  const picksAreOpen = (weekState === 'picks_open' || weekState === 'live') && currentWeek === dbCurrentWeek;
+
+  // Wave-lock fallback: earliest kickoff of any live/final game this week.
+  // Used by SeasonMatchCard to lock games without lock_at that kicked off at
+  // or before this time. Games with lock_at use lock_at as authoritative.
+  const liveAnchorTime = useMemo(() => {
+    if (weekState !== 'live') return null;
+    const liveOrFinalKickoffs = games
+      .filter(g => {
+        const s = (g.status ?? '').toUpperCase();
+        return s === 'IN_PROGRESS' || s === 'LIVE' || s === 'FINAL' || s === 'STATUS_FINAL' || s === 'COMPLETED';
+      })
+      .map(g => new Date(g.kickoff_at).getTime());
+    return liveOrFinalKickoffs.length > 0 ? Math.min(...liveOrFinalKickoffs) : null;
+  }, [weekState, games]);
+
   const renderGame = ({item, index}: {item: DbSeasonGame; index: number}) => (
     <View style={[
       styles.cardWrapper,
@@ -155,6 +251,8 @@ export function SeasonPicksScreen() {
         config={config}
         userId={user?.id ?? ''}
         pickSplit={pickStats[item.game_id] ?? null}
+        picksAreOpen={picksAreOpen}
+        liveAnchorTime={liveAnchorTime}
       />
     </View>
   );
@@ -182,33 +280,60 @@ export function SeasonPicksScreen() {
           />
 
           {/* Score widgets */}
-          <View style={styles.widgetRow}>
-            <View style={styles.widget}>
-              <Text style={styles.widgetLabel}>Season Total</Text>
-              <View style={styles.widgetValueRow}>
-                <Text style={styles.widgetValue}>{userSeasonTotal ?? 0}</Text>
-                <Text style={styles.widgetPts}>pts</Text>
-              </View>
-            </View>
-            <View style={styles.widget}>
-              <Text style={styles.widgetLabel}>
-                {allGamesFinal && finalScore != null ? 'Final Score' : 'Week Potential'}
-              </Text>
-              <View style={styles.widgetValueRow}>
-                <Text style={[
-                  styles.widgetValue,
-                  allGamesFinal && finalScore != null
-                    ? {color: finalScore >= 0 ? '#1b9a06' : colors.error}
-                    : pickCount > 0 && {color: colors.primary},
-                ]}>
-                  {allGamesFinal && finalScore != null
-                    ? `${finalScore >= 0 ? '+' : ''}${finalScore}`
-                    : `+${potentialWeekScore}`}
+          {allGamesFinal && weekEarned != null ? (
+            <View style={styles.widgetRow}>
+              <View style={styles.widgetFull}>
+                <Text style={styles.widgetLabel}>
+                  Week {currentWeek} {'\u2022'} FINAL SCORE
                 </Text>
-                <Text style={styles.widgetPts}>pts</Text>
+                <View style={styles.widgetValueRow}>
+                  <Text style={[
+                    styles.widgetValue,
+                    {color: weekEarned >= 0 ? '#1b9a06' : colors.error},
+                  ]}>
+                    {weekEarned >= 0 ? '+' : ''}{weekEarned}
+                  </Text>
+                  <Text style={[
+                    styles.widgetPts,
+                    {color: weekEarned >= 0 ? '#1b9a06' : colors.error},
+                  ]}>pts</Text>
+                  <Text style={styles.widgetTarget}>/{potentialWeekScore} target pts</Text>
+                </View>
               </View>
             </View>
-          </View>
+          ) : (
+            <View style={styles.widgetRow}>
+              <View style={styles.widget}>
+                <Text style={styles.widgetLabel}>Pts. Target</Text>
+                <View style={styles.widgetValueRow}>
+                  <Text style={[
+                    styles.widgetValue,
+                    pickCount > 0 && {color: colors.primary},
+                  ]}>
+                    +{potentialWeekScore}
+                  </Text>
+                  <Text style={styles.widgetPts}>pts</Text>
+                </View>
+              </View>
+              <View style={styles.widget}>
+                <Text style={styles.widgetLabel}>PTS. EARNED</Text>
+                <View style={styles.widgetValueRow}>
+                  <Text style={[
+                    styles.widgetValue,
+                    weekEarned != null && weekEarned > 0 && {color: '#1b9a06'},
+                    weekEarned != null && weekEarned < 0 && {color: colors.error},
+                  ]}>
+                    {weekEarned == null
+                      ? '—'
+                      : weekEarned > 0
+                        ? `+${weekEarned}`
+                        : `${weekEarned}`}
+                  </Text>
+                  <Text style={styles.widgetPts}>pts</Text>
+                </View>
+              </View>
+            </View>
+          )}
         </>
       )}
 
@@ -241,8 +366,10 @@ export function SeasonPicksScreen() {
           isWeekComplete={isWeekComplete}
           allGamesLocked={games.length > 0 && games.every(g => {
             const status = (g.status ?? '').toUpperCase();
-            const kickoffPassed = new Date(g.kickoff_at).getTime() <= Date.now();
-            return status === 'FINAL' || status === 'IN_PROGRESS' || status === 'LIVE' || kickoffPassed;
+            if (status === 'FINAL' || status === 'STATUS_FINAL' || status === 'COMPLETED'
+              || status === 'IN_PROGRESS' || status === 'LIVE') return true;
+            if (g.lock_at && new Date(g.lock_at).getTime() <= Date.now()) return true;
+            return false;
           })}
           onSubmit={() => setWeekComplete(true)}
           accentColor={config.color}
@@ -279,6 +406,17 @@ const createStyles = (colors: any) => StyleSheet.create({
     flex: 1,
     backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.sm + 2,
+    alignItems: 'center',
+  },
+  widgetFull: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
     padding: spacing.sm + 2,
     alignItems: 'center',
   },
@@ -299,6 +437,11 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
     color: colors.textPrimary,
+  },
+  widgetTarget: {
+    fontSize: 14,
+    fontWeight: '400',
+    color: colors.textSecondary,
   },
   widgetPts: {
     fontSize: 13,

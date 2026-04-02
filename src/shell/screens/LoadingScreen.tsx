@@ -69,6 +69,13 @@ export function LoadingScreen({navigation}: any) {
           return;
         }
 
+        // TOS version gate: check if user needs to re-accept updated TOS
+        const currentTosVersion = await useGlobalStore.getState().fetchCurrentTosVersion();
+        if (currentTosVersion && useGlobalStore.getState().needsTosUpdate(currentTosVersion)) {
+          navigation.replace('TosVersionGate');
+          return;
+        }
+
         // Ensure user is enrolled in global pools, then load pools
         await ensureGlobalPoolMembership();
         await fetchUserPools(session.user.id, defaultEvent.competition);

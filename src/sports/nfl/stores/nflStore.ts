@@ -724,7 +724,6 @@ export const useNFLStore = create<NFLState>((set, get) => ({
             liveScores: {},
             highestRankedGame: null,
             weekFirstKickoff: null,
-            sundayLockAnchor: null,
           });
         },
       )

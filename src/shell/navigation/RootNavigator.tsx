@@ -28,6 +28,7 @@ import {CommunityGuidelinesScreen} from '@shell/screens/CommunityGuidelinesScree
 import {NotificationPreferencesScreen} from '@shell/screens/NotificationPreferencesScreen';
 import {ResetPasswordScreen} from '@shell/screens/ResetPasswordScreen';
 import {HardwareAdminScreen} from '@shell/screens/HardwareAdminScreen';
+import {TosVersionGateScreen} from '@shell/screens/TosVersionGateScreen';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {supabase} from '@shared/config/supabase';
 import {Linking} from 'react-native';
@@ -179,6 +180,7 @@ export function RootNavigator() {
         />
 
         {/* Onboarding */}
+        <Stack.Screen name="TosVersionGate" component={TosVersionGateScreen} />
         <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
         <Stack.Screen
           name="PushNotification"

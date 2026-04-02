@@ -1,15 +1,15 @@
 import type {SeasonConfig} from '@shared/types/templates';
 
 export const nflSeason: SeasonConfig = {
-  competition: 'nfl_2026',
+  competition: 'nfl_2025_sim', // SIM — revert to 'nfl_2026' after testing
   templateType: 'season',
   sport: 'football',
   name: 'NFL 2026-27 Season',
   shortName: 'NFL',
   status: 'active',
-  startDate: '2026-09-10',
-  endDate: '2027-02-14',
-  picksOpenDate: '2026-09-07',
+  startDate: '2026-09-09',
+  endDate: '2027-02-08',
+  picksOpenDate: '2026-09-02',
   color: '#013369',
 
   sportIdentity: {
@@ -66,7 +66,7 @@ export const nflSeason: SeasonConfig = {
     {code: 'DAL', name: 'Dallas Cowboys', shortName: 'Cowboys'},
     {code: 'NYG', name: 'New York Giants', shortName: 'Giants'},
     {code: 'PHI', name: 'Philadelphia Eagles', shortName: 'Eagles'},
-    {code: 'WAS', name: 'Washington Commanders', shortName: 'Commanders'},
+    {code: 'WSH', name: 'Washington Commanders', shortName: 'Commanders'},
     // NFC North
     {code: 'CHI', name: 'Chicago Bears', shortName: 'Bears'},
     {code: 'DET', name: 'Detroit Lions', shortName: 'Lions'},

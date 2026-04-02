@@ -16,13 +16,13 @@ import type {BrandConfig, BrandLogoSet} from './types';
  * |------------|-----------|------------------------------------------------|
  * | primary    | #F5620F   | CTAs, active buttons, highlights               |
  * | secondary  | #45615E   | Accents, inactive states                       |
- * | highlight  | #F5C842   | Light color for text/elements on dark backgrounds |
+ * | highlight  | #34A4D1   | Accent color — blue in light mode, gold (#F5C842) in dark mode |
  * | background | #FCFCFC   | App bg, splash bg, adaptive icon bg            |
  */
 export const HOTPICK_BRAND_COLORS = {
   primary: '#F5620F',
   secondary: '#45615E',
-  highlight: '#F5C842',
+  highlight: '#34A4D1',
   background: '#FCFCFC',
 } as const;
 

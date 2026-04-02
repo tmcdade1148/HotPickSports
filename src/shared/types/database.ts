@@ -320,6 +320,7 @@ export interface DbSeasonGame {
   q2_away_score: number | null;
   q3_home_score: number | null;
   q3_away_score: number | null;
+  lock_at: string | null;
   created_at: string;
   updated_at: string;
 }

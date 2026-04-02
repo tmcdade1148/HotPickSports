@@ -85,6 +85,8 @@ async function scoreWeek(competition: string, seasonYear: number, week: number) 
   if (picksError) return { users_scored: 0, final_games: games.length, error: picksError.message };
 
   const aggByUser = new Map<string, any>();
+  // Track per-pick results to write back to season_picks
+  const pickResults: { user_id: string; game_id: string; is_correct: boolean; points: number }[] = [];
 
   for (const p of picks ?? []) {
     const game = gameMap.get(p.game_id);
@@ -103,24 +105,36 @@ async function scoreWeek(competition: string, seasonYear: number, week: number) 
 
     agg.total_picks += 1;
 
+    let pickPoints = 0;
     if (isHotpick) {
       agg.hotpick_rank = rank;
       if (isWin) {
-        const pts = isDoubleDown ? rank * 2 : rank;
-        agg.week_points += pts;
+        pickPoints = isDoubleDown ? rank * 2 : rank;
+        agg.week_points += pickPoints;
         agg.correct_picks += 1;
         agg.is_hotpick_correct = true;
         if (isDoubleDown) { agg.double_down_used = true; agg.double_down_delta = rank; }
       } else {
+        pickPoints = -rank;
         agg.week_points -= rank;
         if (agg.is_hotpick_correct === null) agg.is_hotpick_correct = false;
       }
     } else if (isWin) {
+      pickPoints = BASE_WIN_POINTS;
       agg.week_points += BASE_WIN_POINTS;
       agg.correct_picks += 1;
     }
 
+    pickResults.push({ user_id: p.user_id, game_id: p.game_id, is_correct: isWin, points: pickPoints });
     aggByUser.set(p.user_id, agg);
+  }
+
+  // Write per-pick results (points, is_correct) back to season_picks
+  if (pickResults.length > 0) {
+    for (const pr of pickResults) {
+      await supabase.from("season_picks").update({ is_correct: pr.is_correct, points: pr.points })
+        .eq("user_id", pr.user_id).eq("game_id", pr.game_id).eq("competition", competition);
+    }
   }
 
   const userAggs = Array.from(aggByUser.values());

@@ -1,0 +1,1345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HotPick — Season Simulator</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0D1117; color: #8A97AA; font-size: 14px; }
+  h1 { color: #F5C842; font-size: 18px; font-weight: 700; letter-spacing: 0.5px; }
+  h2 { color: #F5620F; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+
+  .header { background: #161C26; border-bottom: 1px solid #2C3A52; padding: 12px 20px; display: flex; align-items: center; gap: 16px; }
+  .badge { background: #F5620F; color: #fff; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: 0.5px; }
+
+  .layout { display: grid; grid-template-columns: 340px 1fr; gap: 0; height: calc(100vh - 53px); overflow: hidden; }
+
+  .sidebar { background: #161C26; border-right: 1px solid #2C3A52; display: flex; flex-direction: column; overflow: hidden; }
+  .sidebar-section { padding: 16px; border-bottom: 1px solid #2C3A52; }
+
+  .main { display: flex; flex-direction: column; overflow: hidden; }
+
+  label { display: block; font-size: 11px; color: #8A97AA; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  input[type="text"], input[type="password"], select {
+    width: 100%; background: #0D1117; border: 1px solid #2C3A52; color: #8A97AA;
+    padding: 7px 10px; border-radius: 6px; font-size: 13px; outline: none;
+  }
+  input[type="text"]:focus, input[type="password"]:focus, select:focus { border-color: #F5620F; color: #E8EAF0; }
+  select option { background: #161C26; }
+
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: opacity 0.15s; }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-primary { background: #F5620F; color: #fff; }
+  .btn-secondary { background: #2C3A52; color: #8A97AA; }
+  .btn-warning { background: #F5C842; color: #0D1117; }
+  .btn-danger { background: #C0392B; color: #fff; }
+  .btn:not(:disabled):hover { opacity: 0.85; }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+
+  /* Timeline */
+  .timeline-wrap { padding: 16px; }
+  .timeline-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .timer-display { font-size: 22px; font-weight: 700; color: #F5620F; font-variant-numeric: tabular-nums; }
+  .timer-total { font-size: 12px; color: #8A97AA; }
+  .progress-track { background: #2C3A52; border-radius: 4px; height: 8px; overflow: hidden; margin-bottom: 12px; }
+  .progress-fill { background: #F5620F; height: 100%; border-radius: 4px; transition: width 0.5s linear; width: 0%; }
+
+  .checkpoints { overflow-y: auto; flex: 1; }
+  .checkpoint { display: flex; align-items: flex-start; gap: 10px; padding: 6px 16px; border-left: 3px solid transparent; transition: background 0.1s; }
+  .checkpoint.done { border-left-color: #1b9a06; }
+  .checkpoint.current { background: #F5620F15; border-left-color: #F5620F; }
+  .checkpoint.pending { border-left-color: transparent; }
+  .cp-icon { font-size: 14px; line-height: 1.4; flex-shrink: 0; }
+  .cp-time { font-size: 11px; color: #8A97AA; font-variant-numeric: tabular-nums; width: 32px; flex-shrink: 0; margin-top: 2px; }
+  .cp-label { font-size: 13px; color: #8A97AA; }
+  .checkpoint.done .cp-label { color: #1b9a06; }
+  .checkpoint.current .cp-label { color: #F5620F; font-weight: 600; }
+
+  /* Games table */
+  .games-panel { padding: 16px; flex: 1; overflow-y: auto; }
+  .games-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .games-table th { text-align: left; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #8A97AA; padding: 0 8px 8px; border-bottom: 1px solid #2C3A52; }
+  .games-table td { padding: 7px 8px; border-bottom: 1px solid #2C3A5230; color: #8A97AA; }
+  .games-table tr:hover td { background: #161C2650; }
+  .picked { color: #F5C842; font-weight: 700; }
+  .hotpick-mark { color: #F5620F; font-size: 10px; font-weight: 700; margin-left: 2px; }
+  .status-scheduled { color: #8A97AA; }
+  .status-in_progress { color: #F5620F; font-weight: 600; }
+  .status-final { color: #1b9a06; font-weight: 600; }
+  .score-cell { font-variant-numeric: tabular-nums; }
+  .rank-pill { display: inline-block; background: #F5620F; color: #fff; border-radius: 10px; font-size: 10px; font-weight: 700; padding: 1px 6px; }
+  .wave-badge { display: inline-block; font-size: 10px; color: #8A97AA; background: #2C3A52; border-radius: 3px; padding: 1px 5px; }
+
+  /* Activity log */
+  .log-panel { background: #0D1117; border-top: 1px solid #2C3A52; height: 180px; overflow-y: auto; padding: 8px 16px; display: flex; flex-direction: column-reverse; }
+  .log-entry { display: flex; gap: 10px; padding: 3px 0; font-size: 12px; border-bottom: 1px solid #2C3A5220; }
+  .log-time { color: #8A97AA; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+  .log-msg { color: #8A97AA; }
+  .log-msg.success { color: #1b9a06; }
+  .log-msg.warn { color: #F5C842; }
+  .log-msg.error { color: #C0392B; }
+  .log-msg.info { color: #51A1A6; }
+
+  .status-bar { padding: 8px 16px; background: #161C26; border-bottom: 1px solid #2C3A52; display: flex; align-items: center; gap: 16px; font-size: 12px; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #2C3A52; }
+  .status-dot.running { background: #F5620F; animation: pulse 1s infinite; }
+  .status-dot.paused { background: #F5C842; }
+  .status-dot.complete { background: #1b9a06; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .state-chip { background: #2C3A52; color: #8A97AA; border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  .state-chip.picks_open { background: #1b9a0620; color: #1b9a06; }
+  .state-chip.locked { background: #F5C84220; color: #F5C842; }
+  .state-chip.live { background: #F5620F20; color: #F5620F; }
+  .state-chip.settling { background: #51A1A620; color: #51A1A6; }
+  .state-chip.complete { background: #1b9a0620; color: #1b9a06; }
+  .pre-label { font-size: 10px; color: #8A97AA; text-transform: uppercase; letter-spacing: 1px; padding: 8px 16px 4px; opacity: 0.7; }
+  .pre-divider { font-size: 10px; color: #F5C842; text-transform: uppercase; letter-spacing: 1px; padding: 6px 16px; background: #F5C84210; border-left: 3px solid #F5C842; margin: 2px 0; }
+
+  .empty-state { text-align: center; padding: 40px; color: #8A97AA; }
+  .empty-state p { margin-top: 8px; font-size: 13px; }
+  details { margin-top: 8px; }
+  summary { cursor: pointer; font-size: 11px; color: #8A97AA; outline: none; }
+  summary:hover { color: #E8EAF0; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Season Simulator</h1>
+  <span class="badge">nfl_2025_sim</span>
+  <span style="color:#8A97AA;font-size:12px;">Pool: Season Simulator · SIMPOOL</span>
+</div>
+
+<div class="layout">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <!-- Config -->
+    <div class="sidebar-section">
+      <h2>Configuration</h2>
+      <div style="margin-bottom:10px;">
+        <label>Service Role Key</label>
+        <input type="password" id="serviceKey" placeholder="eyJhbGci..."
+          oninput="localStorage.setItem('sim_service_key', this.value)" />
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div>
+          <label>Week</label>
+          <select id="weekSelect">
+            <option value="1">Week 1</option>
+            <option value="2">Week 2</option>
+            <option value="3">Week 3</option>
+            <option value="4">Week 4</option>
+            <option value="5">Week 5</option>
+            <option value="6">Week 6</option>
+            <option value="7">Week 7</option>
+            <option value="8">Week 8</option>
+            <option value="9">Week 9</option>
+            <option value="10">Week 10</option>
+            <option value="11">Week 11</option>
+            <option value="12">Week 12</option>
+            <option value="13">Week 13</option>
+            <option value="14">Week 14</option>
+            <option value="15">Week 15</option>
+            <option value="16">Week 16</option>
+            <option value="17">Week 17</option>
+            <option value="18">Week 18</option>
+            <option value="19">Wild Card</option>
+            <option value="20">Divisional</option>
+            <option value="21">Conf. Championship</option>
+            <option value="22">Super Bowl</option>
+          </select>
+        </div>
+        <div>
+          <label>Speed</label>
+          <select id="speedSelect">
+            <option value="1">1× (30 min)</option>
+            <option value="2" selected>2× (15 min)</option>
+            <option value="4">4× (7.5 min)</option>
+            <option value="10">10× (3 min)</option>
+            <option value="30">30× (1 min)</option>
+            <option value="60">60× (30 sec)</option>
+          </select>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btnStart" onclick="startWeek()">▶ Start Week</button>
+        <button class="btn btn-secondary" id="btnPause" onclick="togglePause()" disabled>⏸ Pause</button>
+        <button class="btn btn-secondary" id="btnBack" onclick="prevCheckpoint()" disabled>⏮ Back</button>
+        <button class="btn btn-secondary" id="btnNext" onclick="nextCheckpoint()" disabled>⏭ Next</button>
+        <button class="btn btn-danger" id="btnReset" onclick="resetWeek()">↺ Reset</button>
+      </div>
+      <details style="margin-top:10px;">
+        <summary>Manual controls</summary>
+        <div style="margin-top:8px;">
+          <div style="font-size:10px;color:#F5C842;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px;">Tom's Picks (McDude_tpm)</div>
+          <div class="btn-row">
+            <button class="btn btn-warning" onclick="autoPickPlayer('tom','random')" style="font-size:11px;padding:5px 10px;">🎲 Random Picks</button>
+            <button class="btn btn-warning" onclick="autoPickPlayer('tom','perfect')" style="font-size:11px;padding:5px 10px;">🏆 Perfect Week</button>
+          </div>
+          <div style="font-size:10px;color:#F5C842;text-transform:uppercase;letter-spacing:0.5px;margin-top:8px;margin-bottom:5px;">Honey+Punch1 Picks</div>
+          <div class="btn-row">
+            <button class="btn btn-warning" onclick="autoPickPlayer('sharpshooter','random')" style="font-size:11px;padding:5px 10px;">🎲 Random Picks</button>
+            <button class="btn btn-warning" onclick="autoPickPlayer('sharpshooter','perfect')" style="font-size:11px;padding:5px 10px;">🏆 Perfect Week</button>
+          </div>
+          <div style="font-size:10px;color:#8A97AA;text-transform:uppercase;letter-spacing:0.5px;margin-top:10px;margin-bottom:5px;">Admin</div>
+          <div class="btn-row">
+            <button class="btn btn-secondary" onclick="manualSeedBotPicks()" style="font-size:11px;padding:5px 10px;">Seed Bots</button>
+            <button class="btn btn-secondary" onclick="manualCalculateScores()" style="font-size:11px;padding:5px 10px;">Calc Scores</button>
+            <button class="btn btn-secondary" onclick="manualFinalizeWeek()" style="font-size:11px;padding:5px 10px;">Finalize Week</button>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <!-- Timeline -->
+    <div class="timeline-wrap">
+      <div class="timeline-header">
+        <div>
+          <div class="timer-display" id="timerDisplay">0:00</div>
+          <div class="timer-total">/ 30:00 simulated</div>
+        </div>
+        <div id="nextCheckpointLabel" style="font-size:11px;color:#8A97AA;text-align:right;max-width:120px;"></div>
+      </div>
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    </div>
+
+    <!-- Checkpoints list -->
+    <div class="checkpoints" id="checkpointList"></div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <!-- Status bar -->
+    <div class="status-bar">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText" style="color:#8A97AA;">Ready — enter service role key and select a week</span>
+      <span class="state-chip" id="weekStateChip" style="display:none;"></span>
+    </div>
+
+    <!-- Games panel -->
+    <div class="games-panel">
+      <h2 style="margin-bottom:12px;">Games</h2>
+      <div id="gamesContent">
+        <div class="empty-state">
+          <div style="font-size:32px;">🏈</div>
+          <p>Start a week to see games and live score updates</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Log -->
+    <div class="log-panel" id="logPanel">
+      <div class="log-entry"><span class="log-time">—</span><span class="log-msg info">Season Simulator ready. Enter your service role key and click Start Week.</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────
+// Constants
+// ─────────────────────────────────────────────────────────────
+const SUPABASE_URL = 'https://mzqtrpdiqhopjmxjccwy.supabase.co';
+const ANON_KEY     = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im16cXRycGRpcWhvcGpteGpjY3d5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDIwMDQsImV4cCI6MjA3MjA3ODAwNH0.017SoJAJLh4UKRYm4jVVCWDf1gCN2wjkpcUTHJJOsU4';
+const COMPETITION  = 'nfl_2025_sim';
+const SOURCE_COMP  = 'nfl_2025';
+const POOL_ID      = 'bbded6da-d977-4032-99be-20c0610366cf';
+const SEASON_YEAR  = 2025;
+
+const PLAYERS = {
+  tom:         { id: '7b4f41c8-008d-4319-98e7-8c80ec6edf69', name: 'McDude_tpm',   strategy: 'human' },
+  sharpshooter:{ id: '6db177b6-f060-4709-abb1-2b578aecc36c', name: 'Honey+Punch1', strategy: 'sharpshooter' },
+  contrarian:  { id: 'f75a727e-ad7d-4120-bc6e-b65e7c5a5929', name: 'Caleb C',       strategy: 'contrarian' },
+  random:      { id: 'ca724975-87b4-4cf3-87ae-30e1fed49832', name: 'Hammer',         strategy: 'random' },
+};
+const BOTS = [PLAYERS.sharpshooter, PLAYERS.contrarian, PLAYERS.random];
+
+// Timeline: {t: seconds, label, fn: string}
+// 1 simulated minute = 60 simulated seconds
+// Total: 30 simulated minutes = 1800 sim-seconds (actual wall time depends on speed)
+// Pre-season steps that run before the timer (before 0:00)
+const PRE_CHECKPOINTS = [
+  { icon: '📂', label: 'Games loaded from nfl_2025' },
+  { icon: '🤖', label: 'Bot picks seeded (silent, before picks open)' },
+];
+let preDone = new Set();
+
+const CHECKPOINTS = [
+  { t: 0,    icon: '🟢', label: 'Picks Open',               fn: 'openPicks' },
+  { t: 270,  icon: '🏈', label: 'Thursday Kickoff',         fn: 'kickoffWave', arg: 'thursday' },
+  { t: 420,  icon: '✅', label: 'Thursday Final',           fn: 'finalizeWave', arg: 'thursday' },
+  { t: 540,  icon: '🏈', label: 'Sunday 1pm Kickoff',       fn: 'kickoffWave', arg: 'sunday1' },
+  { t: 780,  icon: '✅', label: 'Sunday 1pm Final',         fn: 'finalizeWave', arg: 'sunday1' },
+  { t: 960,  icon: '🏈', label: 'Sunday 4pm Kickoff',       fn: 'kickoffWave', arg: 'sunday4' },
+  { t: 1140, icon: '✅', label: 'Sunday 4pm Final',         fn: 'finalizeWave', arg: 'sunday4' },
+  { t: 1200, icon: '🌙', label: 'SNF Kickoff',              fn: 'kickoffWave', arg: 'snf' },
+  { t: 1320, icon: '✅', label: 'SNF Final',                fn: 'finalizeWave', arg: 'snf' },
+  { t: 1380, icon: '🌙', label: 'MNF Kickoff',              fn: 'kickoffWave', arg: 'mnf' },
+  { t: 1620, icon: '🧮', label: 'MNF Final — Calculate Scores', fn: 'endWeek' },
+  { t: 1710, icon: '🏁', label: 'Week Complete',            fn: 'completeWeek' },
+  { t: 1770, icon: '🔓', label: 'Next Week Opens',          fn: 'nextWeek' },
+];
+
+// Score updates within each wave (fraction of final score)
+const SCORE_UPDATES = [
+  { t: 310, wave: 'thursday', pct: 0.25 },
+  { t: 360, wave: 'thursday', pct: 0.55 },
+  { t: 400, wave: 'thursday', pct: 0.80 },
+  { t: 620, wave: 'sunday1',  pct: 0.25 },
+  { t: 680, wave: 'sunday1',  pct: 0.55 },
+  { t: 740, wave: 'sunday1',  pct: 0.80 },
+  { t: 990, wave: 'sunday4',  pct: 0.25 },
+  { t: 1060, wave: 'sunday4', pct: 0.55 },
+  { t: 1110, wave: 'sunday4', pct: 0.80 },
+  { t: 1230, wave: 'snf',     pct: 0.25 },
+  { t: 1270, wave: 'snf',     pct: 0.55 },
+  { t: 1300, wave: 'snf',     pct: 0.80 },
+  { t: 1430, wave: 'mnf',     pct: 0.25 },
+  { t: 1510, wave: 'mnf',     pct: 0.55 },
+  { t: 1570, wave: 'mnf',     pct: 0.80 },
+];
+
+// ─────────────────────────────────────────────────────────────
+// State
+// ─────────────────────────────────────────────────────────────
+let simElapsed = 0;       // sim-seconds elapsed
+let simRunning = false;
+let simPaused  = false;
+let simBusy    = false;   // true while a checkpoint/score-update is awaiting API calls — freezes time
+let ticker     = null;
+let currentWeek = 1;
+let weekGames  = [];      // source games from nfl_2025 with real scores
+let simGames   = [];      // sim games from nfl_2025_sim (live state)
+let nextCheckpointIdx = 0;
+let nextScoreUpdateIdx = 0;
+let firedCheckpoints = new Set();
+let firedScoreUpdates = new Set();
+let weekState  = 'idle';
+
+function getServiceKey() { return document.getElementById('serviceKey').value.trim(); }
+function getSpeed() { return parseFloat(document.getElementById('speedSelect').value); }
+
+// ─────────────────────────────────────────────────────────────
+// Supabase API helpers
+// ─────────────────────────────────────────────────────────────
+async function api(path, method = 'GET', body = null, useServiceRole = true) {
+  const key = useServiceRole ? getServiceKey() : ANON_KEY;
+  const headers = {
+    'apikey': key,
+    'Authorization': `Bearer ${key}`,
+    'Content-Type': 'application/json',
+  };
+  if (method !== 'GET' && method !== 'DELETE') {
+    headers['Prefer'] = 'return=minimal';
+  }
+  const opts = { method, headers };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, opts);
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`${method} ${path} → ${res.status}: ${err}`);
+  }
+  if (method === 'GET') return res.json();
+  return null;
+}
+
+// Upsert a competition_config row (creates if missing, updates if exists)
+async function upsertConfig(competition, key, value, description) {
+  const svcKey = getServiceKey();
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/competition_config`, {
+    method: 'POST',
+    headers: {
+      'apikey': svcKey,
+      'Authorization': `Bearer ${svcKey}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'resolution=merge-duplicates,return=minimal',
+    },
+    body: JSON.stringify({ competition, key, value, description }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`UPSERT config ${key} → ${res.status}: ${err}`);
+  }
+}
+
+async function callEdgeFunction(name, body = {}) {
+  const key = getServiceKey();
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${key}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(`Edge Function ${name}: ${JSON.stringify(data)}`);
+  return data;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Wave detection — from original 2025 kickoff UTC datetime
+// ─────────────────────────────────────────────────────────────
+function detectWave(kickoffAt) {
+  const d = new Date(kickoffAt);
+  const day  = d.getUTCDay();   // 0=Sun 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri 6=Sat
+  const hour = d.getUTCHours();
+
+  // Thursday night: day=4 OR early Friday UTC (day=5, hour<8) → opener night game
+  if (day === 4) return 'thursday';
+  if (day === 5 && hour < 8) return 'thursday';   // Thu night that crosses midnight UTC
+
+  // Saturday games (rare regular-season, common playoffs)
+  if (day === 6) return 'saturday';
+
+  // Sunday: distinguish by UTC hour
+  if (day === 0) {
+    if (hour >= 17 && hour < 20) return 'sunday1'; // 1pm ET = 17-19 UTC
+    if (hour >= 20 && hour < 23) return 'sunday4'; // 4pm ET = 20-22 UTC
+    // After midnight = SNF Sunday night
+    return 'snf';
+  }
+  if (day === 0 && hour < 4) return 'snf'; // just in case
+
+  // Sunday Night Football: plays Sunday evening ET = Monday early UTC (day=1, hour<4)
+  if (day === 1 && hour < 4) return 'snf';
+
+  // Monday Night Football: plays Monday evening ET = Tuesday early UTC (day=2, hour<4)
+  // OR Monday daytime UTC (day=1, hour>=17)
+  if (day === 1 && hour >= 17) return 'mnf';
+  if (day === 2 && hour < 4) return 'mnf';
+
+  // Friday/Saturday early games
+  if (day === 5) return 'sunday1'; // treat late-season Friday as early wave
+  if (day === 6) return 'saturday';
+
+  return 'sunday1'; // fallback
+}
+
+// Map wave → compressed sim kickoff_at (offset from week start, as ISO string)
+function waveKickoffOffset(wave) {
+  const offsets = {
+    thursday: 270,   // 4:30
+    saturday: 540,   // 9:00 (treat same as Sunday 1pm)
+    sunday1:  540,   // 9:00
+    sunday4:  960,   // 16:00
+    snf:      1200,  // 20:00
+    mnf:      1380,  // 23:00
+  };
+  return offsets[wave] ?? 540;
+}
+
+// Wave display label
+function waveLabel(wave) {
+  const labels = { thursday: 'Thu', saturday: 'Sat', sunday1: 'Sun 1pm', sunday4: 'Sun 4pm', snf: 'SNF', mnf: 'MNF' };
+  return labels[wave] ?? wave;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Load week data
+// ─────────────────────────────────────────────────────────────
+async function loadWeekData(week) {
+  log(`Loading Week ${week} games from nfl_2025...`, 'info');
+
+  // Source games (real scores)
+  weekGames = await api(
+    `season_games?competition=eq.${SOURCE_COMP}&week=eq.${week}&select=game_id,week,home_team,away_team,kickoff_at,home_score,away_score,winner_team,rank,frozen_rank,spread&order=kickoff_at.asc`
+  );
+
+  // Add wave classification
+  weekGames.forEach(g => {
+    g.wave = detectWave(g.kickoff_at);
+    g.simGameId = 'sim_' + g.game_id;
+  });
+
+  log(`Loaded ${weekGames.length} games across waves: ${[...new Set(weekGames.map(g => g.wave))].join(', ')}`, 'success');
+  renderGamesTable();
+}
+
+// ─────────────────────────────────────────────────────────────
+// Sim actions
+// ─────────────────────────────────────────────────────────────
+let weekStartWallTime = null; // when this week started in wall time
+
+// Pre-season: reset games, delete old picks, seed bots — runs BEFORE the timer (before 0:00)
+async function preSeasonSetup() {
+  log(`Pre-Season — resetting Week ${currentWeek} games and seeding bots...`, 'info');
+
+  // Set DB to PRE_SEASON — app shows "Season starts in:" countdown, no week-state content
+  await api(`competition_config?competition=eq.${COMPETITION}&key=eq.current_week`, 'PATCH', { value: currentWeek });
+  await api(`competition_config?competition=eq.${COMPETITION}&key=eq.current_phase`, 'PATCH', { value: 'PRE_SEASON' });
+  await api(`competition_config?competition=eq.${COMPETITION}&key=eq.week_state`, 'PATCH', { value: 'complete' });
+  setWeekState('complete');
+
+  // Reset sim games: clear scores, reset status (kickoff_at remapped at 0:00)
+  for (const g of weekGames) {
+    await api(
+      `season_games?game_id=eq.${g.simGameId}&competition=eq.${COMPETITION}`,
+      'PATCH',
+      { status: 'scheduled', home_score: null, away_score: null, winner_team: null,
+        is_finalized: false, current_period: null, game_clock: null, lock_at: null,
+        kickoff_at: g.kickoff_at }
+    );
+  }
+
+  // Delete any previous picks for this week (clean slate before bot seeding)
+  const allUserIds = [PLAYERS.tom.id, ...BOTS.map(b => b.id)];
+  for (const uid of allUserIds) {
+    await api(
+      `season_picks?user_id=eq.${uid}&competition=eq.${COMPETITION}&week=eq.${currentWeek}`,
+      'DELETE'
+    );
+  }
+
+  // Seed bot picks silently — games are 'scheduled' so the pick-lock trigger allows it
+  await seedBotPicks();
+  log('✓ Pre-Season complete — bot picks in DB. Waiting for 0:00 to open picks.', 'success');
+}
+
+async function openPicks() {
+  log('0:00 — Opening picks...', 'info');
+  weekStartWallTime = Date.now();
+
+  // All games start unlocked — lock_at set to far future.
+  // Each kickoffWave() call will set that wave's lock_at to the past.
+  const FAR_FUTURE = '2099-01-01T00:00:00Z';
+  for (const g of weekGames) {
+    await api(
+      `season_games?game_id=eq.${g.simGameId}&competition=eq.${COMPETITION}`,
+      'PATCH',
+      { lock_at: FAR_FUTURE }
+    );
+  }
+
+  // Sunday lock anchor also starts in the far future — updated when Sunday wave kicks off.
+  await upsertConfig(COMPETITION, 'sunday_lock_anchor', FAR_FUTURE,
+    'ISO timestamp of the Sunday 1pm ET anchor kickoff. All games lock at this time.');
+
+  // Transition PRE_SEASON → REGULAR and open picks
+  await api(`competition_config?competition=eq.${COMPETITION}&key=eq.current_phase`, 'PATCH', { value: 'REGULAR' });
+  await api(`competition_config?competition=eq.${COMPETITION}&key=eq.week_state`, 'PATCH', { value: 'picks_open' });
+  await api(`competition_config?competition=eq.${COMPETITION}&key=eq.sim_current_offset`, 'PATCH', { value: 0 });
+  setWeekState('picks_open');
+  log(`✓ Picks open for Week ${currentWeek}. Tom's picks can now be entered in the app.`, 'success');
+}
+
+async function seedBotPicks() {
+  log('Seeding bot picks...', 'info');
+
+  const picks = [];
+  for (const bot of BOTS) {
+    const botPicks = buildBotPicks(bot.strategy, bot.id);
+    picks.push(...botPicks);
+  }
+
+  // Insert in batches
+  const BATCH = 50;
+  for (let i = 0; i < picks.length; i += BATCH) {
+    await api('season_picks', 'POST', picks.slice(i, i + BATCH));
+  }
+
+  log(`✓ Seeded ${picks.length} bot picks (${BOTS.map(b => b.name).join(', ')})`, 'success');
+}
+
+function buildBotPicks(strategy, userId) {
+  const sorted = [...weekGames].sort((a, b) => (b.frozen_rank ?? b.rank ?? 0) - (a.frozen_rank ?? a.rank ?? 0));
+  const picks = [];
+
+  for (const g of weekGames) {
+    let pickedTeam;
+    const rank = g.frozen_rank ?? g.rank ?? 1;
+
+    if (strategy === 'sharpshooter') {
+      // Pick favorite: spread < 0 means home favored
+      if (g.spread != null) {
+        pickedTeam = g.spread < 0 ? g.home_team : g.away_team;
+      } else {
+        pickedTeam = Math.random() < 0.5 ? g.home_team : g.away_team;
+      }
+    } else if (strategy === 'contrarian') {
+      // Pick underdog: opposite of spread
+      if (g.spread != null) {
+        pickedTeam = g.spread < 0 ? g.away_team : g.home_team;
+      } else {
+        pickedTeam = Math.random() < 0.5 ? g.home_team : g.away_team;
+      }
+    } else {
+      // random
+      pickedTeam = Math.random() < 0.5 ? g.home_team : g.away_team;
+    }
+
+    picks.push({
+      user_id: userId,
+      game_id: g.simGameId,
+      competition: COMPETITION,
+      season_year: SEASON_YEAR,
+      week: currentWeek,
+      picked_team: pickedTeam,
+      is_hotpick: false,
+    });
+  }
+
+  // Designate HotPick
+  if (picks.length > 0) {
+    if (strategy === 'sharpshooter') {
+      // Highest rank game
+      const best = weekGames.reduce((a, b) => ((a.frozen_rank ?? a.rank ?? 0) > (b.frozen_rank ?? b.rank ?? 0) ? a : b));
+      const p = picks.find(p => p.game_id === best.simGameId);
+      if (p) p.is_hotpick = true;
+    } else if (strategy === 'contrarian') {
+      // Lowest rank game
+      const worst = weekGames.reduce((a, b) => ((a.frozen_rank ?? a.rank ?? 0) < (b.frozen_rank ?? b.rank ?? 0) ? a : b));
+      const p = picks.find(p => p.game_id === worst.simGameId);
+      if (p) p.is_hotpick = true;
+    } else {
+      // Random game
+      const idx = Math.floor(Math.random() * picks.length);
+      picks[idx].is_hotpick = true;
+    }
+  }
+
+  return picks;
+}
+
+async function kickoffWave(wave) {
+  // Saturday = Friday night ET games that cross midnight UTC (getUTCDay() → 6).
+  // They share the sunday1 sim slot (offset 540) so process them together.
+  const games = weekGames.filter(g => g.wave === wave || (wave === 'sunday1' && g.wave === 'saturday'));
+  if (games.length === 0) {
+    log(`No ${wave} games this week — skipping`, 'info');
+    return;
+  }
+
+  // Lock logic:
+  // - Thursday kickoff: lock only Thursday games. All others stay unlocked.
+  // - Sunday 1pm+ kickoff: lock ALL remaining games (mirrors production —
+  //   once Sunday 1pm kicks off, all picks are sealed for the week).
+  const thisOffset = waveKickoffOffset(wave);
+  const sunday1Offset = waveKickoffOffset('sunday1');
+  const isSundayOrLater = thisOffset >= sunday1Offset;
+  const PAST = new Date('2020-01-01T00:00:00Z').toISOString();
+  const FAR_FUTURE = new Date('2099-01-01T00:00:00Z').toISOString();
+  for (const g of weekGames) {
+    const gOffset = waveKickoffOffset(g.wave);
+    if (gOffset === thisOffset || (wave === 'sunday1' && g.wave === 'saturday')) {
+      // This wave — lock now
+      await api(
+        `season_games?game_id=eq.${g.simGameId}&competition=eq.${COMPETITION}`,
+        'PATCH',
+        { lock_at: PAST }
+      );
+    } else if (isSundayOrLater && gOffset > thisOffset) {
+      // Sunday+ wave: lock ALL future games too (all picks sealed)
+      await api(
+        `season_games?game_id=eq.${g.simGameId}&competition=eq.${COMPETITION}`,
+        'PATCH',
+        { lock_at: PAST }
+      );
+    } else if (gOffset > thisOffset) {
+      // Pre-Sunday (Thursday only): future waves stay unlocked
+      await api(
+        `season_games?game_id=eq.${g.simGameId}&competition=eq.${COMPETITION}`,
+        'PATCH',
+        { lock_at: FAR_FUTURE }
+      );
+    }
+  }
+  // Refresh sunday_lock_anchor
+  if (isSundayOrLater) {
+    await upsertConfig(COMPETITION, 'sunday_lock_anchor', PAST,
+      'ISO timestamp of the Sunday 1pm ET anchor kickoff. All games lock at this time.');
+  } else {
+    await upsertConfig(COMPETITION, 'sunday_lock_anchor', FAR_FUTURE,
+      'ISO timestamp of the Sunday 1pm ET anchor kickoff. All games lock at this time.');
+  }
+
+  for (const g of games) {
+    await api(
+      `season_games?game_id=eq.${g.simGameId}&competition=eq.${COMPETITION}`,
+      'PATCH',
+      { status: 'IN_PROGRESS', current_period: 1, game_clock: '15:00', home_score: 0, away_score: 0 }
+    );
+  }
+  if (wave === 'thursday') {
+    await api(`competition_config?competition=eq.${COMPETITION}&key=eq.week_state`, 'PATCH', { value: 'live' });
+    setWeekState('live');
+  }
+  log(`🏈 ${waveLabel(wave)} games kicked off (${games.length} game${games.length !== 1 ? 's' : ''})`, 'success');
+  renderGamesTable();
+}
+
+async function updateScores(wave, pct) {
+  const games = weekGames.filter(g => g.wave === wave || (wave === 'sunday1' && g.wave === 'saturday'));
+  if (games.length === 0) return;
+
+  for (const g of games) {
+    if (g.home_score == null || g.away_score == null) continue; // no real score data
+    const h = Math.round(g.home_score * pct);
+    const a = Math.round(g.away_score * pct);
+    const period = pct < 0.5 ? 1 : pct < 0.75 ? 2 : 3;
+    await api(
+      `season_games?game_id=eq.${g.simGameId}&competition=eq.${COMPETITION}`,
+      'PATCH',
+      { home_score: h, away_score: a, current_period: period, game_clock: '8:00' }
+    );
+  }
+  log(`📊 ${waveLabel(wave)} scores updated to ${Math.round(pct * 100)}%`, 'info');
+  renderGamesTable();
+}
+
+async function finalizeWave(wave) {
+  const games = weekGames.filter(g => g.wave === wave || (wave === 'sunday1' && g.wave === 'saturday'));
+  if (games.length === 0) return;
+
+  for (const g of games) {
+    const winner = g.winner_team ?? (
+      g.home_score >= g.away_score ? g.home_team : g.away_team
+    );
+    await api(
+      `season_games?game_id=eq.${g.simGameId}&competition=eq.${COMPETITION}`,
+      'PATCH',
+      {
+        status: 'FINAL',
+        home_score: g.home_score,
+        away_score: g.away_score,
+        winner_team: winner,
+        current_period: null,
+        game_clock: null,
+        is_finalized: true,
+      }
+    );
+  }
+  log(`✅ ${waveLabel(wave)} games finalized (${games.length} game${games.length !== 1 ? 's' : ''})`, 'success');
+  renderGamesTable();
+
+  // Score what's final so far — pts earned updates progressively as each wave ends
+  try {
+    const result = await callEdgeFunction('nfl-calculate-scores', { competition: COMPETITION, week: currentWeek });
+    log(`🧮 Partial scores updated (${result.users_scored ?? '?'} users, ${result.final_games ?? '?'} final games)`, 'info');
+  } catch (err) {
+    log(`⚠ Partial score update failed: ${err.message}`, 'warn');
+  }
+}
+
+async function endWeek() {
+  // Ensure all games finalized before scoring
+  for (const g of weekGames) {
+    if (!g.winner_team) {
+      const winner = g.home_score >= g.away_score ? g.home_team : g.away_team;
+      await api(
+        `season_games?game_id=eq.${g.simGameId}&competition=eq.${COMPETITION}`,
+        'PATCH',
+        { status: 'FINAL', home_score: g.home_score, away_score: g.away_score, winner_team: winner, is_finalized: true }
+      );
+    }
+  }
+
+  log('🧮 All games final — calling nfl-calculate-scores...', 'info');
+  try {
+    const result = await callEdgeFunction('nfl-calculate-scores', { competition: COMPETITION, week: currentWeek });
+    log(`✓ Scores calculated: ${result.users_scored ?? '?'} users scored, ${result.final_games ?? '?'} final games`, 'success');
+  } catch (err) {
+    log(`⚠ Score calculation error: ${err.message}`, 'error');
+  }
+
+  await api(`competition_config?competition=eq.${COMPETITION}&key=eq.week_state`, 'PATCH', { value: 'settling' });
+  setWeekState('settling');
+  log('Week state → settling', 'info');
+  renderGamesTable();
+}
+
+async function completeWeek() {
+  await api(`competition_config?competition=eq.${COMPETITION}&key=eq.week_state`, 'PATCH', { value: 'complete' });
+  setWeekState('complete');
+  log('Week state → complete', 'success');
+}
+
+async function nextWeek() {
+  if (currentWeek < 22) {
+    const nextW = currentWeek + 1;
+    await api(`competition_config?competition=eq.${COMPETITION}&key=eq.current_week`, 'PATCH', { value: nextW });
+    await api(`competition_config?competition=eq.${COMPETITION}&key=eq.week_state`, 'PATCH', { value: 'picks_open' });
+    log(`🔓 Next week opens — Week ${nextW} picks are now open`, 'success');
+
+    // Auto-advance the week selector
+    document.getElementById('weekSelect').value = nextW;
+    currentWeek = nextW;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Manual controls
+// ─────────────────────────────────────────────────────────────
+async function autoPickPlayer(playerKey, strategy) {
+  if (!validateKey()) return;
+  if (weekGames.length === 0) {
+    log('✗ No games loaded — start the week first', 'error');
+    return;
+  }
+
+  const tom = PLAYERS[playerKey];
+  log(`Auto-picking for ${tom.name} — strategy: ${strategy}...`, 'info');
+
+  // Fetch current status of sim games so we skip any that are already
+  // IN_PROGRESS or FINAL. Including a locked game in the batch causes
+  // enforce_pick_lock to raise an exception, rolling back ALL inserts.
+  const simStatuses = await api(
+    `season_games?competition=eq.${COMPETITION}&week=eq.${currentWeek}&select=game_id,status`
+  );
+  const statusMap = {};
+  for (const g of simStatuses ?? []) {
+    statusMap[g.game_id] = (g.status ?? 'SCHEDULED').toUpperCase();
+  }
+
+  // Delete any existing picks for Tom this week
+  await api(
+    `season_picks?user_id=eq.${tom.id}&competition=eq.${COMPETITION}&week=eq.${currentWeek}`,
+    'DELETE'
+  );
+
+  const picks = [];
+  let skipped = 0;
+
+  for (const g of weekGames) {
+    const currentStatus = statusMap[g.simGameId] ?? 'SCHEDULED';
+    if (currentStatus !== 'SCHEDULED') {
+      skipped++;
+      continue; // enforce_pick_lock would reject this; skip it
+    }
+
+    let pickedTeam;
+
+    if (strategy === 'perfect') {
+      // Pick the actual winner from 2025 source data
+      pickedTeam = g.winner_team ?? (
+        (g.home_score ?? 0) >= (g.away_score ?? 0) ? g.home_team : g.away_team
+      );
+    } else {
+      // Random
+      pickedTeam = Math.random() < 0.5 ? g.home_team : g.away_team;
+    }
+
+    picks.push({
+      user_id: tom.id,
+      game_id: g.simGameId,
+      competition: COMPETITION,
+      season_year: SEASON_YEAR,
+      week: currentWeek,
+      picked_team: pickedTeam,
+      is_hotpick: false,
+    });
+  }
+
+  // Designate HotPick
+  if (picks.length > 0) {
+    if (strategy === 'perfect') {
+      // Highest ranked game for perfect week
+      const best = weekGames.reduce((a, b) =>
+        ((a.frozen_rank ?? a.rank ?? 0) > (b.frozen_rank ?? b.rank ?? 0) ? a : b)
+      );
+      const p = picks.find(p => p.game_id === best.simGameId);
+      if (p) p.is_hotpick = true;
+    } else {
+      // Random HotPick
+      picks[Math.floor(Math.random() * picks.length)].is_hotpick = true;
+    }
+  }
+
+  await api('season_picks', 'POST', picks);
+
+  const hotpick = picks.find(p => p.is_hotpick);
+  const hotpickGame = weekGames.find(g => g.simGameId === hotpick?.game_id);
+  log(
+    `✓ ${picks.length} picks submitted for ${tom.name} (${strategy})${skipped ? ` — ${skipped} game(s) skipped (already locked)` : ''}. HotPick: ${hotpickGame?.away_team} @ ${hotpickGame?.home_team} (rank ${hotpickGame?.frozen_rank ?? hotpickGame?.rank ?? '?'})`,
+    'success'
+  );
+}
+
+async function manualSeedBotPicks() {
+  if (!validateKey()) return;
+  await seedBotPicks();
+}
+
+async function manualCalculateScores() {
+  if (!validateKey()) return;
+  log('Manual: calling nfl-calculate-scores...', 'info');
+  try {
+    const result = await callEdgeFunction('nfl-calculate-scores', { competition: COMPETITION, week: currentWeek });
+    log(`✓ Manual score calc: ${JSON.stringify(result)}`, 'success');
+  } catch (err) {
+    log(`✗ ${err.message}`, 'error');
+  }
+}
+
+async function manualFinalizeWeek() {
+  if (!validateKey()) return;
+  log('Manual: calling nfl-finalize-week...', 'info');
+  try {
+    const result = await callEdgeFunction('nfl-finalize-week', { competition: COMPETITION });
+    log(`✓ Finalize result: ${JSON.stringify(result)}`, 'success');
+  } catch (err) {
+    log(`✗ ${err.message}`, 'error');
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Main sim loop
+// ─────────────────────────────────────────────────────────────
+const TICK_MS = 500; // wall-clock tick interval
+
+async function startWeek() {
+  if (!validateKey()) return;
+
+  currentWeek = parseInt(document.getElementById('weekSelect').value);
+  simElapsed = 0;
+  firedCheckpoints = new Set();
+  firedScoreUpdates = new Set();
+  preDone = new Set();
+  nextCheckpointIdx = 0;
+  nextScoreUpdateIdx = 0;
+  simRunning = false; // not running yet during pre-season
+  simPaused = false;
+
+  document.getElementById('btnStart').disabled = true;
+  document.getElementById('btnPause').disabled = true;
+  document.getElementById('statusDot').className = 'status-dot paused';
+  document.getElementById('statusText').textContent = `Week ${currentWeek} — Pre-Season setup…`;
+  renderCheckpoints();
+
+  try {
+    // ── Pre-season step 1: load games ──────────────────────────
+    await loadWeekData(currentWeek);
+    preDone.add(0);
+    renderCheckpoints();
+
+    // ── Pre-season step 2: reset DB + seed bots silently ──────
+    await preSeasonSetup();
+    preDone.add(1);
+    renderCheckpoints();
+
+    // ── Pre-season complete — start timer at 0:00 ─────────────
+    simRunning = true;
+    document.getElementById('btnPause').disabled = false;
+    document.getElementById('btnPause').textContent = '⏸ Pause';
+    document.getElementById('btnNext').disabled = false;
+    setStatusRunning();
+    log('▶ Pre-Season complete — timer starting. Picks open at 0:00.', 'success');
+    ticker = setInterval(tickSim, TICK_MS);
+  } catch (err) {
+    log(`✗ Start failed: ${err.message}`, 'error');
+    simRunning = false;
+    document.getElementById('btnStart').disabled = false;
+    document.getElementById('btnPause').disabled = true;
+    document.getElementById('statusDot').className = 'status-dot';
+    document.getElementById('statusText').textContent = 'Error — check log and console (F12)';
+  }
+}
+
+async function tickSim() {
+  if (!simRunning || simPaused) return;
+  // If a checkpoint or score update is still awaiting API calls, freeze the clock.
+  // Without this guard, setInterval keeps firing and simElapsed races ahead while
+  // openPicks/lockPicks/etc. are still in-flight — picks open and picks lock would
+  // fire back-to-back instead of having real separation.
+  if (simBusy) return;
+
+  const speed = getSpeed();
+  simElapsed += (TICK_MS / 1000) * speed; // advance sim time
+  const TOTAL = CHECKPOINTS[CHECKPOINTS.length - 1].t + 30; // 30s buffer after last checkpoint
+  const elapsed = Math.min(simElapsed, TOTAL);
+
+  updateTimerDisplay(elapsed);
+
+  // Fire at most one checkpoint per tick (re-enter next tick for the next one)
+  for (let i = 0; i < CHECKPOINTS.length; i++) {
+    const cp = CHECKPOINTS[i];
+    if (!firedCheckpoints.has(i) && elapsed >= cp.t) {
+      firedCheckpoints.add(i);
+      markCheckpointDone(i);
+      simBusy = true;
+      try {
+        if (cp.fn && window[cp.fn]) {
+          await window[cp.fn](cp.arg);
+        }
+      } catch (err) {
+        log(`✗ Checkpoint "${cp.label}" error: ${err.message}`, 'error');
+      } finally {
+        simBusy = false;
+      }
+      break; // one checkpoint per tick — next tick handles the next one
+    }
+  }
+
+  // Fire score updates (also guarded by simBusy above — only runs when no checkpoint is active)
+  if (!simBusy) {
+    for (let i = 0; i < SCORE_UPDATES.length; i++) {
+      const su = SCORE_UPDATES[i];
+      if (!firedScoreUpdates.has(i) && elapsed >= su.t) {
+        firedScoreUpdates.add(i);
+        simBusy = true;
+        try {
+          await updateScores(su.wave, su.pct);
+        } catch (err) {
+          log(`✗ Score update error: ${err.message}`, 'error');
+        } finally {
+          simBusy = false;
+        }
+        break; // one score update per tick
+      }
+    }
+  }
+
+  // Update progress bar
+  document.getElementById('progressFill').style.width = `${(elapsed / TOTAL) * 100}%`;
+
+  // Update next checkpoint label
+  const next = CHECKPOINTS.find((cp, i) => !firedCheckpoints.has(i));
+  if (next) {
+    const remaining = Math.max(0, next.t - elapsed);
+    document.getElementById('nextCheckpointLabel').textContent =
+      `Next: ${next.label}\nin ${fmtTime(remaining / speed)} real`;
+  } else {
+    document.getElementById('nextCheckpointLabel').textContent = 'Week complete';
+  }
+
+  // Stop at end
+  if (elapsed >= TOTAL) {
+    clearInterval(ticker);
+    ticker = null;
+    simRunning = false;
+    document.getElementById('btnStart').disabled = false;
+    document.getElementById('btnPause').disabled = true;
+    setStatusComplete();
+    log('✓ Simulation complete', 'success');
+  }
+}
+
+function togglePause() {
+  simPaused = !simPaused;
+  document.getElementById('btnPause').textContent = simPaused ? '▶ Resume' : '⏸ Pause';
+  document.getElementById('statusDot').className = 'status-dot ' + (simPaused ? 'paused' : 'running');
+  log(simPaused ? '⏸ Simulation paused' : '▶ Simulation resumed', 'info');
+}
+
+async function nextCheckpoint() {
+  if (simBusy) return;
+
+  // Find the next unfired checkpoint
+  const nextIndex = CHECKPOINTS.findIndex((cp, i) => !firedCheckpoints.has(i));
+  if (nextIndex === -1) {
+    log('All checkpoints complete.', 'info');
+    return;
+  }
+  const cp = CHECKPOINTS[nextIndex];
+
+  // Pause the auto-timer if it's running so it doesn't race ahead
+  if (simRunning && !simPaused) {
+    simPaused = true;
+    document.getElementById('btnPause').textContent = '▶ Resume';
+    document.getElementById('statusDot').className = 'status-dot paused';
+  }
+
+  document.getElementById('btnNext').disabled = true;
+
+  // Advance simElapsed to this checkpoint's time and update the display
+  simElapsed = cp.t;
+  updateTimerDisplay(simElapsed);
+
+  // Fire any score updates whose time falls between the last position and this checkpoint
+  for (let i = 0; i < SCORE_UPDATES.length; i++) {
+    const su = SCORE_UPDATES[i];
+    if (!firedScoreUpdates.has(i) && su.t <= simElapsed) {
+      firedScoreUpdates.add(i);
+      simBusy = true;
+      try {
+        await updateScores(su.wave, su.pct);
+      } catch (err) {
+        log(`✗ Score update error: ${err.message}`, 'error');
+      } finally {
+        simBusy = false;
+      }
+    }
+  }
+
+  // Fire the checkpoint
+  firedCheckpoints.add(nextIndex);
+  markCheckpointDone(nextIndex);
+  simBusy = true;
+  try {
+    if (cp.fn && window[cp.fn]) {
+      await window[cp.fn](cp.arg);
+    }
+  } catch (err) {
+    log(`✗ Checkpoint "${cp.label}" error: ${err.message}`, 'error');
+  } finally {
+    simBusy = false;
+  }
+
+  // Re-enable Next if there are more checkpoints remaining
+  const hasMore = CHECKPOINTS.some((c, i) => !firedCheckpoints.has(i));
+  document.getElementById('btnNext').disabled = !hasMore;
+  document.getElementById('btnBack').disabled = false;
+}
+
+async function resetWeek() {
+  clearInterval(ticker);
+  ticker = null;
+  simRunning = false;
+  simPaused = false;
+  simElapsed = 0;
+  firedCheckpoints = new Set();
+  firedScoreUpdates = new Set();
+
+  document.getElementById('btnStart').disabled = true;
+  document.getElementById('btnPause').disabled = true;
+  document.getElementById('statusText').textContent = 'Resetting…';
+  log('↺ Resetting Week ' + currentWeek + ' in DB…', 'warn');
+
+  if (validateKey()) {
+    try {
+      // Reset all sim games for this week
+      await api(
+        `season_games?competition=eq.${COMPETITION}&week=eq.${currentWeek}`,
+        'PATCH',
+        { status: 'scheduled', home_score: null, away_score: null, winner_team: null,
+          current_period: null, game_clock: null, is_finalized: false, lock_at: null }
+      );
+      // Delete all picks for this week
+      const allUserIds = [PLAYERS.tom.id, PLAYERS.sharpshooter.id, ...BOTS.map(b => b.id)];
+      for (const uid of allUserIds) {
+        await api(
+          `season_picks?user_id=eq.${uid}&competition=eq.${COMPETITION}&week=eq.${currentWeek}`,
+          'DELETE'
+        );
+      }
+      // Delete season_user_totals for this week (clears leaderboard data)
+      await api(
+        `season_user_totals?competition=eq.${COMPETITION}&week=eq.${currentWeek}`,
+        'DELETE'
+      );
+      // Reset to PRE_SEASON — pre-season phase runs again before picks open
+      await api(`competition_config?competition=eq.${COMPETITION}&key=eq.current_phase`, 'PATCH', { value: 'PRE_SEASON' });
+      await api(`competition_config?competition=eq.${COMPETITION}&key=eq.week_state`, 'PATCH', { value: 'complete' });
+      await api(`competition_config?competition=eq.${COMPETITION}&key=eq.current_week`, 'PATCH', { value: currentWeek });
+      await upsertConfig(COMPETITION, 'sunday_lock_anchor', null,
+        'ISO timestamp of the Sunday 1pm ET anchor kickoff. All games lock at this time.');
+      log('✓ DB reset complete — ready to Start Week', 'success');
+    } catch (err) {
+      log(`✗ DB reset error: ${err.message}`, 'error');
+    }
+  }
+
+  weekGames = [];
+  preDone = new Set();
+  simBusy = false;
+  document.getElementById('btnStart').disabled = false;
+  document.getElementById('btnNext').disabled = true;
+  document.getElementById('btnBack').disabled = true;
+  document.getElementById('btnPause').textContent = '⏸ Pause';
+  document.getElementById('progressFill').style.width = '0%';
+  document.getElementById('timerDisplay').textContent = '0:00';
+  document.getElementById('nextCheckpointLabel').textContent = '';
+  document.getElementById('gamesContent').innerHTML = '<div class="empty-state"><div style="font-size:32px;">🏈</div><p>Start a week to see games</p></div>';
+  document.getElementById('statusDot').className = 'status-dot';
+  document.getElementById('statusText').textContent = 'Ready';
+  document.getElementById('weekStateChip').style.display = 'none';
+  renderCheckpoints();
+}
+
+// ─────────────────────────────────────────────────────────────
+// UI rendering
+// ─────────────────────────────────────────────────────────────
+function renderCheckpoints() {
+  const list = document.getElementById('checkpointList');
+
+  // Pre-season section
+  const preHtml = `
+    <div class="pre-label">Pre-Season</div>
+    ${PRE_CHECKPOINTS.map((cp, i) => {
+      const done = preDone.has(i);
+      return `<div class="checkpoint ${done ? 'done' : 'pending'}" id="pre-cp-${i}">
+        <span class="cp-icon">${done ? '✓' : cp.icon}</span>
+        <span class="cp-time" style="color:#F5C842;font-weight:700;">PRE</span>
+        <span class="cp-label">${cp.label}</span>
+      </div>`;
+    }).join('')}
+    <div class="pre-divider">0:00 — Picks Open</div>
+  `;
+
+  // Main timeline checkpoints
+  const mainHtml = CHECKPOINTS.map((cp, i) => {
+    const state = firedCheckpoints.has(i) ? 'done' : 'pending';
+    return `<div class="checkpoint ${state}" id="cp-${i}">
+      <span class="cp-icon">${firedCheckpoints.has(i) ? '✓' : cp.icon}</span>
+      <span class="cp-time">${fmtTime(cp.t)}</span>
+      <span class="cp-label">${cp.label}</span>
+    </div>`;
+  }).join('');
+
+  list.innerHTML = preHtml + mainHtml;
+}
+
+function markCheckpointDone(idx) {
+  const el = document.getElementById(`cp-${idx}`);
+  if (el) {
+    el.className = 'checkpoint done';
+    el.querySelector('.cp-icon').textContent = '✓';
+  }
+  // Mark next as current
+  const next = document.getElementById(`cp-${idx + 1}`);
+  if (next) next.className = 'checkpoint current';
+}
+
+function unmarkCheckpointDone(idx) {
+  const el = document.getElementById(`cp-${idx}`);
+  if (el) {
+    el.className = 'checkpoint current';
+    el.querySelector('.cp-icon').textContent = CHECKPOINTS[idx].icon;
+  }
+  // Un-mark next (it's no longer current)
+  const next = document.getElementById(`cp-${idx + 1}`);
+  if (next && next.className === 'checkpoint current') next.className = 'checkpoint';
+}
+
+async function prevCheckpoint() {
+  if (simBusy) return;
+
+  // Find the most recently fired checkpoint
+  let lastFiredIndex = -1;
+  for (let i = CHECKPOINTS.length - 1; i >= 0; i--) {
+    if (firedCheckpoints.has(i)) { lastFiredIndex = i; break; }
+  }
+  if (lastFiredIndex === -1) {
+    log('No checkpoints to go back to.', 'info');
+    return;
+  }
+
+  // Pause the auto-timer if running
+  if (simRunning && !simPaused) {
+    simPaused = true;
+    document.getElementById('btnPause').textContent = '▶ Resume';
+    document.getElementById('statusDot').className = 'status-dot paused';
+  }
+
+  const cp = CHECKPOINTS[lastFiredIndex];
+  const prevT = lastFiredIndex > 0 ? CHECKPOINTS[lastFiredIndex - 1].t : 0;
+
+  // Un-fire this checkpoint
+  firedCheckpoints.delete(lastFiredIndex);
+  unmarkCheckpointDone(lastFiredIndex);
+
+  // Un-fire score updates that fall after the previous checkpoint
+  for (let i = 0; i < SCORE_UPDATES.length; i++) {
+    if (SCORE_UPDATES[i].t > prevT) firedScoreUpdates.delete(i);
+  }
+
+  simElapsed = cp.t;
+  updateTimerDisplay(simElapsed);
+
+  // Update button states
+  document.getElementById('btnNext').disabled = false;
+  document.getElementById('btnBack').disabled = lastFiredIndex === 0;
+
+  log(`↩ Rewound to before "${cp.label}" — press Next to re-run it`, 'warn');
+}
+
+function renderGamesTable() {
+  if (weekGames.length === 0) return;
+  const html = `
+    <table class="games-table">
+      <thead><tr>
+        <th>Matchup</th>
+        <th>Wave</th>
+        <th>Rank</th>
+        <th>Status</th>
+        <th>Score</th>
+      </tr></thead>
+      <tbody>
+        ${weekGames.map(g => {
+          const statusClass = g.status === 'FINAL' ? 'final' : g.status === 'IN_PROGRESS' ? 'in_progress' : 'scheduled';
+          const score = (g.liveHome != null && g.liveAway != null)
+            ? `<span class="score-cell">${g.liveAway}–${g.liveHome}</span>`
+            : (g.status === 'FINAL' ? `<span class="score-cell" style="color:#1b9a06">${g.away_score}–${g.home_score}</span>` : '—');
+          return `<tr>
+            <td><strong style="color:#E8EAF0">${g.away_team}</strong> @ <strong style="color:#E8EAF0">${g.home_team}</strong></td>
+            <td><span class="wave-badge">${waveLabel(g.wave)}</span></td>
+            <td><span class="rank-pill">${g.frozen_rank ?? g.rank ?? '?'}</span></td>
+            <td><span class="status-${statusClass}">${g.status ?? 'scheduled'}</span></td>
+            <td>${score}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+  document.getElementById('gamesContent').innerHTML = html;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────
+function fmtTime(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function updateTimerDisplay(elapsed) {
+  document.getElementById('timerDisplay').textContent = fmtTime(elapsed);
+}
+
+function setWeekState(state) {
+  weekState = state;
+  const chip = document.getElementById('weekStateChip');
+  chip.style.display = '';
+  chip.className = `state-chip ${state}`;
+  chip.textContent = state.toUpperCase().replace('_', ' ');
+}
+
+function setStatusRunning() {
+  document.getElementById('statusDot').className = 'status-dot running';
+  document.getElementById('statusText').textContent = `Week ${currentWeek} simulating...`;
+}
+
+function setStatusComplete() {
+  document.getElementById('statusDot').className = 'status-dot complete';
+  document.getElementById('statusText').textContent = `Week ${currentWeek} complete`;
+}
+
+function log(msg, type = '') {
+  const panel = document.getElementById('logPanel');
+  const now = new Date().toLocaleTimeString('en-US', { hour12: false });
+  const div = document.createElement('div');
+  div.className = 'log-entry';
+  div.innerHTML = `<span class="log-time">${now}</span><span class="log-msg ${type}">${msg}</span>`;
+  panel.insertBefore(div, panel.firstChild);
+}
+
+function validateKey() {
+  if (!getServiceKey()) {
+    log('✗ Service role key required', 'error');
+    document.getElementById('serviceKey').focus();
+    return false;
+  }
+  return true;
+}
+
+// Expose functions globally for the checkpoint runner
+window.preSeasonSetup = preSeasonSetup;
+window.openPicks      = openPicks;
+window.seedBotPicks   = seedBotPicks;
+window.lockPicks      = lockPicks;
+window.kickoffWave    = kickoffWave;
+window.finalizeWave   = finalizeWave;
+window.endWeek        = endWeek;
+window.completeWeek   = completeWeek;
+window.nextWeek       = nextWeek;
+
+// Init — restore saved service role key so page reloads don't clear it
+(function() {
+  const saved = localStorage.getItem('sim_service_key');
+  if (saved) document.getElementById('serviceKey').value = saved;
+})();
+renderCheckpoints();
+</script>
+</body>
+</html>

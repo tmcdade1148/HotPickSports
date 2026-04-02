@@ -42,6 +42,7 @@ interface SeasonState {
   config: SeasonConfig | null;
   poolId: string;
   currentWeek: number;
+  seasonYear: number;
   games: DbSeasonGame[];
   allWeekGames: Record<number, DbSeasonGame[]>;
   weekPicks: DbSeasonPick[];
@@ -89,6 +90,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
   config: null,
   poolId: '',
   currentWeek: 1,
+  seasonYear: 2026,
   games: [],
   allWeekGames: {},
   weekPicks: [],
@@ -106,21 +108,28 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
     if (state.config?.competition === config.competition && state.poolId === poolId && state.currentWeek > 0) {
       return;
     }
-    // Read current_week from competition_config (never hardcode)
-    const {data: cfgRow} = await supabase
+    // Read current_week and season_year from competition_config (never hardcode)
+    const {data: cfgRows} = await supabase
       .from('competition_config')
-      .select('value')
+      .select('key, value')
       .eq('competition', config.competition)
-      .eq('key', 'current_week')
-      .maybeSingle();
+      .in('key', ['current_week', 'season_year']);
+
+    const cfgMap: Record<string, unknown> = {};
+    for (const row of cfgRows ?? []) {
+      cfgMap[row.key] = row.value;
+    }
 
     const currentWeek =
-      typeof cfgRow?.value === 'number' ? cfgRow.value : 1;
+      typeof cfgMap.current_week === 'number' ? cfgMap.current_week : 1;
+    const seasonYear =
+      typeof cfgMap.season_year === 'number' ? cfgMap.season_year : 2026;
 
     set(state => ({
       config,
       poolId,
       currentWeek,
+      seasonYear,
       games: [],
       allWeekGames: {},
       weekPicks: [],
@@ -225,7 +234,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       user_id: userId,
       game_id: gameId,
       competition: config.competition,
-      season_year: new Date().getFullYear(),
+      season_year: get().seasonYear,
       week: currentWeek,
       picked_team: pickedTeam,
       is_hotpick: isHotPick,
@@ -250,7 +259,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       {
         user_id: userId,
         competition: config.competition,
-        season_year: config.seasonYear ?? 2026,
+        season_year: get().seasonYear,
         game_id: gameId,
         week: currentWeek,
         picked_team: pickedTeam,
@@ -295,7 +304,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
         {
           user_id: userId,
           competition: config.competition,
-          season_year: config.seasonYear ?? 2026,
+          season_year: get().seasonYear,
           game_id: oldHotPick.game_id,
           week: currentWeek,
           picked_team: oldHotPick.picked_team,
@@ -314,7 +323,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       {
         user_id: userId,
         competition: config.competition,
-        season_year: config.seasonYear ?? 2026,
+        season_year: get().seasonYear,
         game_id: gameId,
         week: currentWeek,
         picked_team: pick.picked_team,
@@ -653,8 +662,9 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
     const {config, currentWeek} = get();
     if (!config) return () => {};
 
+    const id = Math.random().toString(36).slice(2, 8);
     const channel = supabase
-      .channel(`game-scores-${config.competition}-week${currentWeek}`)
+      .channel(`game-scores-${config.competition}-week${currentWeek}-${id}`)
       .on(
         'postgres_changes',
         {

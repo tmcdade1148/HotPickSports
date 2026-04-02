@@ -295,7 +295,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'flex-start',
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xs,
-    paddingBottom: spacing.md,
+    paddingBottom: spacing.md / 2,
   },
   headerDivider: {
     height: 2,

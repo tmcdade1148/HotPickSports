@@ -250,21 +250,21 @@ function ImpactLine({impact}: {impact: HotPickImpact}) {
     case 'losing':
       return (
         <Text style={[styles.impactText, {color: colors.error}]}>
-          {'\u2212'}{impact.points} at risk {'\u26A0\uFE0F'}
+          {'\u2212'}{Math.abs(impact.points)} at risk {'\u26A0\uFE0F'}
         </Text>
       );
 
     case 'tied':
       return (
-        <Text style={[styles.impactText, {color: colors.textPrimary}]}>
-          It's still a tossup!
+        <Text style={[styles.impactText, {color: colors.textPrimary}]} numberOfLines={2}>
+          This is going to be{'\n'}a great game.
         </Text>
       );
 
     case 'final':
       return (
         <Text style={[styles.impactText, {color: impact.isCorrect ? '#1B9A06' : colors.error}]}>
-          {impact.isCorrect ? `+${impact.points} \u2705` : `\u2212${impact.points} \u274C`}
+          {impact.isCorrect ? `+${impact.points} \u2705` : `\u2212${Math.abs(impact.points)} \u274C`}
         </Text>
       );
 
@@ -293,7 +293,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: 12,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
+    paddingTop: spacing.md / 2,
+    paddingBottom: spacing.md,
   },
   hotPickSectionLive: {
     borderWidth: 2,
@@ -301,13 +302,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   hotPickHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.xs,
-  },
-  hotPickHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     marginBottom: spacing.sm,
   },
@@ -328,9 +323,9 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.primary,
   },
   inProgressClock: {
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: '400',
-    color: colors.textSecondary,
+    color: colors.textPrimary,
   },
   rankBadge: {
     backgroundColor: colors.highlight + '15',
@@ -388,6 +383,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: '700',
     color: colors.textPrimary,
     textTransform: 'uppercase',
+    marginLeft: 10, // align with pickedBox text (8px padding + 2px border)
   },
   inlineScore: {
     fontSize: 18,
@@ -435,7 +431,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   impactText: {
     ...typography.body,
     fontWeight: '700',
-    marginTop: spacing.xs,
+    marginTop: 0,
   },
   body: {
     ...typography.body,
