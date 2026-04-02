@@ -6,8 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   LayoutAnimation,
-  Platform,
-  UIManager,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {ChevronLeft, ChevronDown, ChevronUp} from 'lucide-react-native';
@@ -15,13 +13,6 @@ import {useNavigation} from '@react-navigation/native';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 import type {ThemeColors} from '@shell/theme';
-
-if (
-  Platform.OS === 'android' &&
-  UIManager.setLayoutAnimationEnabledExperimental
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 interface SectionProps {
   title: string;
@@ -109,9 +100,14 @@ export function InstructionsScreen() {
             count across all your pools simultaneously.
           </Text>
           <Text style={[styles.body, {color: colors.textSecondary, marginTop: spacing.sm}]}>
-            Picks open a few days before the first game of the week and lock at the
-            pick deadline (typically the first kickoff). You can edit your picks as
-            many times as you want before the deadline.
+            Picks open a few days before the first game of the week. Each game locks
+            individually at its own kickoff — so Thursday's game locks Thursday night,
+            while Sunday games stay open until Sunday. You can edit any pick as many
+            times as you want right up until that game kicks off.
+          </Text>
+          <Text style={[styles.body, {color: colors.textSecondary, marginTop: spacing.sm}]}>
+            Once a game kicks off, that pick is locked. You can still submit or change
+            picks for any game that hasn't started yet, even mid-week.
           </Text>
         </AccordionSection>
 
