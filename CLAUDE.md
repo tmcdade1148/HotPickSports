@@ -60,6 +60,16 @@ Never suggest designs that tie picks or scores to a pool_id.**
 - Week-side leaderboard: ✅/❌ shown next to each user's hotpick game only when `is_hotpick_correct` is `true`/`false` (never when `null` — game not yet final).
 - Season leaderboard Week 1 empty state: shows "The season leaderboard updates after all Week 1 scores are in." when `currentWeek === 1` and week is in progress.
 - Home screen header: `alignItems: 'flex-start'` so greeting aligns with phase label and user name aligns with event name. Both first-line labels are `fontSize: 14`.
+- `season_year` in picks: always read from `competition_config` via `seasonStore.seasonYear` (set during `initialize()`). Never hardcoded. Mismatch between picks and games causes scoring to silently skip the pick.
+- Game locking: two-phase system. Thursday kickoff locks only Thursday games. Sunday 1pm+ kickoff locks ALL remaining games for the week. `lock_at` is authoritative — set to `2020-01-01` (past=locked) or `2099-01-01` (future=unlocked) by the simulator. Client checks `lock_at <= now()` OR active game status.
+- `sunday_lock_anchor` in `competition_config`: must exist as a row for PATCH to work. Simulator uses upsert (POST with `resolution=merge-duplicates`) to create if missing. When set to past date, Home screen `allGamesLocked` Strategy 1 fires immediately.
+- Realtime subscriptions: `subscribeToGameScores` (season_games changes) active on both Picks screen (always) and Home screen (during live/settling). Channel names include random suffix to avoid collision when multiple subscribers exist.
+- `LastWeekRecap` component: shown on Home screen picks_open state for Week 2+. Fetches previous week totals and HotPick result. Accepts `teams: TeamConfig[]` prop from SeasonConfig.
+- `WeekScoreModule`: rolling two-week display — previous week FINAL on left, current week on right. Uses `useFocusEffect` for re-fetch on tab focus.
+- History tab: always rendered in navigation but greyed out (`tabBarDisabled`) until user has at least one completed week (`week < currentWeek`). Query scoped to current competition.
+- HotPick tied-game text: "This is going to be a great game." (two lines). Impact text top-aligned with "Your HotPick" header.
+- "GAME IN PROGRESS" / "GAMES IN PROGRESS": singular when `liveGameCount === 1`.
+- TOS Version Gate: `TosVersionGateScreen` blocks app until user accepts when `current_tos_version` is bumped in competition_config.
 
 **Default event:** `nfl_2026` — this is the active competition.
 Do not default to worldCup2026 or any other event.
@@ -674,7 +684,7 @@ one HotPick per user per week.
 | `process-notification-queue` | Cron | Every 60s |
 | `smack-archive-messages` | Cron | Daily 3am UTC |
 | `espn-health-check` | Cron | Hourly at :17 |
-| `season-simulator` | Manual (admin) | On demand |
+| `season-simulator` | Manual (admin) | On demand — also `tools/season-simulator.html` (browser-based) |
 
 ### ESPN Health Monitor
 
