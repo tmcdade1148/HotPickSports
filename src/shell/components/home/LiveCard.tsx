@@ -292,7 +292,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   hotPickSection: {
     backgroundColor: colors.surface,
     borderRadius: 12,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     paddingTop: spacing.md / 2,
     paddingBottom: spacing.md / 2,
   },

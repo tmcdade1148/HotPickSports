@@ -161,8 +161,8 @@ export function HomeScreen({navigation}: any) {
           }}
         />
 
-        {/* Hardware Module — directly above the event card / picks CTA */}
-        <HardwareModule onPress={() => navigation.navigate('HistoryTab')} />
+        {/* Hardware Module hidden — History tab not ready for launch */}
+        {/* <HardwareModule onPress={() => navigation.navigate('HistoryTab')} /> */}
 
         {cardsToShow.map(config => (
           <EventCardForConfig

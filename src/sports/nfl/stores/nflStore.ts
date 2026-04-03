@@ -86,7 +86,9 @@ interface NFLState {
   activePoolMemberCount: number;
 
   // ScoreModule data
+  currentWeekPoints: number;
   lastWeekNet: number | null; // null in Week 1
+  weekPointsMap: Record<number, number>; // week → week_points for rolling display
 
   // Game Day Engagement
   gamePickStats: Record<string, GamePickStats>; // gameId → stats for active pool
@@ -94,6 +96,9 @@ interface NFLState {
   hotPickGameStatus: 'pending' | 'live' | 'complete' | null;
   /** Kickoff time of the next scheduled game this week — drives gap countdown in the kickoff pill */
   nextKickoff: Date | null;
+
+  /** True after initialize() has fetched competition_config at least once */
+  configLoaded: boolean;
 
   // Actions
   initialize: (competition: string) => Promise<void>;
@@ -114,6 +119,7 @@ interface NFLState {
   fetchNextKickoff: () => Promise<void>;
   subscribeToGamePickStats: (poolId: string) => () => void;
   subscribeToLiveScores: () => () => void;
+  subscribeToWeekEarned: () => () => void;
   subscribeToCompetitionConfig: () => () => void;
 }
 
@@ -144,13 +150,16 @@ export const useNFLStore = create<NFLState>((set, get) => ({
   activePoolMemberCount: 0,
 
   // ScoreModule data
+  currentWeekPoints: 0,
   lastWeekNet: null,
+  weekPointsMap: {},
 
   // Game Day Engagement
   gamePickStats: {},
   pathBackNarrative: null,
   hotPickGameStatus: null,
   nextKickoff: null,
+  configLoaded: false,
 
   initialize: async (competition: string) => {
     const alreadyInitialized = get().competition === competition && get().currentWeek > 0;
@@ -169,7 +178,9 @@ export const useNFLStore = create<NFLState>((set, get) => ({
         userSeasonTotal: 0,
         userPoolRank: null,
         activePoolMemberCount: 0,
+        currentWeekPoints: 0,
         lastWeekNet: null,
+        weekPointsMap: {},
         gamePickStats: {},
         pathBackNarrative: null,
         hotPickGameStatus: null,
@@ -182,6 +193,7 @@ export const useNFLStore = create<NFLState>((set, get) => ({
     // of reading the actual DB state (e.g. 'live'). Fetching every time here
     // ensures weekState, currentWeek, and currentPhase are always fresh.
     await get().fetchCompetitionConfig();
+    set({configLoaded: true});
     if (!alreadyInitialized) {
       await get().fetchHighestRankedGame();
     }
@@ -287,34 +299,47 @@ export const useNFLStore = create<NFLState>((set, get) => ({
   fetchHighestRankedGame: async () => {
     const {competition, currentWeek, currentPhase} = get();
 
-    const {data} = await supabase
-      .from('season_games')
-      .select('*')
-      .eq('competition', competition)
-      .eq('week', currentWeek)
-      .not('frozen_rank', 'is', null)
-      .order('frozen_rank', {ascending: false})
-      .limit(1)
-      .maybeSingle();
+    // PRE_SEASON: kickoff_at values are stale 2025 dates.
+    // Only fetch the ranked game — do not set weekFirstKickoff.
+    if (currentPhase === 'PRE_SEASON') {
+      const {data} = await supabase
+        .from('season_games')
+        .select('*')
+        .eq('competition', competition)
+        .eq('week', currentWeek)
+        .not('frozen_rank', 'is', null)
+        .order('frozen_rank', {ascending: false})
+        .limit(1)
+        .maybeSingle();
+      set({highestRankedGame: (data as DbSeasonGame) ?? null});
+      return;
+    }
 
-    set({highestRankedGame: (data as DbSeasonGame) ?? null});
-
-    // Don't set weekFirstKickoff during PRE_SEASON — game kickoff_at values
-    // are stale 2025 dates and would corrupt the countdown target logic.
-    if (currentPhase === 'PRE_SEASON') return;
-
-    // Fetch earliest kickoff this week for countdown
-    const {data: earliest} = await supabase
-      .from('season_games')
-      .select('kickoff_at')
-      .eq('competition', competition)
-      .eq('week', currentWeek)
-      .not('kickoff_at', 'is', null)
-      .order('kickoff_at', {ascending: true})
-      .limit(1)
-      .maybeSingle();
+    // All other phases: both queries need only competition + week.
+    // Neither depends on the other — fire simultaneously.
+    const [{data: ranked}, {data: earliest}] = await Promise.all([
+      supabase
+        .from('season_games')
+        .select('*')
+        .eq('competition', competition)
+        .eq('week', currentWeek)
+        .not('frozen_rank', 'is', null)
+        .order('frozen_rank', {ascending: false})
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from('season_games')
+        .select('kickoff_at')
+        .eq('competition', competition)
+        .eq('week', currentWeek)
+        .not('kickoff_at', 'is', null)
+        .order('kickoff_at', {ascending: true})
+        .limit(1)
+        .maybeSingle(),
+    ]);
 
     set({
+      highestRankedGame: (ranked as DbSeasonGame) ?? null,
       weekFirstKickoff: earliest?.kickoff_at
         ? new Date(earliest.kickoff_at)
         : null,
@@ -443,14 +468,13 @@ export const useNFLStore = create<NFLState>((set, get) => ({
   fetchUserSeasonScore: async (userId: string) => {
     const {competition, currentWeek, currentPhase, weekState} = get();
     const isPlayoffs = currentPhase !== 'REGULAR';
-    // Exclude the current week's partial scores while games are in progress.
-    // The season total reflects only completed weeks; WeekScoreModule shows
-    // the current week's live earned points separately.
+    // Exclude the current week from the season total while games are in progress.
+    // currentWeekPoints is shown separately by WeekScoreModule.
     const weekInProgress =
       weekState === 'picks_open' || weekState === 'locked' || weekState === 'live';
 
-    // Pool-independent: query user's own season_user_totals
-    // Filtered to current season phase (regular vs playoffs are separate)
+    // Fetch ALL weeks (including current) so we can extract currentWeekPoints
+    // and lastWeekNet from the same query.
     let query = supabase
       .from('season_user_totals')
       .select('week, week_points')
@@ -462,18 +486,23 @@ export const useNFLStore = create<NFLState>((set, get) => ({
     } else {
       query = query.eq('phase', 'REGULAR');
     }
-    if (weekInProgress) {
-      query = query.neq('week', currentWeek);
-    }
 
     const {data} = await query;
 
-    // Sum week_points for the current season phase
     let total = 0;
     let lastWeekPoints: number | null = null;
+    let currentWeekPts = 0;
 
     for (const row of data ?? []) {
-      total += row.week_points ?? 0;
+      if (row.week === currentWeek) {
+        currentWeekPts = row.week_points ?? 0;
+        // Exclude from season total when week is in progress
+        if (!weekInProgress) {
+          total += row.week_points ?? 0;
+        }
+      } else {
+        total += row.week_points ?? 0;
+      }
       if (row.week === currentWeek - 1) {
         lastWeekPoints = row.week_points ?? 0;
       }
@@ -484,9 +513,17 @@ export const useNFLStore = create<NFLState>((set, get) => ({
     const isFirstWeekOfPhase =
       phaseWeeks.length === 0 || currentWeek <= (phaseWeeks[0] ?? currentWeek);
 
+    // Build per-week points map for the rolling 3-week display
+    const wpm: Record<number, number> = {};
+    for (const row of data ?? []) {
+      wpm[row.week] = row.week_points ?? 0;
+    }
+
     set({
       userSeasonTotal: total,
+      currentWeekPoints: currentWeekPts,
       lastWeekNet: isFirstWeekOfPhase ? null : lastWeekPoints,
+      weekPointsMap: wpm,
     });
   },
 
@@ -683,6 +720,43 @@ export const useNFLStore = create<NFLState>((set, get) => ({
           );
           if (wasAnyLive && !isAnyLive) {
             get().fetchNextKickoff();
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  },
+
+  /**
+   * Subscribe to season_user_totals for the current user+week so
+   * currentWeekPoints updates live as the scoring Edge Function writes results.
+   * Returns an unsubscribe function.
+   */
+  subscribeToWeekEarned: () => {
+    const {competition, currentWeek, userId} = get();
+    if (!userId) return () => {};
+
+    const channel = supabase
+      .channel(`week_earned_${userId}_${competition}_${currentWeek}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'season_user_totals',
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload: any) => {
+          const row = payload.new;
+          if (row?.competition === competition && row?.week === currentWeek) {
+            const pts = row.week_points ?? 0;
+            set(state => ({
+              currentWeekPoints: pts,
+              weekPointsMap: {...state.weekPointsMap, [currentWeek]: pts},
+            }));
           }
         },
       )

@@ -1,6 +1,6 @@
 import React, {useState, useEffect} from 'react';
 import {View, Text, StyleSheet} from 'react-native';
-import {spacing, borderRadius} from '@shared/theme';
+import {spacing, borderRadius, typography} from '@shared/theme';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useTheme} from '@shell/theme';
 import {supabase} from '@shared/config/supabase';
@@ -21,8 +21,8 @@ interface LastWeekData {
 }
 
 /**
- * LastWeekRecap — shown on the picks_open home screen for Week 2+.
- * Summarizes last week's score, HotPick result, and a contextual observation.
+ * LastWeekRecap — compact single-row recap shown on picks_open Home screen for Week 2+.
+ * Matches module title style (typography.body, 700, textPrimary).
  */
 export function LastWeekRecap({teams}: LastWeekRecapProps) {
   const {colors} = useTheme();
@@ -39,7 +39,6 @@ export function LastWeekRecap({teams}: LastWeekRecapProps) {
     const lastWeek = currentWeek - 1;
 
     const load = async () => {
-      // Fetch last week's totals
       const {data: totals} = await supabase
         .from('season_user_totals')
         .select('week_points, correct_picks, total_picks, is_hotpick_correct, hotpick_rank')
@@ -50,7 +49,6 @@ export function LastWeekRecap({teams}: LastWeekRecapProps) {
 
       if (!totals) return;
 
-      // Fetch last week's HotPick to get team name
       const {data: hotPick} = await supabase
         .from('season_picks')
         .select('picked_team')
@@ -60,7 +58,6 @@ export function LastWeekRecap({teams}: LastWeekRecapProps) {
         .eq('is_hotpick', true)
         .maybeSingle();
 
-      // Resolve team code to short name
       const team = teams?.find(t => t.code === hotPick?.picked_team);
       const teamName = team?.shortName ?? hotPick?.picked_team ?? null;
 
@@ -80,14 +77,8 @@ export function LastWeekRecap({teams}: LastWeekRecapProps) {
   if (!data || currentWeek <= 1) return null;
 
   const lastWeek = currentWeek - 1;
-
-  // HotPick summary
-  const hotPickSummary = (() => {
-    if (!data.hotPickTeamName || data.hotpickRank == null || data.isHotpickCorrect == null) return null;
-    const icon = data.isHotpickCorrect ? '\u2705' : '\u274C';
-    const pts = data.isHotpickCorrect ? `+${data.hotpickRank}` : `\u2212${data.hotpickRank}`;
-    return `${data.hotPickTeamName} (Rank ${data.hotpickRank}) ${icon} ${pts} pts`;
-  })();
+  const pointsColor = data.weekPoints >= 0 ? '#1b9a06' : colors.error;
+  const pointsStr = `${data.weekPoints >= 0 ? '+' : ''}${data.weekPoints}`;
 
   // Contextual observation
   const observation = (() => {
@@ -115,35 +106,44 @@ export function LastWeekRecap({teams}: LastWeekRecapProps) {
     return null;
   })();
 
+  // HotPick compact: "Bills (Rk 5) +5" or "Bills (Rk 5) -5"
+  const hotPickCompact = (() => {
+    if (!data.hotPickTeamName || data.hotpickRank == null || data.isHotpickCorrect == null) return null;
+    const icon = data.isHotpickCorrect ? '\u2705' : '\u274C';
+    const pts = data.isHotpickCorrect ? `+${data.hotpickRank}` : `\u2212${data.hotpickRank}`;
+    return `${icon} ${data.hotPickTeamName} ${pts}`;
+  })();
+
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>Week {lastWeek} Recap</Text>
-
-      <View style={styles.scoreRow}>
-        <Text style={[
-          styles.scoreValue,
-          {color: data.weekPoints >= 0 ? '#1b9a06' : colors.error},
-        ]}>
-          {data.weekPoints >= 0 ? '+' : ''}{data.weekPoints}
-        </Text>
-        <Text style={styles.scoreLabel}>pts</Text>
-        <Text style={styles.picksLabel}>
-          {data.correctPicks}/{data.totalPicks} correct
-        </Text>
+      {/* Title row: "Week X Recap" left, points right */}
+      <View style={styles.headerRow}>
+        <Text style={styles.header}>Week {lastWeek} Recap</Text>
+        <View style={styles.pointsRow}>
+          <Text style={[styles.pointsValue, {color: pointsColor}]}>
+            {pointsStr}
+          </Text>
+          <Text style={styles.pointsLabel}>pts</Text>
+          <Text style={styles.picksLabel}>
+            {data.correctPicks}/{data.totalPicks}
+          </Text>
+        </View>
       </View>
 
-      {hotPickSummary && (
+      {/* HotPick result — compact single line */}
+      {hotPickCompact && (
         <View style={styles.hotPickRow}>
           <Text style={styles.hotPickLabel}>HotPick</Text>
           <Text style={[
             styles.hotPickResult,
             {color: data.isHotpickCorrect ? '#1b9a06' : colors.error},
           ]}>
-            {hotPickSummary}
+            {hotPickCompact}
           </Text>
         </View>
       )}
 
+      {/* Contextual observation */}
       {observation && (
         <Text style={styles.observation}>{observation}</Text>
       )}
@@ -155,30 +155,30 @@ const createStyles = (colors: any) => StyleSheet.create({
   container: {
     backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm + 2,
     marginTop: spacing.sm,
-    marginBottom: spacing.sm,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
   },
   header: {
-    fontSize: 13,
+    ...typography.body,
     fontWeight: '700',
-    color: colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: spacing.sm,
+    color: colors.textPrimary,
   },
-  scoreRow: {
+  pointsRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    gap: 4,
+    gap: 3,
   },
-  scoreValue: {
-    fontSize: 22,
+  pointsValue: {
+    fontSize: 18,
     fontWeight: '700',
   },
-  scoreLabel: {
+  pointsLabel: {
     fontSize: 13,
     fontWeight: '400',
     color: colors.textSecondary,
@@ -186,10 +186,13 @@ const createStyles = (colors: any) => StyleSheet.create({
   picksLabel: {
     fontSize: 13,
     color: colors.textSecondary,
-    marginLeft: spacing.sm,
+    marginLeft: 4,
   },
   hotPickRow: {
-    marginTop: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
   },
   hotPickLabel: {
     fontSize: 11,
@@ -197,16 +200,15 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 2,
   },
   hotPickResult: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   observation: {
     fontSize: 13,
     color: colors.textSecondary,
     fontStyle: 'italic',
-    marginTop: spacing.sm,
+    marginTop: 4,
   },
 });

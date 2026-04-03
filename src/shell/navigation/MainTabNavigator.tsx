@@ -159,6 +159,36 @@ function SmackTalkTab() {
 }
 
 /**
+ * HistoryTabWrapper — History with logo header (matches Settings).
+ */
+function HistoryTabWrapper(props: any) {
+  const {colors} = useTheme();
+  const brand = useBrand();
+  const wordmark = isDarkBg(colors.background) ? wordmarkDark : wordmarkLight;
+
+  return (
+    <SafeAreaView style={{flex: 1, backgroundColor: colors.background}} edges={['top']}>
+      <View style={{alignItems: 'center', marginBottom: spacing.xs, paddingTop: spacing.xs}}>
+        {brand.isBranded && brand.logo.full ? (
+          <Image
+            source={{uri: brand.logo.full}}
+            style={{height: 30, width: 160}}
+            resizeMode="contain"
+          />
+        ) : (
+          <Image
+            source={wordmark}
+            style={{height: 40, width: 225}}
+            resizeMode="contain"
+          />
+        )}
+      </View>
+      <HistoryScreen {...props} />
+    </SafeAreaView>
+  );
+}
+
+/**
  * SettingsTabWrapper — Settings with logo header.
  */
 function SettingsTabWrapper(props: any) {
@@ -489,9 +519,10 @@ export function MainTabNavigator() {
           ),
         }}
       />
+      {/* History tab hidden — not ready for launch
       <Tab.Screen
         name="HistoryTab"
-        component={HistoryScreen}
+        component={HistoryTabWrapper}
         options={{
           tabBarLabel: 'History',
           tabBarDisabled: !hasHistory,
@@ -507,6 +538,7 @@ export function MainTabNavigator() {
           },
         }}
       />
+      */}
       <Tab.Screen
         name="SettingsTab"
         component={SettingsTabWrapper}

@@ -1,128 +1,90 @@
-import React, {useState, useEffect, useCallback} from 'react';
-import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
+import React, {useEffect, useRef} from 'react';
+import {View, Text, TouchableOpacity, Animated, StyleSheet} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
-import {useFocusEffect} from '@react-navigation/native';
 import {spacing, borderRadius, typography} from '@shared/theme';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useTheme} from '@shell/theme';
-import {supabase} from '@shared/config/supabase';
-import {useAuth} from '@shared/hooks/useAuth';
 
 
 /**
- * WeekScoreModule — Pts. Target (left) + PTS. EARNED (right).
+ * WeekScoreModule — Rolling 3-week score strip (pure display).
  *
- * Mirrors the two-widget layout on the Picks page. PTS. EARNED subscribes
- * to Realtime so it updates live as the scoring Edge Function writes each
- * game result. Hidden during PRE_SEASON (gated by SeasonEventCard) and
- * when weekState is complete (standings card covers that state).
+ * Reads all data from nflStore — no fetching, no subscriptions.
+ * Shows up to 3 week score cells in a row (oldest left → newest right).
+ * Each week a new cell enters on the right; the oldest exits left.
+ *
+ * Week 1: [ blank ] [ blank ] [ Wk 1 ]
+ * Week 2: [ blank ] [ Wk 1  ] [ Wk 2 ]
+ * Week 3: [ Wk 1  ] [ Wk 2  ] [ Wk 3 ]
+ * Week 4: [ Wk 2  ] [ Wk 3  ] [ Wk 4 ]
+ *
+ * Current week cell has a primary-color border accent and a pulsing dot
+ * to indicate the score is live and updating. Past week cells are dimmed.
  */
+
+// ---------------------------------------------------------------------------
+// Pulsing Dot — animated opacity loop
+// ---------------------------------------------------------------------------
+function PulsingDot({color}: {color: string}) {
+  const opacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 0.2,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [opacity]);
+
+  return (
+    <Animated.View
+      style={{
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: color,
+        opacity,
+        marginLeft: 4,
+      }}
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// WeekScoreModule
+// ---------------------------------------------------------------------------
 export function WeekScoreModule() {
   const {colors} = useTheme();
   const styles = createStyles(colors);
   const navigation = useNavigation<any>();
+
+  // All data from nflStore — zero local fetching
   const weekState = useNFLStore(s => s.weekState);
   const currentWeek = useNFLStore(s => s.currentWeek);
-  const competition = useNFLStore(s => s.competition);
-  const {user} = useAuth();
-
-  const [pickCount, setPickCount] = useState(0);
-  const [weekEarned, setWeekEarned] = useState<number | null>(null);
-  const [lastWeekEarned, setLastWeekEarned] = useState<number | null>(null);
-  const [focusCount, setFocusCount] = useState(0);
-
-  // Re-fetch when Home tab regains focus (e.g. after making picks)
-  useFocusEffect(
-    useCallback(() => {
-      setFocusCount(c => c + 1);
-    }, []),
-  );
-
-  // Fetch current week picks + earned, and previous week's final score
-  useEffect(() => {
-    if (!user?.id || !currentWeek || currentWeek === 0 || !competition) return;
-
-    const load = async () => {
-      const queries: Promise<any>[] = [
-        supabase
-          .from('season_picks')
-          .select('game_id, is_hotpick')
-          .eq('user_id', user.id)
-          .eq('competition', competition)
-          .eq('week', currentWeek),
-        supabase
-          .from('season_user_totals')
-          .select('week_points')
-          .eq('user_id', user.id)
-          .eq('competition', competition)
-          .eq('week', currentWeek)
-          .maybeSingle(),
-      ];
-
-      // Fetch previous week's final score for Week 2+
-      if (currentWeek > 1) {
-        queries.push(
-          supabase
-            .from('season_user_totals')
-            .select('week_points')
-            .eq('user_id', user.id)
-            .eq('competition', competition)
-            .eq('week', currentWeek - 1)
-            .maybeSingle(),
-        );
-      }
-
-      const results = await Promise.all(queries);
-      const picks = results[0].data;
-      const totals = results[1].data;
-
-      setPickCount(picks?.length ?? 0);
-      setWeekEarned(totals?.week_points ?? null);
-
-      if (currentWeek > 1 && results[2]) {
-        setLastWeekEarned(results[2].data?.week_points ?? null);
-      }
-    };
-
-    load();
-  }, [user?.id, currentWeek, weekState, competition, focusCount]);
-
-  // Realtime: keep PTS. EARNED current as scoring Edge Function writes results
-  useEffect(() => {
-    if (!user?.id || !currentWeek || currentWeek === 0 || !competition) return;
-
-    const channel = supabase
-      .channel(`home_week_earned_${user.id}_${competition}_${currentWeek}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'season_user_totals',
-          filter: `user_id=eq.${user.id}`,
-        },
-        (payload: any) => {
-          const row = payload.new;
-          if (row.competition === competition && row.week === currentWeek) {
-            setWeekEarned(row.week_points ?? null);
-          }
-        },
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user?.id, currentWeek, competition]);
+  const userPickCount = useNFLStore(s => s.userPickCount);
+  const currentWeekPoints = useNFLStore(s => s.currentWeekPoints);
+  const weekPointsMap = useNFLStore(s => s.weekPointsMap);
 
   // Hide when no week state, no week, or no picks
-  if (!weekState || currentWeek === 0 || pickCount === 0) {
+  if (!weekState || currentWeek === 0 || userPickCount === 0) {
     return null;
   }
 
   const isSettled = weekState === 'settling' || weekState === 'complete';
+  const isLive = weekState === 'live' || weekState === 'locked';
 
-  if (isSettled && weekEarned != null) {
+  if (isSettled && currentWeekPoints != null) {
     // Single full-width Final Score widget — taps to Picks screen
     return (
       <TouchableOpacity
@@ -136,13 +98,13 @@ export function WeekScoreModule() {
           <View style={styles.widgetValueRow}>
             <Text style={[
               styles.widgetValue,
-              {color: weekEarned >= 0 ? '#1b9a06' : colors.error},
+              {color: currentWeekPoints >= 0 ? '#1b9a06' : colors.error},
             ]}>
-              {weekEarned >= 0 ? '+' : ''}{weekEarned}
+              {currentWeekPoints >= 0 ? '+' : ''}{currentWeekPoints}
             </Text>
             <Text style={[
               styles.widgetPts,
-              {color: weekEarned >= 0 ? '#1b9a06' : colors.error},
+              {color: currentWeekPoints >= 0 ? '#1b9a06' : colors.error},
             ]}>pts</Text>
           </View>
         </View>
@@ -150,53 +112,66 @@ export function WeekScoreModule() {
     );
   }
 
-  const earnedDisplay = weekEarned == null
-    ? '0'
-    : weekEarned > 0
-      ? `+${weekEarned}`
-      : `${weekEarned}`;
+  // Build 3 slots: oldest on left, newest on right
+  const slots: {week: number | null}[] = [];
+  for (let i = 2; i >= 0; i--) {
+    const w = currentWeek - i;
+    slots.push({week: w >= 1 ? w : null});
+  }
 
   return (
     <View style={styles.widgetRow}>
-      {/* Left — Previous week FINAL (Week 2+) or TBD (Week 1) */}
-      <View style={styles.widget}>
-        {currentWeek > 1 && lastWeekEarned != null ? (
-          <>
-            <Text style={styles.widgetLabel}>
-              Week {currentWeek - 1} {'\u2022'} FINAL
-            </Text>
+      {slots.map((slot, idx) => {
+        if (!slot.week) {
+          // Empty placeholder
+          return <View key={`empty-${idx}`} style={styles.widgetSmall} />;
+        }
+
+        const isCurrent = slot.week === currentWeek;
+        const pts = weekPointsMap[slot.week] ?? null;
+        const display = pts == null ? '0' : pts > 0 ? `+${pts}` : `${pts}`;
+        const ptsColor = pts != null && pts > 0
+          ? '#1b9a06'
+          : pts != null && pts < 0
+            ? colors.error
+            : colors.textPrimary;
+
+        return (
+          <View
+            key={slot.week}
+            style={[
+              styles.widgetSmall,
+              !isCurrent && styles.widgetDimmed,
+              isCurrent && isLive && styles.widgetLive,
+            ]}>
+            <View style={styles.labelRow}>
+              <Text style={[
+                styles.widgetLabel,
+                !isCurrent && styles.labelDimmed,
+              ]}>
+                WEEK {slot.week}
+              </Text>
+              {isCurrent && isLive && <PulsingDot color={colors.primary} />}
+            </View>
             <View style={styles.widgetValueRow}>
               <Text style={[
                 styles.widgetValue,
-                {color: lastWeekEarned >= 0 ? '#1b9a06' : colors.error},
+                {color: ptsColor},
+                !isCurrent && {opacity: 0.6},
               ]}>
-                {lastWeekEarned >= 0 ? '+' : ''}{lastWeekEarned}
+                {display}
               </Text>
               <Text style={[
                 styles.widgetPts,
-                {color: lastWeekEarned >= 0 ? '#1b9a06' : colors.error},
-              ]}>pts</Text>
+                pts != null && pts !== 0 && {color: ptsColor},
+                !isCurrent && {opacity: 0.6},
+              ]}>
+                pts
+              </Text>
             </View>
-          </>
-        ) : (
-          <Text style={styles.widgetLabel}>{' '}</Text>
-        )}
-      </View>
-
-      {/* Right — WEEK X score */}
-      <View style={styles.widget}>
-        <Text style={styles.widgetLabel}>WEEK {currentWeek}</Text>
-        <View style={styles.widgetValueRow}>
-          <Text style={[
-            styles.widgetValue,
-            weekEarned != null && weekEarned > 0 && {color: '#1b9a06'},
-            weekEarned != null && weekEarned < 0 && {color: colors.error},
-          ]}>
-            {earnedDisplay}
-          </Text>
-          <Text style={styles.widgetPts}>pts</Text>
-        </View>
-      </View>
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -212,15 +187,38 @@ const createStyles = (colors: any) => StyleSheet.create({
     flex: 1,
     backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
-    padding: spacing.sm + 2,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm + 2,
+    alignItems: 'flex-start',
+  },
+  widgetSmall: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm + 2,
+    alignItems: 'flex-start',
+  },
+  widgetDimmed: {
+    opacity: 0.6,
+  },
+  widgetLive: {
+    borderWidth: 2,
+    borderColor: colors.primary,
+  },
+  labelRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 2,
   },
   widgetLabel: {
     ...typography.body,
     fontWeight: '700',
     fontStyle: 'italic',
     color: colors.textPrimary,
-    marginBottom: 2,
+  },
+  labelDimmed: {
+    opacity: 1,
   },
   widgetValueRow: {
     flexDirection: 'row',
@@ -234,11 +232,6 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   widgetPts: {
     fontSize: 13,
-    fontWeight: '400',
-    color: colors.textSecondary,
-  },
-  widgetTarget: {
-    fontSize: 14,
     fontWeight: '400',
     color: colors.textSecondary,
   },

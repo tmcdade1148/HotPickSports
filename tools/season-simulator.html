@@ -335,7 +335,20 @@ async function api(path, method = 'GET', body = null, useServiceRole = true) {
   }
   const opts = { method, headers };
   if (body) opts.body = JSON.stringify(body);
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, opts);
+  console.log(`[api] ${method} ${path}`, body ? JSON.stringify(body).slice(0, 120) : '');
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000); // 15s timeout
+  opts.signal = controller.signal;
+  let res;
+  try {
+    res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, opts);
+  } catch (e) {
+    clearTimeout(timeout);
+    if (e.name === 'AbortError') throw new Error(`${method} ${path} → TIMEOUT after 15s`);
+    throw e;
+  }
+  clearTimeout(timeout);
+  console.log(`[api] ${method} ${path} → ${res.status}`);
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`${method} ${path} → ${res.status}: ${err}`);
@@ -1097,22 +1110,22 @@ async function resetWeek() {
 
   if (validateKey()) {
     try {
-      // Read current_week from DB so we reset the right week (not the stale JS default)
-      const cfgRows = await api(
-        `competition_config?competition=eq.${COMPETITION}&key=eq.current_week&select=value`
-      );
-      if (cfgRows?.[0]?.value && typeof cfgRows[0].value === 'number') {
-        currentWeek = cfgRows[0].value;
-      }
+      // Use the week from the dropdown (same as startWeek)
+      currentWeek = parseInt(document.getElementById('weekSelect').value);
       log('↺ Resetting Week ' + currentWeek + ' in DB…', 'warn');
+
       // Reset all sim games for this week
+      log('  resetting season_games…', 'info');
       await api(
         `season_games?competition=eq.${COMPETITION}&week=eq.${currentWeek}`,
         'PATCH',
         { status: 'scheduled', home_score: null, away_score: null, winner_team: null,
           current_period: null, game_clock: null, is_finalized: false, lock_at: null }
       );
+      log('  ✓ games reset', 'info');
+
       // Delete all picks for this week
+      log('  deleting picks…', 'info');
       const allUserIds = [PLAYERS.tom.id, PLAYERS.sharpshooter.id, ...BOTS.map(b => b.id)];
       for (const uid of allUserIds) {
         await api(
@@ -1120,12 +1133,18 @@ async function resetWeek() {
           'DELETE'
         );
       }
+      log('  ✓ picks deleted', 'info');
+
       // Delete season_user_totals for this week (clears leaderboard data)
+      log('  deleting user totals…', 'info');
       await api(
         `season_user_totals?competition=eq.${COMPETITION}&week=eq.${currentWeek}`,
         'DELETE'
       );
-      // Reset to PRE_SEASON — pre-season phase runs again before picks open
+      log('  ✓ totals deleted', 'info');
+
+      // Reset config
+      log('  resetting competition_config…', 'info');
       await api(`competition_config?competition=eq.${COMPETITION}&key=eq.current_phase`, 'PATCH', { value: 'PRE_SEASON' });
       await api(`competition_config?competition=eq.${COMPETITION}&key=eq.week_state`, 'PATCH', { value: 'complete' });
       await api(`competition_config?competition=eq.${COMPETITION}&key=eq.current_week`, 'PATCH', { value: currentWeek });
@@ -1334,12 +1353,13 @@ function validateKey() {
 window.preSeasonSetup = preSeasonSetup;
 window.openPicks      = openPicks;
 window.seedBotPicks   = seedBotPicks;
-window.lockPicks      = lockPicks;
 window.kickoffWave    = kickoffWave;
 window.finalizeWave   = finalizeWave;
 window.endWeek        = endWeek;
 window.completeWeek   = completeWeek;
 window.nextWeek       = nextWeek;
+window.resetWeek      = resetWeek;
+window.startWeek      = startWeek;
 
 // Init — restore saved service role key so page reloads don't clear it
 (function() {

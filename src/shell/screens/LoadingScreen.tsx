@@ -60,42 +60,39 @@ export function LoadingScreen({navigation}: any) {
         setUser(session.user);
         setActiveSport(defaultEvent);
 
-        // Fetch full profile to determine onboarding state
-        const profile = await fetchProfile(session.user.id);
+        // ── ROUND 1 (parallel) ──────────────────────────────────────
+        // fetchProfile, fetchCurrentTosVersion, and ensureGlobalPoolMembership
+        // all need only userId — none depend on each other.
+        const [profile, currentTosVersion] = await Promise.all([
+          fetchProfile(session.user.id),
+          useGlobalStore.getState().fetchCurrentTosVersion(),
+          ensureGlobalPoolMembership(),
+        ]);
 
-        // Beta user migration: first_name null → ProfileSetup
+        // Bail checks (same logic, using already-fetched values)
         if (!profile || !profile.first_name) {
           navigation.replace('ProfileSetup');
           return;
         }
 
-        // TOS version gate: check if user needs to re-accept updated TOS
-        const currentTosVersion = await useGlobalStore.getState().fetchCurrentTosVersion();
         if (currentTosVersion && useGlobalStore.getState().needsTosUpdate(currentTosVersion)) {
           navigation.replace('TosVersionGate');
           return;
         }
 
-        // Ensure user is enrolled in global pools, then load pools
-        await ensureGlobalPoolMembership();
-        await fetchUserPools(session.user.id, defaultEvent.competition);
+        // ── ROUND 2 (parallel) ──────────────────────────────────────
+        // fetchUserPools and AsyncStorage reads need only competition string.
+        const [, defaultId, activeId] = await Promise.all([
+          fetchUserPools(session.user.id, defaultEvent.competition),
+          AsyncStorage.getItem(`hotpick_default_pool_${defaultEvent.competition}`)
+            .catch(() => null),
+          AsyncStorage.getItem(`hotpick_active_pool_${defaultEvent.competition}`)
+            .catch(() => null),
+        ]);
+
         const pools = useGlobalStore.getState().userPools;
 
         if (pools.length > 0) {
-          // Priority: default pool → last active pool → global pool → first pool
-          let defaultId: string | null = null;
-          let activeId: string | null = null;
-          try {
-            defaultId = await AsyncStorage.getItem(
-              `hotpick_default_pool_${defaultEvent.competition}`,
-            );
-            activeId = await AsyncStorage.getItem(
-              `hotpick_active_pool_${defaultEvent.competition}`,
-            );
-          } catch {
-            // AsyncStorage read failed — proceed with fallbacks
-          }
-
           const defaultPool = defaultId
             ? pools.find(p => p.id === defaultId)
             : null;
@@ -117,11 +114,12 @@ export function LoadingScreen({navigation}: any) {
 
           setActivePoolId(startPoolId);
 
-          // Always load default pool ID into store state for the star icon
-          await useGlobalStore.getState().loadDefaultPoolId(defaultEvent.competition);
-
+          // ── ROUND 3 (parallel) ────────────────────────────────────
           const poolIds = pools.map(p => p.id);
-          await fetchSmackUnreadCounts(session.user.id, poolIds);
+          await Promise.all([
+            useGlobalStore.getState().loadDefaultPoolId(defaultEvent.competition),
+            fetchSmackUnreadCounts(session.user.id, poolIds),
+          ]);
         }
 
         subscribeSmackUnread();

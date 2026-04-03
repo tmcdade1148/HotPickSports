@@ -43,7 +43,6 @@ interface GlobalState {
   // Active event cards (Home Screen) — max 2, priority-ordered
   activeEventCards: AnyEventConfig[];
   availableEvents: AnyEventConfig[];
-  setActiveEventCards: (events: AnyEventConfig[]) => void;
   refreshAvailableEvents: () => void;
 
   // Active event context
@@ -241,8 +240,6 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   // ---------------------------------------------------------------------------
   activeEventCards: [],
   availableEvents: [],
-
-  setActiveEventCards: events => set({activeEventCards: events.slice(0, 2)}),
 
   refreshAvailableEvents: () => {
     const all = getEventsByPriority();
@@ -804,37 +801,19 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   },
 
   fetchSmackUnreadCounts: async (userId, poolIds) => {
-    if (poolIds.length === 0) {
-      return;
-    }
+    if (poolIds.length === 0) return;
 
-    // Get read states for all pools
-    const {data: readStates} = await supabase
-      .from('smack_read_state')
-      .select('pool_id, last_read_at')
-      .eq('user_id', userId)
-      .in('pool_id', poolIds);
+    const {data, error} = await supabase
+      .rpc('get_smack_unread_counts', {
+        p_user_id: userId,
+        p_pool_ids: poolIds,
+      });
 
-    const readMap: Record<string, string> = {};
-    for (const rs of readStates ?? []) {
-      readMap[rs.pool_id] = rs.last_read_at;
-    }
+    if (error || !data) return;
 
-    // Count unread messages per pool
     const counts: Record<string, number> = {};
-    for (const poolId of poolIds) {
-      const lastRead = readMap[poolId];
-      let query = supabase
-        .from('smack_messages')
-        .select('id', {count: 'exact', head: true})
-        .eq('pool_id', poolId);
-
-      if (lastRead) {
-        query = query.gt('created_at', lastRead);
-      }
-
-      const {count} = await query;
-      counts[poolId] = count ?? 0;
+    for (const row of data) {
+      counts[row.pool_id] = Number(row.unread_count);
     }
 
     set({smackUnreadCounts: counts});

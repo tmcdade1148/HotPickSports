@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   Modal,
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
+// SafeAreaView handled by HistoryTabWrapper in MainTabNavigator
 import {
   Trophy,
   Target,
@@ -17,16 +17,15 @@ import {
   Zap,
   Award,
   Lock,
-  Eye,
-  EyeOff,
-  Users,
   ChevronDown,
-  ChevronUp,
+  ChevronRight,
 } from 'lucide-react-native';
+// EyeOff, Eye, Users, ChevronUp removed — visibility toggle removed
 import {useGlobalStore} from '@shell/stores/globalStore';
 import type {UserHardwareItem} from '@shell/stores/globalStore';
 import {useTheme} from '@shell/theme';
 import {spacing, borderRadius} from '@shared/theme';
+import {useNFLStore} from '@sports/nfl/stores/nflStore';
 
 // ---------------------------------------------------------------------------
 // Hardware catalog — display info for all launch awards
@@ -113,6 +112,17 @@ const LAUNCH_SLUGS = [
 
 type FilterTab = 'all' | 'weekly' | 'season';
 
+/** Format competition string for display: "nfl_2026" → "NFL 2026" */
+function formatCompetition(comp: string): string {
+  return comp
+    .split('_')
+    .map(part => {
+      // If it's all digits, keep as-is; otherwise uppercase
+      return /^\d+$/.test(part) ? part : part.toUpperCase();
+    })
+    .join(' ');
+}
+
 // ---------------------------------------------------------------------------
 // Main Screen
 // ---------------------------------------------------------------------------
@@ -120,19 +130,18 @@ type FilterTab = 'all' | 'weekly' | 'season';
 export function HistoryScreen() {
   const {colors} = useTheme();
   const styles = createStyles(colors);
-
   const userHardware = useGlobalStore(s => s.userHardware);
-  const hasHistory = useGlobalStore(s => s.hasHistory);
   const playerArchetype = useGlobalStore(s => s.playerArchetype);
-  const historyVisibility = useGlobalStore(s => s.historyVisibility);
   const loadUserHardware = useGlobalStore(s => s.loadUserHardware);
-  const updateHistoryVisibility = useGlobalStore(s => s.updateHistoryVisibility);
   const userProfile = useGlobalStore(s => s.userProfile);
 
   const [filter, setFilter] = useState<FilterTab>('all');
   const [selectedHardware, setSelectedHardware] = useState<UserHardwareItem | null>(null);
   const [selectedLocked, setSelectedLocked] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hardwareExpanded, setHardwareExpanded] = useState(false);
+
+  const competition = useNFLStore(s => s.competition);
 
   useEffect(() => {
     loadUserHardware().finally(() => setLoading(false));
@@ -160,10 +169,12 @@ export function HistoryScreen() {
     return !earnedSlugs.has(slug);
   });
 
+  const hardwareCount = userHardware.length;
+
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-        {/* ① Player Archetype Block */}
+        {/* Player Archetype Block */}
         {playerArchetype && (
           <View style={styles.archetypeBlock}>
             <Text style={styles.archetypeLabel}>{playerArchetype.label}</Text>
@@ -173,7 +184,7 @@ export function HistoryScreen() {
                 <Text style={styles.careerStat}>
                   {(userProfile as any).career_picks_correct ?? 0}/{(userProfile as any).career_picks_total ?? 0} picks
                 </Text>
-                <Text style={styles.careerStatDivider}>•</Text>
+                <Text style={styles.careerStatDivider}>{'\u2022'}</Text>
                 <Text style={styles.careerStat}>
                   {(userProfile as any).career_hotpick_correct ?? 0}/{(userProfile as any).career_hotpick_total ?? 0} HotPicks
                 </Text>
@@ -182,103 +193,125 @@ export function HistoryScreen() {
           </View>
         )}
 
-        {/* Visibility toggle */}
-        <View style={styles.visibilityRow}>
-          {historyVisibility === 'private' ? (
-            <EyeOff size={16} color={colors.textSecondary} />
-          ) : (
-            <Eye size={16} color={colors.textSecondary} />
-          )}
-          <TouchableOpacity
-            onPress={() => {
-              const cycle: Record<string, 'private' | 'pools_only' | 'public'> = {
-                private: 'pools_only',
-                pools_only: 'public',
-                public: 'private',
-              };
-              updateHistoryVisibility(cycle[historyVisibility]);
-            }}>
-            <Text style={styles.visibilityText}>
-              {historyVisibility === 'private' ? 'Private — only you' :
-               historyVisibility === 'pools_only' ? 'My Pools — poolmates can see' :
-               'Public — any HotPick user'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* ② Hardware Shelf */}
-        <Text style={styles.sectionTitle}>Hardware</Text>
-
-        {/* Filter tabs */}
-        <View style={styles.filterRow}>
-          {(['all', 'weekly', 'season'] as FilterTab[]).map(tab => (
-            <TouchableOpacity
-              key={tab}
-              style={[styles.filterTab, filter === tab && styles.filterTabActive]}
-              onPress={() => setFilter(tab)}>
-              <Text style={[styles.filterTabText, filter === tab && styles.filterTabTextActive]}>
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Earned hardware */}
-        {filteredEarned.length > 0 && (
-          <View style={styles.hardwareGrid}>
-            {filteredEarned.map(hw => {
-              const catalog = HARDWARE_CATALOG[hw.hardwareSlug];
-              const Icon = catalog?.icon ?? Award;
-              return (
-                <TouchableOpacity
-                  key={hw.id}
-                  style={styles.hardwareCard}
-                  onPress={() => setSelectedHardware(hw)}>
-                  <View style={[styles.hardwareIconCircle, {backgroundColor: colors.primary + '20'}]}>
-                    <Icon size={24} color={colors.primary} />
-                  </View>
-                  <Text style={styles.hardwareName} numberOfLines={2}>{hw.hardwareName}</Text>
-                  {hw.week && <Text style={styles.hardwareWeek}>Wk {hw.week}</Text>}
-                </TouchableOpacity>
-              );
-            })}
+        {/* Hardware Section — collapsible */}
+        <TouchableOpacity
+          style={styles.sectionHeader}
+          activeOpacity={0.7}
+          onPress={() => setHardwareExpanded(prev => !prev)}>
+          <Text style={styles.sectionTitle}>Hardware</Text>
+          <View style={styles.sectionHeaderRight}>
+            {hardwareCount > 0 && (
+              <Text style={styles.sectionBadge}>{hardwareCount}</Text>
+            )}
+            {hardwareExpanded ? (
+              <ChevronDown size={20} color={colors.textSecondary} />
+            ) : (
+              <ChevronRight size={20} color={colors.textSecondary} />
+            )}
           </View>
-        )}
+        </TouchableOpacity>
 
-        {/* Locked hardware silhouettes */}
-        {lockedSlugs.length > 0 && (
-          <View style={styles.hardwareGrid}>
-            {lockedSlugs.map(slug => {
-              const catalog = HARDWARE_CATALOG[slug];
-              if (!catalog) return null;
-              const Icon = catalog.icon;
-              const name = slug.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-              return (
+        {hardwareExpanded && (
+          <View style={styles.collapsibleContent}>
+            {/* Filter tabs */}
+            <View style={styles.filterRow}>
+              {(['all', 'weekly', 'season'] as FilterTab[]).map(tab => (
                 <TouchableOpacity
-                  key={slug}
-                  style={[styles.hardwareCard, styles.hardwareCardLocked]}
-                  onPress={() => setSelectedLocked(slug)}>
-                  <View style={[styles.hardwareIconCircle, {backgroundColor: colors.border + '40'}]}>
-                    <Icon size={24} color={colors.textSecondary} />
-                    <View style={styles.lockOverlay}>
-                      <Lock size={10} color={colors.textSecondary} />
-                    </View>
-                  </View>
-                  <Text style={[styles.hardwareName, {color: colors.textSecondary}]} numberOfLines={2}>
-                    {name}
+                  key={tab}
+                  style={[styles.filterTab, filter === tab && styles.filterTabActive]}
+                  onPress={() => setFilter(tab)}>
+                  <Text style={[styles.filterTabText, filter === tab && styles.filterTabTextActive]}>
+                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
                   </Text>
                 </TouchableOpacity>
-              );
-            })}
+              ))}
+            </View>
+
+            {/* Earned hardware */}
+            {filteredEarned.length > 0 && (
+              <View style={styles.hardwareGrid}>
+                {filteredEarned.map(hw => {
+                  const catalog = HARDWARE_CATALOG[hw.hardwareSlug];
+                  const Icon = catalog?.icon ?? Award;
+                  return (
+                    <TouchableOpacity
+                      key={hw.id}
+                      style={styles.hardwareCard}
+                      onPress={() => setSelectedHardware(hw)}>
+                      <View style={[styles.hardwareIconCircle, {backgroundColor: colors.primary + '20'}]}>
+                        <Icon size={24} color={colors.primary} />
+                      </View>
+                      <Text style={styles.hardwareName} numberOfLines={2}>{hw.hardwareName}</Text>
+                      {hw.week && <Text style={styles.hardwareWeek}>Wk {hw.week}</Text>}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+
+            {/* Locked hardware silhouettes */}
+            {lockedSlugs.length > 0 && (
+              <View style={styles.hardwareGrid}>
+                {lockedSlugs.map(slug => {
+                  const catalog = HARDWARE_CATALOG[slug];
+                  if (!catalog) return null;
+                  const Icon = catalog.icon;
+                  const name = slug.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                  return (
+                    <TouchableOpacity
+                      key={slug}
+                      style={[styles.hardwareCard, styles.hardwareCardLocked]}
+                      onPress={() => setSelectedLocked(slug)}>
+                      <View style={[styles.hardwareIconCircle, {backgroundColor: colors.border + '40'}]}>
+                        <Icon size={24} color={colors.textSecondary} />
+                        <View style={styles.lockOverlay}>
+                          <Lock size={10} color={colors.textSecondary} />
+                        </View>
+                      </View>
+                      <Text style={[styles.hardwareName, {color: colors.textSecondary}]} numberOfLines={2}>
+                        {name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+
+            {filteredEarned.length === 0 && lockedSlugs.length === 0 && (
+              <View style={styles.emptyState}>
+                <Trophy size={40} color={colors.textSecondary} />
+                <Text style={styles.emptyText}>Complete a week to start earning hardware.</Text>
+              </View>
+            )}
           </View>
         )}
 
-        {filteredEarned.length === 0 && lockedSlugs.length === 0 && (
-          <View style={styles.emptyState}>
-            <Trophy size={40} color={colors.textSecondary} />
-            <Text style={styles.emptyText}>Complete a week to start earning hardware.</Text>
+        {/* Current Sports — active competition + coming soon teaser */}
+        <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>My Sports</Text>
+
+        <View style={styles.competitionsList}>
+          {/* Active competition */}
+          {competition && (
+            <View style={styles.competitionCard}>
+              <View style={styles.competitionInfo}>
+                <Text style={styles.competitionName}>{formatCompetition(competition)}</Text>
+                <Text style={styles.competitionStatus}>In Progress</Text>
+              </View>
+            </View>
+          )}
+
+          {/* Coming soon teaser */}
+          <View style={[styles.competitionCard, styles.competitionCardTeaser]}>
+            <View style={styles.competitionInfo}>
+              <Text style={styles.competitionTeaser}>
+                More sports coming soon
+              </Text>
+              <Text style={styles.competitionTeaserSub}>
+                Browse your picks, results, and history across every sport and season — all in one place.
+              </Text>
+            </View>
           </View>
-        )}
+        </View>
       </ScrollView>
 
       {/* Earned Hardware Detail Modal */}
@@ -324,7 +357,7 @@ export function HistoryScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -424,23 +457,39 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 13,
     color: colors.textSecondary,
   },
-  // Visibility
-  visibilityRow: {
+  // Section headers
+  sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.lg,
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.xs,
   },
-  visibilityText: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    fontWeight: '500',
+  sectionHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
-  // Section
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: colors.textPrimary,
+  },
+  sectionTitleSpaced: {
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  sectionBadge: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primary,
+    backgroundColor: colors.primary + '15',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  collapsibleContent: {
     marginBottom: spacing.sm,
   },
   // Filter tabs
@@ -509,6 +558,52 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 10,
     color: colors.textSecondary,
     marginTop: 2,
+  },
+  // Competitions
+  competitionsList: {
+    gap: spacing.sm,
+  },
+  competitionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  competitionInfo: {
+    flex: 1,
+  },
+  competitionName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  competitionStatus: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.primary,
+    marginTop: 2,
+  },
+  competitionCardTeaser: {
+    opacity: 0.6,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+    backgroundColor: 'transparent',
+  },
+  competitionTeaser: {
+    fontSize: 15,
+    fontWeight: '700',
+    fontStyle: 'italic',
+    color: colors.textSecondary,
+  },
+  competitionTeaserSub: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: 4,
+    lineHeight: 18,
   },
   // Empty state
   emptyState: {

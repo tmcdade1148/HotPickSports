@@ -132,14 +132,14 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontStyle: 'italic',
     letterSpacing: 1,
     marginBottom: spacing.xs,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
   },
   countdownRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: spacing.sm,
     marginBottom: spacing.sm,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
   },
   countdown: {
     ...typography.h2,

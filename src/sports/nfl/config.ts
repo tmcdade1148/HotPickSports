@@ -1,7 +1,7 @@
 import type {SeasonConfig} from '@shared/types/templates';
 
 export const nflSeason: SeasonConfig = {
-  competition: 'nfl_2025_sim', // SIM — revert to 'nfl_2026' after testing
+  competition: 'nfl_2025_sim',
   templateType: 'season',
   sport: 'football',
   name: 'NFL 2026-27 Season',

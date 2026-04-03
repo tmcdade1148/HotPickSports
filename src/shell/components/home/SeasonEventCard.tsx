@@ -69,6 +69,7 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
   const {colors} = useTheme();
   const styles = createStyles(colors);
   // ── Store subscriptions ──────────────────────────────────────────────
+  const configLoaded = useNFLStore(s => s.configLoaded);
   const weekState = useNFLStore(s => s.weekState);
   const currentWeek = useNFLStore(s => s.currentWeek);
   const currentPhase = useNFLStore(s => s.currentPhase);
@@ -98,6 +99,7 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
   const fetchUserSeasonScore = useNFLStore(s => s.fetchUserSeasonScore);
   const fetchLiveScores = useNFLStore(s => s.fetchLiveScores);
   const subscribeToLiveScores = useNFLStore(s => s.subscribeToLiveScores);
+  const subscribeToWeekEarned = useNFLStore(s => s.subscribeToWeekEarned);
   const subscribeToCompetitionConfig = useNFLStore(s => s.subscribeToCompetitionConfig);
 
   const userId = useGlobalStore(s => s.user?.id ?? null);
@@ -123,25 +125,33 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
     return unsub;
   }, [subscribeToCompetitionConfig]);
 
+  // ── 1c. Realtime currentWeekPoints — scoring Edge Function writes ────
+  useEffect(() => {
+    if (!configLoaded) return;
+    const unsub = subscribeToWeekEarned();
+    return unsub;
+  }, [configLoaded, subscribeToWeekEarned]);
+
   // ── 2a. Fetch pool standings for StandingsBadge ───────────────────────
   // Also depends on weekState: the season total excludes the current week
   // while games are in progress, and includes it once the week is settling/complete.
+  // Gated on configLoaded to prevent firing with stale default currentWeek.
   useEffect(() => {
-    if (userId && activePoolId && currentPhase !== 'PRE_SEASON') {
+    if (configLoaded && userId && activePoolId && currentPhase !== 'PRE_SEASON') {
       fetchPoolStandings(userId, activePoolId);
     }
-  }, [userId, activePoolId, currentPhase, weekState, fetchPoolStandings]);
+  }, [configLoaded, userId, activePoolId, currentPhase, currentWeek, weekState, fetchPoolStandings]);
 
   // ── 2b. Fetch pool-independent season score for ScoreModule ──────────
   useEffect(() => {
-    if (userId) {
+    if (configLoaded && userId) {
       fetchUserSeasonScore(userId);
     }
-  }, [userId, currentPhase, weekState, fetchUserSeasonScore]);
+  }, [configLoaded, userId, currentPhase, currentWeek, weekState, fetchUserSeasonScore]);
 
   // ── 3. Fetch user pick status + HotPick when picks are relevant ───────
   useEffect(() => {
-    if (!userId || !weekState) {
+    if (!configLoaded || !userId || !weekState) {
       return;
     }
     // Need HotPick data during picks_open (for the card preview) and during
@@ -296,6 +306,10 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
   const glowColor = isBranded
     ? (activePool?.brand_config as any)?.secondary_color || '#0E6666'
     : '#0E6666';
+
+  // Don't render until competition_config has loaded — prevents flicker
+  // from stale default values (currentWeek=1, userSeasonTotal=0).
+  if (!configLoaded) return null;
 
   return (
     <View style={styles.outerWrapper}>
@@ -617,6 +631,7 @@ function renderWeekState(props: {
     case 'complete':
       return (
         <>
+          {props.currentWeek > 1 && <LastWeekRecap teams={props.teams} />}
           {props.userHotPick && props.userHotPickGame && (
             <LiveCard
               currentWeek={props.currentWeek}
@@ -660,7 +675,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md / 2,
   },
   scoreTotalLabel: {
     ...typography.body,
