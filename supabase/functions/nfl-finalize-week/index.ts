@@ -35,6 +35,52 @@ Deno.serve(async (req) => {
     }
 
     console.log(`[nfl-finalize-week] Result: ${data}`);
+
+    // ── SmackTalk: post week winner to all pools ──
+    try {
+      const { data: configRows } = await supabase
+        .from("competition_config").select("key, value").eq("competition", competition);
+      const cfg = Object.fromEntries((configRows ?? []).map((r: any) => [r.key, r.value]));
+      const currentWeek = Number(cfg.current_week ?? 1);
+      const seasonYear = Number(cfg.season_year ?? 2026);
+
+      const { data: pools } = await supabase
+        .from("pools").select("id").eq("competition", competition).eq("is_archived", false);
+
+      if (pools && pools.length > 0) {
+        await Promise.allSettled(pools.map(async (pool: any) => {
+          // Find the week winner for this pool
+          const { data: members } = await supabase
+            .from("pool_members").select("user_id")
+            .eq("pool_id", pool.id).eq("status", "active");
+          const memberIds = (members ?? []).map((m: any) => m.user_id);
+          if (memberIds.length === 0) return;
+
+          const { data: totals } = await supabase
+            .from("season_user_totals").select("user_id, week_points")
+            .eq("competition", competition).eq("season_year", seasonYear).eq("week", currentWeek)
+            .in("user_id", memberIds)
+            .order("week_points", { ascending: false })
+            .limit(1);
+
+          if (!totals || totals.length === 0) return;
+          const winner = totals[0];
+
+          const { data: profile } = await supabase
+            .from("profiles").select("poolie_name, first_name")
+            .eq("id", winner.user_id).single();
+          const name = profile?.poolie_name || profile?.first_name || "Someone";
+
+          const text = `Week ${currentWeek} is official. ${name} takes the week with ${winner.week_points} pts.`;
+          await supabase.rpc("post_system_message", {
+            p_pool_id: pool.id, p_text: text, p_message_type: "week_result"
+          });
+        }));
+      }
+    } catch (smackErr) {
+      console.warn("[nfl-finalize-week] SmackTalk post failed:", smackErr);
+    }
+
     return json({ success: true, result: data, competition }, 200);
 
   } catch (err) {

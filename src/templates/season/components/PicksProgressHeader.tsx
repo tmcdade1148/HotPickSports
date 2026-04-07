@@ -1,6 +1,6 @@
 import React from 'react';
 import {View, Text, StyleSheet} from 'react-native';
-import {Flame} from 'lucide-react-native';
+import {HotPickFlame} from '@shared/components/HotPickFlame';
 import {spacing} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 
@@ -60,11 +60,10 @@ export function PicksProgressHeader({
         <Text style={styles.weekTitle}>WEEK {currentWeek} PICKS</Text>
         <View style={styles.rightRow}>
           {/* HotPick flame + pick count */}
-          <Flame
+          <HotPickFlame
             size={36}
-            color={hasHotPick ? '#F5620F' : colors.textSecondary}
-            fill={hasHotPick ? '#F5620F' : 'none'}
-            strokeWidth={hasHotPick ? 2.5 : 1.5}
+            active={hasHotPick}
+            inactiveColor={colors.textSecondary}
           />
           <Text
             style={[

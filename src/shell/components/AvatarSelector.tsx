@@ -13,9 +13,9 @@ import {useTheme} from '@shell/theme';
 const SYSTEM_AVATARS = [
   {key: 'avatar_flame', color: '#FF6B35', emoji: '\u{1F525}'},
   {key: 'avatar_bolt', color: '#FFD166', emoji: '\u{26A1}'},
-  {key: 'avatar_trophy', color: '#06D6A0', emoji: '\u{1F3C6}'},
+  {key: 'avatar_trophy', color: '#1DC24C', emoji: '\u{1F3C6}'},
   {key: 'avatar_star', color: '#004E89', emoji: '\u{2B50}'},
-  {key: 'avatar_rocket', color: '#EF476F', emoji: '\u{1F680}'},
+  {key: 'avatar_rocket', color: '#C21D1D', emoji: '\u{1F680}'},
   {key: 'avatar_football', color: '#8B5E3C', emoji: '\u{1F3C8}'},
   {key: 'avatar_crown', color: '#9B59B6', emoji: '\u{1F451}'},
   {key: 'avatar_diamond', color: '#3498DB', emoji: '\u{1F48E}'},

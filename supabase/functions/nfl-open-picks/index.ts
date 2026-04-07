@@ -81,6 +81,10 @@ Deno.serve(async (req) => {
 
     if (updateError) return json({ success: false, error: updateError.message }, 500);
 
+    // ── SmackTalk: post "picks open" to all pools ──
+    await postToAllPools(supabase, competition, "pick_lock",
+      () => `Week ${currentWeek} picks are open. Make your move.`);
+
     console.log(`[nfl-open-picks] Picks open for ${competition} week=${currentWeek}, sunday_anchor=${sundayAnchor?.toISOString() ?? "none"}`);
     return json({ success: true, competition, season_year: seasonYear, week: currentWeek,
       games_available: games.length, unranked_games: unranked.length, picks_locked: false,
@@ -92,4 +96,16 @@ Deno.serve(async (req) => {
 
 function json(body: unknown, status: number) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+}
+
+async function postToAllPools(
+  sb: any, competition: string, messageType: string, textFn: (poolId: string) => string
+) {
+  const { data: pools } = await sb
+    .from("pools").select("id").eq("competition", competition).eq("is_archived", false);
+  await Promise.allSettled(
+    (pools ?? []).map((p: any) =>
+      sb.rpc("post_system_message", { p_pool_id: p.id, p_text: textFn(p.id), p_message_type: messageType })
+    )
+  );
 }

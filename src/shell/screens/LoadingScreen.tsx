@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
     paddingTop: '30%',
     // ✅ PERMITTED EXCEPTION — matches native splash exactly.
     // See CLAUDE.md Section 16 — Splash Screen Color Exception.
-    backgroundColor: '#111414',
+    backgroundColor: '#181818',
   },
   logo: {
     width: 240,

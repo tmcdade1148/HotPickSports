@@ -216,7 +216,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
     marginHorizontal: spacing.md,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 4,
   },

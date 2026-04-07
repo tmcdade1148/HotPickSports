@@ -28,10 +28,10 @@ export function useTheme(): {colors: ThemeColors; isDark: boolean} {
   const config = isDark ? deriveDarkColors(lightConfig) : lightConfig;
   const semantic = isDark ? SEMANTIC_COLORS_DARK : SEMANTIC_COLORS;
 
-  // HotPick uses blue (#34A4D1) in light mode and gold (#F5C842) in dark mode.
+  // HotPick uses blue (#34A4D1) in light mode and gold (#E39032) in dark mode.
   // Partners keep their own highlight in both modes.
   const highlight = isDark && !brandConfig
-    ? '#F5C842'
+    ? '#E39032'
     : (config.highlight_color ?? '#FFFFFF');
 
   return {

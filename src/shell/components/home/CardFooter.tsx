@@ -49,6 +49,7 @@ export function CardFooter({
         <Text style={[
           secondaryLarge ? styles.secondaryLabelLarge : styles.secondaryLabel,
           {color: resolvedSecondary},
+          disabled && styles.buttonDisabled,
         ]}>
           {secondaryLabel}
         </Text>
@@ -58,7 +59,7 @@ export function CardFooter({
         activeOpacity={0.8}
         onPress={onPress}
         disabled={disabled}>
-        <Text style={[styles.buttonText, darkText && {color: '#1A1A1A'}]}>{label}</Text>
+        <Text style={[styles.buttonText, darkText && {color: '#181818'}]}>{label}</Text>
       </TouchableOpacity>
     </View>
   );

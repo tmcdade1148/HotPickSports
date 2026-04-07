@@ -12,14 +12,13 @@ function formatLockDay(date: Date): string {
   return DAYS[date.getDay()];
 }
 
-/** "8:20 PM" from a Date */
+/** "8:20 PM" from a Date in ET */
 function formatLockTime(date: Date): string {
-  let hours = date.getHours();
-  const minutes = date.getMinutes();
-  const ampm = hours >= 12 ? 'PM' : 'AM';
-  hours = hours % 12 || 12;
-  const minStr = minutes < 10 ? `0${minutes}` : String(minutes);
-  return `${hours}:${minStr} ${ampm}`;
+  return date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'America/New_York',
+  });
 }
 import {
   View,
@@ -74,8 +73,15 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
   const currentWeek = useNFLStore(s => s.currentWeek);
   const currentPhase = useNFLStore(s => s.currentPhase);
   const picksDeadline = useNFLStore(s => s.picksDeadline);
-  const userHotPick = useNFLStore(s => s.userHotPick);
-  const userHotPickGame = useNFLStore(s => s.userHotPickGame);
+  const rawUserHotPick = useNFLStore(s => s.userHotPick);
+  const rawUserHotPickGame = useNFLStore(s => s.userHotPickGame);
+  // Guard: never display a hotpick from a different week — prevents stale data.
+  // During settling/complete, the hotpick may be from the current week OR the
+  // previous week (if current_week already advanced to the next week).
+  const hotPickWeekValid = rawUserHotPick?.week === currentWeek
+    || ((weekState === 'settling' || weekState === 'complete') && rawUserHotPick?.week === currentWeek - 1);
+  const userHotPick = hotPickWeekValid ? rawUserHotPick : null;
+  const userHotPickGame = userHotPick ? rawUserHotPickGame : null;
   const liveScores = useNFLStore(s => s.liveScores);
   const weekResult = useNFLStore(s => s.weekResult);
   const poolStandings = useNFLStore(s => s.poolStandings);
@@ -154,10 +160,11 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
     if (!configLoaded || !userId || !weekState) {
       return;
     }
-    // Need HotPick data during picks_open (for the card preview) and during
-    // live/settling (for LiveCard and SettlingCard to display the game)
-    if (weekState === 'picks_open' || weekState === 'live' || weekState === 'settling') {
-      fetchUserHotPick(userId);
+    // Need HotPick data during picks_open (for the card preview), during
+    // live/settling (for LiveCard and SettlingCard to display the game),
+    // and during complete (LiveCard + LastWeekRecap still render).
+    if (weekState === 'picks_open' || weekState === 'live' || weekState === 'settling' || weekState === 'complete') {
+      fetchUserHotPick(userId, currentWeek);
     }
     // Fetch pick count during picks_open AND live — picks are still open for
     // individual games until their lock_at, so the incomplete-picks warning
@@ -179,7 +186,7 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
     useCallback(() => {
       if (userId && (weekState === 'picks_open' || weekState === 'live')) {
         fetchUserPickStatus(userId);
-        fetchUserHotPick(userId);
+        fetchUserHotPick(userId, currentWeek);
       }
       if (weekState === 'picks_open' || weekState === 'live' || weekState === 'settling') {
         fetchWeekGames(currentWeek);
@@ -280,6 +287,30 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
   );
   const anyGameLive = liveGameCount > 0;
 
+  // Has the first game actually kicked off? (status-based, not time-based — works with simulator)
+  const firstGameHasStarted = useMemo(() => {
+    return seasonGames.some(g => {
+      const s = (g.status ?? '').toUpperCase();
+      return s === 'IN_PROGRESS' || s === 'LIVE' || s === 'FINAL' || s === 'STATUS_FINAL' || s === 'COMPLETED';
+    });
+  }, [seasonGames]);
+
+  // Next game to lock — the earliest unlocked pre-Sunday game
+  const nextGameToLock = useMemo(() => {
+    if (!sundayLockAnchor) return null;
+    const anchorMs = sundayLockAnchor.getTime();
+    const unlocked = seasonGames.filter(g => {
+      if (!g.kickoff_at) return false;
+      const s = (g.status ?? '').toUpperCase();
+      const isStarted = s === 'IN_PROGRESS' || s === 'LIVE' || s === 'FINAL' || s === 'STATUS_FINAL' || s === 'COMPLETED';
+      return !isStarted && new Date(g.kickoff_at).getTime() < anchorMs;
+    });
+    if (unlocked.length === 0) return null;
+    unlocked.sort((a, b) => new Date(a.kickoff_at).getTime() - new Date(b.kickoff_at).getTime());
+    const d = new Date(unlocked[0].kickoff_at);
+    return {day: formatLockDay(d), time: formatLockTime(d)};
+  }, [seasonGames, sundayLockAnchor]);
+
   // Countdown to next game kickoff (shown during gaps between game waves)
   const nextKickoffCountdown = useCountdown(weekState === 'live' ? nextKickoff : null);
 
@@ -350,14 +381,14 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
                   <Text style={styles.kickoffLabel}>
                     PICKS are <Text style={{fontWeight: '900', color: '#1b9a06'}}>LIVE!</Text>
                   </Text>
-                  {weekFirstKickoff && !firstGameKickoff.hasExpired ? (
-                    // Phase 1: first game hasn't locked yet
+                  {!firstGameHasStarted && nextGameToLock ? (
+                    // Phase 1: show next game to lock + Sunday anchor
                     <>
                       <Text style={styles.lockInfoLine}>
-                        {formatLockDay(weekFirstKickoff)}'s game locks at {formatLockTime(weekFirstKickoff)}
+                        Next lock: {nextGameToLock.day} at {nextGameToLock.time} ET
                       </Text>
-                      {sundayLockAnchor && !sundayLockCountdown.hasExpired && (
-                        <Text style={styles.lockInfoLine}>Sunday games lock at 1pm ET</Text>
+                      {sundayLockAnchor && (
+                        <Text style={styles.lockInfoLine}>All remaining games lock Sunday at 1pm ET</Text>
                       )}
                     </>
                   ) : sundayLockAnchor && !sundayLockCountdown.hasExpired ? (
@@ -372,9 +403,9 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
                         </Text>
                       </View>
                     ) : (
-                      // Phase 2: > 2h — show clock time
+                      // Phase 2: > 2h — show ET anchor time
                       <Text style={styles.lockInfoLine}>
-                        Remaining games lock at {formatLockTime(sundayLockAnchor)}
+                        Remaining games lock Sunday at 1pm ET
                       </Text>
                     )
                   ) : null}
@@ -447,6 +478,13 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
 
       {/* Week Score — between pills and week state card (hidden in PRE_SEASON) */}
       {currentPhase !== 'PRE_SEASON' && <WeekScoreModule />}
+
+      {/* Week Recap — after score modules, before HotPick (hidden in PRE_SEASON) */}
+      {currentPhase !== 'PRE_SEASON' && currentWeek > 1 && (
+        weekState === 'picks_open' || weekState === 'settling' || weekState === 'complete'
+      ) && (
+        <LastWeekRecap teams={config.teams ?? []} />
+      )}
 
       {/* HotPick game card — above the picks card (hidden in PRE_SEASON) */}
       {currentPhase !== 'PRE_SEASON' && weekState === 'picks_open' && userHotPick && userHotPickGame && (
@@ -523,7 +561,6 @@ function renderWeekState(props: {
     case 'picks_open':
       return (
         <>
-        {props.currentWeek > 1 && <LastWeekRecap teams={props.teams} />}
         <PicksOpenCard
           deadline={props.picksDeadline}
           currentWeek={props.currentWeek}
@@ -588,7 +625,7 @@ function renderWeekState(props: {
           <CardFooter
             label={
               allGamesLocked
-                ? 'All Games Are Locked'
+                ? 'All games locked at 1PM (ET)'
                 : !props.userHasSubmitted
                   ? 'Make Your Picks'
                   : livePicksComplete
@@ -602,7 +639,7 @@ function renderWeekState(props: {
                   ? `${props.userPickCount} of ${props.totalGames} picked — games are live!`
                   : undefined
             }
-            secondaryColor={livePicksComplete ? '#1b9a06' : '#F5C842'}
+            secondaryColor={livePicksComplete ? '#1DC24C' : '#E39032'}
             secondaryLarge={livePicksComplete}
             onPress={props.onMakePicks}
             disabled={allGamesLocked}
@@ -631,7 +668,6 @@ function renderWeekState(props: {
     case 'complete':
       return (
         <>
-          {props.currentWeek > 1 && <LastWeekRecap teams={props.teams} />}
           {props.userHotPick && props.userHotPickGame && (
             <LiveCard
               currentWeek={props.currentWeek}
@@ -664,7 +700,7 @@ function renderWeekState(props: {
 const createStyles = (colors: any) => StyleSheet.create({
   outerWrapper: {
     marginHorizontal: spacing.md,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   pillRow: {
     flexDirection: 'row',

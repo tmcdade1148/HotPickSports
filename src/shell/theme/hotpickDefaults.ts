@@ -14,13 +14,13 @@ import type {BrandConfig, BrandLogoSet} from './types';
  *
  * | Token      | Hex       | Usage                                          |
  * |------------|-----------|------------------------------------------------|
- * | primary    | #F5620F   | CTAs, active buttons, highlights               |
+ * | primary    | #F66321   | CTAs, active buttons, highlights               |
  * | secondary  | #45615E   | Accents, inactive states                       |
- * | highlight  | #34A4D1   | Accent color — blue in light mode, gold (#F5C842) in dark mode |
+ * | highlight  | #34A4D1   | Accent color — blue in light mode, gold (#E39032) in dark mode |
  * | background | #FCFCFC   | App bg, splash bg, adaptive icon bg            |
  */
 export const HOTPICK_BRAND_COLORS = {
-  primary: '#F5620F',
+  primary: '#F66321',
   secondary: '#45615E',
   highlight: '#34A4D1',
   background: '#FCFCFC',
@@ -56,7 +56,7 @@ export const HOTPICK_BRAND: BrandConfig = {
   highlight_color: HOTPICK_BRAND_COLORS.highlight,
   background_color: HOTPICK_BRAND_COLORS.background,
   surface_color: '#F4F4F4',  // auto-derived: slightly darker than #FCFCFC
-  text_primary: '#1A1A1A',   // dark text on light background
+  text_primary: '#181818',   // dark text on light background
   text_secondary: '#6B6B6B', // muted dark text
   logo: HOTPICK_LOGOS,
   app_name: 'HotPick',

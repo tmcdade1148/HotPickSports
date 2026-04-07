@@ -13,6 +13,8 @@ interface SubmitPicksButtonProps {
   allGamesLocked?: boolean;
   onSubmit: () => void;
   accentColor: string;
+  allGamesFinal?: boolean;
+  currentWeek?: number;
 }
 
 type SubmitState = 'locked' | 'no_picks' | 'needs_hotpick' | 'in_progress' | 'submitted';
@@ -36,7 +38,7 @@ function getSubmitState(props: SubmitPicksButtonProps): SubmitState {
  * Does NOT make any Supabase call — picks are already auto-saved.
  */
 export function SubmitPicksButton(props: SubmitPicksButtonProps) {
-  const {colors} = useTheme();
+  const {colors, isDark} = useTheme();
   const styles = createStyles(colors);
   const state = getSubmitState(props);
   const {onSubmit} = props;
@@ -46,7 +48,9 @@ export function SubmitPicksButton(props: SubmitPicksButtonProps) {
     {label: string; bgColor: string; enabled: boolean}
   > = {
     locked: {
-      label: "THIS WEEK'S PICKS ARE LOCKED",
+      label: props.allGamesFinal
+        ? `THAT'S A WRAP ON WEEK ${props.currentWeek ?? ''}`
+        : "THIS WEEK'S PICKS ARE LOCKED",
       bgColor: colors.border,
       enabled: false,
     },
@@ -103,7 +107,11 @@ export function SubmitPicksButton(props: SubmitPicksButtonProps) {
             strokeWidth={2}
           />
         )}
-        <Text style={[styles.buttonText, state === 'in_progress' && {color: '#1A1A1A'}]}>{label}</Text>
+        <Text style={[
+          styles.buttonText,
+          state === 'in_progress' && {color: '#181818'},
+          state === 'locked' && {color: colors.textSecondary},
+        ]}>{label}</Text>
       </TouchableOpacity>
     </View>
   );

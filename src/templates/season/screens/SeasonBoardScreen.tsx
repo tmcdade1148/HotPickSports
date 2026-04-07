@@ -49,6 +49,12 @@ export function SeasonBoardScreen() {
   const weekState = useNFLStore(s => s.weekState);
   const activePoolId = useGlobalStore(s => s.activePoolId);
 
+  // Last finalized week: if current week is settling/complete, it's this week.
+  // Otherwise it's the previous week (current week is still in play).
+  const lastFinalizedWeek = (weekState === 'settling' || weekState === 'complete')
+    ? currentWeek
+    : currentWeek - 1;
+
   const [activeTab, setActiveTab] = useState<'season' | 'week'>('season');
   const scrollRef = useRef<ScrollView>(null);
 
@@ -272,7 +278,7 @@ export function SeasonBoardScreen() {
               styles.toggleText,
               activeTab === 'season' && styles.toggleTextActive,
             ]}>
-              Season
+              Season{lastFinalizedWeek > 0 ? ` - Wk${lastFinalizedWeek}` : ''}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity

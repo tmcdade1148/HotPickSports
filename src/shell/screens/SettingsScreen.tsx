@@ -306,10 +306,10 @@ export function SettingsScreen({route}: any) {
               : undefined;
             // Contrast text for partner pill backgrounds
             const pillTextColor = isBranded
-              ? (isLightColor(pillBg!) ? '#1A1A1A' : '#FFFFFF')
+              ? (isLightColor(pillBg!) ? '#181818' : '#FFFFFF')
               : (isActive ? hotpick.primary : colors.textPrimary);
             const pillIconColor = isBranded
-              ? (isLightColor(pillBg!) ? '#1A1A1A' : '#FFFFFF')
+              ? (isLightColor(pillBg!) ? '#181818' : '#FFFFFF')
               : (isActive ? hotpick.primary : colors.textSecondary);
 
             const poolGlowColor = isBranded

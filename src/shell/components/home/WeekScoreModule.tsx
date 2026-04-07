@@ -1,6 +1,7 @@
 import React, {useEffect, useRef} from 'react';
 import {View, Text, TouchableOpacity, Animated, StyleSheet} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
+import {Lock} from 'lucide-react-native';
 import {spacing, borderRadius, typography} from '@shared/theme';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useTheme} from '@shell/theme';
@@ -75,42 +76,18 @@ export function WeekScoreModule() {
   const userPickCount = useNFLStore(s => s.userPickCount);
   const currentWeekPoints = useNFLStore(s => s.currentWeekPoints);
   const weekPointsMap = useNFLStore(s => s.weekPointsMap);
+  const weekRecordMap = useNFLStore(s => s.weekRecordMap);
 
-  // Hide when no week state, no week, or no picks
-  if (!weekState || currentWeek === 0 || userPickCount === 0) {
+  // Hide when no week state or no week
+  // Don't gate on userPickCount — past week scores should still show
+  // even when the new week has no picks yet.
+  const hasPastScores = Object.keys(weekPointsMap).length > 0;
+  if (!weekState || currentWeek === 0 || (!hasPastScores && userPickCount === 0)) {
     return null;
   }
 
   const isSettled = weekState === 'settling' || weekState === 'complete';
   const isLive = weekState === 'live' || weekState === 'locked';
-
-  if (isSettled && currentWeekPoints != null) {
-    // Single full-width Final Score widget — taps to Picks screen
-    return (
-      <TouchableOpacity
-        style={styles.widgetRow}
-        activeOpacity={0.7}
-        onPress={() => navigation.navigate('PicksTab' as never)}>
-        <View style={styles.widget}>
-          <Text style={styles.widgetLabel}>
-            Week {currentWeek} {'\u2022'} FINAL SCORE
-          </Text>
-          <View style={styles.widgetValueRow}>
-            <Text style={[
-              styles.widgetValue,
-              {color: currentWeekPoints >= 0 ? '#1b9a06' : colors.error},
-            ]}>
-              {currentWeekPoints >= 0 ? '+' : ''}{currentWeekPoints}
-            </Text>
-            <Text style={[
-              styles.widgetPts,
-              {color: currentWeekPoints >= 0 ? '#1b9a06' : colors.error},
-            ]}>pts</Text>
-          </View>
-        </View>
-      </TouchableOpacity>
-    );
-  }
 
   // Build 3 slots: oldest on left, newest on right
   const slots: {week: number | null}[] = [];
@@ -128,7 +105,10 @@ export function WeekScoreModule() {
         }
 
         const isCurrent = slot.week === currentWeek;
+        const isPrevious = slot.week === currentWeek - 1;
+        const isOldest = !isCurrent && !isPrevious;
         const pts = weekPointsMap[slot.week] ?? null;
+        const record = weekRecordMap[slot.week];
         const display = pts == null ? '0' : pts > 0 ? `+${pts}` : `${pts}`;
         const ptsColor = pts != null && pts > 0
           ? '#1b9a06'
@@ -136,39 +116,55 @@ export function WeekScoreModule() {
             ? colors.error
             : colors.textPrimary;
 
+        // Previous week is bright while recap is visible, dims when recap hides at kickoff.
+        // Current week is dimmed until kickoff, then bright + live/settled highlight.
+        const recapVisible = weekState === 'picks_open' || weekState === 'complete';
+        const isActive = isLive || isSettled;
+        const shouldDim = isOldest || (isPrevious && !recapVisible) || (isCurrent && !isActive);
+        const showLock = !isCurrent;
+        const showHighlight = isCurrent && isActive;
+
         return (
           <View
             key={slot.week}
             style={[
               styles.widgetSmall,
-              !isCurrent && styles.widgetDimmed,
-              isCurrent && isLive && styles.widgetLive,
+              shouldDim && styles.widgetDimmed,
+              showHighlight && styles.widgetLive,
             ]}>
             <View style={styles.labelRow}>
               <Text style={[
                 styles.widgetLabel,
-                !isCurrent && styles.labelDimmed,
+                shouldDim && styles.labelDimmed,
               ]}>
                 WEEK {slot.week}
               </Text>
-              {isCurrent && isLive && <PulsingDot color={colors.primary} />}
+              {isCurrent && weekState === 'live' && <PulsingDot color={colors.primary} />}
             </View>
             <View style={styles.widgetValueRow}>
               <Text style={[
                 styles.widgetValue,
                 {color: ptsColor},
-                !isCurrent && {opacity: 0.6},
+                shouldDim && {opacity: 0.6},
               ]}>
                 {display}
               </Text>
               <Text style={[
                 styles.widgetPts,
                 pts != null && pts !== 0 && {color: ptsColor},
-                !isCurrent && {opacity: 0.6},
+                shouldDim && {opacity: 0.6},
               ]}>
                 pts
               </Text>
+              {record && record.total > 0 && (
+                <Text style={[styles.recordText, shouldDim && {opacity: 0.6}, {marginLeft: 'auto'}]}>
+                  {record.correct}/{record.total}
+                </Text>
+              )}
             </View>
+            {showLock && (
+              <Lock size={12} color={colors.textSecondary} style={{position: 'absolute', top: 8, right: 8}} />
+            )}
           </View>
         );
       })}
@@ -195,7 +191,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     flex: 1,
     backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
-    paddingHorizontal: spacing.lg,
+    paddingLeft: spacing.sm + 2,
+    paddingRight: spacing.lg,
     paddingVertical: spacing.sm + 2,
     alignItems: 'flex-start',
   },
@@ -233,6 +230,11 @@ const createStyles = (colors: any) => StyleSheet.create({
   widgetPts: {
     fontSize: 13,
     fontWeight: '400',
+    color: colors.textSecondary,
+  },
+  recordText: {
+    fontSize: 11,
+    fontWeight: '600',
     color: colors.textSecondary,
   },
 });

@@ -1,6 +1,7 @@
 import React from 'react';
 import {View, Text, TouchableOpacity, Alert, StyleSheet} from 'react-native';
-import {Flame, Lock} from 'lucide-react-native';
+import {Lock} from 'lucide-react-native';
+import {HotPickFlame} from '@shared/components/HotPickFlame';
 import type {SeasonConfig} from '@shared/types/templates';
 import type {DbSeasonGame} from '@shared/types/database';
 import {spacing} from '@shared/theme';
@@ -195,13 +196,13 @@ export function SeasonMatchCard({
     isHotPick && !isFinal ? `+/-${rank} pts` : null;
 
   return (
-    <View style={[styles.container, isLocked && !isLive && styles.containerLocked]}>
+    <View style={[styles.container, isLocked && !isLive && !isFinal && styles.containerLocked, isHotPick && styles.containerHotPick]}>
       {/* ── Header: day/time | status | lock | points ── */}
       <View style={styles.header}>
         {!isFinal && !isLive ? (
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
             <Text style={[styles.kickoffText, isLocked && styles.kickoffTextLocked]}>{formatKickoff(kickoffDate)}</Text>
-            {isLocked && <Lock size={12} color={'#FFFFFF'} />}
+            {isLocked && <Lock size={12} color={colors.textPrimary} />}
           </View>
         ) : null}
 
@@ -212,7 +213,20 @@ export function SeasonMatchCard({
           </View>
         ) : null}
 
-        {isFinal ? <Text style={styles.finalText}>FINAL</Text> : null}
+        {isFinal ? (
+          <View style={styles.finalRow}>
+            <Text style={styles.finalText}>FINAL</Text>
+            {existingPick?.points != null && (
+              <Text style={[
+                styles.pointsEarnedInline,
+                existingPick.points > 0 && styles.pointsEarnedPositive,
+                existingPick.points < 0 && styles.pointsEarnedNegative,
+              ]}>
+                {existingPick.points > 0 ? `+${existingPick.points}` : `${existingPick.points}`}
+              </Text>
+            )}
+          </View>
+        ) : null}
 
         <View style={styles.headerSpacer} />
 
@@ -233,8 +247,8 @@ export function SeasonMatchCard({
             ]}>
             <Text style={styles.rankNumber}>{rank}</Text>
           </View>
-          <Text style={styles.rankLabel}>HotPick</Text>
-          <Text style={styles.rankLabel}>Points</Text>
+          <Text style={[styles.rankLabel, {marginTop: 3}]}>HotPick</Text>
+          <Text style={[styles.rankLabel, {marginTop: -1}]}>Points</Text>
         </View>
 
         {/* Team buttons — away on top, home on bottom */}
@@ -270,18 +284,22 @@ export function SeasonMatchCard({
             {(isLive || isFinal) && (
               <View style={styles.scoreClockContainer}>
                 <View style={styles.scoresCol}>
-                  <Text style={[
-                    styles.inlineScore,
-                    isFinal && game.away_score != null && game.home_score != null && game.away_score > game.home_score && styles.inlineScoreWinner,
-                  ]}>
-                    {game.away_score ?? '—'}
-                  </Text>
-                  <Text style={[
-                    styles.inlineScore,
-                    isFinal && game.home_score != null && game.away_score != null && game.home_score > game.away_score && styles.inlineScoreWinner,
-                  ]}>
-                    {game.home_score ?? '—'}
-                  </Text>
+                  <View style={styles.inlineScoreWrap}>
+                    <Text style={[
+                      styles.inlineScore,
+                      isFinal && game.away_score != null && game.home_score != null && game.away_score > game.home_score && styles.inlineScoreWinner,
+                    ]}>
+                      {game.away_score ?? '—'}
+                    </Text>
+                  </View>
+                  <View style={styles.inlineScoreWrap}>
+                    <Text style={[
+                      styles.inlineScore,
+                      isFinal && game.home_score != null && game.away_score != null && game.home_score > game.away_score && styles.inlineScoreWinner,
+                    ]}>
+                      {game.home_score ?? '—'}
+                    </Text>
+                  </View>
                 </View>
                 {isLive && (game.current_period || game.game_clock) && (
                   <Text style={styles.liveClockInline}>
@@ -296,24 +314,13 @@ export function SeasonMatchCard({
 
         {/* Flame icon — outline when inactive, filled orange when HotPick */}
         <View style={styles.flameColumn}>
-          {isFinal && existingPick?.points != null && (
-            <Text style={[
-              styles.pointsEarned,
-              existingPick.points > 0 && styles.pointsEarnedPositive,
-              existingPick.points < 0 && styles.pointsEarnedNegative,
-            ]}>
-              {existingPick.points > 0 ? `+${existingPick.points}` : `${existingPick.points}`}
-            </Text>
-          )}
           <TouchableOpacity
             onPress={handleFlamePress}
             disabled={isLocked || isSaving || !canSetHotPick}
             activeOpacity={0.6}>
-            <Flame
+            <HotPickFlame
               size={48}
-              color={isHotPick ? '#FF8C00' : '#555555'}
-              fill={isHotPick ? '#FF8C00' : 'none'}
-              strokeWidth={isHotPick ? 2.5 : 1.2}
+              active={isHotPick}
             />
           </TouchableOpacity>
         </View>
@@ -373,6 +380,13 @@ const createStyles = (colors: any) => StyleSheet.create({
   container: {
     paddingHorizontal: 12,
   },
+  containerHotPick: {
+    borderWidth: 2,
+    borderColor: colors.primary,
+    borderRadius: 12,
+    marginHorizontal: 4,
+    paddingVertical: 4,
+  },
   containerLocked: {
     opacity: 0.7,
   },
@@ -392,7 +406,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   kickoffTextLocked: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: colors.textPrimary,
   },
   liveRow: {
     flexDirection: 'row',
@@ -405,11 +419,21 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontStyle: 'italic',
     color: '#1B9A06',
   },
+  finalRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+  },
   finalText: {
     fontSize: 14,
     fontWeight: '900',
     fontStyle: 'italic',
     color: colors.error,
+  },
+  pointsEarnedInline: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.textSecondary,
   },
   headerSpacer: {
     flex: 1,
@@ -461,10 +485,11 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: '#FFFFFF',
   },
   rankLabel: {
-    fontSize: 8,
-    fontWeight: '600',
-    color: colors.textSecondary,
+    fontSize: 9,
+    fontWeight: '800',
+    color: colors.primary,
     textAlign: 'center',
+    letterSpacing: 0.3,
   },
 
   // Teams
@@ -473,7 +498,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   teamsWithScores: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'stretch',
     gap: 6,
   },
   teamNamesCol: {
@@ -482,12 +507,17 @@ const createStyles = (colors: any) => StyleSheet.create({
   scoreClockContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    width: 95,
-    gap: 6,
+    width: 100,
+    gap: 4,
   },
   scoresCol: {
-    gap: 2,
+    justifyContent: 'space-around',
     alignItems: 'flex-end',
+    width: 36,
+  },
+  inlineScoreWrap: {
+    height: 32,
+    justifyContent: 'flex-end',
   },
   teamButton: {
     flexDirection: 'row',
@@ -499,8 +529,10 @@ const createStyles = (colors: any) => StyleSheet.create({
   teamNameBox: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingTop: 1,
+    paddingBottom: 1,
+    paddingLeft: 5,
+    paddingRight: 8,
     borderRadius: 4,
     borderWidth: 2,
     borderColor: 'transparent',
@@ -568,7 +600,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignSelf: 'stretch',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 4,
+    marginRight: 12,
     flexDirection: 'column',
   },
   // Pick split bar

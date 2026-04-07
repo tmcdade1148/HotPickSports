@@ -119,13 +119,23 @@ export function LiveCard({
           {/* Header */}
           <View style={styles.hotPickHeader}>
             <View style={styles.hotPickLabelRow}>
-              <Text style={styles.hotPickLabel}>Your HotPick</Text>
+              <Text style={styles.hotPickLabel}>This Week's HotPick:</Text>
               {isHotPickLive && (
                 <Text style={styles.inProgressBadge}>LIVE</Text>
+              )}
+              {isHotPickFinal && (
+                <Text style={styles.finalLabel}>FINAL</Text>
               )}
             </View>
             {impact && <ImpactLine impact={impact} />}
           </View>
+
+          {/* Game day/time — just above the matchup */}
+          {kickoffAt && (
+            <Text style={[styles.gameDateTime, isHotPickFinal && {opacity: 0.4}]}>
+              {kickoffAt.toLocaleDateString('en-US', {weekday: 'long'})}, {kickoffAt.toLocaleTimeString('en-US', {hour: 'numeric', minute: '2-digit'})}
+            </Text>
+          )}
 
           {/* Matchup + clock: left side has rank + teams/scores, right side has clock anchored to bottom */}
           <View style={styles.matchupWithImpact}>
@@ -141,16 +151,24 @@ export function LiveCard({
                   {userHotPick.picked_team === userHotPickGame.away_team ? (
                     <View style={styles.pickedBox}>
                       <Text style={styles.pickedBoxText}>{getTeamName(userHotPickGame.away_team)}</Text>
+                      {userHotPickGame.away_record && <Text style={styles.teamRecord}>{userHotPickGame.away_record}</Text>}
                     </View>
                   ) : (
-                    <Text style={styles.matchupTeam}>{getTeamName(userHotPickGame.away_team)}</Text>
+                    <View style={styles.unpickedRow}>
+                      <Text style={styles.matchupTeam}>{getTeamName(userHotPickGame.away_team)}</Text>
+                      {userHotPickGame.away_record && <Text style={styles.teamRecord}>{userHotPickGame.away_record}</Text>}
+                    </View>
                   )}
                   {userHotPick.picked_team === userHotPickGame.home_team ? (
                     <View style={styles.pickedBox}>
                       <Text style={styles.pickedBoxText}>{getTeamName(userHotPickGame.home_team)}</Text>
+                      {userHotPickGame.home_record && <Text style={styles.teamRecord}>{userHotPickGame.home_record}</Text>}
                     </View>
                   ) : (
-                    <Text style={styles.matchupTeam}>{getTeamName(userHotPickGame.home_team)}</Text>
+                    <View style={styles.unpickedRow}>
+                      <Text style={styles.matchupTeam}>{getTeamName(userHotPickGame.home_team)}</Text>
+                      {userHotPickGame.home_record && <Text style={styles.teamRecord}>{userHotPickGame.home_record}</Text>}
+                    </View>
                   )}
                 </View>
                 {/* Scores column — live scores or final game scores */}
@@ -175,8 +193,6 @@ export function LiveCard({
                   <Text style={styles.inProgressClock}>
                     Q{hotPickScore.currentPeriod}{hotPickScore.gameClock ? ` ${hotPickScore.gameClock}` : ''}
                   </Text>
-                ) : isHotPickFinal ? (
-                  <Text style={styles.finalLabel}>FINAL</Text>
                 ) : null}
               </View>
             </View>
@@ -191,19 +207,11 @@ export function LiveCard({
             )}
           </View>
 
-          {/* Kickoff status / countdown — hide when live or final (FINAL shown inline) */}
-          {!isHotPickLive && !isHotPickFinal && (
-            minutesUntilKickoff != null && minutesUntilKickoff > 0 && minutesUntilKickoff <= 60 ? (
-              <Text style={styles.countdownText}>
-                Kickoff in {minutesUntilKickoff} min
-              </Text>
-            ) : (
-              <Text style={styles.kickoffTime}>
-                {new Date(userHotPickGame.kickoff_at).toLocaleDateString([], {weekday: 'long'})}
-                {', '}
-                {new Date(userHotPickGame.kickoff_at).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'})}
-              </Text>
-            )
+          {/* Kickoff countdown — only show when close to kickoff */}
+          {!isHotPickLive && !isHotPickFinal && minutesUntilKickoff != null && minutesUntilKickoff > 0 && minutesUntilKickoff <= 60 && (
+            <Text style={styles.countdownText}>
+              Kickoff in {minutesUntilKickoff} min
+            </Text>
           )}
 
           {/* HotPick concentration — how many poolmates chose this game */}
@@ -280,7 +288,7 @@ function ImpactLine({impact}: {impact: HotPickImpact}) {
 const createStyles = (colors: any) => StyleSheet.create({
   container: {
     paddingTop: 0,
-    paddingBottom: spacing.xs,
+    paddingBottom: 0,
   },
   label: {
     ...typography.small,
@@ -300,11 +308,27 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.primary,
   },
+  unpickedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  teamRecord: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginLeft: 10,
+  },
+  gameDateTime: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
   hotPickHeader: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: spacing.sm,
+    marginBottom: spacing.sm / 2,
   },
   hotPickLabel: {
     fontSize: 16,
@@ -313,14 +337,14 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   hotPickLabelRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'baseline',
     gap: 6,
   },
   inProgressBadge: {
     fontSize: 18,
     fontWeight: '800',
     fontStyle: 'italic',
-    color: colors.primary,
+    color: '#1b9a06',
   },
   inProgressClock: {
     fontSize: 12,
@@ -395,18 +419,23 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: '#1B9A06',
   },
   finalLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.textSecondary,
+    fontSize: 18,
+    fontWeight: '800',
+    fontStyle: 'italic',
+    color: colors.error,
     letterSpacing: 0.5,
   },
   pickedBox: {
     alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 2,
     borderColor: colors.highlight,
     borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingTop: 1,
+    paddingBottom: 1,
+    paddingLeft: 5,
+    paddingRight: 8,
   },
   pickedBoxText: {
     fontSize: 16,

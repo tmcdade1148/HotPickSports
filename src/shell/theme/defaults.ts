@@ -22,8 +22,8 @@ export {
  * Brand primary/secondary stay the same; backgrounds and text flip.
  */
 export const HOTPICK_DARK_OVERRIDES = {
-  background_color: '#0D1117',
-  surface_color: '#161C26',
+  background_color: '#181818',
+  surface_color: '#262626',
   text_primary: '#8A97AA',
   text_secondary: '#A0A0A0',
 } as const;
@@ -68,7 +68,7 @@ export function deriveFullBrandColors(
   const isLightBg = isLightColor(background);
 
   // Auto-derive highlight if not provided: white on dark bg, dark on light bg
-  const derivedHighlight = highlight || (isLightBg ? '#1A1A1A' : '#FFFFFF');
+  const derivedHighlight = highlight || (isLightBg ? '#181818' : '#FFFFFF');
 
   return {
     primary_color: primary,
@@ -78,7 +78,7 @@ export function deriveFullBrandColors(
       ? darkenHex(background, 0.03) // slightly darker surface on light bg
       : lightenHex(background, 0.06), // slightly lighter surface on dark bg
     highlight_color: derivedHighlight,
-    text_primary: isLightBg ? '#1A1A1A' : '#F5F5F5',
+    text_primary: isLightBg ? '#181818' : '#F5F5F5',
     text_secondary: isLightBg ? '#6B6B6B' : '#A0A0A0',
   };
 }
@@ -118,9 +118,9 @@ function lightenHex(hex: string, amount: number): string {
  * for success/error/warning states across all branded experiences.
  */
 export const SEMANTIC_COLORS = {
-  success: '#06D6A0',
+  success: '#1DC24C',
   warning: '#FFD166',
-  error: '#EF476F',
+  error: '#C21D1D',
   border: '#E0E0E0',
   glow: '#51A1A6',
 } as const;
@@ -129,9 +129,9 @@ export const SEMANTIC_COLORS = {
  * Semantic colors for dark mode.
  */
 export const SEMANTIC_COLORS_DARK = {
-  success: '#06D6A0',
+  success: '#1DC24C',
   warning: '#FFD166',
-  error: '#EF476F',
+  error: '#C21D1D',
   border: '#2C3A52',
   glow: '#51A1A6',
 } as const;

@@ -183,6 +183,65 @@ async function scoreWeek(competition: string, seasonYear: number, week: number) 
     );
 
   if (upsertError) return { users_scored: 0, final_games: games.length, error: upsertError.message };
+
+  // ── SmackTalk: post per-user HotPick results to each pool they belong to ──
+  try {
+    // Find users whose HotPick game is in this batch of FINAL games
+    const hotPickPicks = (picks ?? []).filter((p: any) => p.is_hotpick && gameMap.has(p.game_id));
+    if (hotPickPicks.length > 0) {
+      const hotPickUserIds = hotPickPicks.map((p: any) => p.user_id);
+
+      // Fetch poolie_names
+      const { data: profiles } = await supabase
+        .from("profiles").select("id, poolie_name, first_name")
+        .in("id", hotPickUserIds);
+      const nameMap = new Map((profiles ?? []).map((p: any) => [p.id, p.poolie_name || p.first_name || "Someone"]));
+
+      // Fetch pool memberships
+      const { data: pools } = await supabase
+        .from("pools").select("id").eq("competition", competition).eq("is_archived", false);
+      const poolIds = (pools ?? []).map((p: any) => p.id);
+
+      const { data: memberships } = await supabase
+        .from("pool_members").select("pool_id, user_id")
+        .eq("status", "active").in("pool_id", poolIds).in("user_id", hotPickUserIds);
+
+      // Group memberships: userId → [poolIds]
+      const userPools = new Map<string, string[]>();
+      for (const m of memberships ?? []) {
+        const list = userPools.get(m.user_id) ?? [];
+        list.push(m.pool_id);
+        userPools.set(m.user_id, list);
+      }
+
+      // Post one message per user per pool
+      const msgs: Promise<any>[] = [];
+      for (const pick of hotPickPicks) {
+        const game = gameMap.get(pick.game_id);
+        if (!game || !game.winner_team) continue;
+        const agg = aggByUser.get(pick.user_id);
+        if (!agg || agg.is_hotpick_correct === null) continue;
+
+        const name = nameMap.get(pick.user_id) ?? "Someone";
+        const team = pick.picked_team;
+        const rank = agg.hotpick_rank ?? game.effectiveRank;
+        const hit = agg.is_hotpick_correct;
+        const text = hit
+          ? `${name}'s HotPick on ${team} hit ✅ — +${rank} pts`
+          : `${name}'s HotPick on ${team} missed ❌ — −${rank} pts`;
+
+        for (const poolId of userPools.get(pick.user_id) ?? []) {
+          msgs.push(supabase.rpc("post_system_message", {
+            p_pool_id: poolId, p_text: text, p_message_type: "score_update"
+          }));
+        }
+      }
+      await Promise.allSettled(msgs);
+    }
+  } catch (smackErr) {
+    console.warn("[nfl-calculate-scores] SmackTalk post failed:", smackErr);
+  }
+
   return { users_scored: scoredUserIds.size, final_games: games.length };
 }
 

@@ -90,6 +90,37 @@ Deno.serve(async (req) => {
       if (error) errors.push(`${r.game_id}: ${error.message}`);
     }
 
+    // ── SmackTalk: post "picks locked" to all pools with per-pool counts ──
+    const { data: pools } = await supabase
+      .from("pools").select("id").eq("competition", competition).eq("is_archived", false);
+
+    if (pools && pools.length > 0) {
+      // Count distinct users who submitted picks this week
+      const { data: pickUsers } = await supabase
+        .from("season_picks").select("user_id, game_id")
+        .eq("competition", competition).eq("season_year", seasonYear).eq("week", week);
+
+      // Build set of user_ids who picked, keyed by pool membership
+      const pickerIds = new Set((pickUsers ?? []).map((p: any) => p.user_id));
+
+      await Promise.allSettled(pools.map(async (pool: any) => {
+        const { count: memberCount } = await supabase
+          .from("pool_members").select("*", { count: "exact", head: true })
+          .eq("pool_id", pool.id).eq("status", "active");
+
+        // Count pool members who submitted picks
+        const { data: poolMembers } = await supabase
+          .from("pool_members").select("user_id")
+          .eq("pool_id", pool.id).eq("status", "active");
+        const poolPickerCount = (poolMembers ?? []).filter((m: any) => pickerIds.has(m.user_id)).length;
+
+        const text = `Picks locked 🔒 — ${poolPickerCount} of ${memberCount ?? 0} poolies are in.`;
+        await supabase.rpc("post_system_message", {
+          p_pool_id: pool.id, p_text: text, p_message_type: "pick_lock"
+        });
+      }));
+    }
+
     return json({ success: true, competition, season_year: seasonYear, week, updated: ranked.length, frozen: ranked.length, errors, rankings: ranked }, 200);
   } catch (err) {
     return json({ success: false, error: String(err) }, 500);

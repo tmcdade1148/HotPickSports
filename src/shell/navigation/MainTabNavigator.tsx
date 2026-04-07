@@ -254,6 +254,8 @@ function HomeTab(props: any) {
 function GroupedTabBar({state, descriptors, navigation}: BottomTabBarProps) {
   const {colors} = useTheme();
   const s = groupedTabStyles(colors);
+  const smackUnreadCounts = useGlobalStore(st => st.smackUnreadCounts);
+  const hasUnreadSmack = Object.values(smackUnreadCounts).some(c => c > 0);
 
   const onTabPress = (route: typeof state.routes[number], index: number) => {
     const event = navigation.emit({
@@ -288,9 +290,20 @@ function GroupedTabBar({state, descriptors, navigation}: BottomTabBarProps) {
     const isDisabled = (options as any).tabBarDisabled === true;
     const labelColor = isDisabled && !isFocused ? colors.border : color;
 
+    const showRedDot = route.name === 'SmackTalkTab' && hasUnreadSmack;
+
     return (
       <>
-        {icon}
+        <View>
+          {icon}
+          {showRedDot && (
+            <View style={{
+              position: 'absolute', top: -2, right: -4,
+              width: 8, height: 8, borderRadius: 4,
+              backgroundColor: colors.error,
+            }} />
+          )}
+        </View>
         {label ? <Text style={[s.label, {color: labelColor}]}>{label}</Text> : null}
       </>
     );

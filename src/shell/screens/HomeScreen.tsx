@@ -138,9 +138,7 @@ export function HomeScreen({navigation}: any) {
             <Text style={[styles.eventName, {color: colors.highlight}]}>{eventName}</Text>
             {(nflCurrentPhase === 'REGULAR' || nflCurrentPhase === 'PLAYOFFS' || nflCurrentPhase === 'SUPERBOWL') ? (
               <Text style={[styles.weekLabel, {color: colors.highlight}]}>
-                WEEK {nflWeekState === 'complete' || nflWeekState === 'settling'
-                  ? useNFLStore.getState().currentWeek + 1
-                  : useNFLStore.getState().currentWeek}
+                WEEK {useNFLStore.getState().currentWeek}
               </Text>
             ) : null}
           </View>

@@ -1,5 +1,5 @@
 import React, {useEffect, useCallback, useMemo, useState} from 'react';
-import {View, Text, FlatList, ActivityIndicator, Alert, StyleSheet} from 'react-native';
+import {View, Text, SectionList, ActivityIndicator, Alert, StyleSheet} from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
 import {useSeasonStore} from '../stores/seasonStore';
 import {WeekSelector} from '../components/WeekSelector';
@@ -14,9 +14,58 @@ import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {supabase} from '@shared/config/supabase';
 
+// ---------------------------------------------------------------------------
+// Wave grouping — classify games by kickoff window for section headers
+// ---------------------------------------------------------------------------
+
+type Wave = 'thursday' | 'saturday' | 'sunday1' | 'sunday4' | 'snf' | 'mnf';
+
+const WAVE_LABELS: Record<Wave, string> = {
+  thursday: 'Thursday Night',
+  saturday: 'Saturday',
+  sunday1: 'Sunday 1:00 PM',
+  sunday4: 'Sunday 4:00 PM',
+  snf: 'Sunday Night',
+  mnf: 'Monday Night',
+};
+
+const WAVE_ORDER: Wave[] = ['thursday', 'saturday', 'sunday1', 'sunday4', 'snf', 'mnf'];
+
+function detectWave(kickoffAt: string): Wave {
+  const d = new Date(kickoffAt);
+  const day = d.getUTCDay(); // 0=Sun 4=Thu
+  const hour = d.getUTCHours();
+
+  if (day === 4) return 'thursday';
+  if (day === 5 && hour < 8) return 'thursday';
+  if (day === 6) return 'saturday';
+  if (day === 0) {
+    if (hour >= 17 && hour < 20) return 'sunday1';
+    if (hour >= 20 && hour < 23) return 'sunday4';
+    return 'snf';
+  }
+  if (day === 1 && hour < 4) return 'snf';
+  if (day === 1 && hour >= 17) return 'mnf';
+  if (day === 2 && hour < 4) return 'mnf';
+  if (day === 5) return 'sunday1';
+  return 'sunday1';
+}
+
+function groupGamesByWave(games: DbSeasonGame[]): {title: string; data: DbSeasonGame[]}[] {
+  const groups: Record<string, DbSeasonGame[]> = {};
+  for (const game of games) {
+    const wave = detectWave(game.kickoff_at);
+    if (!groups[wave]) groups[wave] = [];
+    groups[wave].push(game);
+  }
+  return WAVE_ORDER
+    .filter(w => groups[w]?.length)
+    .map(w => ({title: WAVE_LABELS[w], data: groups[w]}));
+}
+
 /**
  * SeasonPicksScreen — Main weekly picks screen.
- * WeekSelector at top, FlatList of SeasonMatchCards below.
+ * SectionList grouped by kickoff wave, SeasonMatchCards below.
  * Never references a specific sport.
  */
 export function SeasonPicksScreen() {
@@ -241,6 +290,8 @@ export function SeasonPicksScreen() {
     return liveOrFinalKickoffs.length > 0 ? Math.min(...liveOrFinalKickoffs) : null;
   }, [weekState, games]);
 
+  const sections = useMemo(() => groupGamesByWave(games), [games]);
+
   const renderGame = ({item, index}: {item: DbSeasonGame; index: number}) => (
     <View style={[
       styles.cardWrapper,
@@ -254,6 +305,14 @@ export function SeasonPicksScreen() {
         picksAreOpen={picksAreOpen}
         liveAnchorTime={liveAnchorTime}
       />
+    </View>
+  );
+
+  const renderSectionHeader = ({section}: {section: {title: string}}) => (
+    <View style={styles.sectionHeader}>
+      <View style={styles.sectionLine} />
+      <Text style={styles.sectionTitle}>{section.title}</Text>
+      <View style={styles.sectionLine} />
     </View>
   );
 
@@ -283,7 +342,7 @@ export function SeasonPicksScreen() {
           {allGamesFinal && weekEarned != null ? (
             <View style={styles.widgetRow}>
               <View style={styles.widgetFull}>
-                <Text style={styles.widgetLabel}>
+                <Text style={styles.widgetLabelFinal}>
                   Week {currentWeek} {'\u2022'} FINAL SCORE
                 </Text>
                 <View style={styles.widgetValueRow}>
@@ -346,14 +405,16 @@ export function SeasonPicksScreen() {
           <Text style={styles.emptyTitle}>No Games</Text>
         </View>
       ) : (
-        <FlatList
-          data={games}
+        <SectionList
+          sections={sections}
           keyExtractor={item => item.game_id}
           renderItem={renderGame}
+          renderSectionHeader={renderSectionHeader}
           contentContainerStyle={styles.list}
           ItemSeparatorComponent={() => (
             <View style={[styles.separator, {backgroundColor: colors.border}]} />
           )}
+          stickySectionHeadersEnabled={false}
         />
       )}
 
@@ -364,6 +425,8 @@ export function SeasonPicksScreen() {
           hotPickCount={hotPickCount}
           hotPicksRequired={config.hotPicksPerWeek}
           isWeekComplete={isWeekComplete}
+          allGamesFinal={allGamesFinal}
+          currentWeek={currentWeek}
           allGamesLocked={games.length > 0 && games.every(g => {
             const status = (g.status ?? '').toUpperCase();
             if (status === 'FINAL' || status === 'STATUS_FINAL' || status === 'COMPLETED'
@@ -396,6 +459,26 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginHorizontal: spacing.md,
     opacity: 0.5,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xs,
+    gap: spacing.sm,
+  },
+  sectionTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  sectionLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.border,
+  },
   widgetRow: {
     flexDirection: 'row',
     paddingHorizontal: spacing.md,
@@ -419,6 +502,14 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderColor: colors.border,
     padding: spacing.sm + 2,
     alignItems: 'center',
+  },
+  widgetLabelFinal: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.textPrimary,
+    letterSpacing: 0.5,
+    marginBottom: 2,
+    textTransform: 'uppercase',
   },
   widgetLabel: {
     fontSize: 11,

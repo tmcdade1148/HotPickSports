@@ -31,12 +31,15 @@ export function LastWeekRecap({teams}: LastWeekRecapProps) {
   const competition = useNFLStore(s => s.competition);
   const {user} = useAuth();
 
+  const weekState = useNFLStore(s => s.weekState);
   const [data, setData] = useState<LastWeekData | null>(null);
 
   useEffect(() => {
     if (!user?.id || !competition || currentWeek <= 1) return;
 
-    const lastWeek = currentWeek - 1;
+    // During 'settling'/'complete', the current week just finished — recap THIS week.
+    // During picks_open/live, we're playing the current week — recap the previous one.
+    const lastWeek = weekState === 'settling' || weekState === 'complete' ? currentWeek : currentWeek - 1;
 
     const load = async () => {
       const {data: totals} = await supabase
@@ -72,7 +75,7 @@ export function LastWeekRecap({teams}: LastWeekRecapProps) {
     };
 
     load();
-  }, [user?.id, competition, currentWeek]);
+  }, [user?.id, competition, currentWeek, weekState]);
 
   if (!data || currentWeek <= 1) return null;
 
@@ -80,33 +83,34 @@ export function LastWeekRecap({teams}: LastWeekRecapProps) {
   const pointsColor = data.weekPoints >= 0 ? '#1b9a06' : colors.error;
   const pointsStr = `${data.weekPoints >= 0 ? '+' : ''}${data.weekPoints}`;
 
-  // Contextual observation
+  // Contextual observation — references team name for personality
+  const teamName = data.hotPickTeamName ?? 'HotPick';
   const observation = (() => {
     const winRate = data.totalPicks > 0 ? data.correctPicks / data.totalPicks : 0;
     const hp = data.isHotpickCorrect;
 
     if (hp && winRate >= 0.7) {
-      return 'Strong week all around. Your HotPick landed and your picks were sharp.';
+      return `Strong week all around. The ${teamName} came through and your picks were sharp.`;
     }
     if (hp && winRate < 0.5) {
-      return 'Your HotPick saved the week. Regular picks need some work.';
+      return `The ${teamName} saved the week. Regular picks need some work.`;
     }
     if (hp) {
-      return 'HotPick hit. Solid week.';
+      return `The ${teamName} hit. Solid week.`;
     }
     if (hp === false && winRate >= 0.7) {
-      return 'Your regular picks were strong but the HotPick miss held you back.';
+      return `Your regular picks were strong but the ${teamName} miss held you back.`;
     }
     if (hp === false && data.weekPoints > 0) {
-      return 'HotPick didn\u2019t land but your regular picks kept you in the green.';
+      return `The ${teamName} didn\u2019t land but your regular picks kept you in the green.`;
     }
     if (hp === false && data.weekPoints <= 0) {
-      return 'Tough week. The HotPick loss was costly. Reset and come back strong.';
+      return `Tough week. The ${teamName} loss was costly. Reset and come back strong.`;
     }
     return null;
   })();
 
-  // HotPick compact: "Bills (Rk 5) +5" or "Bills (Rk 5) -5"
+  // HotPick compact: "✅ Bills +5" or "❌ Bills −5"
   const hotPickCompact = (() => {
     if (!data.hotPickTeamName || data.hotpickRank == null || data.isHotpickCorrect == null) return null;
     const icon = data.isHotpickCorrect ? '\u2705' : '\u274C';
@@ -116,24 +120,10 @@ export function LastWeekRecap({teams}: LastWeekRecapProps) {
 
   return (
     <View style={styles.container}>
-      {/* Title row: "Week X Recap" left, points right */}
-      <View style={styles.headerRow}>
-        <Text style={styles.header}>Week {lastWeek} Recap</Text>
-        <View style={styles.pointsRow}>
-          <Text style={[styles.pointsValue, {color: pointsColor}]}>
-            {pointsStr}
-          </Text>
-          <Text style={styles.pointsLabel}>pts</Text>
-          <Text style={styles.picksLabel}>
-            {data.correctPicks}/{data.totalPicks}
-          </Text>
-        </View>
-      </View>
-
-      {/* HotPick result — compact single line */}
+      {/* HotPick result */}
       {hotPickCompact && (
         <View style={styles.hotPickRow}>
-          <Text style={styles.hotPickLabel}>HotPick</Text>
+          <Text style={styles.hotPickLabel}>Week {lastWeek}'s HotPick:</Text>
           <Text style={[
             styles.hotPickResult,
             {color: data.isHotpickCorrect ? '#1b9a06' : colors.error},
@@ -157,7 +147,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderRadius: borderRadius.lg,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm + 2,
-    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
   },
   headerRow: {
     flexDirection: 'row',
@@ -195,15 +185,14 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginTop: 4,
   },
   hotPickLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    letterSpacing: 0.3,
   },
   hotPickResult: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
   },
   observation: {
     fontSize: 13,

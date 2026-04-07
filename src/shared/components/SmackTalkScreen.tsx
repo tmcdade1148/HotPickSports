@@ -21,6 +21,8 @@ import {spacing, borderRadius} from '@shared/theme';
 
 import type {DbSmackMessage, DbSmackReaction} from '@shared/types/database';
 import {useTheme} from '@shell/theme';
+import {HotPickFlame} from '@shared/components/HotPickFlame';
+import {MentionAutocomplete} from '@shared/components/MentionAutocomplete';
 
 interface SmackTalkScreenProps {
   poolId: string;
@@ -89,6 +91,13 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const [reactorModal, setReactorModal] = useState<ReactionSummary | null>(null);
   const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set());
+  const [replyTo, setReplyTo] = useState<{id: string; authorName: string} | null>(null);
+  const [mentions, setMentions] = useState<{userId: string; name: string}[]>([]);
+  const [replyCounts, setReplyCounts] = useState<Record<string, number>>({});
+  const [expandedReplies, setExpandedReplies] = useState<Record<string, DbSmackMessage[]>>({});
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasOlderMessages, setHasOlderMessages] = useState(true);
+  const isInitialLoad = useRef(true);
   const {user} = useAuth();
   const userProfile = useGlobalStore(s => s.userProfile);
   const markPoolAsRead = useGlobalStore(s => s.markPoolAsRead);
@@ -118,23 +127,34 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
         .from('smack_messages')
         .select('*')
         .eq('pool_id', poolId)
-        .order('created_at', {ascending: true});
+        .is('reply_to', null)
+        .order('created_at', {ascending: false})
+        .limit(50);
 
       if (data) {
         // Filter out messages from blocked users
-        const filtered = (data as DbSmackMessage[]).filter(
+        const filtered = (data as DbSmackMessage[]).reverse().filter(
           m => !blockedUserIds.has(m.user_id),
         );
         setMessages(filtered);
+        setHasOlderMessages(data.length === 50);
         // Fetch reactions for all messages
         const msgIds = filtered.map(m => m.id);
         if (msgIds.length > 0) {
           await fetchReactions(msgIds);
+          await fetchReplyCounts(msgIds);
         }
       }
     };
 
-    fetchMessages();
+    isInitialLoad.current = true;
+    fetchMessages().then(() => {
+      // Scroll to bottom after initial load
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({animated: false});
+        isInitialLoad.current = false;
+      }, 100);
+    });
 
     // Realtime: new messages
     const msgChannel = supabase
@@ -150,8 +170,20 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
         payload => {
           const msg = payload.new as DbSmackMessage;
           // Skip messages from blocked users
-          if (blockedUserIds.has(msg.user_id)) return;
-          setMessages(prev => [...prev, msg]);
+          if (msg.user_id && blockedUserIds.has(msg.user_id)) return;
+
+          if ((msg as any).reply_to) {
+            // It's a reply — increment parent's reply count + append if expanded
+            const parentId = (msg as any).reply_to;
+            setReplyCounts(prev => ({...prev, [parentId]: (prev[parentId] ?? 0) + 1}));
+            setExpandedReplies(prev => {
+              if (!prev[parentId]) return prev;
+              return {...prev, [parentId]: [...prev[parentId], msg]};
+            });
+          } else {
+            // Top-level message — add to main feed
+            setMessages(prev => [...prev, msg]);
+          }
           markPoolAsRead(poolId);
         },
       )
@@ -199,6 +231,38 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [poolId, blockedUserIds]);
 
+  // ── Load older messages (scroll-to-top pagination) ─────────────────
+  const loadMore = async () => {
+    if (loadingMore || !hasOlderMessages || messages.length === 0) return;
+    setLoadingMore(true);
+    const cursor = messages[0]?.created_at;
+    const {data} = await supabase
+      .from('smack_messages')
+      .select('*')
+      .eq('pool_id', poolId)
+      .is('reply_to', null)
+      .lt('created_at', cursor)
+      .order('created_at', {ascending: false})
+      .limit(50);
+
+    if (data && data.length > 0) {
+      const filtered = (data as DbSmackMessage[]).reverse().filter(
+        m => !blockedUserIds.has(m.user_id),
+      );
+      setMessages(prev => {
+        const combined = [...filtered, ...prev];
+        // Cap at 200 messages — drop oldest
+        return combined.length > 200 ? combined.slice(combined.length - 200) : combined;
+      });
+      setHasOlderMessages(data.length === 50);
+      const msgIds = filtered.map(m => m.id);
+      if (msgIds.length > 0) await fetchReactions(msgIds);
+    } else {
+      setHasOlderMessages(false);
+    }
+    setLoadingMore(false);
+  };
+
   const fetchReactions = async (messageIds: string[]) => {
     const {data} = await supabase
       .from('smack_reactions')
@@ -240,6 +304,48 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
     }
   };
 
+  // ── Fetch reply counts for top-level messages ───────────────────────
+  const fetchReplyCounts = async (parentIds: string[]) => {
+    if (parentIds.length === 0) return;
+    const {data} = await supabase
+      .from('smack_messages')
+      .select('reply_to')
+      .in('reply_to', parentIds);
+    if (data) {
+      const counts: Record<string, number> = {};
+      for (const row of data) {
+        if (row.reply_to) {
+          counts[row.reply_to] = (counts[row.reply_to] ?? 0) + 1;
+        }
+      }
+      setReplyCounts(prev => ({...prev, ...counts}));
+    }
+  };
+
+  // ── Toggle expanded replies for a message ──────────────────────────
+  const toggleReplies = async (parentId: string) => {
+    if (expandedReplies[parentId]) {
+      setExpandedReplies(prev => {
+        const next = {...prev};
+        delete next[parentId];
+        return next;
+      });
+      return;
+    }
+    const {data} = await supabase
+      .from('smack_messages')
+      .select('*')
+      .eq('reply_to', parentId)
+      .order('created_at', {ascending: true})
+      .limit(50);
+    if (data) {
+      const filtered = (data as DbSmackMessage[]).filter(
+        m => !blockedUserIds.has(m.user_id),
+      );
+      setExpandedReplies(prev => ({...prev, [parentId]: filtered}));
+    }
+  };
+
   // ── Get aggregated reaction summaries for a message ─────────────────
   const getReactionSummaries = useCallback(
     (messageId: string): ReactionSummary[] => {
@@ -272,28 +378,44 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
     );
 
     if (existing) {
-      // Remove reaction
-      await supabase.from('smack_reactions').delete().eq('id', existing.id);
+      // Optimistic remove
       setReactions(prev => ({
         ...prev,
         [messageId]: (prev[messageId] ?? []).filter(r => r.id !== existing.id),
       }));
-    } else {
-      // Add reaction
-      const {data} = await supabase
-        .from('smack_reactions')
-        .insert({
-          message_id: messageId,
-          user_id: user.id,
-          reaction: emoji,
-        })
-        .select()
-        .single();
-
-      if (data) {
+      const {error} = await supabase.rpc('remove_smack_reaction', {
+        p_message_id: messageId,
+        p_reaction: emoji,
+      });
+      if (error) {
+        // Rollback on failure
         setReactions(prev => ({
           ...prev,
-          [messageId]: [...(prev[messageId] ?? []), data as DbSmackReaction],
+          [messageId]: [...(prev[messageId] ?? []), existing],
+        }));
+      }
+    } else {
+      // Optimistic add
+      const optimistic: DbSmackReaction = {
+        id: `temp-${Date.now()}`,
+        message_id: messageId,
+        user_id: user.id,
+        reaction: emoji,
+        created_at: new Date().toISOString(),
+      };
+      setReactions(prev => ({
+        ...prev,
+        [messageId]: [...(prev[messageId] ?? []), optimistic],
+      }));
+      const {error} = await supabase.rpc('add_smack_reaction', {
+        p_message_id: messageId,
+        p_reaction: emoji,
+      });
+      if (error) {
+        // Rollback on failure
+        setReactions(prev => ({
+          ...prev,
+          [messageId]: (prev[messageId] ?? []).filter(r => r.id !== optimistic.id),
         }));
       }
     }
@@ -394,15 +516,23 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
     if (!newMessage.trim() || !user?.id || sending) return;
 
     setSending(true);
+    const text = newMessage.trim();
     setNewMessage('');
 
-    await supabase.from('smack_messages').insert({
-      pool_id: poolId,
-      user_id: user.id,
-      author_name: getDisplayName(userProfile),
-      text: newMessage.trim(),
+    const {error: sendError} = await supabase.rpc('send_smack_message', {
+      p_pool_id: poolId,
+      p_text: text,
+      p_reply_to: replyTo?.id ?? null,
+      p_mentions: mentions.map(m => m.userId),
     });
 
+    if (sendError) {
+      console.error('[SmackTalk] send_smack_message RPC error:', sendError.message);
+      Alert.alert('Send failed', sendError.message);
+    }
+
+    setReplyTo(null);
+    setMentions([]);
     setSending(false);
   };
 
@@ -418,6 +548,44 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
       return (
         <View style={[styles.bubble, styles.bubbleRemoved]}>
           <Text style={styles.removedText}>Message removed by moderator</Text>
+        </View>
+      );
+    }
+
+    // ── System message rendering ───────────────────────────────────
+    const isSystemMessage = (item as any).message_type !== 'user' || item.user_id === null;
+    if (isSystemMessage) {
+      return (
+        <View>
+          <View style={styles.systemBubble}>
+            <View style={styles.systemHeader}>
+              <HotPickFlame size={16} active />
+              <Text style={[styles.sender, {color: colors.primary, marginBottom: 0}]}>HotPick</Text>
+            </View>
+            <Text style={styles.systemText}>{item.text}</Text>
+            <Text style={styles.time}>{time}</Text>
+          </View>
+          {/* Reactions on system messages */}
+          {summaries.length > 0 && (
+            <View style={styles.reactionRow}>
+              {summaries.map(s => {
+                const iReacted = s.userIds.includes(user?.id ?? '');
+                return (
+                  <TouchableOpacity
+                    key={s.reaction}
+                    style={[styles.reactionBadge, iReacted && styles.reactionBadgeMine]}
+                    onPress={() => handleReaction(item.id, s.reaction)}>
+                    <Text style={styles.reactionEmoji}>{s.reaction}</Text>
+                    {s.count > 1 && (
+                      <Text style={[styles.reactionCount, {color: colors.textSecondary}]}>
+                        {s.count}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
         </View>
       );
     }
@@ -472,6 +640,26 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
             })}
           </View>
         )}
+
+        {/* Reply count + expanded replies — tucked directly under parent */}
+        {(replyCounts[item.id] ?? 0) > 0 && (
+          <TouchableOpacity
+            style={{alignSelf: isMe ? 'flex-end' : 'flex-start', paddingHorizontal: 16, paddingTop: 2, paddingBottom: 2}}
+            onPress={() => toggleReplies(item.id)}>
+            <Text style={{fontSize: 12, fontWeight: '600', color: colors.primary}}>
+              {expandedReplies[item.id]
+                ? '▾ Hide replies'
+                : `▸ ${replyCounts[item.id]} ${replyCounts[item.id] === 1 ? 'reply' : 'replies'}`}
+            </Text>
+          </TouchableOpacity>
+        )}
+        {expandedReplies[item.id]?.map(reply => (
+          <View key={reply.id} style={[styles.replyBubble, isMe && {alignSelf: 'flex-end', marginLeft: 0, marginRight: 24}]}>
+            <Text style={styles.sender}>{reply.author_name}</Text>
+            <Text style={styles.messageText}>{reply.text}</Text>
+            <Text style={styles.time}>{formatSmackTime(new Date(reply.created_at))}</Text>
+          </View>
+        ))}
       </View>
     );
   };
@@ -495,10 +683,52 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
           keyExtractor={item => item.id}
           renderItem={renderMessage}
           contentContainerStyle={styles.list}
-          onContentSizeChange={() =>
-            flatListRef.current?.scrollToEnd({animated: true})
-          }
+          onContentSizeChange={() => {
+            // Auto-scroll to bottom only on initial load and new messages, not loadMore
+            if (!loadingMore) {
+              flatListRef.current?.scrollToEnd({animated: !isInitialLoad.current});
+            }
+          }}
+          onScroll={({nativeEvent}) => {
+            if (nativeEvent.contentOffset.y < 50 && hasOlderMessages && !loadingMore) {
+              loadMore();
+            }
+          }}
+          scrollEventThrottle={200}
+          maintainVisibleContentPosition={{minIndexForVisible: 0}}
         />
+      )}
+
+      {/* Mention autocomplete — above input */}
+      {(() => {
+        const atIdx = newMessage.lastIndexOf('@');
+        const mentionQuery = atIdx >= 0 ? newMessage.slice(atIdx + 1).split(/\s/)[0] : '';
+        if (atIdx < 0 || mentionQuery.length === 0) return null;
+        return (
+          <MentionAutocomplete
+            poolId={poolId}
+            query={mentionQuery}
+            currentUserId={user?.id ?? ''}
+            onSelect={({userId, name}) => {
+              // Replace @partial with @fullName
+              const before = newMessage.slice(0, atIdx);
+              setNewMessage(`${before}@${name} `);
+              setMentions(prev => [...prev, {userId, name}]);
+            }}
+          />
+        );
+      })()}
+
+      {/* Reply chip */}
+      {replyTo && (
+        <View style={[styles.replyChip, {backgroundColor: colors.surface, borderColor: colors.border}]}>
+          <Text style={{color: colors.textSecondary, fontSize: 12}}>
+            Replying to @{replyTo.authorName}
+          </Text>
+          <TouchableOpacity onPress={() => setReplyTo(null)}>
+            <Text style={{color: colors.textSecondary, fontSize: 14, fontWeight: '700', paddingLeft: 8}}>×</Text>
+          </TouchableOpacity>
+        </View>
       )}
 
       <View style={styles.inputRow}>
@@ -545,6 +775,23 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
                 </TouchableOpacity>
               ))}
             </View>
+            {/* Reply — only for user messages (not system) */}
+            {selectedMessageId && (() => {
+              const msg = messages.find(m => m.id === selectedMessageId);
+              return msg && msg.user_id !== null && (msg as any).message_type !== 'system';
+            })() && (
+              <TouchableOpacity
+                style={styles.reportButton}
+                onPress={() => {
+                  const msg = messages.find(m => m.id === selectedMessageId);
+                  if (msg) {
+                    setReplyTo({id: msg.id, authorName: msg.author_name});
+                  }
+                  setSelectedMessageId(null);
+                }}>
+                <Text style={styles.reportText}>💬 Reply</Text>
+              </TouchableOpacity>
+            )}
             {/* Report + Block — only for other people's messages */}
             {selectedMessageId &&
               messages.find(m => m.id === selectedMessageId)?.user_id !== user?.id && (
@@ -635,6 +882,49 @@ const createStyles = (colors: any) => StyleSheet.create({
   bubbleThem: {
     alignSelf: 'flex-start',
     backgroundColor: colors.surface,
+  },
+  systemBubble: {
+    alignSelf: 'stretch',
+    backgroundColor: colors.surface,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primary,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginHorizontal: spacing.md,
+    marginVertical: spacing.xs,
+  },
+  systemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
+  systemText: {
+    fontSize: 13,
+    color: colors.textPrimary,
+    fontWeight: '500',
+  },
+  replyBubble: {
+    marginLeft: 24,
+    marginTop: 4,
+    backgroundColor: colors.surface,
+    borderLeftWidth: 2,
+    borderLeftColor: colors.border,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  replyChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    marginHorizontal: spacing.md,
+    borderWidth: 1,
+    borderRadius: 8,
+    marginBottom: spacing.xs,
   },
   bubbleFlagged: {
     backgroundColor: colors.border,

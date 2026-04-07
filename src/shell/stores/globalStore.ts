@@ -848,11 +848,6 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
 
           const state = get();
 
-          // Skip if this is the currently active pool (user is looking at it)
-          if (newMsg.pool_id === state.activePoolId) {
-            return;
-          }
-
           // Skip if this is the current user's own message
           if (newMsg.user_id === state.user?.id) {
             return;

@@ -113,6 +113,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
   },
   chipTextSelected: {
-    color: '#1A1A1A',
+    color: '#181818',
   },
 });

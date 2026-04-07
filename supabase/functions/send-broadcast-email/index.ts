@@ -159,8 +159,8 @@ function buildEmailHtml({
       <meta charset="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1" />
     </head>
-    <body style="margin:0;padding:0;background-color:#111414;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-      <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#111414;padding:40px 20px;">
+    <body style="margin:0;padding:0;background-color:#181818;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#181818;padding:40px 20px;">
         <tr>
           <td align="center">
             <table width="100%" style="max-width:480px;background-color:#1E2222;border-radius:12px;overflow:hidden;">

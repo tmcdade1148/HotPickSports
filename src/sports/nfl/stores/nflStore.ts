@@ -89,6 +89,7 @@ interface NFLState {
   currentWeekPoints: number;
   lastWeekNet: number | null; // null in Week 1
   weekPointsMap: Record<number, number>; // week → week_points for rolling display
+  weekRecordMap: Record<number, {correct: number; total: number}>; // week → correct/total picks
 
   // Game Day Engagement
   gamePickStats: Record<string, GamePickStats>; // gameId → stats for active pool
@@ -108,7 +109,7 @@ interface NFLState {
   setWeekResult: (result: WeekResult | null) => void;
   setPoolStandings: (standings: Standing[]) => void;
   fetchCompetitionConfig: () => Promise<void>;
-  fetchUserHotPick: (userId: string) => Promise<void>;
+  fetchUserHotPick: (userId: string, week: number) => Promise<void>;
   fetchHighestRankedGame: () => Promise<void>;
   fetchUserPickStatus: (userId: string) => Promise<void>;
   fetchPoolStandings: (userId: string, poolId: string) => Promise<void>;
@@ -153,6 +154,7 @@ export const useNFLStore = create<NFLState>((set, get) => ({
   currentWeekPoints: 0,
   lastWeekNet: null,
   weekPointsMap: {},
+  weekRecordMap: {},
 
   // Game Day Engagement
   gamePickStats: {},
@@ -163,11 +165,15 @@ export const useNFLStore = create<NFLState>((set, get) => ({
 
   initialize: async (competition: string) => {
     const alreadyInitialized = get().competition === competition && get().currentWeek > 0;
+    // Always clear hotpick and reset configLoaded — hotpick is week-scoped
+    // and must be re-fetched after config loads to avoid showing a stale
+    // previous-week game. Resetting configLoaded prevents useEffects from
+    // firing with the old currentWeek before fetchCompetitionConfig resolves.
+    set({userHotPick: null, userHotPickGame: null, configLoaded: false});
     if (!alreadyInitialized) {
       // Full state reset on first init or competition change
       set({
         competition,
-        userHotPickGame: null,
         liveScores: {},
         weekResult: null,
         poolStandings: [],
@@ -181,6 +187,7 @@ export const useNFLStore = create<NFLState>((set, get) => ({
         currentWeekPoints: 0,
         lastWeekNet: null,
         weekPointsMap: {},
+        weekRecordMap: {},
         gamePickStats: {},
         pathBackNarrative: null,
         hotPickGameStatus: null,
@@ -267,8 +274,9 @@ export const useNFLStore = create<NFLState>((set, get) => ({
     set({currentWeek, weekState, picksDeadline, picksOpenAt, seasonOpenerAt, sundayLockAnchor, currentPhase});
   },
 
-  fetchUserHotPick: async (userId: string) => {
-    const {competition, currentWeek} = get();
+  fetchUserHotPick: async (userId: string, week: number) => {
+    const {competition} = get();
+    const currentWeek = week;
 
     const {data: pick} = await supabase
       .from('season_picks')
@@ -288,6 +296,7 @@ export const useNFLStore = create<NFLState>((set, get) => ({
         .from('season_games')
         .select('*')
         .eq('game_id', pick.game_id)
+        .eq('competition', competition)
         .maybeSingle();
 
       set({userHotPickGame: (game as DbSeasonGame) ?? null});
@@ -477,7 +486,7 @@ export const useNFLStore = create<NFLState>((set, get) => ({
     // and lastWeekNet from the same query.
     let query = supabase
       .from('season_user_totals')
-      .select('week, week_points')
+      .select('week, week_points, correct_picks, total_picks')
       .eq('user_id', userId)
       .eq('competition', competition);
 
@@ -513,10 +522,15 @@ export const useNFLStore = create<NFLState>((set, get) => ({
     const isFirstWeekOfPhase =
       phaseWeeks.length === 0 || currentWeek <= (phaseWeeks[0] ?? currentWeek);
 
-    // Build per-week points map for the rolling 3-week display
+    // Build per-week points map and record map for the rolling 3-week display
     const wpm: Record<number, number> = {};
+    const wrm: Record<number, {correct: number; total: number}> = {};
     for (const row of data ?? []) {
       wpm[row.week] = row.week_points ?? 0;
+      wrm[row.week] = {
+        correct: (row as any).correct_picks ?? 0,
+        total: (row as any).total_picks ?? 0,
+      };
     }
 
     set({
@@ -524,6 +538,7 @@ export const useNFLStore = create<NFLState>((set, get) => ({
       currentWeekPoints: currentWeekPts,
       lastWeekNet: isFirstWeekOfPhase ? null : lastWeekPoints,
       weekPointsMap: wpm,
+      weekRecordMap: wrm,
     });
   },
 
@@ -756,6 +771,10 @@ export const useNFLStore = create<NFLState>((set, get) => ({
             set(state => ({
               currentWeekPoints: pts,
               weekPointsMap: {...state.weekPointsMap, [currentWeek]: pts},
+              weekRecordMap: {...state.weekRecordMap, [currentWeek]: {
+                correct: row.correct_picks ?? 0,
+                total: row.total_picks ?? 0,
+              }},
             }));
           }
         },
@@ -784,14 +803,13 @@ export const useNFLStore = create<NFLState>((set, get) => ({
           table: 'competition_config',
           filter: `competition=eq.${competition}`,
         },
-        () => {
-          // Re-fetch config first, then clear stale per-user data so
-          // SeasonEventCard's useEffects re-fetch based on the new state.
-          // This handles simulator resets and admin phase transitions.
-          get().fetchCompetitionConfig();
+        async () => {
+          // Gate all useEffects behind configLoaded = false so they don't
+          // fire with stale currentWeek while config is being fetched.
+          set({configLoaded: false, userHotPick: null, userHotPickGame: null});
+          await get().fetchCompetitionConfig();
           set({
-            userHotPick: null,
-            userHotPickGame: null,
+            configLoaded: true,
             userPickCount: 0,
             weekResult: null,
             poolStandings: [],
