@@ -28,6 +28,13 @@
         <category android:name="android.intent.category.BROWSABLE" />
         <data android:scheme="hotpick" />
       </intent-filter>
+      <!-- Google Sign-In OAuth redirect -->
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="com.googleusercontent.apps.347191789170-ctt7hgfb07obn4p972eroqsi49kejtaj" />
+      </intent-filter>
     </activity>
   </application>
 </manifest>

@@ -10,6 +10,7 @@
 		0C80B921A6F3F58F76C31292 /* libPods-HotPickSports.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-HotPickSports.a */; };
 		126A9B3339183E58A13844E1 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		1C0E8FFF2F85619500996DA3 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 1C0E8FFE2F85619500996DA3 /* GoogleService-Info.plist */; };
 		5A9A7B6015444ED7ADCAF4F0 /* Colors.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7DAFD1BC79E345998E27CEFF /* Colors.xcassets */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		78BE216C575A4B439790B864 /* BootSplash.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = F14169EF94C44DF0B8CEB803 /* BootSplash.storyboard */; };
@@ -22,6 +23,7 @@
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = HotPickSports/Info.plist; sourceTree = "<group>"; };
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = HotPickSports/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		1C0E7B6D2F6382B300D1D3E8 /* HotPickSports.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = HotPickSports.entitlements; path = HotPickSports/HotPickSports.entitlements; sourceTree = "<group>"; };
+		1C0E8FFE2F85619500996DA3 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		3B4392A12AC88292D35C810B /* Pods-HotPickSports.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-HotPickSports.debug.xcconfig"; path = "Target Support Files/Pods-HotPickSports/Pods-HotPickSports.debug.xcconfig"; sourceTree = "<group>"; };
 		5709B34CF0A7D63546082F79 /* Pods-HotPickSports.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-HotPickSports.release.xcconfig"; path = "Target Support Files/Pods-HotPickSports/Pods-HotPickSports.release.xcconfig"; sourceTree = "<group>"; };
 		5DCACB8F33CDC322A6C60F78 /* libPods-HotPickSports.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-HotPickSports.a"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -86,6 +88,7 @@
 		83CBB9F61A601CBA00E9B192 = {
 			isa = PBXGroup;
 			children = (
+				1C0E8FFE2F85619500996DA3 /* GoogleService-Info.plist */,
 				13B07FAE1A68108700A75B9A /* HotPickSports */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
@@ -187,6 +190,7 @@
 				126A9B3339183E58A13844E1 /* PrivacyInfo.xcprivacy in Resources */,
 				78BE216C575A4B439790B864 /* BootSplash.storyboard in Resources */,
 				5A9A7B6015444ED7ADCAF4F0 /* Colors.xcassets in Resources */,
+				1C0E8FFF2F85619500996DA3 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -297,7 +301,7 @@
 				CODE_SIGN_ENTITLEMENTS = HotPickSports/HotPickSports.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = W88A7N6XW5;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = HotPickSports/Info.plist;
@@ -335,7 +339,7 @@
 				CODE_SIGN_ENTITLEMENTS = HotPickSports/HotPickSports.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = W88A7N6XW5;
 				INFOPLIST_FILE = HotPickSports/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.sports";

@@ -173,10 +173,11 @@ export function SettingsScreen({route}: any) {
                   onPress: async () => {
                     try {
                       if (!user?.id) return;
-                      const {error} = await supabase.rpc('anonymize_deleted_user', {
-                        p_user_id: user.id,
+                      const {data: {session}} = await supabase.auth.getSession();
+                      const resp = await supabase.functions.invoke('delete-account', {
+                        headers: {Authorization: `Bearer ${session?.access_token}`},
                       });
-                      if (error) {
+                      if (resp.error || resp.data?.success === false) {
                         Alert.alert('Error', 'Failed to delete account. Please try again or contact support@hotpicksports.com.');
                         return;
                       }

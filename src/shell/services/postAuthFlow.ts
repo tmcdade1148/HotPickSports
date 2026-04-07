@@ -56,10 +56,10 @@ export async function runPostAuthFlow({
   // Step 3: Fetch profile
   const profile = await store.fetchProfile(user.id);
 
-  // Step 4: New user — accept TOS then proceed to profile setup
+  // Step 4: New user — show TOS gate before profile setup
   if (!profile || !profile.tos_accepted_at) {
-    await store.acceptTos(user.id);
-    navigation.replace('ProfileSetup', {
+    navigation.replace('TosVersionGate', {
+      isNewUser: true,
       providerName: providerName ?? undefined,
     });
     return;

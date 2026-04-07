@@ -17,6 +17,7 @@ import {useGlobalStore} from '@shell/stores/globalStore';
 import {getDefaultEvent} from '@sports/registry';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
+import {runPostAuthFlow} from '@shell/services/postAuthFlow';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
@@ -78,12 +79,7 @@ export function EmailEntryScreen({navigation}: any) {
       }
 
       if (data.user) {
-        setUser(data.user);
-        const defaultEvent = getDefaultEvent();
-        setActiveSport(defaultEvent);
-        await acceptTos(data.user.id);
-        await ensureGlobalPoolMembership();
-        navigation.replace('ProfileSetup');
+        await runPostAuthFlow({user: data.user, navigation});
       }
     } else {
       const {data, error: signInError} =
@@ -104,60 +100,7 @@ export function EmailEntryScreen({navigation}: any) {
       }
 
       if (data.user) {
-        setUser(data.user);
-        const defaultEvent = getDefaultEvent();
-        setActiveSport(defaultEvent);
-
-        await ensureGlobalPoolMembership();
-        const profile = await fetchProfile(data.user.id);
-
-        if (!profile || !profile.first_name) {
-          navigation.replace('ProfileSetup');
-          return;
-        }
-
-        // Load pools and select active pool — same logic as LoadingScreen
-        await fetchUserPools(data.user.id, defaultEvent.competition);
-        const pools = useGlobalStore.getState().userPools;
-
-        if (pools.length > 0) {
-          let defaultId: string | null = null;
-          let activeId: string | null = null;
-          try {
-            defaultId = await AsyncStorage.getItem(
-              `hotpick_default_pool_${defaultEvent.competition}`,
-            );
-            activeId = await AsyncStorage.getItem(
-              `hotpick_active_pool_${defaultEvent.competition}`,
-            );
-          } catch {
-            // proceed with fallbacks
-          }
-
-          const defaultPool = defaultId
-            ? pools.find(p => p.id === defaultId)
-            : null;
-          const activePool = activeId
-            ? pools.find(p => p.id === activeId)
-            : null;
-          const globalPool = pools.find(p => p.is_global);
-          const startPoolId =
-            defaultPool?.id ?? activePool?.id ?? globalPool?.id ?? pools[0].id;
-
-          setActivePoolId(startPoolId);
-
-          if (defaultId) {
-            useGlobalStore
-              .getState()
-              .loadDefaultPoolId(defaultEvent.competition);
-          }
-
-          const poolIds = pools.map(p => p.id);
-          await fetchSmackUnreadCounts(data.user.id, poolIds);
-        }
-
-        subscribeSmackUnread();
-        navigation.replace('Home');
+        await runPostAuthFlow({user: data.user, navigation});
       }
     }
   };
@@ -208,6 +151,7 @@ export function EmailEntryScreen({navigation}: any) {
             autoCapitalize="none"
             keyboardType="email-address"
             autoCorrect={false}
+            autoComplete="email"
             autoFocus
             editable={!loading}
             returnKeyType="next"
@@ -226,6 +170,7 @@ export function EmailEntryScreen({navigation}: any) {
             secureTextEntry
             autoCapitalize="none"
             autoCorrect={false}
+            autoComplete={mode === 'sign_up' ? 'password-new' : 'password'}
             editable={!loading}
             returnKeyType={mode === 'sign_up' ? 'next' : 'go'}
             onSubmitEditing={mode === 'sign_in' ? handleSubmit : undefined}
@@ -247,6 +192,7 @@ export function EmailEntryScreen({navigation}: any) {
               secureTextEntry
               autoCapitalize="none"
               autoCorrect={false}
+              autoComplete="password-new"
               editable={!loading}
               returnKeyType="go"
               onSubmitEditing={handleSubmit}
@@ -326,19 +272,19 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   content: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
+    paddingTop: spacing.md,
     paddingBottom: spacing.xxl,
   },
   title: {
     fontSize: 28,
     fontWeight: '700',
     color: colors.textPrimary,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
   },
   subtitle: {
     fontSize: 15,
     color: colors.textSecondary,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.md,
     lineHeight: 22,
   },
   input: {
@@ -392,7 +338,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   toggleButton: {
     alignItems: 'center',
-    marginTop: spacing.xl,
+    marginTop: spacing.sm,
   },
   toggleText: {
     fontSize: 14,

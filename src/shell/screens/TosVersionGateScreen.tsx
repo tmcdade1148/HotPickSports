@@ -13,12 +13,14 @@ import {useTheme} from '@shell/theme';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {supabase} from '@shared/config/supabase';
 
-export function TosVersionGateScreen({navigation}: any) {
+export function TosVersionGateScreen({navigation, route}: any) {
   const {colors} = useTheme();
   const styles = createStyles(colors);
   const [loading, setLoading] = useState(false);
   const user = useGlobalStore(s => s.user);
   const acceptTos = useGlobalStore(s => s.acceptTos);
+  const isNewUser = route?.params?.isNewUser ?? false;
+  const providerName = route?.params?.providerName ?? undefined;
 
   const handleAgree = async () => {
     if (!user) return;
@@ -26,7 +28,11 @@ export function TosVersionGateScreen({navigation}: any) {
     try {
       const success = await acceptTos(user.id);
       if (success) {
-        navigation.replace('Home');
+        if (isNewUser) {
+          navigation.replace('ProfileSetup', {providerName});
+        } else {
+          navigation.replace('Home');
+        }
       } else {
         Alert.alert('Error', 'Could not accept terms. Please try again.');
       }
@@ -46,12 +52,14 @@ export function TosVersionGateScreen({navigation}: any) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.heading}>We've updated our Terms</Text>
+        <Text style={styles.heading}>
+          {isNewUser ? 'Terms of Service' : "We've updated our Terms"}
+        </Text>
 
         <Text style={styles.body}>
-          We've made changes to our Terms of Service to better protect you and
-          clarify how HotPick Sports works. Please review and accept the updated
-          terms to continue.
+          {isNewUser
+            ? 'Before getting started, please review and accept our Terms of Service.'
+            : "We've made changes to our Terms of Service to better protect you and clarify how HotPick Sports works. Please review and accept the updated terms to continue."}
         </Text>
 
         <TouchableOpacity

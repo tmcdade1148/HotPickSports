@@ -474,6 +474,27 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
                 reason: 'inappropriate',
               },
             });
+
+            // Push notification to pool organizer
+            const {data: organizer} = await supabase
+              .from('pool_members')
+              .select('user_id')
+              .eq('pool_id', poolId)
+              .eq('role', 'organizer')
+              .limit(1)
+              .maybeSingle();
+
+            if (organizer?.user_id && organizer.user_id !== user.id) {
+              const flaggedMsg = messages.find(m => m.id === messageId);
+              await supabase.from('notification_queue').insert({
+                user_id: organizer.user_id,
+                notification_type: 'organizer_broadcast',
+                title: 'Message flagged in SmackTalk',
+                body: `${flaggedMsg?.author_name ?? 'A member'}'s message was flagged as inappropriate`,
+                data: {pool_id: poolId, message_id: messageId, escalate_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()},
+                pool_id: poolId,
+              });
+            }
           },
         },
       ],

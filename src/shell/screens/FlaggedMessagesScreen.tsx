@@ -235,7 +235,7 @@ export function FlaggedMessagesScreen() {
   };
 
   const renderItem = ({item}: {item: DbSmackMessage}) => {
-    const isPending = item.moderation_status === 'pending';
+    const isPending = item.moderation_status === 'pending' || item.moderation_status === 'escalated';
     const isApproved = item.moderation_status === 'approved';
     const isRemoved = item.moderation_status === 'removed';
     const isExpanded = expandedId === item.id;
@@ -361,7 +361,7 @@ export function FlaggedMessagesScreen() {
   };
 
   const pendingCount = flaggedMessages.filter(
-    m => m.moderation_status === 'pending',
+    m => m.moderation_status === 'pending' || m.moderation_status === 'escalated',
   ).length;
 
   return (
