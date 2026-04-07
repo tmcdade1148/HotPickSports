@@ -22,6 +22,11 @@ DerivedData
 *.xcuserstate
 **/.xcode.env.local
 
+# Firebase / Google Services config (client keys — safe but GitHub flags them)
+android/app/google-services.json
+ios/HotPickSports/GoogleService-Info.plist
+ios/GoogleService-Info.plist
+
 # Android/IntelliJ
 #
 build/
