@@ -1,5 +1,5 @@
 import React, {useEffect, useRef} from 'react';
-import {View, Image, StyleSheet, LogBox} from 'react-native';
+import {View, Image, Platform, StyleSheet, LogBox} from 'react-native';
 
 // Suppress red screen for Supabase auth retry errors on iOS simulator
 LogBox.ignoreLogs(['AuthRetryableFetchError', 'Network request failed']);
@@ -147,13 +147,20 @@ export function LoadingScreen({navigation}: any) {
     };
   }, [navigation, setUser, setAuthLoading]);
 
+  // On Android 12+, the mandatory splash already showed the logo.
+  // Just show the matching background color — no logo — to avoid the
+  // "small logo in circle → big logo" double-splash effect.
+  const showLogo = Platform.OS === 'ios' || (Platform.OS === 'android' && (Platform.Version ?? 0) < 31);
+
   return (
     <View style={styles.container}>
-      <Image
-        source={require('../../../assets/hotpick-logo.png')}
-        style={styles.logo}
-        resizeMode="contain"
-      />
+      {showLogo && (
+        <Image
+          source={require('../../../assets/hotpick-logo.png')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+      )}
     </View>
   );
 }
