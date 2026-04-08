@@ -1,5 +1,5 @@
 import React, {useEffect, useRef} from 'react';
-import {View, Image, Platform, StyleSheet, LogBox} from 'react-native';
+import {View, Image, StyleSheet, LogBox} from 'react-native';
 
 // Suppress red screen for Supabase auth retry errors on iOS simulator
 LogBox.ignoreLogs(['AuthRetryableFetchError', 'Network request failed']);
@@ -27,10 +27,9 @@ export function LoadingScreen({navigation}: any) {
   const didNavigate = useRef(false);
 
   useEffect(() => {
-    // Dismiss native splash immediately — on Android 12+ the mandatory
-    // splash already showed the logo, so no fade needed to avoid the
-    // "growing logo" effect. On iOS and older Android, fade is fine.
-    BootSplash.hide({fade: false}).catch(() => {});
+    // Dismiss native splash with fade — BootSplash handles the Android 12+
+    // mandatory splash transition internally via Theme.BootSplash v31.
+    BootSplash.hide({fade: true}).catch(() => {});
 
     // Populate available events from registry
     refreshAvailableEvents();
@@ -147,20 +146,13 @@ export function LoadingScreen({navigation}: any) {
     };
   }, [navigation, setUser, setAuthLoading]);
 
-  // On Android 12+, the mandatory splash already showed the logo.
-  // Just show the matching background color — no logo — to avoid the
-  // "small logo in circle → big logo" double-splash effect.
-  const showLogo = Platform.OS === 'ios' || (Platform.OS === 'android' && (Platform.Version ?? 0) < 31);
-
   return (
     <View style={styles.container}>
-      {showLogo && (
-        <Image
-          source={require('../../../assets/hotpick-logo.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-      )}
+      <Image
+        source={require('../../../assets/hotpick-logo.png')}
+        style={styles.logo}
+        resizeMode="contain"
+      />
     </View>
   );
 }
