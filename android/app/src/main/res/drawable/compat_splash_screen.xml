@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Override react-native-bootsplash's compat_splash_screen.xml
-     Library default: 288dp logo = "growing" effect vs native 160dp circle mask.
-     Our override: 160dp logo = matches Android 12+ native splash circle exactly. -->
+     Library default: 288dp = larger than native splash circle.
+     Our override: 240dp = matches native splash icon area exactly.
+     The circle (160dp/66.7%) is baked into the bootsplash_logo PNG. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android" android:opacity="opaque">
     <item android:gravity="fill">
         <color android:color="?attr/bootSplashBackground" />
@@ -9,6 +10,6 @@
     <item
         android:drawable="?bootSplashLogo"
         android:gravity="center"
-        android:width="160dp"
-        android:height="160dp" />
+        android:width="240dp"
+        android:height="240dp" />
 </layer-list>
