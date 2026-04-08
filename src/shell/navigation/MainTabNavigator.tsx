@@ -147,13 +147,17 @@ function SmackTalkTab() {
   const {colors} = useTheme();
   const activeSport = useGlobalStore(s => s.activeSport);
   const activePoolId = useGlobalStore(s => s.activePoolId);
-  if (!activeSport || !activePoolId) {
+  const userPools = useGlobalStore(s => s.userPools);
+  // Fall back to global pool if no active pool (user has no visible private pools)
+  const globalPool = userPools.find(p => p.is_global);
+  const smackPoolId = activePoolId || globalPool?.id || null;
+  if (!activeSport || !smackPoolId) {
     return <EmptyTabScreen label="SmackTalk" />;
   }
   return (
     <SafeAreaView style={{flex: 1, backgroundColor: colors.background}} edges={['top']}>
       <PoolSwitcherBar mode="pool" />
-      <SmackTalkScreen poolId={activePoolId} />
+      <SmackTalkScreen poolId={smackPoolId} />
     </SafeAreaView>
   );
 }

@@ -50,7 +50,10 @@ export function SettingsScreen({route}: any) {
 
   const user = useGlobalStore(s => s.user);
   const userProfile = useGlobalStore(s => s.userProfile);
-  const userPools = useGlobalStore(s => s.visiblePools);
+  const visiblePools = useGlobalStore(s => s.visiblePools);
+  const allPools = useGlobalStore(s => s.userPools);
+  // Show global pool in settings when user has no visible private pools
+  const userPools = visiblePools.length > 0 ? visiblePools : allPools;
   const poolRoles = useGlobalStore(s => s.poolRoles);
   const activePoolId = useGlobalStore(s => s.activePoolId);
   const rawDefaultPoolId = useGlobalStore(s => s.defaultPoolId);

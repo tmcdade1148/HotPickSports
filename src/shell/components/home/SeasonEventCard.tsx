@@ -358,7 +358,7 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
         </View>
 
         {/* Kickoff pill */}
-        {(kickoff.timeLeft || weekState === 'settling' || weekState === 'complete') && (
+        {(kickoff.timeLeft || weekState === 'settling' || weekState === 'complete' || currentPhase === 'PRE_SEASON') && (
           <View style={styles.kickoffPill}>
             <View style={{flex: 1}}>
               {currentPhase === 'PRE_SEASON' ? (
