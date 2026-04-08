@@ -69,7 +69,6 @@ export function SettingsScreen({route}: any) {
     ?? userPools.find(p => !!(p.brand_config as any)?.is_branded)?.id
     ?? userPools[0]?.id
     ?? null;
-  const activeSport = useGlobalStore(s => s.activeSport);
   const joinPool = useGlobalStore(s => s.joinPool);
   const signOut = useGlobalStore(s => s.signOut);
   const flaggedCounts = useGlobalStore(s => s.flaggedCounts);
