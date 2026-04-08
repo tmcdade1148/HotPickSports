@@ -54,7 +54,10 @@ export function CreatePoolScreen({navigation}: any) {
     setCreating(false);
 
     if (result.pool) {
-      navigation.goBack();
+      // Delay navigation to let the store update + HomeScreen re-render settle.
+      // Without this, the JoinPoolModule unmount collides with the navigation
+      // transition in Fabric's ShadowView diffing, causing a SIGSEGV.
+      setTimeout(() => navigation.goBack(), 100);
     } else if (result.upgradeRequired) {
       setError(
         'You have reached the maximum number of pools for your plan. Upgrade to create more pools.',

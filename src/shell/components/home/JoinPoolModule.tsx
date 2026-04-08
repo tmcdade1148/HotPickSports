@@ -69,9 +69,10 @@ export function JoinPoolModule() {
 
     if (result.pool) {
       setCode('');
-      setActivePoolId(result.pool.id);
       setSuccessName(result.pool.name);
-      // Module will self-hide because hasPrivatePool becomes true
+      // Delay pool activation slightly so the success state renders
+      // before this module unmounts (prevents Fabric ShadowView crash)
+      setTimeout(() => setActivePoolId(result.pool!.id), 150);
     } else if (result.poolFull) {
       setError("This pool is full. Let your organizer know — they may be able to upgrade.");
     } else {
