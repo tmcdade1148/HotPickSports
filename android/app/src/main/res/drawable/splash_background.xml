@@ -3,9 +3,9 @@
     <item android:gravity="fill">
         <color android:color="@color/bootsplash_background" />
     </item>
-    <item
-        android:drawable="@drawable/bootsplash_logo"
-        android:gravity="center"
-        android:width="200dp"
-        android:height="200dp" />
+    <item android:gravity="fill">
+        <bitmap
+            android:src="@drawable/splash_fullscreen"
+            android:gravity="fill" />
+    </item>
 </layer-list>

@@ -1,8 +1,7 @@
 <resources>
-    <!-- Android 12+: Skip BootSplash's Theme. Use our own splash_background
-         drawable as windowBackground so the HotPick logo is visible from the
-         moment the mandatory splash ends until React Native renders LoadingScreen.
-         No black gap possible — the window background IS the splash. -->
+    <!-- Android 12+: Skip BootSplash theme. Use fullscreen splash image as
+         window background so the HotPick branding covers everything from
+         the moment the mandatory splash ends until React renders. -->
     <style name="BootTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="android:windowBackground">@drawable/splash_background</item>
         <item name="android:windowSplashScreenBackground">@color/bootsplash_background</item>
