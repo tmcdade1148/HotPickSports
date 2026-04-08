@@ -42,6 +42,7 @@ import {spacing, borderRadius} from '@shared/theme';
 import {useColorScheme} from 'react-native';
 import type {BrandConfig} from '@shell/theme/types';
 import {HOTPICK_DEFAULTS, SEMANTIC_COLORS, SEMANTIC_COLORS_DARK, deriveDarkColors, isLightColor} from '@shell/theme/defaults';
+import {nflSeason, nflSeasonSim} from '@sports/nfl/config';
 
 
 export function SettingsScreen({route}: any) {
@@ -56,6 +57,8 @@ export function SettingsScreen({route}: any) {
   const userPools = visiblePools.length > 0 ? visiblePools : allPools;
   const poolRoles = useGlobalStore(s => s.poolRoles);
   const activePoolId = useGlobalStore(s => s.activePoolId);
+  const activeSport = useGlobalStore(s => s.activeSport);
+  const setActiveSport = useGlobalStore(s => s.setActiveSport);
   const rawDefaultPoolId = useGlobalStore(s => s.defaultPoolId);
   const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
   const setDefaultPoolId = useGlobalStore(s => s.setDefaultPoolId);
@@ -553,6 +556,35 @@ export function SettingsScreen({route}: any) {
               <View style={styles.linkLeft}>
                 <Award size={20} color={colors.primary} />
                 <Text style={[styles.linkText, {color: colors.textPrimary}]}>Hardware Admin</Text>
+              </View>
+              <ChevronRight size={18} color={colors.textSecondary} />
+            </TouchableOpacity>
+            <View style={[styles.groupDivider, {backgroundColor: colors.border}]} />
+            <TouchableOpacity
+              style={styles.groupRow}
+              onPress={() => {
+                const isSim = activeSport?.competition === 'nfl_2025_sim';
+                const target = isSim ? nflSeason : nflSeasonSim;
+                Alert.alert(
+                  'Switch Competition',
+                  `Switch to ${target.name}?\n\nCurrent: ${activeSport?.name ?? 'none'}`,
+                  [
+                    {text: 'Cancel', style: 'cancel'},
+                    {
+                      text: `Switch to ${target.shortName}`,
+                      onPress: () => {
+                        setActiveSport(target);
+                        Alert.alert('Switched', `Now using ${target.name}. Restart the app for a clean state.`);
+                      },
+                    },
+                  ],
+                );
+              }}>
+              <View style={styles.linkLeft}>
+                <Settings size={20} color={colors.primary} />
+                <Text style={[styles.linkText, {color: colors.textPrimary}]}>
+                  Competition: {activeSport?.competition === 'nfl_2025_sim' ? 'SIM' : 'NFL 2026'}
+                </Text>
               </View>
               <ChevronRight size={18} color={colors.textSecondary} />
             </TouchableOpacity>

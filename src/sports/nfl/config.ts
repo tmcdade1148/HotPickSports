@@ -1,5 +1,9 @@
 import type {SeasonConfig} from '@shared/types/templates';
 
+/**
+ * Production NFL config — nfl_2026.
+ * This is the default for all users including TestFlight.
+ */
 export const nflSeason: SeasonConfig = {
   competition: 'nfl_2026',
   templateType: 'season',
@@ -83,4 +87,16 @@ export const nflSeason: SeasonConfig = {
     {code: 'SF', name: 'San Francisco 49ers', shortName: '49ers'},
     {code: 'SEA', name: 'Seattle Seahawks', shortName: 'Seahawks'},
   ],
+};
+
+/**
+ * Simulator NFL config — nfl_2025_sim.
+ * Used for development/testing via the season simulator.
+ * Accessible via Settings > Admin > Competition Switcher (super_admin only).
+ */
+export const nflSeasonSim: SeasonConfig = {
+  ...nflSeason,
+  competition: 'nfl_2025_sim',
+  name: 'NFL 2025 SIM',
+  shortName: 'NFL SIM',
 };
