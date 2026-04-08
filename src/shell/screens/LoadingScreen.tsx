@@ -27,10 +27,6 @@ export function LoadingScreen({navigation}: any) {
   const didNavigate = useRef(false);
 
   useEffect(() => {
-    // Dismiss native splash. On Android 12+, BootSplash is skipped
-    // so this is a no-op. On iOS/older Android, fade out BootSplash.
-    BootSplash.hide({fade: true}).catch(() => {});
-
     // Populate available events from registry
     refreshAvailableEvents();
 
@@ -41,6 +37,7 @@ export function LoadingScreen({navigation}: any) {
       if (!didNavigate.current) {
         didNavigate.current = true;
         setAuthLoading(false);
+        BootSplash.hide({fade: true}).catch(() => {});
         navigation.replace('Welcome');
       }
     }, 5000);
@@ -54,6 +51,7 @@ export function LoadingScreen({navigation}: any) {
         setAuthLoading(false);
 
         if (!session) {
+          BootSplash.hide({fade: true}).catch(() => {});
           navigation.replace('Welcome');
           return;
         }
@@ -72,11 +70,13 @@ export function LoadingScreen({navigation}: any) {
 
         // Bail checks (same logic, using already-fetched values)
         if (!profile || !profile.first_name) {
+          BootSplash.hide({fade: true}).catch(() => {});
           navigation.replace('ProfileSetup');
           return;
         }
 
         if (currentTosVersion && useGlobalStore.getState().needsTosUpdate(currentTosVersion)) {
+          BootSplash.hide({fade: true}).catch(() => {});
           navigation.replace('TosVersionGate');
           return;
         }
@@ -124,6 +124,7 @@ export function LoadingScreen({navigation}: any) {
         }
 
         subscribeSmackUnread();
+        BootSplash.hide({fade: true}).catch(() => {});
         navigation.replace('Home');
       })
       .catch(() => {
@@ -131,6 +132,7 @@ export function LoadingScreen({navigation}: any) {
         didNavigate.current = true;
         clearTimeout(timeout);
         setAuthLoading(false);
+        BootSplash.hide({fade: true}).catch(() => {});
         navigation.replace('Welcome');
       });
 
