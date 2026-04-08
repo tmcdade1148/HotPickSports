@@ -1,5 +1,6 @@
 package com.hotpicksports
 
+import android.os.Build
 import android.os.Bundle
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
@@ -25,7 +26,9 @@ class MainActivity : ReactActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     supportFragmentManager.fragmentFactory = RNScreensFragmentFactory()
-    RNBootSplash.init(this, R.style.BootTheme)
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+      RNBootSplash.init(this, R.style.BootTheme)
+    }
     super.onCreate(savedInstanceState)
   }
 }

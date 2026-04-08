@@ -1,0 +1,11 @@
+<resources>
+    <!-- Android 12+: Override BootTheme to use AppTheme as parent instead of
+         Theme.BootSplash. This prevents the BootSplash library's v31 parent
+         from setting windowSplashScreenAnimatedIcon to bootSplashLogo.
+         The mandatory splash will use the app's launcher icon by default,
+         and we control it with windowSplashScreenBackground only. -->
+    <style name="BootTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/bootsplash_background</item>
+        <item name="android:windowSplashScreenBackground">@color/bootsplash_background</item>
+    </style>
+</resources>
