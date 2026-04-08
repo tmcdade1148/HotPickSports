@@ -1,5 +1,5 @@
 import React, {useEffect, useRef} from 'react';
-import {View, Image, Platform, StyleSheet, LogBox} from 'react-native';
+import {View, Image, StyleSheet, LogBox} from 'react-native';
 
 // Suppress red screen for Supabase auth retry errors on iOS simulator
 LogBox.ignoreLogs(['AuthRetryableFetchError', 'Network request failed']);
@@ -27,10 +27,9 @@ export function LoadingScreen({navigation}: any) {
   const didNavigate = useRef(false);
 
   useEffect(() => {
-    // On Android 12+, BootSplash is skipped — just dismiss immediately.
-    // On iOS and older Android, fade out BootSplash normally.
-    const isAndroid12Plus = Platform.OS === 'android' && (Platform.Version ?? 0) >= 31;
-    BootSplash.hide({fade: !isAndroid12Plus}).catch(() => {});
+    // Dismiss native splash. On Android 12+, BootSplash is skipped
+    // so this is a no-op. On iOS/older Android, fade out BootSplash.
+    BootSplash.hide({fade: true}).catch(() => {});
 
     // Populate available events from registry
     refreshAvailableEvents();
@@ -147,17 +146,13 @@ export function LoadingScreen({navigation}: any) {
     };
   }, [navigation, setUser, setAuthLoading]);
 
-  const showLogo = !(Platform.OS === 'android' && (Platform.Version ?? 0) >= 31);
-
   return (
     <View style={styles.container}>
-      {showLogo && (
-        <Image
-          source={require('../../../assets/hotpick-logo.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-      )}
+      <Image
+        source={require('../../../assets/hotpick-logo.png')}
+        style={styles.logo}
+        resizeMode="contain"
+      />
     </View>
   );
 }
