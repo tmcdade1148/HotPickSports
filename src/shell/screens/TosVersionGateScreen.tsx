@@ -62,11 +62,19 @@ export function TosVersionGateScreen({navigation, route}: any) {
             : "We've made changes to our Terms of Service to better protect you and clarify how HotPick Sports works. Please review and accept the updated terms to continue."}
         </Text>
 
-        <TouchableOpacity
-          onPress={() => navigation.navigate('TermsOfService')}
-          activeOpacity={0.7}>
-          <Text style={styles.reviewLink}>Review full Terms of Service</Text>
-        </TouchableOpacity>
+        <View style={styles.linksRow}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('TermsOfService')}
+            activeOpacity={0.7}>
+            <Text style={styles.reviewLink}>Terms of Service</Text>
+          </TouchableOpacity>
+          <Text style={styles.linkSeparator}>  ·  </Text>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('PrivacyPolicy')}
+            activeOpacity={0.7}>
+            <Text style={styles.reviewLink}>Privacy Policy</Text>
+          </TouchableOpacity>
+        </View>
 
         <TouchableOpacity
           style={styles.agreeButton}
@@ -76,7 +84,9 @@ export function TosVersionGateScreen({navigation, route}: any) {
           {loading ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <Text style={styles.agreeButtonText}>I Agree</Text>
+            <Text style={styles.agreeButtonText}>
+              I am 18 or older and I agree to the{'\n'}Terms of Service and Privacy Policy
+            </Text>
           )}
         </TouchableOpacity>
 
@@ -115,11 +125,19 @@ const createStyles = (colors: any) =>
       marginBottom: spacing.lg,
       paddingHorizontal: spacing.sm,
     },
+    linksRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: spacing.xl,
+    },
     reviewLink: {
       fontSize: 14,
       color: colors.primary,
       textDecorationLine: 'underline',
-      marginBottom: spacing.xxl,
+    },
+    linkSeparator: {
+      fontSize: 14,
+      color: colors.textSecondary,
     },
     agreeButton: {
       width: '100%',
@@ -132,9 +150,11 @@ const createStyles = (colors: any) =>
       marginBottom: spacing.lg,
     },
     agreeButtonText: {
-      fontSize: 16,
+      fontSize: 14,
       fontWeight: '600',
       color: '#FFFFFF',
+      textAlign: 'center',
+      lineHeight: 20,
     },
     logOutLink: {
       fontSize: 13,

@@ -47,7 +47,7 @@ export function TermsOfServiceScreen({navigation}: any) {
         {/* Title block */}
         <H1 s={s}>HotPick Sports</H1>
         <H1 s={s}>Terms of Service</H1>
-        <P s={s}>Effective Date: March 19, 2026</P>
+        <P s={s}>Effective Date: March 15, 2026</P>
         <P s={s}>Version 1.0</P>
         <P s={s}>Last Updated: March 19, 2026</P>
 
@@ -559,7 +559,7 @@ export function TermsOfServiceScreen({navigation}: any) {
         {/* Footer */}
         <View style={s.footer}>
           <Text style={s.footerText}>
-            HotPick Sports Terms of Service — Version 1.0 — Effective March 19, 2026
+            HotPick Sports Terms of Service — Version 1.0 — Effective March 15, 2026
           </Text>
           <Text style={s.footerText}>
             Copyright 2026 HotPick Sports, Inc. All rights reserved.
