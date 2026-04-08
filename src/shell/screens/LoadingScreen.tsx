@@ -27,8 +27,10 @@ export function LoadingScreen({navigation}: any) {
   const didNavigate = useRef(false);
 
   useEffect(() => {
-    // Dismiss native splash — LoadingScreen has matching background
-    BootSplash.hide({fade: true}).catch(() => {});
+    // Dismiss native splash immediately — on Android 12+ the mandatory
+    // splash already showed the logo, so no fade needed to avoid the
+    // "growing logo" effect. On iOS and older Android, fade is fine.
+    BootSplash.hide({fade: false}).catch(() => {});
 
     // Populate available events from registry
     refreshAvailableEvents();
