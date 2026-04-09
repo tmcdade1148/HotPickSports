@@ -62,6 +62,10 @@ export function WelcomeScreen({navigation}: any) {
     navigation.navigate('EmailEntry');
   };
 
+  const handleSignUp = () => {
+    navigation.navigate('EmailEntry', {initialMode: 'sign_up'});
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
@@ -116,6 +120,13 @@ export function WelcomeScreen({navigation}: any) {
               Continue with Email
             </Text>
           </TouchableOpacity>
+
+          <Text style={styles.signupPrompt}>
+            Don't have an account?{' '}
+            <Text style={styles.signupLink} onPress={handleSignUp}>
+              Sign up.
+            </Text>
+          </Text>
         </View>
 
         {/* Implied consent */}
@@ -200,6 +211,17 @@ const createStyles = (colors: any) => StyleSheet.create({
   authButtonText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  signupPrompt: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+  },
+  signupLink: {
+    color: colors.primary,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
   consentText: {
     fontSize: 12,

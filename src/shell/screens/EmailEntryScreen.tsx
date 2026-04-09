@@ -24,9 +24,10 @@ const MIN_PASSWORD_LENGTH = 8;
 
 type Mode = 'sign_in' | 'sign_up';
 
-export function EmailEntryScreen({navigation}: any) {
+export function EmailEntryScreen({navigation, route}: any) {
   const {colors} = useTheme();
   const styles = createStyles(colors);
+  const initialMode: Mode = route?.params?.initialMode === 'sign_up' ? 'sign_up' : 'sign_in';
 
   const setUser = useGlobalStore(s => s.setUser);
   const setActiveSport = useGlobalStore(s => s.setActiveSport);
@@ -38,7 +39,7 @@ export function EmailEntryScreen({navigation}: any) {
   const fetchSmackUnreadCounts = useGlobalStore(s => s.fetchSmackUnreadCounts);
   const subscribeSmackUnread = useGlobalStore(s => s.subscribeSmackUnread);
 
-  const [mode, setMode] = useState<Mode>('sign_in');
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -238,13 +239,12 @@ export function EmailEntryScreen({navigation}: any) {
             </TouchableOpacity>
           )}
 
-          <TouchableOpacity style={styles.toggleButton} onPress={toggleMode}>
-            <Text style={styles.toggleText}>
-              {mode === 'sign_in'
-                ? "Don't have an account? Sign up"
-                : 'Already have an account? Sign in'}
+          <Text style={styles.togglePrompt}>
+            {mode === 'sign_in' ? "Don't have an account? " : 'Already have an account? '}
+            <Text style={styles.toggleLink} onPress={toggleMode}>
+              {mode === 'sign_in' ? 'Sign up.' : 'Sign in.'}
             </Text>
-          </TouchableOpacity>
+          </Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -336,12 +336,15 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 14,
     color: colors.primary,
   },
-  toggleButton: {
-    alignItems: 'center',
-    marginTop: spacing.sm,
-  },
-  toggleText: {
+  togglePrompt: {
     fontSize: 14,
     color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: spacing.md,
+  },
+  toggleLink: {
+    color: colors.primary,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
 });

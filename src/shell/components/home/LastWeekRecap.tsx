@@ -83,7 +83,6 @@ export function LastWeekRecap({teams}: LastWeekRecapProps) {
   const pointsColor = data.weekPoints >= 0 ? '#1b9a06' : colors.error;
   const pointsStr = `${data.weekPoints >= 0 ? '+' : ''}${data.weekPoints}`;
 
-  // Contextual observation — references team name for personality
   const teamName = data.hotPickTeamName ?? 'HotPick';
   const observation = (() => {
     const winRate = data.totalPicks > 0 ? data.correctPicks / data.totalPicks : 0;

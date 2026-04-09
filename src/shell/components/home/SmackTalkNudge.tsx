@@ -1,6 +1,6 @@
 import React, {useEffect, useState} from 'react';
 import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
-import {MessageCircle, ChevronRight} from 'lucide-react-native';
+import {ChevronRight} from 'lucide-react-native';
 import {spacing, borderRadius, typography} from '@shared/theme';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {useTheme} from '@shell/theme';
@@ -11,6 +11,29 @@ interface SmackTalkNudgeProps {
   onPress: () => void;
   /** Called when user taps a specific nudge row — switches pool + navigates to SmackTalk */
   onPressPool: (poolId: string) => void;
+}
+
+interface RecentMsg {
+  id: string;
+  poolId: string;
+  author: string;
+  text: string;
+  time: string;
+  isReply: boolean;
+}
+
+interface PoolGroup {
+  poolId: string;
+  poolName: string;
+  msgs: RecentMsg[];
+}
+
+function formatRelativeTime(createdAt: string, now: number): string {
+  const diffMin = Math.floor((now - new Date(createdAt).getTime()) / 60000);
+  if (diffMin < 1) return 'Just now';
+  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffMin < 1440) return `${Math.floor(diffMin / 60)}h ago`;
+  return 'Yesterday';
 }
 
 /**
@@ -29,25 +52,14 @@ export function SmackTalkNudge({onPress, onPressPool}: SmackTalkNudgeProps) {
   const styles = createStyles(colors);
   const smackUnreadCounts = useGlobalStore(s => s.smackUnreadCounts);
   const userPools = useGlobalStore(s => s.visiblePools);
-  const activePoolId = useGlobalStore(s => s.activePoolId);
-
-  const activePool = userPools.find(p => p.id === activePoolId);
-  const isBranded = !!(activePool?.brand_config as any)?.is_branded;
-  const glowColor = isBranded
-    ? (activePool?.brand_config as any)?.secondary_color || '#0E6666'
-    : '#0E6666';
-
-  // Fetch unseen messages from ALL visible pools
   const userId = useGlobalStore(s => s.user?.id);
-  interface RecentMsg { id: string; poolId: string; author: string; text: string; time: string; isReply: boolean; }
-  interface PoolGroup { poolId: string; poolName: string; msgs: RecentMsg[]; }
+
   const [poolGroups, setPoolGroups] = useState<PoolGroup[]>([]);
   const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     if (!userId || userPools.length === 0) return;
 
-    // Only fetch for pools with unreads
     const poolsWithUnreads = userPools.filter(p => (smackUnreadCounts[p.id] ?? 0) > 0);
     if (poolsWithUnreads.length === 0) {
       setPoolGroups([]);
@@ -56,65 +68,56 @@ export function SmackTalkNudge({onPress, onPressPool}: SmackTalkNudgeProps) {
     }
 
     const fetchAllUnseen = async () => {
-      // Get read states for all pools at once
       const poolIds = poolsWithUnreads.map(p => p.id);
-      const {data: readStates} = await supabase
-        .from('smack_read_state')
-        .select('pool_id, last_read_at')
-        .eq('user_id', userId)
-        .in('pool_id', poolIds);
+
+      // Batch: one query for all read states, one for all messages
+      const [{data: readStates}, {data: allMessages}] = await Promise.all([
+        supabase
+          .from('smack_read_state')
+          .select('pool_id, last_read_at')
+          .eq('user_id', userId)
+          .in('pool_id', poolIds),
+        supabase
+          .from('smack_messages')
+          .select('id, pool_id, author_name, text, created_at, user_id, message_type, reply_to')
+          .in('pool_id', poolIds)
+          .or(`user_id.is.null,user_id.neq.${userId}`)
+          .order('created_at', {ascending: false})
+          .limit(poolIds.length * 10),
+      ]);
+
       const readMap: Record<string, string> = {};
       for (const rs of readStates ?? []) {
         readMap[rs.pool_id] = rs.last_read_at;
       }
 
-      // Fetch unseen messages per pool
-      const groups: PoolGroup[] = [];
+      // Group messages by pool and filter by last_read_at
       const now = Date.now();
-
-      for (const pool of poolsWithUnreads) {
-        let query = supabase
-          .from('smack_messages')
-          .select('id, author_name, text, created_at, user_id, message_type, reply_to')
-          .eq('pool_id', pool.id)
-          .or(`user_id.is.null,user_id.neq.${userId}`)
-          .order('created_at', {ascending: false})
-          .limit(10);
-
-        if (readMap[pool.id]) {
-          query = query.gt('created_at', readMap[pool.id]);
-        }
-
-        const {data} = await query;
-        if (data && data.length > 0) {
-          const msgs: RecentMsg[] = data.map((d: any) => {
-            const msgTime = new Date(d.created_at).getTime();
-            const diffMin = Math.floor((now - msgTime) / 60000);
-            const time = diffMin < 1 ? 'Just now' : diffMin < 60 ? `${diffMin}m ago` : diffMin < 1440 ? `${Math.floor(diffMin / 60)}h ago` : 'Yesterday';
-            return {
-              id: d.id,
-              poolId: pool.id,
-              author: d.user_id === null ? 'HotPick' : d.author_name,
-              text: d.text,
-              time,
-              isReply: !!d.reply_to,
-            };
-          });
-          groups.push({poolId: pool.id, poolName: pool.name, msgs});
-        }
+      const byPool: Record<string, RecentMsg[]> = {};
+      for (const d of (allMessages ?? []) as any[]) {
+        const lastRead = readMap[d.pool_id];
+        if (lastRead && new Date(d.created_at) <= new Date(lastRead)) continue;
+        (byPool[d.pool_id] ??= []).push({
+          id: d.id,
+          poolId: d.pool_id,
+          author: d.user_id === null ? 'HotPick' : d.author_name,
+          text: d.text,
+          time: formatRelativeTime(d.created_at, now),
+          isReply: !!d.reply_to,
+        });
       }
+
+      const groups: PoolGroup[] = poolsWithUnreads
+        .filter(p => byPool[p.id]?.length)
+        .map(p => ({poolId: p.id, poolName: p.name, msgs: byPool[p.id]}));
 
       setPoolGroups(groups);
     };
     fetchAllUnseen();
     setShowAll(false);
-  }, [userId, smackUnreadCounts]);
+  }, [userId, smackUnreadCounts, userPools]);
 
-  const totalMsgs = poolGroups.reduce((sum, g) => sum + g.msgs.length, 0);
-
-  // Build a flat list of all messages across pools for the 4-message cap
   const allMsgs = poolGroups.flatMap(g => g.msgs);
-  const visibleCount = showAll ? allMsgs.length : Math.min(allMsgs.length, 4);
   const hiddenCount = allMsgs.length - 4;
 
   return (
@@ -123,7 +126,6 @@ export function SmackTalkNudge({onPress, onPressPool}: SmackTalkNudgeProps) {
       activeOpacity={0.7}
       onPress={onPress}
       disabled={poolGroups.length > 0}>
-      {/* Header row — always visible */}
       <View style={styles.headerRow}>
         <View style={styles.headerContent}>
           <Text style={styles.labelText}>New SmackTalk Messages</Text>
@@ -136,13 +138,11 @@ export function SmackTalkNudge({onPress, onPressPool}: SmackTalkNudgeProps) {
         )}
       </View>
 
-      {/* Grouped messages from all pools */}
       {poolGroups.length > 0 && (
-        <View style={{marginTop: spacing.xs}}>
-          {poolGroups.map(group => {
-            // How many of this pool's messages are within the visible window
+        <View style={styles.groupsContainer}>
+          {poolGroups.map((group, idx) => {
             const beforeThis = poolGroups
-              .slice(0, poolGroups.indexOf(group))
+              .slice(0, idx)
               .reduce((sum, g) => sum + g.msgs.length, 0);
             const remainingSlots = showAll ? group.msgs.length : Math.max(0, 4 - beforeThis);
             const visibleMsgs = group.msgs.slice(0, remainingSlots);
@@ -169,20 +169,18 @@ export function SmackTalkNudge({onPress, onPressPool}: SmackTalkNudgeProps) {
           })}
           {hiddenCount > 0 && !showAll && (
             <TouchableOpacity
-              style={{paddingTop: spacing.xs}}
+              style={styles.showMoreRow}
               onPress={() => setShowAll(true)}>
-              <Text style={{fontSize: 12, fontWeight: '600', color: colors.primary}}>
+              <Text style={styles.showMoreText}>
                 ▸ {hiddenCount} more message{hiddenCount !== 1 ? 's' : ''}
               </Text>
             </TouchableOpacity>
           )}
           {showAll && hiddenCount > 0 && (
             <TouchableOpacity
-              style={{paddingTop: spacing.xs}}
+              style={styles.showMoreRow}
               onPress={() => setShowAll(false)}>
-              <Text style={{fontSize: 12, fontWeight: '600', color: colors.primary}}>
-                ▾ Show less
-              </Text>
+              <Text style={styles.showMoreText}>▾ Show less</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -218,24 +216,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
-  nudgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-    gap: spacing.sm,
+  groupsContainer: {
     marginTop: spacing.xs,
-  },
-  nudgeText: {
-    ...typography.caption,
-    color: colors.textPrimary,
-    flex: 1,
-  },
-  count: {
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  poolName: {
-    fontWeight: '600',
   },
   poolLabel: {
     fontSize: 11,
@@ -264,5 +246,13 @@ const createStyles = (colors: any) => StyleSheet.create({
     ...typography.small,
     color: colors.textSecondary,
     fontSize: 10,
+  },
+  showMoreRow: {
+    paddingTop: spacing.xs,
+  },
+  showMoreText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.primary,
   },
 });

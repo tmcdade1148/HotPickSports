@@ -160,10 +160,5 @@ export function LoadingScreen({navigation}: any) {
     };
   }, [navigation, setUser, setAuthLoading]);
 
-  // CRITICAL: Return null, NOT a React view.
-  // Returning any component (even a matching background View) causes the
-  // "double splash" / "growing logo" effect on Android 12+. Returning null
-  // keeps the native BootSplash visible until BootSplash.hide() is called
-  // just before navigation, which provides a clean fade to the destination.
   return null;
 }
