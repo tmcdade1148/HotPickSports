@@ -1,5 +1,5 @@
 import React, {useEffect, useRef} from 'react';
-import {View, Image, StyleSheet, LogBox} from 'react-native';
+import {LogBox} from 'react-native';
 
 // Suppress red screen for Supabase auth retry errors on iOS simulator
 LogBox.ignoreLogs(['AuthRetryableFetchError', 'Network request failed']);
@@ -9,6 +9,18 @@ import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {getDefaultEvent} from '@sports/registry';
 
+/**
+ * LoadingScreen — bootstraps auth session and navigates to the first real screen.
+ *
+ * CRITICAL: This component returns `null` while bootstrapping. Returning any
+ * React view (even a matching background View) causes a "double splash" effect
+ * on Android 12+ where the native splash briefly overlaps with a React-rendered
+ * layer. Returning `null` keeps the native BootSplash visible until BootSplash.hide()
+ * fires right before navigation, which then fades cleanly to the destination screen.
+ *
+ * The native splash stays visible from the moment the user taps the icon, through
+ * auth bootstrap, until BootSplash.hide() is called just before navigation.replace().
+ */
 export function LoadingScreen({navigation}: any) {
   const setUser = useGlobalStore(s => s.setUser);
   const setAuthLoading = useGlobalStore(s => s.setAuthLoading);
@@ -148,28 +160,10 @@ export function LoadingScreen({navigation}: any) {
     };
   }, [navigation, setUser, setAuthLoading]);
 
-  return (
-    <View style={styles.container}>
-      <Image
-        source={require('../../../assets/hotpick-logo.png')}
-        style={styles.logo}
-        resizeMode="contain"
-      />
-    </View>
-  );
+  // CRITICAL: Return null, NOT a React view.
+  // Returning any component (even a matching background View) causes the
+  // "double splash" / "growing logo" effect on Android 12+. Returning null
+  // keeps the native BootSplash visible until BootSplash.hide() is called
+  // just before navigation, which provides a clean fade to the destination.
+  return null;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    paddingTop: '30%',
-    // ✅ PERMITTED EXCEPTION — matches native splash exactly.
-    // See CLAUDE.md Section 16 — Splash Screen Color Exception.
-    backgroundColor: '#181818',
-  },
-  logo: {
-    width: 240,
-    height: 240,
-  },
-});
