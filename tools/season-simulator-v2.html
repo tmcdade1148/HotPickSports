@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HotPick — Season Simulator v2</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0D1117; color: #8A97AA; font-size: 14px; line-height: 1.4; }
+  h1 { color: #F5C842; font-size: 18px; font-weight: 700; letter-spacing: 0.5px; }
+  h2 { color: #F5620F; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; padding: 12px 16px 0; }
+
+  .header { background: #161C26; border-bottom: 1px solid #2C3A52; padding: 12px 20px; display: flex; align-items: center; gap: 16px; }
+  .badge { background: #F5620F; color: #fff; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: 0.5px; }
+  .badge-v2 { background: #51A1A6; color: #0D1117; }
+
+  .layout { display: grid; grid-template-columns: 340px 1fr; gap: 0; height: calc(100vh - 53px); overflow: hidden; }
+  .sidebar { background: #161C26; border-right: 1px solid #2C3A52; display: flex; flex-direction: column; overflow-y: auto; }
+  .sidebar-section { padding: 12px 16px; border-bottom: 1px solid #2C3A52; }
+  .main { display: flex; flex-direction: column; overflow: hidden; }
+
+  label { display: block; font-size: 10px; color: #8A97AA; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  input[type="password"], input[type="text"], input[type="number"], select {
+    width: 100%; background: #0D1117; border: 1px solid #2C3A52; color: #E8EAF0;
+    padding: 8px 10px; border-radius: 6px; font-size: 13px; outline: none; font-family: inherit;
+  }
+  input:focus, select:focus { border-color: #F5620F; }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: opacity 0.15s; }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-primary { background: #F5620F; color: #fff; }
+  .btn-secondary { background: #2C3A52; color: #E8EAF0; }
+  .btn-warning { background: #F5C842; color: #0D1117; }
+  .btn-danger { background: #C0392B; color: #fff; }
+  .btn-success { background: #1b9a06; color: #fff; }
+  .btn-full { width: 100%; }
+  .btn-row { display: flex; gap: 6px; margin-top: 6px; }
+  .btn:not(:disabled):hover { opacity: 0.85; }
+
+  /* State mini-panel */
+  .state-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .state-cell { padding: 6px 8px; background: #0D1117; border: 1px solid #2C3A52; border-radius: 4px; }
+  .state-label { font-size: 9px; color: #8A97AA; text-transform: uppercase; letter-spacing: 0.5px; }
+  .state-value { font-size: 13px; font-weight: 700; color: #E8EAF0; }
+  .state-value.ok { color: #1b9a06; }
+  .state-value.warn { color: #F5C842; }
+  .state-value.err { color: #C0392B; }
+  .state-value.dim { color: #8A97AA; font-weight: 400; }
+
+  /* Checkpoint timeline */
+  .checkpoints { padding: 0 0 12px; }
+  .checkpoint { display: flex; align-items: flex-start; gap: 8px; padding: 8px 12px; border-left: 3px solid transparent; transition: background 0.1s; cursor: pointer; }
+  .checkpoint:hover:not(.disabled) { background: #0D1117; }
+  .checkpoint.disabled { opacity: 0.4; cursor: not-allowed; }
+  .checkpoint.done { border-left-color: #1b9a06; }
+  .checkpoint.current { background: #F5620F15; border-left-color: #F5620F; }
+  .checkpoint.pending { border-left-color: transparent; }
+  .cp-icon { font-size: 14px; line-height: 1.3; flex-shrink: 0; width: 18px; text-align: center; }
+  .cp-num { font-size: 10px; color: #8A97AA; font-variant-numeric: tabular-nums; width: 20px; flex-shrink: 0; margin-top: 2px; font-weight: 700; }
+  .cp-label { font-size: 13px; color: #8A97AA; flex: 1; }
+  .checkpoint.done .cp-label { color: #1b9a06; }
+  .checkpoint.current .cp-label { color: #F5620F; font-weight: 600; }
+  .cp-phase-divider { font-size: 9px; color: #F5C842; text-transform: uppercase; letter-spacing: 1px; padding: 8px 16px 4px; background: #F5C84210; border-left: 3px solid #F5C842; margin: 4px 0 2px; font-weight: 700; }
+
+  /* Main panel */
+  .banner { padding: 8px 16px; margin: 12px 16px; border-radius: 6px; font-size: 12px; }
+  .banner-warn { background: #C0392B20; border: 1px solid #C0392B; color: #E8EAF0; }
+  .banner-info { background: #51A1A620; border: 1px solid #51A1A6; color: #E8EAF0; }
+
+  /* Games table */
+  .games-panel { padding: 8px 16px; flex: 1; overflow-y: auto; }
+  .wave-header { display: flex; align-items: center; gap: 8px; margin: 12px 0 4px; padding: 4px 0; border-bottom: 1px solid #2C3A52; }
+  .wave-title { font-size: 11px; color: #F5C842; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+  .wave-count { font-size: 11px; color: #8A97AA; }
+  .games-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .games-table th { text-align: left; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #8A97AA; padding: 4px 6px; border-bottom: 1px solid #2C3A52; }
+  .games-table td { padding: 5px 6px; border-bottom: 1px solid #2C3A5230; color: #8A97AA; }
+  .games-table tr:hover td { background: #161C2650; }
+  .status-scheduled { color: #8A97AA; font-size: 10px; text-transform: uppercase; }
+  .status-in_progress { color: #F5620F; font-weight: 600; font-size: 10px; text-transform: uppercase; }
+  .status-final { color: #1b9a06; font-weight: 600; font-size: 10px; text-transform: uppercase; }
+  .score-cell { font-variant-numeric: tabular-nums; color: #E8EAF0; }
+  .rank-pill { display: inline-block; background: #F5620F; color: #fff; border-radius: 10px; font-size: 9px; font-weight: 700; padding: 1px 6px; }
+
+  /* Log */
+  .log-panel { background: #0D1117; border-top: 1px solid #2C3A52; height: 160px; overflow-y: auto; padding: 6px 16px; display: flex; flex-direction: column-reverse; }
+  .log-entry { display: flex; gap: 10px; padding: 3px 0; font-size: 11px; border-bottom: 1px solid #2C3A5220; }
+  .log-time { color: #8A97AA; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+  .log-msg { color: #E8EAF0; }
+  .log-msg.success { color: #1b9a06; }
+  .log-msg.warn { color: #F5C842; }
+  .log-msg.error { color: #C0392B; }
+  .log-msg.info { color: #51A1A6; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <h1>HotPick — Season Simulator</h1>
+    <span class="badge">nfl_2025_sim</span>
+    <span class="badge badge-v2">v2 checkpoint</span>
+    <span style="margin-left: auto; font-size: 11px; color: #8A97AA;">Manual step-through — no time compression</span>
+  </div>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-section">
+        <label>Service Role Key</label>
+        <input type="password" id="serviceKey" placeholder="paste service role key">
+        <div class="btn-row">
+          <button class="btn btn-secondary btn-full" onclick="connect()">Connect</button>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="state-grid">
+          <div class="state-cell">
+            <div class="state-label">Week</div>
+            <div class="state-value" id="s-week">—</div>
+          </div>
+          <div class="state-cell">
+            <div class="state-label">State</div>
+            <div class="state-value" id="s-state">—</div>
+          </div>
+          <div class="state-cell">
+            <div class="state-label">Phase</div>
+            <div class="state-value dim" id="s-phase">—</div>
+          </div>
+          <div class="state-cell">
+            <div class="state-label">Scoring</div>
+            <div class="state-value" id="s-scoring-locked">—</div>
+          </div>
+        </div>
+        <div style="margin-top: 8px;">
+          <button class="btn btn-secondary btn-full" id="btn-refresh" onclick="refreshState()" disabled>Refresh state</button>
+        </div>
+      </div>
+
+      <h2>Checkpoint Timeline</h2>
+      <div class="checkpoints" id="checkpoint-list">
+        <div style="padding: 12px 16px; font-size: 12px; color: #8A97AA;">Connect to load checkpoints.</div>
+      </div>
+
+      <div class="sidebar-section">
+        <h2 style="padding: 0;">Run Week</h2>
+        <button class="btn btn-warning btn-full" id="btn-run-week" onclick="runEntireWeek()" disabled>
+          &#9654; Run entire week (auto)
+        </button>
+        <div style="font-size: 11px; color: #8A97AA; margin-top: 6px;">
+          Steps through all checkpoints with a 3s pause between each. Stops before "Next Week Opens" so you can verify the complete state.
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <h2 style="padding: 0;">Reviewer Reset</h2>
+        <button class="btn btn-danger btn-full" id="btn-reset-reviewer" onclick="resetReviewerCurrentWeek()" disabled>
+          Reset Mel&rsquo;s current-week picks
+        </button>
+
+        <button class="btn btn-danger btn-full" id="btn-reset-to-week8" onclick="resetToReviewerState()" disabled style="margin-top: 10px;">
+          Reset sim to Week 8 (App Review state)
+        </button>
+        <div style="font-size: 11px; color: #8A97AA; margin-top: 6px;">
+          Rolls the entire sim back to the App Review submission state:
+          <code>current_week=8</code>, <code>picks_open</code>, Mel and all fakes have 0 Week 8+ picks, Week 8 games back to <code>scheduled</code>, no Week 8+ totals. Weeks 1&ndash;7 untouched.
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="banner banner-warn">
+        <strong>Scoped to nfl_2025_sim only.</strong> Every operation hardcodes
+        <code>competition='nfl_2025_sim'</code>. nfl_2026 production data is never touched.
+      </div>
+      <div class="banner banner-info">
+        <strong>Do not run on The Proving Grounds during active App Review.</strong>
+        Both sim pools share <code>competition_config</code> \u2014 advancing the week affects both.
+        Freeze the sim until Apple approves, then start beta testing on Testing NFL2.
+      </div>
+
+      <div class="games-panel" id="games-panel">
+        <div style="padding: 40px 20px; text-align: center; color: #8A97AA;">
+          Click <strong>Connect</strong> to load the current week&rsquo;s games.
+        </div>
+      </div>
+
+      <div class="log-panel" id="log"></div>
+    </main>
+  </div>
+
+<script>
+const SUPABASE_URL = 'https://mzqtrpdiqhopjmxjccwy.supabase.co';
+const ANON_KEY     = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im16cXRycGRpcWhvcGpteGpjY3d5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDIwMDQsImV4cCI6MjA3MjA3ODAwNH0.017SoJAJLh4UKRYm4jVVCWDf1gCN2wjkpcUTHJJOsU4';
+const COMPETITION  = 'nfl_2025_sim';
+const SOURCE_COMP  = 'nfl_2025';
+const SEASON_YEAR  = 2025;
+const PROVING_GROUNDS_POOL_ID = '1178a95d-7689-4348-a472-1852cb8c89b8';
+const REVIEWER_USER_ID = '55ed62e4-9fe3-45d6-b9a0-a1819d81387b';
+
+// ─────────────────────────────────────────────────────────────
+// State
+// ─────────────────────────────────────────────────────────────
+let state = {
+  currentWeek: null,
+  weekState: null,
+  picksOpen: null,
+  picksLocked: null,
+  phase: null,
+  scoringLocked: null,
+};
+let simGames = [];   // current week's games in nfl_2025_sim (live DB state)
+let sourceGames = []; // same week in nfl_2025 (source of scores + winners)
+
+// Checkpoint definitions (v1-style, de-compressed)
+// id:     stable identifier
+// icon:   emoji
+// label:  display text
+// fn:     handler name
+// arg:    optional argument to pass to handler
+// phase:  which PRE/LIVE phase this belongs to for rendering
+const CHECKPOINTS = [
+  // Pre-week setup
+  { id: 'pre-load',    icon: '&#128194;', label: 'Games loaded from nfl_2025', fn: 'cpLoadGames', phase: 'PRE' },
+  { id: 'pre-reset',   icon: '&#128260;', label: 'Reset week to scheduled + clear scores', fn: 'cpResetWeek', phase: 'PRE' },
+
+  // 0:00 Week starts
+  { id: 'open-picks',  icon: '&#128994;', label: 'Picks Open', fn: 'cpOpenPicks', phase: 'LIVE' },
+
+  // Thursday
+  { id: 'thu-kickoff', icon: '&#127944;', label: 'Thursday Kickoff',       fn: 'cpKickoffWave',  arg: 'thursday', phase: 'LIVE' },
+  { id: 'thu-final',   icon: '&#9989;',   label: 'Thursday Final',         fn: 'cpFinalizeWave', arg: 'thursday', phase: 'LIVE' },
+
+  // Sunday 1pm
+  { id: 'sun1-kickoff',icon: '&#127944;', label: 'Sunday 1pm Kickoff',     fn: 'cpKickoffWave',  arg: 'sunday1',  phase: 'LIVE' },
+  { id: 'sun1-final',  icon: '&#9989;',   label: 'Sunday 1pm Final',       fn: 'cpFinalizeWave', arg: 'sunday1',  phase: 'LIVE' },
+
+  // Sunday 4pm
+  { id: 'sun4-kickoff',icon: '&#127944;', label: 'Sunday 4pm Kickoff',     fn: 'cpKickoffWave',  arg: 'sunday4',  phase: 'LIVE' },
+  { id: 'sun4-final',  icon: '&#9989;',   label: 'Sunday 4pm Final',       fn: 'cpFinalizeWave', arg: 'sunday4',  phase: 'LIVE' },
+
+  // Sunday Night
+  { id: 'snf-kickoff', icon: '&#127769;', label: 'SNF Kickoff',            fn: 'cpKickoffWave',  arg: 'snf',      phase: 'LIVE' },
+  { id: 'snf-final',   icon: '&#9989;',   label: 'SNF Final',              fn: 'cpFinalizeWave', arg: 'snf',      phase: 'LIVE' },
+
+  // Monday Night
+  { id: 'mnf-kickoff', icon: '&#127769;', label: 'MNF Kickoff',            fn: 'cpKickoffWave',  arg: 'mnf',      phase: 'LIVE' },
+  { id: 'mnf-final',   icon: '&#129518;', label: 'MNF Final — Calculate Scores', fn: 'cpEndWeek', phase: 'LIVE' },
+
+  // Settle + Complete
+  { id: 'week-complete', icon: '&#127937;', label: 'Week Complete',        fn: 'cpCompleteWeek', phase: 'POST' },
+  { id: 'next-week',     icon: '&#128275;', label: 'Next Week Opens',      fn: 'cpNextWeek', phase: 'POST' },
+];
+let checkpointStatus = {}; // id → 'pending' | 'current' | 'done'
+
+// ─────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────
+function getServiceKey() {
+  const k = document.getElementById('serviceKey').value.trim();
+  if (!k) {
+    log('Service role key required.', 'error');
+    return null;
+  }
+  return k;
+}
+
+function log(msg, type = '') {
+  const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.innerHTML = `<span class="log-time">${time}</span><span class="log-msg ${type}">${msg}</span>`;
+  document.getElementById('log').prepend(entry);
+}
+
+async function api(path, method = 'GET', body = null, useServiceRole = true) {
+  const key = useServiceRole ? getServiceKey() : ANON_KEY;
+  if (useServiceRole && !key) throw new Error('no service key');
+  const headers = {
+    'apikey': key,
+    'Authorization': `Bearer ${key}`,
+    'Content-Type': 'application/json',
+  };
+  if (method === 'PATCH' || method === 'POST') headers['Prefer'] = 'return=representation';
+  const opts = { method, headers };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, opts);
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`${method} ${path} → ${res.status}: ${text}`);
+  }
+  if (res.status === 204) return null;
+  return res.json();
+}
+
+async function callEdgeFunction(name, body) {
+  const key = getServiceKey();
+  if (!key) throw new Error('no service key');
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`${name} → ${res.status}: ${text}`);
+  }
+  return res.json();
+}
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ─────────────────────────────────────────────────────────────
+// Wave detection — identical logic to v1
+// ─────────────────────────────────────────────────────────────
+function detectWave(kickoffAtUtc) {
+  const d = new Date(kickoffAtUtc);
+  const day = d.getUTCDay();    // 0=Sun, 1=Mon, 4=Thu, 5=Fri, 6=Sat
+  const hour = d.getUTCHours();
+  // Thursday night football (Fri UTC or late Thu UTC)
+  if (day === 4 && hour >= 17) return 'thursday';
+  if (day === 5 && hour < 4)   return 'thursday';
+  // Sunday 1pm ET = 17:00 UTC
+  if (day === 0 && hour >= 17 && hour < 20) return 'sunday1';
+  // Sunday 4pm ET = 20:00 UTC
+  if (day === 0 && hour >= 20 && hour < 23) return 'sunday4';
+  // Sunday night football
+  if (day === 0 && hour >= 23) return 'snf';
+  if (day === 1 && hour < 4)   return 'snf';
+  // Monday night football
+  if (day === 1 && hour >= 17) return 'mnf';
+  if (day === 2 && hour < 4)   return 'mnf';
+  // Friday/Saturday
+  if (day === 5) return 'sunday1';
+  if (day === 6) return 'sunday1'; // late-season Sat games fold into Sunday 1pm wave
+  return 'sunday1';
+}
+
+function waveLabel(wave) {
+  return {
+    thursday: 'Thursday', sunday1: 'Sunday 1pm', sunday4: 'Sunday 4pm', snf: 'SNF', mnf: 'MNF',
+  }[wave] || wave;
+}
+
+// ─────────────────────────────────────────────────────────────
+// State refresh + render
+// ─────────────────────────────────────────────────────────────
+async function connect() {
+  if (!getServiceKey()) return;
+  log('Connecting…', 'info');
+  try {
+    await refreshState();
+    await loadWeekGames();
+    document.getElementById('btn-refresh').disabled = false;
+    renderCheckpoints();
+    log('✓ Connected. Current week loaded.', 'success');
+  } catch (e) {
+    log(`Connect failed: ${e.message}`, 'error');
+  }
+}
+
+function setStatus(id, value, klass = '') {
+  const el = document.getElementById(id);
+  el.textContent = value;
+  el.className = 'state-value ' + klass;
+}
+
+async function refreshState() {
+  // Service role required: competition_config SELECT policy is scoped to
+  // the 'authenticated' role, so the anon key returns []. Same for season_games.
+  const cfg = await api(
+    `competition_config?competition=eq.${COMPETITION}&select=key,value`,
+    'GET'
+  );
+  const map = Object.fromEntries(cfg.map(r => [r.key, r.value]));
+  state.currentWeek = map.current_week;
+  state.weekState = map.week_state;
+  state.picksOpen = map.picks_open;
+  state.picksLocked = map.picks_locked;
+  state.phase = map.current_phase;
+  state.scoringLocked = map.scoring_locked;
+
+  setStatus('s-week', state.currentWeek ?? '—');
+  setStatus('s-state', state.weekState ?? '—',
+    state.weekState === 'picks_open' ? 'ok' :
+    state.weekState === 'live' ? 'warn' :
+    state.weekState === 'complete' ? 'dim' : 'warn');
+  setStatus('s-phase', state.phase ?? '—', 'dim');
+  setStatus('s-scoring-locked', state.scoringLocked ? 'LOCKED' : 'ok',
+    state.scoringLocked ? 'err' : 'ok');
+
+  updateCheckpointStatesFromWeekState();
+  renderCheckpoints();
+  updateButtons();
+}
+
+function updateButtons() {
+  const ready = state.currentWeek != null && !state.scoringLocked;
+  document.getElementById('btn-run-week').disabled = !ready;
+  document.getElementById('btn-reset-reviewer').disabled = !ready;
+  document.getElementById('btn-reset-to-week8').disabled = !ready;
+}
+
+// Translate week_state → checkpoint completion status
+function updateCheckpointStatesFromWeekState() {
+  // Reset
+  for (const cp of CHECKPOINTS) checkpointStatus[cp.id] = 'pending';
+
+  const ws = state.weekState;
+  // pre-load / pre-reset are always "done" if games are loaded
+  if (sourceGames.length > 0) {
+    checkpointStatus['pre-load'] = 'done';
+  }
+  if (simGames.every(g => (g.status || '').toLowerCase() === 'scheduled')) {
+    checkpointStatus['pre-reset'] = 'done';
+  }
+
+  if (ws === 'picks_open' || ws === 'locked' || ws === 'live' || ws === 'settling' || ws === 'complete') {
+    checkpointStatus['open-picks'] = 'done';
+  }
+
+  // Per-wave state derived from the live sim game rows
+  const wavesInGames = {};
+  for (const g of simGames) {
+    const wave = detectWave(g.kickoff_at);
+    if (!wavesInGames[wave]) wavesInGames[wave] = { total: 0, inProgress: 0, final: 0 };
+    wavesInGames[wave].total++;
+    const s = (g.status || '').toUpperCase();
+    if (s === 'IN_PROGRESS' || s === 'LIVE') wavesInGames[wave].inProgress++;
+    if (s === 'FINAL' || s === 'COMPLETE') wavesInGames[wave].final++;
+  }
+  const waveIds = {
+    thursday: { kickoff: 'thu-kickoff', final: 'thu-final' },
+    sunday1:  { kickoff: 'sun1-kickoff', final: 'sun1-final' },
+    sunday4:  { kickoff: 'sun4-kickoff', final: 'sun4-final' },
+    snf:      { kickoff: 'snf-kickoff', final: 'snf-final' },
+    mnf:      { kickoff: 'mnf-kickoff', final: 'mnf-final' },
+  };
+  for (const wave of Object.keys(waveIds)) {
+    const w = wavesInGames[wave];
+    if (!w) continue; // no games in this wave this week
+    if (w.inProgress > 0 || w.final > 0) checkpointStatus[waveIds[wave].kickoff] = 'done';
+    if (w.final === w.total) checkpointStatus[waveIds[wave].final] = 'done';
+  }
+
+  if (ws === 'settling' || ws === 'complete') checkpointStatus['mnf-final'] = 'done';
+  if (ws === 'complete') checkpointStatus['week-complete'] = 'done';
+}
+
+// ─────────────────────────────────────────────────────────────
+// Load week games (both competitions)
+// ─────────────────────────────────────────────────────────────
+async function loadWeekGames() {
+  if (state.currentWeek == null) return;
+  const wk = state.currentWeek;
+  log(`Loading Week ${wk} games from ${SOURCE_COMP} and ${COMPETITION}…`, 'info');
+
+  sourceGames = await api(
+    `season_games?competition=eq.${SOURCE_COMP}&week=eq.${wk}&select=game_id,week,home_team,away_team,kickoff_at,home_score,away_score,winner_team,frozen_rank&order=kickoff_at.asc`,
+    'GET'
+  );
+  sourceGames.forEach(g => {
+    g.wave = detectWave(g.kickoff_at);
+    g.simGameId = 'sim_' + g.game_id;
+  });
+
+  simGames = await api(
+    `season_games?competition=eq.${COMPETITION}&week=eq.${wk}&select=game_id,home_team,away_team,kickoff_at,home_score,away_score,winner_team,status,frozen_rank,lock_at&order=kickoff_at.asc`,
+    'GET'
+  );
+
+  log(`Loaded ${sourceGames.length} source games, ${simGames.length} sim games.`, 'success');
+  renderGames();
+  updateCheckpointStatesFromWeekState();
+  renderCheckpoints();
+}
+
+function renderGames() {
+  const panel = document.getElementById('games-panel');
+  if (simGames.length === 0) {
+    panel.innerHTML = '<div style="padding:40px 20px;text-align:center;color:#8A97AA;">No games loaded.</div>';
+    return;
+  }
+
+  // Group by wave
+  const byWave = {};
+  for (const g of simGames) {
+    const wave = detectWave(g.kickoff_at);
+    if (!byWave[wave]) byWave[wave] = [];
+    byWave[wave].push(g);
+  }
+  const waveOrder = ['thursday', 'sunday1', 'sunday4', 'snf', 'mnf'];
+
+  let html = `<h2 style="padding: 8px 0;">Week ${state.currentWeek} Games (${simGames.length})</h2>`;
+
+  for (const wave of waveOrder) {
+    const games = byWave[wave];
+    if (!games || games.length === 0) continue;
+    html += `<div class="wave-header">
+      <span class="wave-title">${waveLabel(wave)}</span>
+      <span class="wave-count">${games.length} game${games.length !== 1 ? 's' : ''}</span>
+    </div>`;
+    html += '<table class="games-table"><thead><tr>'
+      + '<th>Rank</th><th>Away</th><th>Home</th><th>Score</th><th>Winner</th><th>Status</th><th>Lock</th>'
+      + '</tr></thead><tbody>';
+    for (const g of games) {
+      const status = (g.status || 'scheduled').toUpperCase();
+      const statusClass = status === 'FINAL' ? 'status-final'
+                        : (status === 'IN_PROGRESS' || status === 'LIVE') ? 'status-in_progress'
+                        : 'status-scheduled';
+      const score = (g.home_score != null && g.away_score != null)
+        ? `${g.away_score}–${g.home_score}` : '—';
+      const lockNote = g.lock_at
+        ? (new Date(g.lock_at) <= new Date() ? '🔒' : '—')
+        : '—';
+      html += `<tr>
+        <td><span class="rank-pill">${g.frozen_rank ?? '—'}</span></td>
+        <td>${g.away_team}</td>
+        <td>${g.home_team}</td>
+        <td class="score-cell">${score}</td>
+        <td>${g.winner_team ?? '—'}</td>
+        <td class="${statusClass}">${status}</td>
+        <td>${lockNote}</td>
+      </tr>`;
+    }
+    html += '</tbody></table>';
+  }
+  panel.innerHTML = html;
+}
+
+function renderCheckpoints() {
+  const container = document.getElementById('checkpoint-list');
+  if (state.currentWeek == null) {
+    container.innerHTML = '<div style="padding:12px 16px;font-size:12px;color:#8A97AA;">Connect to load checkpoints.</div>';
+    return;
+  }
+
+  // Pre-week + Live + Post dividers
+  let html = '';
+  let lastPhase = null;
+  let idx = 0;
+  for (const cp of CHECKPOINTS) {
+    if (cp.phase !== lastPhase) {
+      const phaseLabel = cp.phase === 'PRE' ? 'PRE-WEEK SETUP'
+                       : cp.phase === 'LIVE' ? `WEEK ${state.currentWeek} TIMELINE`
+                       : 'SETTLE';
+      html += `<div class="cp-phase-divider">${phaseLabel}</div>`;
+      lastPhase = cp.phase;
+    }
+    const s = checkpointStatus[cp.id] || 'pending';
+    const disabled = !getServiceKey() || state.scoringLocked ? 'disabled' : '';
+    idx++;
+    const num = idx < 10 ? `0${idx}` : idx;
+    html += `<div class="checkpoint ${s} ${disabled}" onclick="runCheckpoint('${cp.id}')">
+      <span class="cp-icon">${cp.icon}</span>
+      <span class="cp-num">${num}</span>
+      <span class="cp-label">${cp.label}</span>
+    </div>`;
+  }
+  container.innerHTML = html;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Checkpoint handlers
+// ─────────────────────────────────────────────────────────────
+async function runCheckpoint(id) {
+  if (!getServiceKey()) return;
+  if (state.scoringLocked) { log('scoring_locked=true, refusing to run checkpoints.', 'error'); return; }
+  const cp = CHECKPOINTS.find(c => c.id === id);
+  if (!cp) return;
+  try {
+    checkpointStatus[id] = 'current';
+    renderCheckpoints();
+    await window[cp.fn](cp.arg);
+    await refreshState();
+    await loadWeekGames();
+  } catch (e) {
+    log(`Checkpoint "${cp.label}" failed: ${e.message}`, 'error');
+    checkpointStatus[id] = 'pending';
+    renderCheckpoints();
+  }
+}
+
+// Load games (PRE)
+async function cpLoadGames() {
+  log('Loading games from source…', 'info');
+  await loadWeekGames();
+  log('✓ Games loaded.', 'success');
+}
+
+// Reset current week: clear scores, status=scheduled, lock_at=null
+async function cpResetWeek() {
+  const wk = state.currentWeek;
+  log(`Resetting Week ${wk} sim games to scheduled…`, 'info');
+  await api(
+    `season_games?competition=eq.${COMPETITION}&week=eq.${wk}`,
+    'PATCH',
+    {
+      status: 'scheduled',
+      home_score: null,
+      away_score: null,
+      winner_team: null,
+      is_finalized: false,
+      current_period: null,
+      game_clock: null,
+      lock_at: null,
+    }
+  );
+  log(`✓ Week ${wk} reset.`, 'success');
+}
+
+// Picks open — also clears lock_at on current week games AND auto-seeds
+// fake-member picks so the pool always has an active leaderboard. Without
+// this, fakes never submit picks for new weeks and the Week tab stays empty
+// during live play.
+async function cpOpenPicks() {
+  const wk = state.currentWeek;
+  log(`[Week ${wk}] Opening picks…`, 'info');
+  await api(`competition_config?competition=eq.${COMPETITION}&key=eq.week_state`, 'PATCH', { value: 'picks_open' });
+  await api(`competition_config?competition=eq.${COMPETITION}&key=eq.picks_open`, 'PATCH', { value: true });
+  await api(`competition_config?competition=eq.${COMPETITION}&key=eq.picks_locked`, 'PATCH', { value: false });
+  // Clear lock_at on every current-week game and push sunday_lock_anchor far future
+  await api(
+    `season_games?competition=eq.${COMPETITION}&week=eq.${wk}`,
+    'PATCH',
+    { lock_at: null }
+  );
+  // sunday_lock_anchor: upsert (the key always exists but belt-and-suspenders)
+  try {
+    await api(`competition_config?competition=eq.${COMPETITION}&key=eq.sunday_lock_anchor`,
+      'PATCH', { value: '2099-01-01T00:00:00Z' });
+  } catch {}
+
+  // Auto-seed fake member picks for the current week (skip if any fake
+  // already has picks — idempotent re-runs).
+  await seedFakeWeekPicks(wk);
+
+  log(`✓ Week ${wk} picks open.`, 'success');
+}
+
+// Fake member UUIDs + their HotPick rank persona. Used by seedFakeWeekPicks()
+// on every cpOpenPicks() call so the pool always has active picks.
+const FAKE_MEMBERS = [
+  { id: '11111111-1111-4111-8111-000000000001', name: 'The Gunslinger', hpRank: 13 },
+  { id: '11111111-1111-4111-8111-000000000002', name: 'Salty Sarah',    hpRank: 12 },
+  { id: '11111111-1111-4111-8111-000000000003', name: 'DSmiley',        hpRank:  9 },
+  { id: '11111111-1111-4111-8111-000000000004', name: 'P-Train',        hpRank: 11 },
+  { id: '11111111-1111-4111-8111-000000000005', name: 'BigSwingJake',   hpRank:  8 },
+  { id: '11111111-1111-4111-8111-000000000006', name: 'The Oracle',     hpRank:  1 },
+  { id: '11111111-1111-4111-8111-000000000007', name: 'ChrisP',         hpRank:  2 },
+  { id: '11111111-1111-4111-8111-000000000008', name: 'LateNightMia',   hpRank: 10 },
+];
+
+// Seed picks for every fake member for the given week — 1 pick per game,
+// 1 HotPick at the fake's persona rank. Idempotent: skips any fake that
+// already has picks for the week.
+async function seedFakeWeekPicks(wk) {
+  log(`Checking fake member picks for Week ${wk}…`, 'info');
+
+  // Which fakes already have picks this week? Skip those.
+  const existingFakeIds = FAKE_MEMBERS.map(f => f.id).join(',');
+  const existing = await api(
+    `season_picks?competition=eq.${COMPETITION}&week=eq.${wk}&user_id=in.(${existingFakeIds})&select=user_id`,
+    'GET'
+  );
+  const existingSet = new Set((existing ?? []).map(p => p.user_id));
+  const toSeed = FAKE_MEMBERS.filter(f => !existingSet.has(f.id));
+
+  if (toSeed.length === 0) {
+    log(`All fakes already have Week ${wk} picks — skipping seed.`, 'info');
+    return;
+  }
+
+  // Week games with frozen_rank (from already-loaded simGames — avoids extra fetch)
+  if (simGames.length === 0) {
+    log(`simGames empty — fetching before seed.`, 'warn');
+    await loadWeekGames();
+  }
+  const weekGames = simGames.filter(g =>
+    // simGames is current-week only, but defensive in case we're called with a
+    // stale cache — no harm just using what's there
+    g.game_id && g.frozen_rank != null
+  );
+  if (weekGames.length === 0) {
+    log(`No Week ${wk} games with frozen_rank — cannot seed fake picks.`, 'error');
+    return;
+  }
+
+  // Build picks payload: each fake picks one team per game, HotPick at their rank.
+  // Deterministic team selection: alternate home/away by (user_id char + rank) parity.
+  const rows = [];
+  for (const fake of toSeed) {
+    for (const g of weekGames) {
+      const isHp = g.frozen_rank === fake.hpRank;
+      // Pseudo-deterministic team selection for variety
+      const parity = (fake.id.charCodeAt(fake.id.length - 1) + g.frozen_rank) % 2;
+      const pickedTeam = isHp
+        ? g.home_team  // HotPick defaults to home (mixed real results)
+        : (parity === 0 ? g.home_team : g.away_team);
+      rows.push({
+        user_id: fake.id,
+        game_id: g.game_id,
+        competition: COMPETITION,
+        season_year: SEASON_YEAR,
+        week: wk,
+        picked_team: pickedTeam,
+        is_hotpick: isHp,
+      });
+    }
+  }
+
+  // Bulk insert — games are scheduled so pick-lock trigger allows this
+  await api('season_picks', 'POST', rows);
+  log(`✓ Seeded ${rows.length} fake picks for ${toSeed.length} members (Week ${wk}).`, 'success');
+}
+
+// Kickoff a wave — sets games IN_PROGRESS, locks this wave's picks + all
+// later waves if this is Sunday or later. On the FIRST kickoff of the week
+// (state.weekState !== 'live'), seeds placeholder season_user_totals rows so
+// the Week tab populates immediately with all 9 members at 0 pts. Also ticks
+// live scores 25% → 55% → 80% of the final so Mel sees the HotPick score
+// climb during play (ticker runs async; doesn't block checkpoint completion).
+async function cpKickoffWave(wave) {
+  const wk = state.currentWeek;
+  const matching = simGames.filter(g => detectWave(g.kickoff_at) === wave);
+  if (matching.length === 0) {
+    log(`No ${waveLabel(wave)} games this week — skipping.`, 'info');
+    return;
+  }
+
+  // Lock this wave (and later waves if Sunday+)
+  const waveOrder = ['thursday', 'sunday1', 'sunday4', 'snf', 'mnf'];
+  const thisIdx = waveOrder.indexOf(wave);
+  const isSundayOrLater = thisIdx >= 1;
+  const PAST = '2020-01-01T00:00:00Z';
+  const FAR_FUTURE = '2099-01-01T00:00:00Z';
+
+  for (const g of simGames) {
+    const gWave = detectWave(g.kickoff_at);
+    const gIdx = waveOrder.indexOf(gWave);
+    if (gIdx === thisIdx) {
+      // This wave — lock
+      await api(`season_games?competition=eq.${COMPETITION}&game_id=eq.${g.game_id}`,
+        'PATCH', { lock_at: PAST });
+    } else if (isSundayOrLater && gIdx > thisIdx) {
+      // Sunday+ also seals everything later
+      await api(`season_games?competition=eq.${COMPETITION}&game_id=eq.${g.game_id}`,
+        'PATCH', { lock_at: PAST });
+    } else if (gIdx > thisIdx) {
+      // Pre-Sunday: future waves stay unlocked
+      await api(`season_games?competition=eq.${COMPETITION}&game_id=eq.${g.game_id}`,
+        'PATCH', { lock_at: FAR_FUTURE });
+    }
+  }
+
+  if (isSundayOrLater) {
+    await api(`competition_config?competition=eq.${COMPETITION}&key=eq.sunday_lock_anchor`,
+      'PATCH', { value: PAST });
+  }
+
+  // Mark these games IN_PROGRESS with period/clock and 0-0 starting score
+  for (const g of matching) {
+    await api(`season_games?competition=eq.${COMPETITION}&game_id=eq.${g.game_id}`,
+      'PATCH',
+      { status: 'IN_PROGRESS', current_period: 1, game_clock: '15:00', home_score: 0, away_score: 0 }
+    );
+  }
+
+  // On the FIRST kickoff of the week, transition to live AND seed placeholder
+  // season_user_totals rows for every pool member with picks this week. This
+  // populates the Week tab with all 9 members at 0 pts so Mel sees the full
+  // field the moment Thursday kicks off.
+  if (state.weekState !== 'live') {
+    await api(`competition_config?competition=eq.${COMPETITION}&key=eq.week_state`, 'PATCH', { value: 'live' });
+    await seedPlaceholderWeekTotals(wk);
+  }
+
+  log(`&#127944; ${waveLabel(wave)} kicked off (${matching.length} game${matching.length !== 1 ? 's' : ''})`, 'success');
+
+  // Start the live score ticker in the background — bump THIS wave's scores
+  // 25% → 55% → 80% of the final over ~9 seconds. Doesn't block the checkpoint
+  // from completing so you can click Finalize Wave whenever you want.
+  tickLiveScores(wave).catch(e => log(`Score ticker failed: ${e.message}`, 'warn'));
+}
+
+// Seed zero-point season_user_totals rows for every pool member who has
+// picks this week. Mirrors the "Write 0-rows" branch in nfl-calculate-scores
+// so the Week tab populates immediately at kickoff. Safe to re-run — uses
+// upsert semantics via the pick-existence filter.
+async function seedPlaceholderWeekTotals(wk) {
+  log(`Seeding placeholder Week ${wk} totals for all pool members with picks…`, 'info');
+
+  // Find distinct user_ids with picks this week
+  const picksData = await api(
+    `season_picks?competition=eq.${COMPETITION}&week=eq.${wk}&select=user_id`,
+    'GET'
+  );
+  const userIds = [...new Set((picksData ?? []).map(p => p.user_id))];
+  if (userIds.length === 0) {
+    log(`No Week ${wk} picks yet — skipping placeholder totals seed.`, 'info');
+    return;
+  }
+
+  // Check which already have totals rows — avoid overwriting real scores
+  const existing = await api(
+    `season_user_totals?competition=eq.${COMPETITION}&week=eq.${wk}&select=user_id`,
+    'GET'
+  );
+  const existingIds = new Set((existing ?? []).map(r => r.user_id));
+  const toInsert = userIds.filter(id => !existingIds.has(id));
+  if (toInsert.length === 0) {
+    log(`Placeholder totals already exist for all ${userIds.length} users.`, 'info');
+    return;
+  }
+
+  const rows = toInsert.map(uid => ({
+    user_id: uid,
+    competition: COMPETITION,
+    season_year: SEASON_YEAR,
+    week: wk,
+    phase: 'REGULAR',
+    week_points: 0,
+    playoff_points: 0,
+    correct_picks: 0,
+    total_picks: 0,
+    is_hotpick_correct: null,
+    hotpick_rank: null,
+    is_no_show: false,
+    double_down_used: false,
+    double_down_delta: 0,
+    mulligan_used: false,
+    scored_at: new Date().toISOString(),
+  }));
+  await api('season_user_totals', 'POST', rows);
+  log(`✓ Seeded ${rows.length} placeholder totals rows for Week ${wk}.`, 'success');
+}
+
+// Background live score ticker. Bumps home_score/away_score for games in the
+// given wave to 25% → 55% → 80% of their real final score over ~9 seconds.
+// Uses the source competition as the truth for final scores. Doesn't await
+// any scoring run — just sets scores so Realtime subscribers see the tick.
+async function tickLiveScores(wave) {
+  const sourceById = Object.fromEntries(
+    sourceGames.map(sg => ['sim_' + sg.game_id, sg])
+  );
+  const matching = simGames.filter(g => detectWave(g.kickoff_at) === wave);
+  const stages = [
+    { pct: 0.25, period: 1, clock: '05:00', delay: 3000 },
+    { pct: 0.55, period: 2, clock: '08:00', delay: 3000 },
+    { pct: 0.80, period: 3, clock: '04:00', delay: 3000 },
+  ];
+  for (const stage of stages) {
+    await sleep(stage.delay);
+    for (const g of matching) {
+      const src = sourceById[g.game_id];
+      if (!src || src.home_score == null || src.away_score == null) continue;
+      const h = Math.round(src.home_score * stage.pct);
+      const a = Math.round(src.away_score * stage.pct);
+      try {
+        await api(
+          `season_games?competition=eq.${COMPETITION}&game_id=eq.${g.game_id}`,
+          'PATCH',
+          { home_score: h, away_score: a, current_period: stage.period, game_clock: stage.clock }
+        );
+      } catch (e) {
+        // Game may have been finalized in the meantime — skip silently
+      }
+    }
+    log(`&#128200; ${waveLabel(wave)} scores ticked to ${Math.round(stage.pct * 100)}%`, 'info');
+  }
+}
+
+// Finalize a wave — copies real scores + winner from source, sets FINAL,
+// runs nfl-calculate-scores for partial scoring.
+async function cpFinalizeWave(wave) {
+  const wk = state.currentWeek;
+  const matching = simGames.filter(g => detectWave(g.kickoff_at) === wave);
+  if (matching.length === 0) {
+    log(`No ${waveLabel(wave)} games — skipping.`, 'info');
+    return;
+  }
+
+  const sourceById = Object.fromEntries(
+    sourceGames.map(sg => ['sim_' + sg.game_id, sg])
+  );
+
+  for (const g of matching) {
+    const src = sourceById[g.game_id];
+    if (!src) continue;
+    await api(
+      `season_games?competition=eq.${COMPETITION}&game_id=eq.${g.game_id}`,
+      'PATCH',
+      {
+        status: 'FINAL',
+        home_score: src.home_score,
+        away_score: src.away_score,
+        winner_team: src.winner_team,
+        is_finalized: true,
+        current_period: null,
+        game_clock: null,
+      }
+    );
+  }
+  log(`&#9989; ${waveLabel(wave)} finalized (${matching.length} games)`, 'success');
+
+  // Partial scoring
+  try {
+    const r = await callEdgeFunction('nfl-calculate-scores', { competition: COMPETITION, week: wk });
+    log(`&#129518; Partial score: ${r.users_scored ?? 0} users, ${r.final_games ?? 0} final games`, 'info');
+  } catch (e) {
+    log(`Partial scoring failed: ${e.message}`, 'warn');
+  }
+}
+
+// End week — force ALL games FINAL, full scoring, settling state
+async function cpEndWeek() {
+  const wk = state.currentWeek;
+  log(`[Week ${wk}] Forcing all games FINAL and scoring…`, 'info');
+
+  const sourceById = Object.fromEntries(
+    sourceGames.map(sg => ['sim_' + sg.game_id, sg])
+  );
+  for (const g of simGames) {
+    const src = sourceById[g.game_id];
+    if (!src) continue;
+    await api(
+      `season_games?competition=eq.${COMPETITION}&game_id=eq.${g.game_id}`,
+      'PATCH',
+      {
+        status: 'FINAL',
+        home_score: src.home_score,
+        away_score: src.away_score,
+        winner_team: src.winner_team,
+        is_finalized: true,
+      }
+    );
+  }
+
+  try {
+    const r = await callEdgeFunction('nfl-calculate-scores', { competition: COMPETITION, week: wk });
+    log(`&#129518; Full scoring: ${r.users_scored ?? 0} users, ${r.final_games ?? 0} final games`, 'success');
+  } catch (e) {
+    log(`Full scoring failed: ${e.message}`, 'error');
+  }
+
+  await api(`competition_config?competition=eq.${COMPETITION}&key=eq.week_state`, 'PATCH', { value: 'settling' });
+  log('Week state → settling', 'info');
+}
+
+async function cpCompleteWeek() {
+  await api(`competition_config?competition=eq.${COMPETITION}&key=eq.week_state`, 'PATCH', { value: 'complete' });
+  log(`&#127937; Week ${state.currentWeek} complete.`, 'success');
+}
+
+async function cpNextWeek() {
+  const next = (state.currentWeek || 0) + 1;
+  if (next > 22) {
+    if (!confirm(`Week ${state.currentWeek} is the last week. Advance anyway?`)) return;
+  }
+  await api(`competition_config?competition=eq.${COMPETITION}&key=eq.current_week`, 'PATCH', { value: next });
+  await api(`competition_config?competition=eq.${COMPETITION}&key=eq.week_state`, 'PATCH', { value: 'picks_open' });
+  await api(`competition_config?competition=eq.${COMPETITION}&key=eq.picks_open`, 'PATCH', { value: true });
+  await api(`competition_config?competition=eq.${COMPETITION}&key=eq.picks_locked`, 'PATCH', { value: false });
+  log(`&#128275; Advanced to Week ${next}.`, 'success');
+}
+
+// ─────────────────────────────────────────────────────────────
+// Run entire week — steps 01..14 (stops before next-week)
+// ─────────────────────────────────────────────────────────────
+async function runEntireWeek() {
+  if (!getServiceKey()) return;
+  if (!confirm(
+    `▶ Run entire Week ${state.currentWeek}?\n\n` +
+    `Steps through all checkpoints with 3-second pauses.\n` +
+    `Stops before "Next Week Opens".\n\n` +
+    `Skips individual confirm prompts.`
+  )) return;
+
+  const steps = CHECKPOINTS.filter(c => c.id !== 'next-week');
+  for (const cp of steps) {
+    checkpointStatus[cp.id] = 'current';
+    renderCheckpoints();
+    try {
+      await window[cp.fn](cp.arg);
+    } catch (e) {
+      log(`Auto-run stopped at "${cp.label}": ${e.message}`, 'error');
+      checkpointStatus[cp.id] = 'pending';
+      renderCheckpoints();
+      return;
+    }
+    await refreshState();
+    await loadWeekGames();
+    await sleep(3000);
+  }
+  log('▶ Week auto-run complete. Click "Next Week Opens" when ready to advance.', 'success');
+}
+
+// ─────────────────────────────────────────────────────────────
+// Reviewer reset
+// ─────────────────────────────────────────────────────────────
+async function resetReviewerCurrentWeek() {
+  const wk = state.currentWeek;
+  if (!confirm(
+    `Reset Mel Smiles (reviewer) for Week ${wk}?\n\n` +
+    `Deletes Mel's picks and season_user_totals row for Week ${wk}, then\n` +
+    `re-runs nfl-calculate-scores so other users stay correct.\n\n` +
+    `Weeks 1-7 are untouched.`
+  )) return;
+  try {
+    log(`Resetting reviewer picks for Week ${wk}…`, 'info');
+    await api(
+      `season_picks?user_id=eq.${REVIEWER_USER_ID}&competition=eq.${COMPETITION}&week=eq.${wk}`,
+      'DELETE'
+    );
+    await api(
+      `season_user_totals?user_id=eq.${REVIEWER_USER_ID}&competition=eq.${COMPETITION}&week=eq.${wk}`,
+      'DELETE'
+    );
+    const r = await callEdgeFunction('nfl-calculate-scores', { competition: COMPETITION, week: wk });
+    log(`✓ Reviewer reset complete. ${r.users_scored ?? 0} users rescored.`, 'success');
+    await refreshState();
+    await loadWeekGames();
+  } catch (e) {
+    log(`Reviewer reset failed: ${e.message}`, 'error');
+  }
+}
+
+// Reset the entire sim to the App Review submission state:
+//   - current_week = 8, week_state = picks_open
+//   - Delete all picks for Week 8+
+//   - Delete all season_user_totals for Week 8+
+//   - Reset Week 8 games to scheduled (clear scores/winner/is_finalized)
+//   - Clear lock_at on Week 8 games
+//   - Reset Week 9+ games that were advanced past scheduled (defensive)
+//
+// Weeks 1-7 historical picks + totals are UNTOUCHED.
+async function resetToReviewerState() {
+  if (!confirm(
+    'Reset entire sim to App Review state (Week 8, picks_open)?\n\n' +
+    'This will:\n' +
+    '  1. Delete ALL picks for Week 8+ (all users, all weeks 8-22)\n' +
+    '  2. Delete ALL season_user_totals for Week 8+\n' +
+    '  3. Reset all Week 8-22 games back to scheduled (clear scores)\n' +
+    '  4. Clear lock_at on Week 8 games\n' +
+    '  5. Set current_week=8, week_state=picks_open\n\n' +
+    'Weeks 1-7 are UNTOUCHED.\n\n' +
+    'This is the App Review submission state. Run this before submitting to Apple/Google.'
+  )) return;
+
+  try {
+    log('=== Resetting sim to App Review state (Week 8) ===', 'info');
+
+    // 1. Delete Week 8+ picks across all users (temporarily disable pick-lock
+    //    trigger in case any games are FINAL).
+    // DELETE on season_picks doesn't trigger check_pick_lock (trigger fires on
+    // INSERT OR UPDATE OF picked_team/is_hotpick), so we can DELETE without
+    // disabling anything.
+    log('Deleting all Week 8-22 picks…', 'info');
+    await api(
+      `season_picks?competition=eq.${COMPETITION}&week=gte.8`,
+      'DELETE'
+    );
+    log('✓ Week 8-22 picks deleted.', 'success');
+
+    // 2. Delete Week 8+ totals
+    log('Deleting all Week 8-22 season_user_totals…', 'info');
+    await api(
+      `season_user_totals?competition=eq.${COMPETITION}&week=gte.8`,
+      'DELETE'
+    );
+    log('✓ Week 8-22 totals deleted.', 'success');
+
+    // 3. Reset Week 8-22 games to scheduled. We can't PATCH multiple columns
+    //    with a gte filter via the REST endpoint in a single call, so we do it
+    //    with one PATCH using the filter — PostgREST supports this.
+    log('Resetting Week 8-22 games to scheduled…', 'info');
+    await api(
+      `season_games?competition=eq.${COMPETITION}&week=gte.8`,
+      'PATCH',
+      {
+        status: 'scheduled',
+        home_score: null,
+        away_score: null,
+        winner_team: null,
+        is_finalized: false,
+        current_period: null,
+        game_clock: null,
+        q1_home_score: null, q1_away_score: null,
+        q2_home_score: null, q2_away_score: null,
+        q3_home_score: null, q3_away_score: null,
+        lock_at: null,
+      }
+    );
+    log('✓ Week 8-22 games reset.', 'success');
+
+    // 4. Set sim state back to Week 8 picks_open
+    log('Setting current_week=8, week_state=picks_open…', 'info');
+    await api(`competition_config?competition=eq.${COMPETITION}&key=eq.current_week`, 'PATCH', { value: 8 });
+    await api(`competition_config?competition=eq.${COMPETITION}&key=eq.week_state`, 'PATCH', { value: 'picks_open' });
+    await api(`competition_config?competition=eq.${COMPETITION}&key=eq.picks_open`, 'PATCH', { value: true });
+    await api(`competition_config?competition=eq.${COMPETITION}&key=eq.picks_locked`, 'PATCH', { value: false });
+    try {
+      await api(`competition_config?competition=eq.${COMPETITION}&key=eq.sunday_lock_anchor`,
+        'PATCH', { value: '2099-01-01T00:00:00Z' });
+    } catch {}
+    log('✓ Sim state set to Week 8 picks_open.', 'success');
+
+    // 5. Reload games state so the fake-pick seeder has current simGames cached,
+    //    then seed Week 8 picks for all 8 fake members so the pool is populated.
+    state.currentWeek = 8;
+    await loadWeekGames();
+    await seedFakeWeekPicks(8);
+
+    // 6. Backdate TheReviewer's SmackTalk read state so recent seeded messages
+    //    show as unread on the home screen SmackTalk nudge module.
+    log('Backdating reviewer SmackTalk read state…', 'info');
+    await api(
+      `smack_read_state?user_id=eq.${REVIEWER_USER_ID}&pool_id=eq.${PROVING_GROUNDS_POOL_ID}`,
+      'PATCH',
+      { last_read_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString() }
+    );
+    log('✓ Reviewer SmackTalk read state backdated 3 days — recent messages show as new.', 'success');
+
+    log('=== Reset complete. Sim is ready for App Review. ===', 'success');
+    log('Expected: Mel lands at Week 8 picks_open, Week tab shows Week 7 leaderboard (fallback), Picks tab shows 13 scheduled Week 8 games, 8 fakes have picks ready, SmackTalk nudge shows unread messages.', 'info');
+
+    await refreshState();
+    await loadWeekGames();
+  } catch (e) {
+    log(`Reset to reviewer state failed: ${e.message}`, 'error');
+  }
+}
+
+log('Season Simulator v2 loaded. Paste service role key and click Connect.', 'info');
+</script>
+</body>
+</html>
