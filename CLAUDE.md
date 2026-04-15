@@ -8,7 +8,9 @@ Read this file before writing any code. Full architecture context is in `REFEREN
 
 HotPick Sports is a sports prediction platform. Users make picks once and compete across multiple pools simultaneously. **Scores belong to the user, not to any pool.** Pools are social lenses on shared user-level data. This pool-independent architecture is the deepest structural moat — never design against it.
 
-**Active competition:** `nfl_2026`. Do not default to worldCup2026 or any other event.
+**Active competition for App Review/testing:** `nfl_2025_sim`
+**Active competition for live season:** `nfl_2026`
+Do not default to worldCup2026 or any other event.
 
 ---
 
@@ -143,6 +145,32 @@ Power-ups, career hardware awards, AI archetypes, tier system, pool discovery, S
 | Any write that must bypass RLS | |
 
 When in doubt, use `apply_migration`.
+
+---
+
+## Deployment Rules
+
+These rules apply from the moment the app is live in the App Store and Google Play. Violations risk user-facing incidents during a live season.
+
+- **Never commit directly to main during a live season** — all changes go through a feature branch and preview build first
+- **EAS Update (OTA) is for JavaScript-only fixes only** — new features that change app behavior require a full build and store submission
+- **All Edge Functions must be committed to git before deployment** — never deploy an Edge Function that isn't in the repository
+- **Take a manual Supabase backup before every schema migration** — Project Settings → Database → Backups → Manual backup
+- **`scoring_locked` in `competition_config` is the emergency scoring brake** — set to `true` to pause all scoring computation instantly, no deployment needed
+- **Build profile order is always: `development` → `preview` → `production`** — never skip preview; every non-trivial change verifies on a real device first
+
+---
+
+## Branch Rules
+
+- **All new feature development happens on a feature branch, never directly on main** — branch naming: `feature/description`, `fix/description`, `hotfix/description`
+- **Nothing merges to main without Tom's explicit approval**
+- **Active competitions live on main** — currently `nfl_2025_sim` (App Review) and `nfl_2026` (live season). New sports (EPL, World Cup, NHL) always start on a feature branch. Example: `feature/epl-2027`, `feature/world-cup-2026`
+- **When Tom says "build EPL" or any new sport/feature, the first step is always:**
+  ```
+  git checkout main && git pull && git checkout -b feature/[name]
+  ```
+  Never start new sport work on main.
 
 ---
 
