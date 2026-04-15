@@ -1,9 +1,9 @@
 import type {AnyEventConfig} from '@shared/types/templates';
 import {worldCup2026} from './worldcup/config';
-import {nflSeason} from './nfl/config';
+import {nflSeason, nflSeasonSim} from './nfl/config';
 import {nhlPlayoffs2027} from './nhl/config';
 
-const ALL_EVENTS: AnyEventConfig[] = [nflSeason, worldCup2026, nhlPlayoffs2027];
+const ALL_EVENTS: AnyEventConfig[] = [nflSeason, nflSeasonSim, worldCup2026, nhlPlayoffs2027];
 
 export function getEventById(id: string): AnyEventConfig | undefined {
   return ALL_EVENTS.find(e => e.competition === id);

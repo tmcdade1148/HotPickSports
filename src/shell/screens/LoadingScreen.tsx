@@ -6,8 +6,11 @@ LogBox.ignoreLogs(['AuthRetryableFetchError', 'Network request failed']);
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BootSplash from 'react-native-bootsplash';
 import {supabase} from '@shared/config/supabase';
-import {useGlobalStore} from '@shell/stores/globalStore';
-import {getDefaultEvent} from '@sports/registry';
+import {
+  useGlobalStore,
+  DEV_ACTIVE_COMPETITION_KEY,
+} from '@shell/stores/globalStore';
+import {getDefaultEvent, getEventsByPriority} from '@sports/registry';
 
 /**
  * LoadingScreen — bootstraps auth session and navigates to the first real screen.
@@ -69,7 +72,27 @@ export function LoadingScreen({navigation}: any) {
         }
 
         setUser(session.user);
-        setActiveSport(defaultEvent);
+
+        // DEV only: restore last-selected competition across Metro hot reloads
+        // so flipping between competitions during development doesn't reset on
+        // every save. Production always uses defaultEvent.
+        let eventToActivate = defaultEvent;
+        if (__DEV__) {
+          try {
+            const persistedCompetition = await AsyncStorage.getItem(
+              DEV_ACTIVE_COMPETITION_KEY,
+            );
+            if (persistedCompetition) {
+              const match = getEventsByPriority().find(
+                e => e.competition === persistedCompetition,
+              );
+              if (match) eventToActivate = match;
+            }
+          } catch (err) {
+            console.warn('[LoadingScreen] DEV competition restore failed:', err);
+          }
+        }
+        setActiveSport(eventToActivate);
 
         // ── ROUND 1 (parallel) ──────────────────────────────────────
         // fetchProfile, fetchCurrentTosVersion, and ensureGlobalPoolMembership

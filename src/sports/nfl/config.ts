@@ -2,7 +2,10 @@ import type {SeasonConfig} from '@shared/types/templates';
 
 /**
  * Production NFL config — nfl_2026.
- * This is the default for all users including TestFlight.
+ * Parked as 'upcoming' until the real NFL 2026-27 season launches in Sept 2026.
+ * Until then, nfl_2025_sim is the active event for all users (App Store review,
+ * beta testers, and dev). Flip this back to 'active' and flip nfl_2025_sim to
+ * 'completed' when the real season launches.
  */
 export const nflSeason: SeasonConfig = {
   competition: 'nfl_2026',
@@ -10,7 +13,7 @@ export const nflSeason: SeasonConfig = {
   sport: 'football',
   name: 'NFL 2026-27 Season',
   shortName: 'NFL',
-  status: 'active',
+  status: 'upcoming',
   startDate: '2026-09-09',
   endDate: '2027-02-08',
   picksOpenDate: '2026-09-02',
@@ -90,13 +93,18 @@ export const nflSeason: SeasonConfig = {
 };
 
 /**
- * Simulator NFL config — nfl_2025_sim.
- * Used for development/testing via the season simulator.
- * Accessible via Settings > Admin > Competition Switcher (super_admin only).
+ * NFL config for the App Store reviewer pool ("The Proving Grounds") and
+ * active beta testing ("Testing NFL2"). Runs on pre-seeded 2025 NFL data.
+ *
+ * Currently status='active' and the only active NFL event — this is the
+ * default for every user (App Store reviewer, beta testers, dev) until the
+ * real NFL 2026 season launches in Sept 2026. When that happens, flip
+ * nflSeason back to 'active' and this one to 'completed'.
  */
 export const nflSeasonSim: SeasonConfig = {
   ...nflSeason,
   competition: 'nfl_2025_sim',
   name: 'NFL 2025 SIM',
   shortName: 'NFL SIM',
+  status: 'active',
 };

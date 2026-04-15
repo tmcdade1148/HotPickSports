@@ -12,6 +12,13 @@ import {nflSeason} from '@sports/nfl/config';
 const POOL_STORAGE_PREFIX = 'hotpick_active_pool_';
 const DEFAULT_POOL_PREFIX = 'hotpick_default_pool_';
 
+/**
+ * DEV-only: AsyncStorage key for the active competition so Metro hot reloads
+ * don't reset the developer back to the default event. Production builds must
+ * never read this value — LoadingScreen handles the gating.
+ */
+export const DEV_ACTIVE_COMPETITION_KEY = 'hotpick_dev_active_competition';
+
 /** AsyncStorage key for a competition's active pool */
 function poolStorageKey(competition: string): string {
   return `${POOL_STORAGE_PREFIX}${competition}`;
@@ -375,6 +382,13 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       get().loadPersistedPoolId(sport.competition);
     } else {
       set({activeSport: sport});
+    }
+    // DEV only: persist competition so Metro hot reloads preserve selection.
+    // Production ignores this value — see LoadingScreen for the read path.
+    if (__DEV__) {
+      AsyncStorage.setItem(DEV_ACTIVE_COMPETITION_KEY, sport.competition).catch(
+        () => {},
+      );
     }
   },
 

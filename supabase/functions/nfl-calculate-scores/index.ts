@@ -185,6 +185,12 @@ async function scoreWeek(competition: string, seasonYear: number, week: number) 
   if (upsertError) return { users_scored: 0, final_games: games.length, error: upsertError.message };
 
   // ── SmackTalk: post per-user HotPick results to each pool they belong to ──
+  // Suppressed for sim competitions — the Proving Grounds reviewer pool and
+  // Testing NFL2 should show a clean human-authored feed. Production (nfl_2026)
+  // still gets the auto-posts.
+  if (competition.endsWith("_sim")) {
+    return { users_scored: scoredUserIds.size, final_games: games.length };
+  }
   try {
     // Find users whose HotPick game is in this batch of FINAL games
     const hotPickPicks = (picks ?? []).filter((p: any) => p.is_hotpick && gameMap.has(p.game_id));
