@@ -147,7 +147,7 @@ template, sport, data_provider, scoring_locked
 
 **Global (competition = 'global'):**
 ```
-free_tier_max_pools (1), free_tier_max_members (10),
+free_tier_max_pools (1 — creation limit, not join limit), free_tier_max_members (10),
 paid_small_max_members (25), paid_medium_max_members (50),
 paid_large_max_members (null = unlimited),
 founding_pools_remaining (starts at 100),
@@ -197,7 +197,7 @@ One row per pool per paying organizer in `subscriptions` table. Free users have 
 'addon_pool'        → $15, additional pool same event
 ```
 
-Free: up to 10 members, 1 pool per competition (no subscriptions row needed).
+Free organizers: can create up to 1 pool per competition, max 10 members (no subscriptions row needed). Users can **join** unlimited pools regardless of tier — tier limits only constrain pool creation.
 
 **Founding 100 pools:** Free forever regardless of size. Determined at creation time by `founding_pools_remaining` config key. `is_founding_pool = true` on pool row — permanent, never revoked.
 
@@ -210,6 +210,7 @@ Free: up to 10 members, 1 pool per competition (no subscriptions row needed).
 
 ## 5. Pool Model
 
+- **Users belong to multiple pools for the same competition** — their picks and scores are identical across all of them. Each pool is a different social lens on the same user-level data. Never design features that assume one pool per user.
 - One pool = one event (no rollover between seasons)
 - Join via invite code only — no pool discovery at launch
 - Organizers can "run it back" to create a new pool for a new event
@@ -304,6 +305,8 @@ ORDER BY pool_points DESC;
 - Season-side: cumulative from pool_start_date to present
 
 Both views always available via toggle. Both use `pool_start_date` filter.
+
+**Multi-pool implication:** The same user's scores appear on every pool leaderboard they belong to. A user who joins 5 pools sees 5 different leaderboard contexts, but their points never change — only the peer group and `pool_start_date` filter differ. `pool_id` is always a WHERE-clause filter, never a foreign key on scoring tables.
 
 ---
 
@@ -628,7 +631,7 @@ Template-based labels computed client-side from `userHardware` + career stats:
 ## 17. Game Day Engagement System
 
 ### game_pick_stats Caching Table
-Pick percentages cached with 60s cron refresh. Never query `season_picks` directly from game cards — always use `game_pick_stats`. Pick splits only shown after kickoff (never before).
+Pick percentages cached with 60s cron refresh. Never query `season_picks` directly from game cards — always use `game_pick_stats`. Pick splits only shown after kickoff (never before). Stats are pool-scoped (social lens) — each pool sees how *its* members picked, not the platform total.
 
 ### Pool Pick Stats
 Split percentages shown at kickoff. Realtime subscription in `nflStore` pushes updates. Subscription left open only when `weekState = 'live'`.

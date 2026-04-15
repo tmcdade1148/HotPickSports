@@ -57,6 +57,7 @@ If you find yourself writing any of the following, stop and revise.
 ### Data Architecture
 - New table per sport or event → use template tables with `event_id`
 - `pool_id` column on `*_user_totals` tables → never; scores are user-scoped
+- Any query or feature that assumes one pool per user → users belong to many pools; `pool_id` is always a WHERE filter, never a data-model boundary
 - Leaderboard query without `pool_start_date` filter → always filter from pool start, not season start
 - Playoff leaderboard mixing regular season scores → scope to `week_number >= playoff_start_week`
 - `DELETE FROM user_hardware` → use `is_visible = false`; hardware rows are permanent
