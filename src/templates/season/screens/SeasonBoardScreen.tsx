@@ -1,4 +1,4 @@
-import React, {useEffect, useState, useRef} from 'react';
+import React, {useEffect, useState, useRef, useCallback} from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import {spacing, borderRadius} from '@shared/theme';
 import {Flame} from 'lucide-react-native';
 
 import {useTheme} from '@shell/theme';
+import {AvatarBadge} from '@shared/components/AvatarBadge';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useGlobalStore} from '@shell/stores/globalStore';
 
@@ -39,7 +40,15 @@ export function SeasonBoardScreen() {
   const currentWeek = useSeasonStore(s => s.currentWeek);
   const leaderboard = useSeasonStore(s => s.leaderboard);
   const weekLeaderboard = useSeasonStore(s => s.weekLeaderboard);
+  const weekLeaderboardDisplayedWeek = useSeasonStore(
+    s => s.weekLeaderboardDisplayedWeek,
+  );
+  // Week tab label should reflect the week the leaderboard data is actually
+  // for. During picks_open/locked the store falls back to currentWeek - 1 so
+  // the tab doesn't show an empty list that fills as picks arrive.
+  const displayedWeek = weekLeaderboardDisplayedWeek ?? currentWeek;
   const userNames = useSeasonStore(s => s.userNames);
+  const userAvatars = useSeasonStore(s => s.userAvatars);
   const isLoading = useSeasonStore(s => s.isLoading);
   const fetchLeaderboard = useSeasonStore(s => s.fetchLeaderboard);
   const fetchWeekLeaderboard = useSeasonStore(s => s.fetchWeekLeaderboard);
@@ -56,6 +65,23 @@ export function SeasonBoardScreen() {
     : currentWeek - 1;
 
   const [activeTab, setActiveTab] = useState<'season' | 'week'>('season');
+  // Scroll-aware pinning: measureInWindow gives screen-space Y that
+  // works reliably across nested ScrollViews. Compare the real row's
+  // screen Y against the pinned row's screen Y to decide visibility.
+  const mySeasonRowRef = useRef<View>(null);
+  const myWeekRowRef = useRef<View>(null);
+  const [showPinnedRow, setShowPinnedRow] = useState(false);
+  // Screen height minus tab bar — the Y threshold below which the row is off-screen
+  const screenThreshold = useRef(Dimensions.get('window').height - 120);
+
+  const updatePinned = useCallback(() => {
+    const ref = activeTab === 'season' ? mySeasonRowRef : myWeekRowRef;
+    if (!ref.current) return;
+    ref.current.measureInWindow((_x, y) => {
+      // Row is off-screen when its top is below the visible area
+      setShowPinnedRow(y > screenThreshold.current);
+    });
+  }, [activeTab]);
   const scrollRef = useRef<ScrollView>(null);
 
   // Subscribe to poolId changes in the season store via Zustand subscribe
@@ -103,7 +129,10 @@ export function SeasonBoardScreen() {
     };
   }, [config, currentWeek, fetchWeekLeaderboard]);
 
-  // Realtime: season leaderboard refreshes when week state transitions to complete
+  // Realtime: both leaderboards refresh when week_state or current_week changes.
+  // The Week tab's fallback logic (show previous week during picks_open/locked,
+  // flip to current week during live/settling/complete) depends on week_state,
+  // so we must refetch the Week tab too — not just the Season tab.
   useEffect(() => {
     if (!config) return;
 
@@ -118,10 +147,10 @@ export function SeasonBoardScreen() {
           filter: `competition=eq.${config.competition}`,
         },
         (payload) => {
-          // Refresh season leaderboard when week_state changes (scores finalized)
           const key = (payload.new as any)?.key;
           if (key === 'week_state' || key === 'current_week') {
             fetchLeaderboard();
+            fetchWeekLeaderboard();
           }
         },
       )
@@ -130,7 +159,12 @@ export function SeasonBoardScreen() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [config, fetchLeaderboard]);
+  }, [config, fetchLeaderboard, fetchWeekLeaderboard]);
+
+  // Re-check pinned visibility after tab switch or data change.
+  useEffect(() => {
+    updatePinned();
+  }, [activeTab, leaderboard, weekLeaderboard, updatePinned]);
 
   const switchTab = (tab: 'season' | 'week') => {
     setActiveTab(tab);
@@ -147,6 +181,28 @@ export function SeasonBoardScreen() {
   };
 
   const currentPhase = useNFLStore(s => s.currentPhase);
+
+  // Compute previous-week rankings so we can show rank movement arrows.
+  // Must live above early returns to satisfy React's hook ordering rules.
+  const prevRankMap = React.useMemo(() => {
+    if (leaderboard.length === 0) return {} as Record<string, number>;
+    const allWeeks = new Set<number>();
+    for (const entry of leaderboard) {
+      for (const w of Object.keys(entry.weekly_breakdown).map(Number)) allWeeks.add(w);
+    }
+    const sortedWeeks = [...allWeeks].sort((a, b) => b - a);
+    const latestWeek = sortedWeeks[0];
+    if (latestWeek == null || sortedWeeks.length < 2) return {};
+
+    const prevTotals = leaderboard.map(e => ({
+      user_id: e.user_id,
+      pts: e.total_points - (e.weekly_breakdown[latestWeek] ?? 0),
+    }));
+    prevTotals.sort((a, b) => b.pts - a.pts);
+    const map: Record<string, number> = {};
+    prevTotals.forEach((e, i) => { map[e.user_id] = i + 1; });
+    return map;
+  }, [leaderboard]);
 
   if (currentPhase === 'PRE_SEASON') {
     return (
@@ -177,15 +233,32 @@ export function SeasonBoardScreen() {
     const latestWeek = weekKeys[0];
     const latestPoints = latestWeek != null ? item.weekly_breakdown[latestWeek] : null;
 
+    // Rank movement: positive = moved up, negative = moved down
+    const prevRank = prevRankMap[item.user_id];
+    const rankDelta = prevRank != null ? prevRank - rank : 0;
+
     return (
-      <View key={item.user_id} style={[styles.row, isMe && styles.rowHighlight]}>
+      <View
+        key={item.user_id}
+        style={[styles.row, isMe && styles.rowHighlight]}
+        ref={isMe ? mySeasonRowRef : undefined}>
         <Text style={[styles.rank, isMe && styles.textHighlight]}>{rank}</Text>
+        <AvatarBadge avatarKey={userAvatars[item.user_id]} name={userNames[item.user_id] ?? 'P'} size={24} />
         <View style={styles.userInfo}>
-          <Text
-            style={[styles.userName, isMe && styles.textHighlight]}
-            numberOfLines={1}>
-            {isMe ? 'You' : (userNames[item.user_id] ?? `Player ${rank}`)}
-          </Text>
+          <View style={styles.nameRow}>
+            <Text
+              style={[styles.userName, isMe && styles.textHighlight]}
+              numberOfLines={1}>
+              {isMe ? 'You' : (userNames[item.user_id] ?? `Player ${rank}`)}
+            </Text>
+            {rankDelta !== 0 ? (
+              <Text style={[styles.rankDelta, rankDelta > 0 ? styles.rankUp : styles.rankDown]}>
+                {rankDelta > 0 ? '▲' : '▼'}{Math.abs(rankDelta)}
+              </Text>
+            ) : prevRank != null ? (
+              <Text style={styles.rankSame}>◆</Text>
+            ) : null}
+          </View>
           {latestPoints != null && (
             <Text style={styles.breakdown}>
               Wk {latestWeek}: {latestPoints} pts
@@ -220,8 +293,12 @@ export function SeasonBoardScreen() {
         : '';
 
     return (
-      <View key={item.user_id} style={[styles.row, isMe && styles.rowHighlight]}>
+      <View
+        key={item.user_id}
+        style={[styles.row, isMe && styles.rowHighlight]}
+        ref={isMe ? myWeekRowRef : undefined}>
         <Text style={[styles.rank, isMe && styles.textHighlight]}>{rank}</Text>
+        <AvatarBadge avatarKey={userAvatars[item.user_id]} name={userNames[item.user_id] ?? 'P'} size={24} />
         <View style={styles.userInfo}>
           <Text
             style={[styles.userName, isMe && styles.textHighlight]}
@@ -281,7 +358,9 @@ export function SeasonBoardScreen() {
       <ScrollView
         style={{flex: 1}}
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        scrollEventThrottle={64}
+        onScroll={updatePinned}>
         {/* Toggle */}
         <View style={styles.toggleContainer}>
           <TouchableOpacity
@@ -301,7 +380,7 @@ export function SeasonBoardScreen() {
               styles.toggleText,
               activeTab === 'week' && styles.toggleTextActive,
             ]}>
-              Week {currentWeek}
+              Week {displayedWeek}
             </Text>
           </TouchableOpacity>
         </View>
@@ -339,7 +418,7 @@ export function SeasonBoardScreen() {
               {weekLeaderboard.length === 0 ? (
                 <View style={styles.emptyState}>
                   <Text style={styles.emptyText}>
-                    Week {currentWeek} scores will appear once games are played.
+                    Week {displayedWeek} scores will appear once games are played.
                   </Text>
                 </View>
               ) : (
@@ -350,12 +429,11 @@ export function SeasonBoardScreen() {
         </ScrollView>
       </ScrollView>
 
-      {/* Pinned "You" row — shows when user is ranked below visible area */}
+      {/* Pinned "You" row — shows only when user's row has scrolled off screen */}
       {(() => {
         const activeList = activeTab === 'season' ? leaderboard : weekLeaderboard;
         const myIndex = activeList.findIndex(e => e.user_id === user?.id);
-        // Pin if user exists and is beyond 5th position (likely off-screen)
-        if (myIndex < 5 || myIndex === -1) return null;
+        if (myIndex === -1 || !showPinnedRow) return null;
         const myEntry = activeList[myIndex];
         const rank = myIndex + 1;
         const points = activeTab === 'season'
@@ -364,6 +442,7 @@ export function SeasonBoardScreen() {
         return (
           <View style={[styles.pinnedRow, {borderTopColor: colors.border}]}>
             <Text style={[styles.rank, styles.textHighlight]}>{rank}</Text>
+            <AvatarBadge avatarKey={userAvatars[user?.id ?? ''] ?? null} name={userNames[user?.id ?? ''] ?? 'Y'} size={24} />
             <View style={styles.userInfo}>
               <Text style={[styles.userName, styles.textHighlight]} numberOfLines={1}>
                 You
@@ -424,7 +503,8 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    gap: spacing.sm,
     padding: spacing.md,
     backgroundColor: colors.surface,
     borderRadius: borderRadius.md,
@@ -437,7 +517,8 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   pinnedRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    gap: spacing.sm,
     padding: spacing.md,
     backgroundColor: colors.surface,
     borderTopWidth: 1,
@@ -445,12 +526,31 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginHorizontal: 0,
   },
   rank: {
-    width: 32,
-    fontSize: 16,
-    fontWeight: '700',
+    width: 28,
+    fontSize: 20,
+    fontWeight: '800',
     color: colors.primary,
     textAlign: 'center',
-    paddingTop: 2,
+    lineHeight: 24,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  rankDelta: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  rankUp: {
+    color: colors.success ?? '#1DC24C',
+  },
+  rankDown: {
+    color: colors.error ?? '#C21D1D',
+  },
+  rankSame: {
+    fontSize: 9,
+    color: colors.highlight ?? '#E39032',
   },
   userInfo: {
     flex: 1,

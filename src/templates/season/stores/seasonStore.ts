@@ -7,6 +7,12 @@ import type {
   DbSeasonUserTotal,
 } from '@shared/types/database';
 
+/** Leaderboard display name: poolie_name → first + last initial → 'Player' */
+function formatLeaderboardName(p: {poolie_name: string | null; first_name: string | null; last_name: string | null}): string {
+  return p.poolie_name
+    || (p.first_name ? `${p.first_name}${p.last_name ? ` ${p.last_name.charAt(0)}.` : ''}` : 'Player');
+}
+
 /**
  * Aggregated leaderboard entry — computed client-side by summing
  * per-week rows from season_user_totals.
@@ -48,8 +54,16 @@ interface SeasonState {
   weekPicks: DbSeasonPick[];
   leaderboard: SeasonLeaderboardEntry[];
   weekLeaderboard: WeekLeaderboardEntry[];
+  /** Which week the weekLeaderboard data is actually for. Differs from
+   *  currentWeek during picks_open/locked — fetchWeekLeaderboard falls back
+   *  to the previously-scored week so the Week tab never shows an empty list
+   *  that fills in as picks are submitted. UI should label the Week tab with
+   *  this value, not currentWeek. */
+  weekLeaderboardDisplayedWeek: number | null;
   /** Map of user_id -> display_name for leaderboard display */
   userNames: Record<string, string>;
+  /** Map of user_id -> avatar_key for leaderboard/profile display */
+  userAvatars: Record<string, string | null>;
   isLoading: boolean;
   isSaving: boolean;
   saveError: string | null;
@@ -96,7 +110,9 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
   weekPicks: [],
   leaderboard: [],
   weekLeaderboard: [],
+  weekLeaderboardDisplayedWeek: null,
   userNames: {},
+  userAvatars: {},
   isLoading: false,
   isSaving: false,
   saveError: null,
@@ -140,6 +156,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       weekPicks: [],
       leaderboard: [],
       weekLeaderboard: [], // clear to force re-render when new data arrives
+      weekLeaderboardDisplayedWeek: null,
       userNames: state.userNames, // preserve — names are user-level, not pool-scoped
       isWeekComplete: false,
     }));
@@ -381,17 +398,41 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       get().currentWeek ||
       (typeof cfgMap.current_week === 'number' ? cfgMap.current_week : 1);
 
-    // Step 1: Get ACTIVE pool member user IDs (never include removed/left)
-    const {data: members} = await supabase
-      .from('pool_members')
-      .select('user_id')
-      .eq('pool_id', poolId)
-      .eq('status', 'active');
+    // Step 1: Get ACTIVE pool member user IDs + pool_start_date in parallel
+    const [membersResult, poolResult] = await Promise.all([
+      supabase
+        .from('pool_members')
+        .select('user_id')
+        .eq('pool_id', poolId)
+        .eq('status', 'active'),
+      supabase
+        .from('pools')
+        .select('pool_start_date')
+        .eq('id', poolId)
+        .single(),
+    ]);
 
-    const memberIds = (members ?? []).map(m => m.user_id);
+    const memberIds = (membersResult.data ?? []).map(m => m.user_id);
     if (memberIds.length === 0) {
       set({leaderboard: [], userNames: {}, isLoading: false});
       return;
+    }
+
+    // Determine the first week that falls on or after pool_start_date.
+    // This ensures mid-season pools start everyone at 0 for this pool's leaderboard.
+    let startWeek = 1;
+    if (poolResult.data?.pool_start_date) {
+      const {data: firstGame} = await supabase
+        .from('season_games')
+        .select('week')
+        .eq('competition', config.competition)
+        .gte('kickoff_at', poolResult.data.pool_start_date)
+        .order('kickoff_at', {ascending: true})
+        .limit(1)
+        .maybeSingle();
+      if (firstGame?.week) {
+        startWeek = firstGame.week;
+      }
     }
 
     // Step 2: Fetch per-week totals filtered to current season phase
@@ -399,7 +440,8 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       .from('season_user_totals')
       .select('*')
       .eq('competition', config.competition)
-      .in('user_id', memberIds);
+      .in('user_id', memberIds)
+      .gte('week', startWeek);
 
     if (isPlayoffs) {
       query = query.neq('phase', 'REGULAR');
@@ -439,19 +481,20 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       (a, b) => b.total_points - a.total_points,
     );
 
-    // Step 4: Fetch display names for all users on the leaderboard
+    // Step 4: Fetch display names + avatars for all users on the leaderboard
     const userIds = leaderboard.map(s => s.user_id);
     let names: Record<string, string> = {};
+    let avatars: Record<string, string | null> = {};
     if (userIds.length > 0) {
       const {data: profiles} = await supabase
         .from('profiles')
-        .select('id, poolie_name, first_name, last_name')
+        .select('id, poolie_name, first_name, last_name, avatar_key')
         .in('id', userIds);
 
       if (profiles) {
         for (const p of profiles) {
-          names[p.id] = p.poolie_name
-            || (p.first_name ? `${p.first_name}${p.last_name ? ` ${p.last_name.charAt(0)}.` : ''}` : 'Player');
+          names[p.id] = formatLeaderboardName(p);
+          avatars[p.id] = p.avatar_key ?? null;
         }
       }
     }
@@ -459,6 +502,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
     set({
       leaderboard,
       userNames: names,
+      userAvatars: avatars,
       isLoading: false,
     });
   },
@@ -469,27 +513,41 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
 
     let targetWeek = week ?? currentWeek;
 
-    // If no explicit week requested, check if current week has any live/final games
-    // If not, show previous week's leaderboard until games kick off
+    // Week-tab fallback rule: when no explicit week is requested, show the
+    // previously-scored week's leaderboard until the current week has data
+    // worth showing. This keeps the Week tab from displaying an empty list
+    // that fills one-row-at-a-time as poolies submit picks during picks_open.
+    //
+    // Primary signal: competition_config.week_state — source of truth.
+    //   picks_open / locked  → show currentWeek - 1 (scored)
+    //   live / settling / complete → show currentWeek (scoring in progress or done)
+    // Secondary safety net: if season_user_totals has rows for currentWeek,
+    // trust that and show currentWeek regardless of weekState.
     if (!week && currentWeek > 1) {
-      const {data: liveGames} = await supabase
-        .from('season_games')
-        .select('game_id')
+      const {data: cfgRow} = await supabase
+        .from('competition_config')
+        .select('value')
         .eq('competition', config.competition)
-        .eq('week', currentWeek)
-        .in('status', ['in_progress', 'final', 'live'])
-        .limit(1);
+        .eq('key', 'week_state')
+        .maybeSingle();
 
-      if (!liveGames || liveGames.length === 0) {
-        // Also check if anyone has scores for current week
-        const {data: weekScores} = await supabase
+      const weekState =
+        typeof cfgRow?.value === 'string' ? cfgRow.value : null;
+      const currentWeekIsPrePlay =
+        weekState === 'picks_open' || weekState === 'locked';
+
+      if (currentWeekIsPrePlay) {
+        // Safety net: if someone already has a totals row for currentWeek
+        // (e.g. week was partially scored during testing) prefer the current
+        // week so we don't hide real data.
+        const {data: existingTotals} = await supabase
           .from('season_user_totals')
           .select('id')
           .eq('competition', config.competition)
           .eq('week', currentWeek)
           .limit(1);
 
-        if (!weekScores || weekScores.length === 0) {
+        if (!existingTotals || existingTotals.length === 0) {
           targetWeek = currentWeek - 1;
         }
       }
@@ -625,22 +683,32 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
     if (allWeekUserIds.length > 0) {
       const {data: profiles} = await supabase
         .from('profiles')
-        .select('id, poolie_name, first_name, last_name')
+        .select('id, poolie_name, first_name, last_name, avatar_key')
         .in('id', allWeekUserIds);
 
       if (profiles) {
         const existingNames = get().userNames;
+        const existingAvatars = get().userAvatars;
         const updatedNames = {...existingNames};
+        const updatedAvatars = {...existingAvatars};
         for (const p of profiles) {
-          updatedNames[p.id] = p.poolie_name
-            || (p.first_name ? `${p.first_name}${p.last_name ? ` ${p.last_name.charAt(0)}.` : ''}` : 'Player');
+          updatedNames[p.id] = formatLeaderboardName(p);
+          updatedAvatars[p.id] = p.avatar_key ?? null;
         }
-        set({weekLeaderboard: weekEntries, userNames: updatedNames});
+        set({
+          weekLeaderboard: weekEntries,
+          weekLeaderboardDisplayedWeek: targetWeek,
+          userNames: updatedNames,
+          userAvatars: updatedAvatars,
+        });
         return;
       }
     }
 
-    set({weekLeaderboard: weekEntries});
+    set({
+      weekLeaderboard: weekEntries,
+      weekLeaderboardDisplayedWeek: targetWeek,
+    });
   },
 
   getPickForGame: (gameId: string) => {

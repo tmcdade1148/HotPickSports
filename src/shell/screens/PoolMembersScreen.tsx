@@ -14,7 +14,7 @@ import {ChevronLeft, Shield, Crown, UserMinus} from 'lucide-react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {useAuth} from '@shared/hooks/useAuth';
 import {getDisplayName} from '@shared/utils/displayName';
-import {SYSTEM_AVATARS} from '@shell/components/AvatarSelector';
+import {AvatarBadge} from '@shared/components/AvatarBadge';
 import {spacing, borderRadius} from '@shared/theme';
 import type {DbPoolMember, DbProfile} from '@shared/types/database';
 import {useTheme} from '@shell/theme';
@@ -125,11 +125,6 @@ export function PoolMembersScreen() {
       year: 'numeric',
     });
 
-    // Resolve avatar
-    const avatarInfo = item.profile?.avatar_key
-      ? SYSTEM_AVATARS.find(a => a.key === item.profile?.avatar_key)
-      : null;
-
     const canTap =
       canManage && !isMe && item.role !== 'organizer' && !(isAdmin && item.role === 'admin');
 
@@ -138,20 +133,7 @@ export function PoolMembersScreen() {
         style={[styles.memberRow, isMe && styles.memberRowMe]}
         onPress={() => canTap && handleMemberAction(item)}
         activeOpacity={canTap ? 0.7 : 1}>
-        {/* Avatar */}
-        <View
-          style={[
-            styles.avatar,
-            avatarInfo && {backgroundColor: avatarInfo.color},
-          ]}>
-          {avatarInfo ? (
-            <Text style={styles.avatarEmoji}>{avatarInfo.emoji}</Text>
-          ) : (
-            <Text style={styles.avatarEmoji}>
-              {memberName.charAt(0).toUpperCase()}
-            </Text>
-          )}
-        </View>
+        <AvatarBadge avatarKey={item.profile?.avatar_key ?? null} name={memberName} size={40} />
 
         {/* Info */}
         <View style={styles.memberInfo}>
@@ -287,17 +269,6 @@ const createStyles = (colors: any) => StyleSheet.create({
   memberRowMe: {
     borderWidth: 1,
     borderColor: colors.primary,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarEmoji: {
-    fontSize: 18,
   },
   memberInfo: {
     flex: 1,
