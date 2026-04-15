@@ -28,7 +28,7 @@ export function AboutScreen() {
         contentContainerStyle={styles.content}>
         <Text style={[styles.appName, {color: colors.primary}]}>HotPick Sports</Text>
         <Text style={[styles.tagline, {color: colors.textPrimary}]}>
-          Pick once. Play every pool.
+          Pick once. Play everywhere.
         </Text>
 
         <View style={[styles.card, {backgroundColor: colors.surface}]}>

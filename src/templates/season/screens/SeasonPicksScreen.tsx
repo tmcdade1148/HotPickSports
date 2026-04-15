@@ -292,11 +292,8 @@ export function SeasonPicksScreen() {
 
   const sections = useMemo(() => groupGamesByWave(games), [games]);
 
-  const renderGame = ({item, index}: {item: DbSeasonGame; index: number}) => (
-    <View style={[
-      styles.cardWrapper,
-      index % 2 === 1 && {backgroundColor: colors.surface},
-    ]}>
+  const renderGame = ({item}: {item: DbSeasonGame}) => (
+    <View style={styles.cardWrapper}>
       <SeasonMatchCard
         game={item}
         config={config}
@@ -452,11 +449,10 @@ const createStyles = (colors: any) => StyleSheet.create({
     paddingBottom: 100,
   },
   cardWrapper: {
-    paddingVertical: spacing.xs,
+    marginBottom: spacing.sm,
   },
   separator: {
-    height: 1,
-    marginHorizontal: spacing.md,
+    height: 0,
     opacity: 0.5,
   },
   sectionHeader: {

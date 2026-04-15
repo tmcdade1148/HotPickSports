@@ -378,14 +378,15 @@ export function SeasonMatchCard({
 
 const createStyles = (colors: any) => StyleSheet.create({
   container: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    marginHorizontal: spacing.sm,
     paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   containerHotPick: {
     borderWidth: 2,
     borderColor: colors.primary,
-    borderRadius: 12,
-    marginHorizontal: 4,
-    paddingVertical: 4,
   },
   containerLocked: {
     opacity: 0.7,
@@ -549,6 +550,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   teamName: {
     fontSize: 16,
     fontWeight: '800',
+    fontStyle: 'italic',
     color: colors.textPrimary,
     flexShrink: 1,
   },

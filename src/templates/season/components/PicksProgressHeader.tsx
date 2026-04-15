@@ -63,7 +63,6 @@ export function PicksProgressHeader({
           <HotPickFlame
             size={36}
             active={hasHotPick}
-            inactiveColor={colors.textSecondary}
           />
           <Text
             style={[

@@ -108,7 +108,7 @@ export function PoolSwitcherBar({mode, onGoBack}: PoolSwitcherBarProps) {
       <View style={styles.row}>
         {mode === 'picks' ? (
           <Text style={[styles.message, {color: colors.textSecondary}]}>
-            Pick once. Play every pool.
+            Pick once. Play everywhere.
           </Text>
         ) : hasVisiblePools ? (
           <TouchableOpacity
@@ -257,7 +257,8 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   message: {
-    fontSize: 14,
+    fontSize: 18,
+    fontWeight: '700',
     fontStyle: 'italic',
   },
   overlay: {

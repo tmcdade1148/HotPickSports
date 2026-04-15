@@ -55,7 +55,7 @@ export const HOTPICK_BRAND: BrandConfig = {
   secondary_color: HOTPICK_BRAND_COLORS.secondary,
   highlight_color: HOTPICK_BRAND_COLORS.highlight,
   background_color: HOTPICK_BRAND_COLORS.background,
-  surface_color: '#F4F4F4',  // auto-derived: slightly darker than #FCFCFC
+  surface_color: '#EBEBEB',  // visible contrast against #FCFCFC background
   text_primary: '#181818',   // dark text on light background
   text_secondary: '#6B6B6B', // muted dark text
   logo: HOTPICK_LOGOS,
