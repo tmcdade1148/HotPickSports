@@ -11,6 +11,7 @@
 		126A9B3339183E58A13844E1 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		1C0E8FFF2F85619500996DA3 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 1C0E8FFE2F85619500996DA3 /* GoogleService-Info.plist */; };
+		1C6431F32F9003AF004AEB6D /* apple.icon in Resources */ = {isa = PBXBuildFile; fileRef = 1C6431F22F9003AF004AEB6D /* apple.icon */; };
 		5A9A7B6015444ED7ADCAF4F0 /* Colors.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7DAFD1BC79E345998E27CEFF /* Colors.xcassets */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		78BE216C575A4B439790B864 /* BootSplash.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = F14169EF94C44DF0B8CEB803 /* BootSplash.storyboard */; };
@@ -24,6 +25,7 @@
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = HotPickSports/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		1C0E7B6D2F6382B300D1D3E8 /* HotPickSports.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = HotPickSports.entitlements; path = HotPickSports/HotPickSports.entitlements; sourceTree = "<group>"; };
 		1C0E8FFE2F85619500996DA3 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		1C6431F22F9003AF004AEB6D /* apple.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; name = apple.icon; path = HotPickSports/apple.icon; sourceTree = "<group>"; };
 		3B4392A12AC88292D35C810B /* Pods-HotPickSports.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-HotPickSports.debug.xcconfig"; path = "Target Support Files/Pods-HotPickSports/Pods-HotPickSports.debug.xcconfig"; sourceTree = "<group>"; };
 		5709B34CF0A7D63546082F79 /* Pods-HotPickSports.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-HotPickSports.release.xcconfig"; path = "Target Support Files/Pods-HotPickSports/Pods-HotPickSports.release.xcconfig"; sourceTree = "<group>"; };
 		5DCACB8F33CDC322A6C60F78 /* libPods-HotPickSports.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-HotPickSports.a"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -65,6 +67,7 @@
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
 				F14169EF94C44DF0B8CEB803 /* BootSplash.storyboard */,
 				7DAFD1BC79E345998E27CEFF /* Colors.xcassets */,
+				1C6431F22F9003AF004AEB6D /* apple.icon */,
 			);
 			name = HotPickSports;
 			sourceTree = "<group>";
@@ -191,6 +194,7 @@
 				78BE216C575A4B439790B864 /* BootSplash.storyboard in Resources */,
 				5A9A7B6015444ED7ADCAF4F0 /* Colors.xcassets in Resources */,
 				1C0E8FFF2F85619500996DA3 /* GoogleService-Info.plist in Resources */,
+				1C6431F32F9003AF004AEB6D /* apple.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -295,7 +299,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 3B4392A12AC88292D35C810B /* Pods-HotPickSports.debug.xcconfig */;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = apple;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = HotPickSports/HotPickSports.entitlements;
@@ -333,7 +337,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 5709B34CF0A7D63546082F79 /* Pods-HotPickSports.release.xcconfig */;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = apple;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = HotPickSports/HotPickSports.entitlements;
