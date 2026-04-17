@@ -4,6 +4,7 @@
 
 import { AppRegistry } from 'react-native';
 import App from './App';
-import { name as appName } from './app.json';
 
-AppRegistry.registerComponent(appName, () => App);
+// Must match android/app/src/main/java/com/hotpicksports/MainActivity.kt
+// and ios/HotPickSports/AppDelegate.swift — those are the source of truth.
+AppRegistry.registerComponent('HotPickSports', () => App);
