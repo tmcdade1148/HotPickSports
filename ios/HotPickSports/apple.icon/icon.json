@@ -1,30 +1,87 @@
 {
   "fill" : {
     "linear-gradient" : [
-      "extended-gray:0.75000,1.00000",
-      "extended-gray:1.00000,1.00000"
+      "extended-gray:1.00000,1.00000",
+      "extended-gray:0.75000,1.00000"
     ],
     "orientation" : {
       "start" : {
         "x" : 0.5,
-        "y" : 1
+        "y" : 0
       },
       "stop" : {
         "x" : 0.5,
-        "y" : 0.3
+        "y" : 0.7
       }
     }
   },
   "groups" : [
     {
+      "hidden" : false,
       "layers" : [
         {
-          "blend-mode" : "multiply",
+          "blend-mode" : "normal",
+          "fill" : "automatic",
+          "glass" : false,
+          "hidden" : false,
+          "image-name" : "title.svg",
+          "name" : "title",
+          "position" : {
+            "scale" : 0.52,
+            "translation-in-points" : [
+              3.0966,
+              -5.59375
+            ]
+          }
+        },
+        {
+          "blend-mode" : "normal",
+          "fill" : "none",
+          "glass" : false,
+          "hidden" : false,
+          "image-name" : "backer.svg",
+          "name" : "backer",
+          "position" : {
+            "scale" : 0.53,
+            "translation-in-points" : [
+              7,
+              23
+            ]
+          }
+        }
+      ],
+      "position" : {
+        "scale" : 1,
+        "translation-in-points" : [
+          0,
+          152
+        ]
+      },
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    },
+    {
+      "layers" : [
+        {
+          "blend-mode" : "normal",
+          "fill" : "automatic",
           "glass" : true,
           "hidden" : false,
-          "image-name" : "icon 2.png",
-          "name" : "icon 2",
-          "opacity" : 1
+          "image-name" : "flame.svg",
+          "name" : "flame",
+          "position" : {
+            "scale" : 0.78,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
         }
       ],
       "shadow" : {
