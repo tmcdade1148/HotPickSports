@@ -158,6 +158,7 @@ These rules apply from the moment the app is live in the App Store and Google Pl
 - **Take a manual Supabase backup before every schema migration** — Project Settings → Database → Backups → Manual backup
 - **`scoring_locked` in `competition_config` is the emergency scoring brake** — set to `true` to pause all scoring computation instantly, no deployment needed
 - **Build profile order is always: `development` → `preview` → `production`** — never skip preview; every non-trivial change verifies on a real device first
+- **When bumping the app's marketing version, bump `runtimeVersion` simultaneously in all three places** — `app.json`, `ios/HotPickSports/Supporting/Expo.plist` (`EXUpdatesRuntimeVersion`), and `android/app/src/main/res/values/strings.xml` (`expo_runtime_version`). Drift breaks OTA silently. Bare workflow requires a literal string; the `appVersion` policy is not supported
 
 ---
 
