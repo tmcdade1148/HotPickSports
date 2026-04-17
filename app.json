@@ -1,7 +1,7 @@
 {
-  "name": "HotPickSports",
-  "displayName": "HotPick Sports",
   "expo": {
+    "name": "HotPick Sports",
+    "slug": "hotpicksports",
     "icon": "./assets/icon.png",
     "splash": {
       "image": "./assets/splash.png",
