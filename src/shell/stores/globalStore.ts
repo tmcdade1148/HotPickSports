@@ -516,11 +516,18 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
 
     const typedPool = data.pool as DbPool;
 
-    // Auto-select, add role, and add to both local list and competition cache
+    // Auto-select, add role, and add to both local list and competition cache.
+    // IMPORTANT: also append to `visiblePools` — every pool-listing UI reads
+    // that derived list, not `userPools`. Newly-created pools are never
+    // global (organizers create non-global pools; globals are platform-
+    // provisioned), so no filter check is needed. Without this update the
+    // pool only appears after an app restart triggers `fetchUserPools`.
     set(state => {
       const updatedPools = [...state.userPools, typedPool];
+      const updatedVisible = [...state.visiblePools, typedPool];
       return {
         userPools: updatedPools,
+        visiblePools: updatedVisible,
         poolsByCompetition: {
           ...state.poolsByCompetition,
           [competition]: updatedPools,
