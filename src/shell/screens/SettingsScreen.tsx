@@ -358,9 +358,9 @@ export function SettingsScreen({route}: any) {
                       </Text>
                     <View style={styles.poolMetaRow}>
                       {pool.is_global ? (
-                        <Text style={[styles.globalBadge, isBranded && {color: pillTextColor + 'AA'}]}>Global pool</Text>
+                        <Text style={[styles.globalBadge, {color: colors.textSecondary}, isBranded && {color: pillTextColor + 'AA'}]}>Global pool</Text>
                       ) : poolRoles[pool.id] ? (
-                        <Text style={[styles.roleBadge, isBranded && {color: pillTextColor + 'AA'}]}>
+                        <Text style={[styles.roleBadge, {color: colors.textSecondary}, isBranded && {color: pillTextColor + 'AA'}]}>
                           {poolRoles[pool.id].charAt(0).toUpperCase() +
                             poolRoles[pool.id].slice(1)}
                         </Text>

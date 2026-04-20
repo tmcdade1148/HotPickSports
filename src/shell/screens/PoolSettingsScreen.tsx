@@ -113,33 +113,6 @@ export function PoolSettingsScreen() {
     Alert.alert('Copied', 'Invite code copied to clipboard.');
   };
 
-  const handleTogglePublic = () => {
-    const newVal = !pool.is_public;
-    Alert.alert(
-      newVal ? 'Make Public?' : 'Make Private?',
-      newVal
-        ? 'Anyone with the invite code can join.'
-        : 'New members will need approval to join.',
-      [
-        {text: 'Cancel', style: 'cancel'},
-        {
-          text: 'Confirm',
-          onPress: async () => {
-            const result = await updatePoolSettings(poolId, {
-              isPublic: newVal,
-            });
-            if (!result.success) {
-              Alert.alert(
-                'Error',
-                result.error ?? 'Failed to update setting',
-              );
-            }
-          },
-        },
-      ],
-    );
-  };
-
   const handleArchive = () => {
     Alert.alert(
       'Archive Pool',
@@ -256,33 +229,16 @@ export function PoolSettingsScreen() {
           )}
         </View>
 
-        {/* Public Toggle */}
-        <TouchableOpacity style={styles.toggleRow} onPress={handleTogglePublic}>
-          <Globe
-            size={18}
-            color={pool.is_public ? colors.primary : colors.textSecondary}
-          />
+        {/* Privacy label — switch hidden; pools are always private at launch */}
+        <View style={styles.toggleRow}>
+          <Globe size={18} color={colors.textSecondary} />
           <View style={styles.toggleInfo}>
-            <Text style={styles.toggleLabel}>Public Pool</Text>
+            <Text style={styles.toggleLabel}>Private Pool</Text>
             <Text style={styles.toggleDesc}>
-              {pool.is_public
-                ? 'Anyone with the invite code can join'
-                : 'New members need approval'}
+              Only people with the invite code can join
             </Text>
           </View>
-          <View
-            style={[
-              styles.toggleIndicator,
-              pool.is_public && styles.toggleIndicatorOn,
-            ]}>
-            <View
-              style={[
-                styles.toggleDot,
-                pool.is_public && styles.toggleDotOn,
-              ]}
-            />
-          </View>
-        </TouchableOpacity>
+        </View>
 
         {/* Communication & Moderation */}
         <Text style={styles.sectionTitle}>Communication</Text>

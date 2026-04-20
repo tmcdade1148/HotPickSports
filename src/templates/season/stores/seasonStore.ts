@@ -146,20 +146,30 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
     const seasonYear =
       typeof cfgMap.season_year === 'number' ? cfgMap.season_year : 2026;
 
-    set(state => ({
-      config,
-      poolId,
-      currentWeek,
-      seasonYear,
-      games: [],
-      allWeekGames: {},
-      weekPicks: [],
-      leaderboard: [],
-      weekLeaderboard: [], // clear to force re-render when new data arrives
-      weekLeaderboardDisplayedWeek: null,
-      userNames: state.userNames, // preserve — names are user-level, not pool-scoped
-      isWeekComplete: false,
-    }));
+    set(state => {
+      // When the user only switches pools (same competition), these caches
+      // remain valid because they're user+competition+week scoped, not
+      // pool-scoped (CLAUDE.md rule #2 — no pool_id on picks/games). Wiping
+      // them on every pool switch causes the Picks screen to go blank because
+      // the loading useEffect doesn't depend on poolId. Clear only when the
+      // competition itself changes (e.g., NFL → NHL).
+      const competitionChanged =
+        state.config?.competition !== config.competition;
+      return {
+        config,
+        poolId,
+        currentWeek,
+        seasonYear,
+        games: competitionChanged ? [] : state.games,
+        allWeekGames: competitionChanged ? {} : state.allWeekGames,
+        weekPicks: competitionChanged ? [] : state.weekPicks,
+        leaderboard: [], // pool-scoped, always clear
+        weekLeaderboard: [], // pool-scoped, always clear
+        weekLeaderboardDisplayedWeek: null,
+        userNames: state.userNames, // user-level, preserve
+        isWeekComplete: false,
+      };
+    });
 
     // Leaderboards are fetched by SeasonBoardScreen's useEffect on poolId.
     // Don't fetch here — it causes a race condition with the component.

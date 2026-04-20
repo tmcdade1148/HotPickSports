@@ -1000,9 +1000,13 @@ async function resetReviewerCurrentWeek() {
   const wk = state.currentWeek;
   if (!confirm(
     `Reset Mel Smiles (reviewer) for Week ${wk}?\n\n` +
-    `Deletes Mel's picks and season_user_totals row for Week ${wk}, then\n` +
-    `re-runs nfl-calculate-scores so other users stay correct.\n\n` +
-    `Weeks 1-7 are untouched.`
+    `This will:\n` +
+    `  1. Delete Mel's picks for Week ${wk}\n` +
+    `  2. Delete Mel's season_user_totals row for Week ${wk}\n` +
+    `  3. Delete ALL SmackTalk messages Mel posted (all weeks, all pools)\n` +
+    `  4. Delete Mel's smack_read_state so all SmackTalk shows as NEW/unread\n` +
+    `  5. Re-run nfl-calculate-scores so other users stay correct\n\n` +
+    `Weeks 1-7 picks + totals are untouched.`
   )) return;
   try {
     log(`Resetting reviewer picks for Week ${wk}…`, 'info');
@@ -1014,6 +1018,29 @@ async function resetReviewerCurrentWeek() {
       `season_user_totals?user_id=eq.${REVIEWER_USER_ID}&competition=eq.${COMPETITION}&week=eq.${wk}`,
       'DELETE'
     );
+
+    // Delete ALL SmackTalk messages posted by Mel across every pool. Reviewer
+    // accidentally pasted his email into the chat once — this prevents that
+    // kind of artifact from leaking into the App Review demo state.
+    log(`Deleting all SmackTalk posts by Mel…`, 'info');
+    await api(
+      `smack_messages?user_id=eq.${REVIEWER_USER_ID}`,
+      'DELETE'
+    );
+    log(`✓ Mel's SmackTalk posts removed.`, 'success');
+
+    // Delete Mel's smack_read_state rows. Unread count is derived from
+    // smack_messages.created_at > smack_read_state.last_read_at per user/pool.
+    // Wiping these rows makes every existing message show as unread, which
+    // gives the Home Screen SmackTalk preview a fresh "new messages" badge
+    // for Mel the first time he opens the app.
+    log(`Clearing Mel's SmackTalk read state (all pools)…`, 'info');
+    await api(
+      `smack_read_state?user_id=eq.${REVIEWER_USER_ID}`,
+      'DELETE'
+    );
+    log(`✓ Read state cleared — all SmackTalk now unread for Mel.`, 'success');
+
     const r = await callEdgeFunction('nfl-calculate-scores', { competition: COMPETITION, week: wk });
     log(`✓ Reviewer reset complete. ${r.users_scored ?? 0} users rescored.`, 'success');
     await refreshState();
@@ -1039,8 +1066,10 @@ async function resetToReviewerState() {
     '  1. Delete ALL picks for Week 8+ (all users, all weeks 8-22)\n' +
     '  2. Delete ALL season_user_totals for Week 8+\n' +
     '  3. Reset all Week 8-22 games back to scheduled (clear scores)\n' +
-    '  4. Clear lock_at on Week 8 games\n' +
-    '  5. Set current_week=8, week_state=picks_open\n\n' +
+    '  4. Set current_week=8, week_state=picks_open\n' +
+    '  5. Seed Week 8 picks for all 8 fake members\n' +
+    "  6. Clear Mel's SmackTalk read state so all messages show as NEW\n" +
+    "  7. Delete any SmackTalk messages Mel posted\n\n" +
     'Weeks 1-7 are UNTOUCHED.\n\n' +
     'This is the App Review submission state. Run this before submitting to Apple/Google.'
   )) return;
@@ -1109,15 +1138,26 @@ async function resetToReviewerState() {
     await loadWeekGames();
     await seedFakeWeekPicks(8);
 
-    // 6. Backdate TheReviewer's SmackTalk read state so recent seeded messages
-    //    show as unread on the home screen SmackTalk nudge module.
-    log('Backdating reviewer SmackTalk read state…', 'info');
+    // 6. Clear Mel's SmackTalk read state so ALL messages show as unread on
+    //    the Home Screen nudge. DELETE (not PATCH) is correct because if the
+    //    row doesn't exist, PATCH silently does nothing — we saw this fail
+    //    during reviewer testing. With no row, the client treats last_read_at
+    //    as -infinity and every message counts as unread.
+    log(`Clearing Mel's SmackTalk read state (all pools)…`, 'info');
     await api(
-      `smack_read_state?user_id=eq.${REVIEWER_USER_ID}&pool_id=eq.${PROVING_GROUNDS_POOL_ID}`,
-      'PATCH',
-      { last_read_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString() }
+      `smack_read_state?user_id=eq.${REVIEWER_USER_ID}`,
+      'DELETE'
     );
-    log('✓ Reviewer SmackTalk read state backdated 3 days — recent messages show as new.', 'success');
+
+    // Also delete any SmackTalk messages Mel posted across every pool —
+    // reviewer accidentally pasted his email once, this prevents any
+    // reviewer-authored artifact from leaking into the App Review state.
+    log(`Deleting any SmackTalk posts by Mel…`, 'info');
+    await api(
+      `smack_messages?user_id=eq.${REVIEWER_USER_ID}`,
+      'DELETE'
+    );
+    log(`✓ Mel's SmackTalk reset — all seeded messages now unread, no reviewer posts.`, 'success');
 
     log('=== Reset complete. Sim is ready for App Review. ===', 'success');
     log('Expected: Mel lands at Week 8 picks_open, Week tab shows Week 7 leaderboard (fallback), Picks tab shows 13 scheduled Week 8 games, 8 fakes have picks ready, SmackTalk nudge shows unread messages.', 'info');
