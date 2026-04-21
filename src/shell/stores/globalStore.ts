@@ -685,19 +685,22 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       return {success: false, error: data.error};
     }
 
-    // Update local state
+    // Update local state — mirror the change into both `userPools` and
+    // `visiblePools`. Every pool-listing UI reads `visiblePools`; updates
+    // that only touch `userPools` won't appear until the next fetch.
+    const applyUpdate = (p: DbPool) =>
+      p.id === poolId
+        ? {
+            ...p,
+            ...(settings.name !== undefined ? {name: settings.name} : {}),
+            ...(settings.isPublic !== undefined
+              ? {is_public: settings.isPublic}
+              : {}),
+          }
+        : p;
     set(state => ({
-      userPools: state.userPools.map(p =>
-        p.id === poolId
-          ? {
-              ...p,
-              ...(settings.name !== undefined ? {name: settings.name} : {}),
-              ...(settings.isPublic !== undefined
-                ? {is_public: settings.isPublic}
-                : {}),
-            }
-          : p,
-      ),
+      userPools: state.userPools.map(applyUpdate),
+      visiblePools: state.visiblePools.map(applyUpdate),
     }));
 
     return {success: true};
@@ -716,9 +719,14 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       return {success: false, error: data.error};
     }
 
-    // Remove from local state
+    // Remove from local state — mirror the removal into `visiblePools`
+    // so Settings, Home, and the pool switcher all stop listing it
+    // immediately. Without the visiblePools update the pool stays on
+    // screen, and a second archive attempt hits the RPC which (rightly)
+    // reports it's already archived.
     set(state => ({
       userPools: state.userPools.filter(p => p.id !== poolId),
+      visiblePools: state.visiblePools.filter(p => p.id !== poolId),
       activePoolId:
         state.activePoolId === poolId ? null : state.activePoolId,
     }));
@@ -1016,10 +1024,12 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   activeBrandConfig: null,
   setActiveBrandConfig: config => set({activeBrandConfig: config}),
   updatePoolBrandConfig: (poolId, config) => {
+    // Mirror into visiblePools too — see note in archivePool / updatePoolSettings.
+    const applyBrand = (p: DbPool) =>
+      p.id === poolId ? {...p, brand_config: config as Record<string, unknown> | null} : p;
     set(state => ({
-      userPools: state.userPools.map(p =>
-        p.id === poolId ? {...p, brand_config: config as Record<string, unknown> | null} : p,
-      ),
+      userPools: state.userPools.map(applyBrand),
+      visiblePools: state.visiblePools.map(applyBrand),
       // If this is the active pool, also update the global theme
       ...(state.activePoolId === poolId ? {activeBrandConfig: config} : {}),
     }));
