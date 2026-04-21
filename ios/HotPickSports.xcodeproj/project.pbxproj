@@ -305,7 +305,7 @@
 				CODE_SIGN_ENTITLEMENTS = HotPickSports/HotPickSports.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = W88A7N6XW5;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = HotPickSports/Info.plist;
@@ -346,7 +346,7 @@
 				CODE_SIGN_ENTITLEMENTS = HotPickSports/HotPickSports.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = W88A7N6XW5;
 				INFOPLIST_FILE = HotPickSports/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.sports";

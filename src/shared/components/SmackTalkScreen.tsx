@@ -5,6 +5,7 @@ import {
   TextInput,
   TouchableOpacity,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Modal,
@@ -686,17 +687,25 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
   };
 
   return (
+    // KAV notes:
+    //   behavior="padding" + keyboardVerticalOffset=0 is correct for a KAV
+    //   that lives inside a tab screen. The KAV's bottom edge already sits
+    //   above the tab bar, so RN's padding math (keyboard_height -
+    //   tab_bar_height + verticalOffset) only needs offset=0. Any positive
+    //   offset shows up as a literal white gap between input and keyboard.
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={90}>
+      keyboardVerticalOffset={0}>
       {messages.length === 0 ? (
-        <View style={styles.emptyState}>
+        // Tap-to-dismiss: when the chat is empty there's no FlatList to
+        // drag, so the empty state itself dismisses the keyboard on tap.
+        <Pressable style={styles.emptyState} onPress={Keyboard.dismiss}>
           <Text style={styles.emptyTitle}>SmackTalk</Text>
           <Text style={styles.emptyText}>
             No messages yet. Be the first to talk trash!
           </Text>
-        </View>
+        </Pressable>
       ) : (
         <FlatList
           ref={flatListRef}
@@ -704,6 +713,13 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
           keyExtractor={item => item.id}
           renderItem={renderMessage}
           contentContainerStyle={styles.list}
+          // Dragging down on the message list closes the keyboard, the
+          // standard iOS Messages gesture. "interactive" follows the finger;
+          // "on-drag" closes on any drag — either works, interactive feels
+          // more native. Message long-press for reactions still works via
+          // keyboardShouldPersistTaps="handled".
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          keyboardShouldPersistTaps="handled"
           onContentSizeChange={() => {
             // Auto-scroll to bottom only on initial load and new messages, not loadMore
             if (!loadingMore) {
