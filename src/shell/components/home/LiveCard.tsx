@@ -248,17 +248,19 @@ function ImpactLine({impact}: {impact: HotPickImpact}) {
   const {colors} = useTheme();
   const styles = createStyles(colors);
   switch (impact.status) {
+    // During live games we no longer project point outcomes. Show a neutral
+    // status label reflecting whether the user's pick is leading or trailing.
     case 'winning':
       return (
         <Text style={[styles.impactText, {color: '#1B9A06'}]}>
-          +{impact.points} if this holds {'\uD83D\uDD25'}
+          Your pick is leading
         </Text>
       );
 
     case 'losing':
       return (
-        <Text style={[styles.impactText, {color: colors.error}]}>
-          {'\u2212'}{Math.abs(impact.points)} at risk {'\u26A0\uFE0F'}
+        <Text style={[styles.impactText, {color: colors.textSecondary}]}>
+          Your pick is trailing
         </Text>
       );
 
@@ -272,7 +274,9 @@ function ImpactLine({impact}: {impact: HotPickImpact}) {
     case 'final':
       return (
         <Text style={[styles.impactText, {color: impact.isCorrect ? '#1B9A06' : colors.error}]}>
-          {impact.isCorrect ? `+${impact.points} \u2705` : `\u2212${Math.abs(impact.points)} \u274C`}
+          {impact.isCorrect
+            ? `FINAL \u2713 Correct +${impact.points} pts`
+            : `FINAL \u2717 Incorrect \u2212${Math.abs(impact.points)} pts`}
         </Text>
       );
 

@@ -191,9 +191,10 @@ export function SeasonMatchCard({
     setHotPick({userId, gameId: game.game_id});
   };
 
-  // HotPick points label in header
+  // HotPick points label in header — reframed from "+/-13 pts" (wager-like)
+  // to "13 HotPick Points" (descriptive point value).
   const pointsLabel =
-    isHotPick && !isFinal ? `+/-${rank} pts` : null;
+    isHotPick && !isFinal ? `${rank} HotPick Points` : null;
 
   return (
     <View style={[styles.container, isLocked && !isLive && !isFinal && styles.containerLocked, isHotPick && styles.containerHotPick]}>
@@ -222,7 +223,11 @@ export function SeasonMatchCard({
                 existingPick.points > 0 && styles.pointsEarnedPositive,
                 existingPick.points < 0 && styles.pointsEarnedNegative,
               ]}>
-                {existingPick.points > 0 ? `+${existingPick.points}` : `${existingPick.points}`}
+                {existingPick.points > 0
+                  ? `\u2713 Correct +${existingPick.points} pts`
+                  : existingPick.points < 0
+                    ? `\u2717 Incorrect \u2212${Math.abs(existingPick.points)} pts`
+                    : '0 pts'}
               </Text>
             )}
           </View>
@@ -247,8 +252,14 @@ export function SeasonMatchCard({
             ]}>
             <Text style={styles.rankNumber}>{rank}</Text>
           </View>
-          <Text style={[styles.rankLabel, {marginTop: 3}]}>HotPick</Text>
-          <Text style={[styles.rankLabel, {marginTop: -1}]}>Points</Text>
+          {isHotPick ? (
+            <>
+              <Text style={[styles.rankLabel, {marginTop: 3}]}>HotPick</Text>
+              <Text style={[styles.rankLabel, {marginTop: -1}]}>Points</Text>
+            </>
+          ) : (
+            <Text style={[styles.rankLabel, {marginTop: 3}]}>Points</Text>
+          )}
         </View>
 
         {/* Team buttons — away on top, home on bottom */}

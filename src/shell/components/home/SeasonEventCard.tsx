@@ -419,7 +419,7 @@ export function SeasonEventCard({config, onNavigateToEvent}: SeasonEventCardProp
                     <>
                       {isHotPickGameLive && hotPickTeamName ? (
                         <>
-                          <Text style={[styles.kickoffLabel, {color: '#1b9a06', fontWeight: '700', fontStyle: 'italic'}]}>YOUR HOTPICK IS LIVE</Text>
+                          <Text style={[styles.kickoffLabel, {color: '#1b9a06', fontWeight: '700', fontStyle: 'italic'}]}>HOTPICK IN PROGRESS</Text>
                           <TouchableOpacity onPress={handleSmackTalkPress} activeOpacity={0.7}>
                             <Text style={styles.lockInfoLine}>
                               {'The '}

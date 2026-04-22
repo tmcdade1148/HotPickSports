@@ -353,26 +353,26 @@ export function SeasonPicksScreen() {
                     styles.widgetPts,
                     {color: weekEarned >= 0 ? '#1b9a06' : colors.error},
                   ]}>pts</Text>
-                  <Text style={styles.widgetTarget}>/{potentialWeekScore} target pts</Text>
+                  <Text style={styles.widgetTarget}>/{potentialWeekScore} ceiling pts</Text>
                 </View>
               </View>
             </View>
           ) : (
             <View style={styles.widgetRow}>
               <View style={styles.widget}>
-                <Text style={styles.widgetLabel}>Pts. Target</Text>
+                <Text style={styles.widgetLabel}>Weekly Ceiling</Text>
                 <View style={styles.widgetValueRow}>
                   <Text style={[
                     styles.widgetValue,
                     pickCount > 0 && {color: colors.primary},
                   ]}>
-                    +{potentialWeekScore}
+                    {potentialWeekScore}
                   </Text>
                   <Text style={styles.widgetPts}>pts</Text>
                 </View>
               </View>
               <View style={styles.widget}>
-                <Text style={styles.widgetLabel}>PTS. EARNED</Text>
+                <Text style={styles.widgetLabel}>Weekly Score</Text>
                 <View style={styles.widgetValueRow}>
                   <Text style={[
                     styles.widgetValue,
