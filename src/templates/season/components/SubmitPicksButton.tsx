@@ -60,7 +60,7 @@ export function SubmitPicksButton(props: SubmitPicksButtonProps) {
       enabled: false,
     },
     needs_hotpick: {
-      label: '🔥 Select your HotPick to submit',
+      label: 'Select your HotPick',
       bgColor: colors.primary,
       enabled: true,
     },

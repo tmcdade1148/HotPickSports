@@ -122,7 +122,7 @@ export function InstructionsScreen() {
             {'\u2022'} Correct HotPick: earn +rank points (e.g., rank 8 = +8 pts)
           </Text>
           <Text style={[styles.bulletItem, {color: colors.textSecondary}]}>
-            {'\u2022'} Wrong HotPick: lose -rank points (e.g., rank 8 = -8 pts)
+            {'\u2022'} Wrong HotPick: subtract rank points (e.g., rank 8 = -8 pts)
           </Text>
           <Text style={[styles.bulletItem, {color: colors.textSecondary}]}>
             {'\u2022'} All other picks: +1 for correct, 0 for incorrect
