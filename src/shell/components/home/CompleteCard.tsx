@@ -67,9 +67,9 @@ function getObservation(
     return `${correctPicks} for ${totalPicks} on picks but the HotPick didn't land. So close.`;
   }
 
-  // Bold HotPick win (high rank)
+  // High-rank HotPick win
   if (hotPickCorrect && rank >= 12) {
-    return `Bold call. +${rank} on the Rank ${rank} HotPick. That's how it's done.`;
+    return `Rank ${rank} HotPick landed. +${rank} pts. Nicely called.`;
   }
 
   // Standard HotPick win
@@ -77,9 +77,9 @@ function getObservation(
     return `HotPick landed. +${rank} added to the total.`;
   }
 
-  // Bold HotPick loss (high rank)
+  // High-rank HotPick loss
   if (hotPickCorrect === false && rank >= 12) {
-    return `Rank ${rank} HotPick gone wrong. -${rank} pts. Ouch.`;
+    return `Rank ${rank} HotPick didn\u2019t land. \u2212${rank} pts. Next week.`;
   }
 
   // Standard HotPick loss

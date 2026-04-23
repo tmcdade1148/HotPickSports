@@ -90,7 +90,7 @@ export function SubmitPicksButton(props: SubmitPicksButtonProps) {
           if (state === 'needs_hotpick') {
             Alert.alert(
               'Choose Your HotPick',
-              'Every week you must designate one game as your HotPick — your bold call. Tap the 🔥 icon on a game card to select it. Get it right for bonus points. Get it wrong and it costs you.',
+              'Every week you designate one game as your HotPick. A correct HotPick earns the game\u2019s full rank value in points; an incorrect HotPick subtracts that value. Tap the flame icon on a game card to select your HotPick.',
               [{text: 'Got it'}],
             );
             return;

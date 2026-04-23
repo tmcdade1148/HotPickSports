@@ -51,9 +51,10 @@ export function AboutScreen() {
         <View style={[styles.card, {backgroundColor: colors.surface}]}>
           <Text style={[styles.cardTitle, {color: colors.textPrimary}]}>The HotPick</Text>
           <Text style={[styles.body, {color: colors.textSecondary}]}>
-            Every week, designate one pick as your HotPick. Get it right and earn
-            bonus points based on the game's rank. Get it wrong and lose those
-            same points. High risk, high reward — it's what keeps things interesting.
+            Every week, designate one pick as your HotPick. A correct HotPick
+            earns the game's full rank value as points; an incorrect HotPick
+            subtracts that value from your weekly total. It's the mechanic that
+            rewards conviction on close games.
           </Text>
         </View>
 

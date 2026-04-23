@@ -128,8 +128,8 @@ export function InstructionsScreen() {
             {'\u2022'} All other picks: +1 for correct, 0 for incorrect
           </Text>
           <Text style={[styles.body, {color: colors.textSecondary, marginTop: spacing.sm}]}>
-            Bold calls on high-ranked games can vault you up the leaderboard — or
-            send you tumbling. That's the fun.
+            Picking higher-ranked games as your HotPick compounds your weekly
+            movement — up or down. Choose with conviction.
           </Text>
         </AccordionSection>
 

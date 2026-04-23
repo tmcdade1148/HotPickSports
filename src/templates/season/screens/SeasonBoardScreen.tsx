@@ -14,7 +14,6 @@ import {SeasonProgress} from '../components/SeasonProgress';
 import {useAuth} from '@shared/hooks/useAuth';
 import {supabase} from '@shared/config/supabase';
 import {spacing, borderRadius} from '@shared/theme';
-import {Flame} from 'lucide-react-native';
 
 import {useTheme} from '@shell/theme';
 import {AvatarBadge} from '@shared/components/AvatarBadge';
