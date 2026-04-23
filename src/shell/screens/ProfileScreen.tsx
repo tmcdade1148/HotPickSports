@@ -16,6 +16,10 @@ import {useGlobalStore} from '@shell/stores/globalStore';
 import {AvatarSelector, SYSTEM_AVATARS} from '@shell/components/AvatarSelector';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
+import {
+  usePoolieNameValidator,
+  poolieNameErrorMessage,
+} from '@shell/hooks/usePoolieNameValidator';
 
 /**
  * ProfileScreen — Full profile settings per onboarding spec.
@@ -32,7 +36,6 @@ export function ProfileScreen({navigation}: any) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [poolieName, setPoolieName] = useState('');
-  // display_name_preference always 'poolie_name' — all poolies identified by poolie name
   const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -45,12 +48,17 @@ export function ProfileScreen({navigation}: any) {
       setFirstName(userProfile.first_name ?? '');
       setLastName(userProfile.last_name ?? '');
       setPoolieName(userProfile.poolie_name ?? '');
-      // display_name_preference always poolie_name
       setSelectedAvatar(userProfile.avatar_key ?? null);
       // Mark initialized after first load so auto-save doesn't fire on mount
       setTimeout(() => { isInitialized.current = true; }, 100);
     }
   }, [userProfile]);
+
+  const poolieValidation = usePoolieNameValidator(
+    poolieName,
+    userProfile?.poolie_name ?? null,
+  );
+  const poolieError = poolieNameErrorMessage(poolieValidation);
 
   const hasChanges =
     firstName.trim() !== (userProfile?.first_name ?? '') ||
@@ -58,13 +66,27 @@ export function ProfileScreen({navigation}: any) {
     poolieName.trim() !== (userProfile?.poolie_name ?? '') ||
     selectedAvatar !== (userProfile?.avatar_key ?? null);
 
-  const canSave = firstName.trim().length > 0 && lastName.trim().length > 0 && poolieName.trim().length > 0 && hasChanges && !saving;
+  const canSave =
+    firstName.trim().length > 0 &&
+    lastName.trim().length > 0 &&
+    poolieValidation.state === 'available' &&
+    hasChanges &&
+    !saving;
+
+  // OAuth users can't change their email (provider-managed). The email
+  // field is always read-only here regardless — email/password users do
+  // any change via Settings → Change Email (separate flow).
+  const authProvider = (user?.app_metadata as any)?.provider as string | undefined;
+  const isOAuthUser = authProvider === 'apple' || authProvider === 'google';
 
   // Auto-save: debounce 1.5s after any field change
   const doAutoSave = useCallback(async () => {
     if (!user?.id || !isInitialized.current) return;
     const trimmedFirst = firstName.trim();
     if (!trimmedFirst) return; // Don't auto-save with empty first name
+
+    // Never autosave an invalid or not-yet-validated poolie_name.
+    if (poolieValidation.state !== 'available') return;
 
     const currentHasChanges =
       trimmedFirst !== (userProfile?.first_name ?? '') ||
@@ -83,7 +105,6 @@ export function ProfileScreen({navigation}: any) {
       first_name: trimmedFirst,
       last_name: lastName.trim() || null,
       poolie_name: poolieName.trim() || null,
-      display_name_preference: 'poolie_name',
       ...avatarData,
     });
 
@@ -92,7 +113,7 @@ export function ProfileScreen({navigation}: any) {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     }
-  }, [firstName, lastName, poolieName, selectedAvatar, user?.id, userProfile, updateProfile]);
+  }, [firstName, lastName, poolieName, selectedAvatar, user?.id, userProfile, updateProfile, poolieValidation.state]);
 
   // Trigger auto-save on field changes
   useEffect(() => {
@@ -102,7 +123,7 @@ export function ProfileScreen({navigation}: any) {
     return () => {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     };
-  }, [firstName, lastName, poolieName, selectedAvatar, doAutoSave]);
+  }, [firstName, lastName, poolieName, selectedAvatar, doAutoSave, poolieValidation.state]);
 
   const handleAvatarSelect = (avatar: {
     key: string;
@@ -110,13 +131,6 @@ export function ProfileScreen({navigation}: any) {
     emoji: string;
   }) => {
     setSelectedAvatar(avatar.key);
-  };
-
-  const handleUploadPhoto = () => {
-    Alert.alert(
-      'Coming Soon',
-      'Photo upload will be available soon. Choose a system avatar for now!',
-    );
   };
 
   const handleSave = async () => {
@@ -138,7 +152,6 @@ export function ProfileScreen({navigation}: any) {
       first_name: trimmedFirst,
       last_name: lastName.trim() || null,
       poolie_name: poolieName.trim() || null,
-      display_name_preference: 'poolie_name',
       ...avatarData,
     });
 
@@ -188,7 +201,6 @@ export function ProfileScreen({navigation}: any) {
             <AvatarSelector
               selectedKey={selectedAvatar}
               onSelect={handleAvatarSelect}
-              onUploadPress={handleUploadPhoto}
             />
           </View>
 
@@ -235,7 +247,7 @@ export function ProfileScreen({navigation}: any) {
               Poolie name <Text style={styles.required}>*</Text>
             </Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, poolieError ? styles.inputError : null]}
               placeholder={
                 poolieName ? 'Your poolie name' : 'Add your poolie name'
               }
@@ -244,11 +256,18 @@ export function ProfileScreen({navigation}: any) {
               onChangeText={setPoolieName}
               autoCapitalize="none"
               autoCorrect={false}
+              maxLength={20}
               editable={!saving}
             />
-            <Text style={styles.hint}>
-              Pick your Poolie name. This is how you'll be identified in the leaderboard and SmackTalk. Change anytime.
-            </Text>
+            {poolieValidation.state === 'checking' ? (
+              <Text style={styles.hint}>Checking availability…</Text>
+            ) : poolieError ? (
+              <Text style={styles.errorText}>{poolieError}</Text>
+            ) : (
+              <Text style={styles.hint}>
+                Shown on leaderboards and SmackTalk. Change anytime.
+              </Text>
+            )}
           </View>
 
           {/* Email (read-only) */}
@@ -257,6 +276,11 @@ export function ProfileScreen({navigation}: any) {
             <View style={styles.readOnlyField}>
               <Text style={styles.readOnlyText}>{user?.email ?? ''}</Text>
             </View>
+            {isOAuthUser ? (
+              <Text style={styles.hint}>
+                Managed by your {authProvider === 'apple' ? 'Apple' : 'Google'} account.
+              </Text>
+            ) : null}
           </View>
 
           {/* Save button */}
@@ -342,6 +366,14 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 16,
     color: colors.textPrimary,
     backgroundColor: colors.surface,
+  },
+  inputError: {
+    borderColor: colors.error,
+  },
+  errorText: {
+    color: colors.error,
+    fontSize: 13,
+    marginTop: spacing.xs,
   },
   hint: {
     fontSize: 12,

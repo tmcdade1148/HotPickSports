@@ -20,7 +20,6 @@ export function TosVersionGateScreen({navigation, route}: any) {
   const user = useGlobalStore(s => s.user);
   const acceptTos = useGlobalStore(s => s.acceptTos);
   const isNewUser = route?.params?.isNewUser ?? false;
-  const providerName = route?.params?.providerName ?? undefined;
 
   const handleAgree = async () => {
     if (!user) return;
@@ -29,7 +28,7 @@ export function TosVersionGateScreen({navigation, route}: any) {
       const success = await acceptTos(user.id);
       if (success) {
         if (isNewUser) {
-          navigation.replace('ProfileSetup', {providerName});
+          navigation.replace('ProfileSetup');
         } else {
           navigation.replace('Home');
         }

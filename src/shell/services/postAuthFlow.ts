@@ -5,7 +5,14 @@
  * authentication. Handles TOS acceptance (new users only), global pool
  * enrollment, profile check, pool selection restoration, and navigation.
  *
- * This eliminates duplicated post-auth logic across auth screens.
+ * Onboarding gate: profiles.poolie_name. Per OAuth Onboarding Spec §4.1
+ * this is the single gate distinguishing new from returning users. A
+ * user without a poolie_name sees the welcome screen; a user with one
+ * goes directly to Home.
+ *
+ * OAuth name capture (spec §2.2 / §3.1): first_name / last_name are
+ * written to profiles inside socialAuth.ts at sign-in time — not passed
+ * through navigation params. This screen reads from profiles only.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -14,16 +21,9 @@ import {getDefaultEvent} from '@sports/registry';
 import {registerForPushNotifications} from '@shell/services/pushNotifications';
 import type {User} from '@supabase/supabase-js';
 
-interface ProviderName {
-  firstName: string | null;
-  lastName: string | null;
-}
-
 interface PostAuthOptions {
   user: User;
   navigation: any;
-  /** Name from OAuth provider (Apple only sends this on first sign-in) */
-  providerName?: ProviderName | null;
 }
 
 /**
@@ -35,13 +35,12 @@ interface PostAuthOptions {
  * 3. Fetch profile
  * 4. If new user (no tos_accepted_at) → accept TOS, then ProfileSetup
  * 5. If returning user with outdated TOS → TosVersionGate
- * 6. If profile incomplete → ProfileSetup
+ * 6. If profile missing poolie_name → ProfileSetup (onboarding gate)
  * 7. If profile complete → load pools, restore selection, navigate Home
  */
 export async function runPostAuthFlow({
   user,
   navigation,
-  providerName,
 }: PostAuthOptions): Promise<void> {
   const store = useGlobalStore.getState();
   const defaultEvent = getDefaultEvent();
@@ -58,10 +57,7 @@ export async function runPostAuthFlow({
 
   // Step 4: New user — show TOS gate before profile setup
   if (!profile || !profile.tos_accepted_at) {
-    navigation.replace('TosVersionGate', {
-      isNewUser: true,
-      providerName: providerName ?? undefined,
-    });
+    navigation.replace('TosVersionGate', {isNewUser: true});
     return;
   }
 
@@ -72,11 +68,11 @@ export async function runPostAuthFlow({
     return;
   }
 
-  // Step 6: Check if profile is complete
-  if (!profile.first_name) {
-    navigation.replace('ProfileSetup', {
-      providerName: providerName ?? undefined,
-    });
+  // Step 6: Onboarding gate — poolie_name is the single marker of a
+  // completed profile. The DB CHECK constraint already guarantees any
+  // non-null value has content after trim.
+  if (!profile.poolie_name) {
+    navigation.replace('ProfileSetup');
     return;
   }
 

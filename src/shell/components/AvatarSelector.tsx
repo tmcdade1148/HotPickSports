@@ -5,9 +5,22 @@ import {
   ScrollView,
   Text,
   StyleSheet,
+  Alert,
 } from 'react-native';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
+
+/**
+ * Default photo-upload handler. Real upload flow is deferred until the
+ * image-picker dependency ships — showing this alert keeps the affordance
+ * visible and sets user expectation.
+ */
+function defaultUploadPress() {
+  Alert.alert(
+    'Coming Soon',
+    'Photo upload will be available soon. Choose a system avatar for now!',
+  );
+}
 
 /** System avatars — colored abstract shapes with initials fallback */
 const SYSTEM_AVATARS = [
@@ -24,13 +37,14 @@ const SYSTEM_AVATARS = [
 interface AvatarSelectorProps {
   selectedKey: string | null;
   onSelect: (avatar: {key: string; color: string; emoji: string}) => void;
-  onUploadPress: () => void;
+  /** Optional. Defaults to a "Coming Soon" alert until photo upload ships. */
+  onUploadPress?: () => void;
 }
 
 export function AvatarSelector({
   selectedKey,
   onSelect,
-  onUploadPress,
+  onUploadPress = defaultUploadPress,
 }: AvatarSelectorProps) {
   const {colors} = useTheme();
   const styles = createStyles(colors);

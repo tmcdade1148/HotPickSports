@@ -1,6 +1,5 @@
 import React, {useState} from 'react';
 import {
-  View,
   Text,
   TextInput,
   TouchableOpacity,
@@ -11,10 +10,7 @@ import {
   ScrollView,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {supabase} from '@shared/config/supabase';
-import {useGlobalStore} from '@shell/stores/globalStore';
-import {getDefaultEvent} from '@sports/registry';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 import {runPostAuthFlow} from '@shell/services/postAuthFlow';
@@ -28,16 +24,6 @@ export function EmailEntryScreen({navigation, route}: any) {
   const {colors} = useTheme();
   const styles = createStyles(colors);
   const initialMode: Mode = route?.params?.initialMode === 'sign_up' ? 'sign_up' : 'sign_in';
-
-  const setUser = useGlobalStore(s => s.setUser);
-  const setActiveSport = useGlobalStore(s => s.setActiveSport);
-  const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
-  const acceptTos = useGlobalStore(s => s.acceptTos);
-  const ensureGlobalPoolMembership = useGlobalStore(s => s.ensureGlobalPoolMembership);
-  const fetchProfile = useGlobalStore(s => s.fetchProfile);
-  const fetchUserPools = useGlobalStore(s => s.fetchUserPools);
-  const fetchSmackUnreadCounts = useGlobalStore(s => s.fetchSmackUnreadCounts);
-  const subscribeSmackUnread = useGlobalStore(s => s.subscribeSmackUnread);
 
   const [mode, setMode] = useState<Mode>(initialMode);
   const [email, setEmail] = useState('');

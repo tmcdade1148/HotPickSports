@@ -23,8 +23,8 @@ export function WelcomeScreen({navigation}: any) {
   const handleApple = async () => {
     setLoading('apple');
     try {
-      const {user, providerName} = await signInWithApple();
-      await runPostAuthFlow({user, navigation, providerName});
+      const {user} = await signInWithApple();
+      await runPostAuthFlow({user, navigation});
     } catch (err: any) {
       // User cancelled — Apple throws error code 1001
       if (err?.code === '1001' || err?.message?.includes('canceled')) {
@@ -40,8 +40,8 @@ export function WelcomeScreen({navigation}: any) {
   const handleGoogle = async () => {
     setLoading('google');
     try {
-      const {user, providerName} = await signInWithGoogle();
-      await runPostAuthFlow({user, navigation, providerName});
+      const {user} = await signInWithGoogle();
+      await runPostAuthFlow({user, navigation});
     } catch (err: any) {
       // User cancelled — Google throws statusCode 12501
       if (
