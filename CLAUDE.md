@@ -34,7 +34,7 @@ These are non-negotiable. If a task requires violating one, stop and ask.
 14. **Subscription tier limits are never hardcoded** — always read from `competition_config` global keys
 15. **Pool join and creation enforcement runs server-side only** — Edge Function enforces; client only shows the prompt
 16. **Organizers archive pools, never delete them** — hard delete is admin-only with audit log, grace period, and cron execution
-17. **`admin_audit_log` entry is required before any destructive admin action** — log first, act second, never skip
+17. **`admin_audit_log` entry is required before any destructive admin action on production data** — log first, act second, never skip. Simulator tools scoped to a sandbox competition (e.g., `nfl_2025_sim`) are exempt.
 18. **Use `organizer_id` not `created_by` in all new code** — `created_by` is legacy, pending migration
 19. **Home Screen shows maximum 2 event cards** — priority-ordered by urgency; rest appear in sport switcher only
 20. **Pool selection is global app state** — switching pools updates Home Screen, Board tab, and SmackTalk simultaneously; never scoped to one component

@@ -173,7 +173,7 @@ if (cfg.scoring_locked) return;
 PRE_SEASON → REGULAR → REGULAR_COMPLETE → PLAYOFFS → SUPERBOWL_INTRO → SUPERBOWL → SEASON_COMPLETE
 ```
 
-Weekly cycle (`picks_open → locked → live → settling → complete`) only runs inside REGULAR, PLAYOFFS, and SUPERBOWL. All other phases show static cards.
+Weekly cycle (`picks_open → locked → live → settling → complete`) only runs inside REGULAR, PLAYOFFS, and SUPERBOWL. All other phases set `week_state = 'idle'` and show static cards.
 
 **Playoffs phase reset is automatic and mandatory** when transitioning REGULAR → REGULAR_COMPLETE → PLAYOFFS:
 - Regular season champion recorded, awards distributed
@@ -415,9 +415,11 @@ Card priority computed in globalStore — never in the component.
 ```
 picks_open → locked → live → settling → complete → picks_open (next week)
 ```
+Above is the in-cycle progression during REGULAR, PLAYOFFS, and SUPERBOWL. Outside the weekly cycle (PRE_SEASON, REGULAR_COMPLETE, SUPERBOWL_INTRO, SEASON_COMPLETE), `week_state = 'idle'`.
 
 | State | What the card shows |
 |---|---|
+| `idle` | Off-cycle state. Calm salutation, 0 pts season total, join/create pool CTA, SmackTalk pointer. No countdown, no live data. Verified active during PRE_SEASON; assumed used in other non-weekly phases — confirm before relying. |
 | `picks_open` | Countdown to kickoff + HotPick game + social pressure ("X of Y poolies locked in") |
 | `locked` | Waiting state — picks are in, games haven't started |
 | `live` | HotPick game: teams, live score, current point impact ("+6 if this holds") + pool rank delta |
