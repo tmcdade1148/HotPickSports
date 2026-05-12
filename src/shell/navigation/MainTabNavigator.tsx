@@ -22,6 +22,7 @@ import {useGlobalStore} from '@shell/stores/globalStore';
 import {PoweredByHotPick} from '@shell/components/PoweredByHotPick';
 import {PoolSwitcherBar} from '@shell/components/PoolSwitcherBar';
 import {spacing, typography, borderRadius} from '@shared/theme';
+import {useForegroundRefetch} from '@shared/hooks/useForegroundRefetch';
 
 // Sport store imports for initialization
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
@@ -421,6 +422,12 @@ const groupedTabStyles = (colors: any) => StyleSheet.create({
  */
 export function MainTabNavigator() {
   const {colors} = useTheme();
+  // AppState foreground-refetch insurance: when the OS suspends the app
+  // and resumes it, we refetch competition_config, picks, leaderboards,
+  // and SmackTalk unread counts in case the Realtime socket dropped during
+  // background. Realtime itself is now the primary update path (publication
+  // fixed), this is just the safety net.
+  useForegroundRefetch();
   const userProfile = useGlobalStore(s => s.userProfile);
   const activeSport = useGlobalStore(s => s.activeSport);
   const activePoolId = useGlobalStore(s => s.activePoolId);
