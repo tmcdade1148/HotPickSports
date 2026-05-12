@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HotPick — Season Simulator v2</title>
+<title>HotPick — Season Simulator v3.1</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0D1117; color: #8A97AA; font-size: 14px; line-height: 1.4; }
@@ -91,13 +91,44 @@
   .log-msg.warn { color: #F5C842; }
   .log-msg.error { color: #C0392B; }
   .log-msg.info { color: #51A1A6; }
+
+  /* Expected Home Screen panel (v3) */
+  .hs-spec-title {
+    font-size: 10px; color: #F25922; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;
+  }
+  .hs-spec-block {
+    background: #0D1117; border: 1px solid #2C3A52;
+    border-radius: 6px; padding: 10px 12px;
+  }
+  .hs-spec-state-name {
+    font-size: 13px; font-weight: 700; color: #F5C842;
+    margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .hs-spec-section {
+    font-size: 9px; color: #8A97AA; margin-top: 10px; margin-bottom: 4px;
+    text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;
+  }
+  .hs-spec-line {
+    font-size: 12px; color: #E8EAF0; margin: 3px 0; line-height: 1.4;
+  }
+  .hs-spec-line-absent { color: #8A97AA; }
+  .hs-spec-quote {
+    font-size: 11px; color: #51A1A6; font-style: italic;
+    margin: 2px 0; line-height: 1.4;
+  }
+  .hs-spec-warn {
+    font-size: 11px; color: #F5C842; margin-top: 8px; padding: 6px 8px;
+    background: rgba(245, 200, 66, 0.1); border-left: 2px solid #F5C842;
+    line-height: 1.4;
+  }
 </style>
 </head>
 <body>
   <div class="header">
     <h1>HotPick — Season Simulator</h1>
     <span class="badge">nfl_2025_sim</span>
-    <span class="badge badge-v2">v2 checkpoint</span>
+    <span class="badge badge-v2">v3.1 home-screen</span>
     <span style="margin-left: auto; font-size: 11px; color: #8A97AA;">Manual step-through — no time compression</span>
   </div>
 
@@ -132,6 +163,13 @@
         </div>
         <div style="margin-top: 8px;">
           <button class="btn btn-secondary btn-full" id="btn-refresh" onclick="refreshState()" disabled>Refresh state</button>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="hs-spec-title">Expected Home Screen</div>
+        <div id="hs-spec-content" class="hs-spec-block">
+          <div style="font-size:12px;color:#8A97AA;">Connect to load.</div>
         </div>
       </div>
 
@@ -410,6 +448,7 @@ async function refreshState() {
   updateCheckpointStatesFromWeekState();
   renderCheckpoints();
   updateButtons();
+  renderHomeScreenSpec();
 }
 
 function updateButtons() {
@@ -633,9 +672,30 @@ async function cpResetWeek() {
 // fake-member picks so the pool always has an active leaderboard. Without
 // this, fakes never submit picks for new weeks and the Week tab stays empty
 // during live play.
+//
+// v3.1: Also auto-transitions current_phase to REGULAR if it's currently
+// outside the weekly cycle (PRE_SEASON, REGULAR_COMPLETE, etc.). Without
+// this, week_state=picks_open is ignored by the app per CLAUDE.md Hard
+// Rule #22 — the weekly cycle only runs in REGULAR/PLAYOFFS/SUPERBOWL.
 async function cpOpenPicks() {
   const wk = state.currentWeek;
   log(`[Week ${wk}] Opening picks…`, 'info');
+
+  // Phase gate: if we're outside the weekly cycle, bump to REGULAR.
+  // The simulator currently only models the regular-season flow, so REGULAR
+  // is the correct destination phase. If you ever spec playoff/superbowl
+  // checkpoint flows, this logic will need to branch.
+  const WEEKLY_CYCLE = ['REGULAR', 'PLAYOFFS', 'SUPERBOWL'];
+  if (state.phase && !WEEKLY_CYCLE.includes(state.phase)) {
+    log(`Phase is ${state.phase} (outside weekly cycle). Transitioning to REGULAR…`, 'info');
+    await api(
+      `competition_config?competition=eq.${COMPETITION}&key=eq.current_phase`,
+      'PATCH',
+      { value: 'REGULAR' }
+    );
+    log(`✓ Phase transitioned to REGULAR.`, 'success');
+  }
+
   await api(`competition_config?competition=eq.${COMPETITION}&key=eq.week_state`, 'PATCH', { value: 'picks_open' });
   await api(`competition_config?competition=eq.${COMPETITION}&key=eq.picks_open`, 'PATCH', { value: true });
   await api(`competition_config?competition=eq.${COMPETITION}&key=eq.picks_locked`, 'PATCH', { value: false });
@@ -1419,7 +1479,146 @@ async function resetToPreseason() {
   }
 }
 
-log('Season Simulator v2 loaded. Paste service role key and click Connect.', 'info');
+// ─────────────────────────────────────────────────────────────
+// Expected Home Screen panel (v3)
+// Source of truth: REFERENCE.md section 11
+// Maps (phase, week_state) to expected Home Screen content so
+// you can spec-check the app against the architecture without
+// remembering the doc.
+// ─────────────────────────────────────────────────────────────
+const WEEKLY_CYCLE_PHASES = ['REGULAR', 'PLAYOFFS', 'SUPERBOWL'];
+
+const HOME_SCREEN_SPECS = {
+  idle: {
+    title: 'IDLE (off-cycle)',
+    salutations: ['"Nothing today."', '"Rest day."', '"Back at it soon."'],
+    elements: [
+      'Calm salutation',
+      '0 pts season total',
+      'Join/create pool CTA',
+      'SmackTalk pointer',
+    ],
+    absent: ['No countdown', 'No live data'],
+    cta: 'Join or create a pool',
+  },
+  picks_open: {
+    title: 'PICKS OPEN',
+    salutations: ['"Picks are open."', '"Your move."', '"Clock\'s running."'],
+    salutationsLate: ['"Last call."', '"Closing time."', '"You sure about this?"'],
+    elements: [
+      'Countdown to kickoff',
+      'HotPick game preview',
+      'Social pressure: "X of Y poolies locked in"',
+    ],
+    cta: 'Tap to set picks',
+  },
+  locked: {
+    title: 'LOCKED (waiting)',
+    salutations: ['"On record. No edits."', '"Said what you said."', '"Locked in."'],
+    elements: [
+      'Waiting state — picks are in',
+      'Games have not started yet',
+    ],
+    cta: 'View your picks',
+  },
+  live: {
+    title: 'LIVE',
+    salutations: ['"It\'s happening."', '"Too late to change anything."'],
+    elements: [
+      'HotPick game: teams + live score',
+      'Current point impact ("+6 if this holds")',
+      'Pool rank delta',
+    ],
+    cta: 'Tap to view live game',
+  },
+  settling: {
+    title: 'SETTLING',
+    salutations: ['"The record doesn\'t lie."', '"It\'s official."'],
+    elements: [
+      'Weekly result: net points',
+      'Rank movement with named players',
+      'SmackTalk CTA',
+    ],
+    cta: 'See the damage',
+  },
+  complete: {
+    title: 'COMPLETE (between weeks)',
+    salutations: ['"Nothing today."', '"Rest day."', '"Back at it soon."'],
+    elements: [
+      'Season standings as a race ("47 pts behind 1st. 9 weeks left.")',
+      'Mini sparkline of season trajectory',
+    ],
+    cta: 'View season standings',
+  },
+};
+
+function renderHomeScreenSpec() {
+  const el = document.getElementById('hs-spec-content');
+  if (!el) return;
+
+  // Phase gate: non-weekly phases force idle; week_state is ignored.
+  let effectiveState = state.weekState || 'idle';
+  const phaseForcesIdle =
+    state.phase && !WEEKLY_CYCLE_PHASES.includes(state.phase);
+  if (phaseForcesIdle) effectiveState = 'idle';
+
+  const spec = HOME_SCREEN_SPECS[effectiveState] || HOME_SCREEN_SPECS.idle;
+  let html = `<div class="hs-spec-state-name">${spec.title}</div>`;
+
+  // Warn if phase is forcing idle despite a non-idle week_state.
+  if (phaseForcesIdle && state.weekState && state.weekState !== 'idle') {
+    html += `<div class="hs-spec-warn">
+      Phase <strong>${state.phase}</strong> is outside the weekly cycle.
+      <code>week_state="${state.weekState}"</code> is ignored.
+      The app should be showing the idle card.
+    </div>`;
+  }
+
+  if (spec.salutations && spec.salutations.length) {
+    html += `<div class="hs-spec-section">Salutation (any of)</div>`;
+    spec.salutations.forEach(s => {
+      html += `<div class="hs-spec-quote">${s}</div>`;
+    });
+    if (spec.salutationsLate && spec.salutationsLate.length) {
+      html += `<div class="hs-spec-section">Salutation (deadline close)</div>`;
+      spec.salutationsLate.forEach(s => {
+        html += `<div class="hs-spec-quote">${s}</div>`;
+      });
+    }
+  }
+
+  if (spec.elements && spec.elements.length) {
+    html += `<div class="hs-spec-section">Elements shown</div>`;
+    spec.elements.forEach(e => {
+      html += `<div class="hs-spec-line">&bull; ${e}</div>`;
+    });
+  }
+
+  if (spec.absent && spec.absent.length) {
+    html += `<div class="hs-spec-section">NOT shown</div>`;
+    spec.absent.forEach(a => {
+      html += `<div class="hs-spec-line hs-spec-line-absent">&ndash; ${a}</div>`;
+    });
+  }
+
+  if (spec.cta) {
+    html += `<div class="hs-spec-section">CTA</div>`;
+    html += `<div class="hs-spec-line">${spec.cta}</div>`;
+  }
+
+  // Conditional UI note: Join Pool Module
+  if (state.phase !== 'SEASON_COMPLETE') {
+    html += `<div class="hs-spec-section">Conditional</div>`;
+    html += `<div class="hs-spec-line hs-spec-line-absent">
+      Join Pool Module shown if user has no visible private pool
+      (suppressed during SEASON_COMPLETE).
+    </div>`;
+  }
+
+  el.innerHTML = html;
+}
+
+log('Season Simulator v3.1 loaded. Paste service role key and click Connect.', 'info');
 </script>
 </body>
 </html>
