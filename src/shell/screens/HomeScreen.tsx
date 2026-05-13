@@ -22,6 +22,7 @@ import {useTheme} from '@shell/theme/hooks';
 import {spacing, bodyType} from '@shared/theme';
 
 import {SystemMessageSlot} from '@shell/components/home/SystemMessageSlot';
+import {HomeHeader} from '@shell/components/home/HomeHeader';
 import {IdentityBar} from '@shell/components/home/IdentityBar';
 import {StateHero} from '@shell/components/home/StateHero';
 import {StatBlocks} from '@shell/components/home/StatBlocks';
@@ -152,6 +153,7 @@ export function HomeScreen() {
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}>
+        <HomeHeader />
         <SystemMessageSlot />
         <IdentityBar />
         <StateHero state={homeState} />
