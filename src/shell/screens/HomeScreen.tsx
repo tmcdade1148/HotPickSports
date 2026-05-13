@@ -23,39 +23,14 @@ import {spacing} from '@shared/theme';
 
 import {SystemMessageSlot} from '@shell/components/home/SystemMessageSlot';
 import {IdentityBar} from '@shell/components/home/IdentityBar';
-import {StateHero, type HomeState} from '@shell/components/home/StateHero';
+import {StateHero} from '@shell/components/home/StateHero';
 import {LastWeekRecapChip} from '@shell/components/home/LastWeekRecapChip';
 import {WeekMiniStrip} from '@shell/components/home/WeekMiniStrip';
 import {PoolModule} from '@shell/components/home/PoolModule';
 import {PartnerModule} from '@shell/components/home/PartnerModule';
+import {resolveHomeState} from '@shell/components/home/resolveHomeState';
 
 const NFL_2026 = 'nfl_2026';
-
-/**
- * resolveHomeState — spec §6.1. Maps (visiblePools, current_phase, week_state)
- * to one of 10 states. Zero-pools is an overlay that overrides everything.
- */
-function resolveHomeState(
-  visiblePoolCount: number,
-  phase: string,
-  weekState: string,
-): HomeState {
-  if (visiblePoolCount === 0) return 'zero_pools';
-  if (phase === 'PRE_SEASON')        return 'pre_season_idle';
-  if (phase === 'REGULAR_COMPLETE')  return 'regular_complete_bridge';
-  if (phase === 'SUPERBOWL_INTRO')   return 'superbowl_intro_bridge';
-  if (phase === 'SEASON_COMPLETE')   return 'season_complete';
-
-  // In-cycle: REGULAR | PLAYOFFS | SUPERBOWL
-  switch (weekState) {
-    case 'picks_open': return 'picks_open';
-    case 'locked':     return 'picks_locked';
-    case 'live':       return 'games_live';
-    case 'settling':   return 'settling';
-    case 'complete':   return 'complete';
-    default:           return 'pre_season_idle';
-  }
-}
 
 export function HomeScreen() {
   const {colors} = useTheme();
