@@ -30,8 +30,6 @@ import {PoolModule} from '@shell/components/home/PoolModule';
 import {PartnerModule} from '@shell/components/home/PartnerModule';
 import {resolveHomeState} from '@shell/components/home/resolveHomeState';
 
-const NFL_2026 = 'nfl_2026';
-
 export function HomeScreen() {
   const {colors} = useTheme();
 
@@ -43,6 +41,10 @@ export function HomeScreen() {
   const currentPhase = useNFLStore(s => s.currentPhase);
   const weekState    = useNFLStore(s => s.weekState);
   const currentWeek  = useNFLStore(s => s.currentWeek);
+  // Pull the active competition straight from the store — never hardcode.
+  // Per the May 13 memory note, nfl_2025_sim is the default for everyone
+  // until Sept 2026; nfl_2026 is parked.
+  const competition  = useNFLStore(s => s.competition);
 
   // Loaders — pulled once per render so the deps below stay stable.
   const loadLastWeekHotPick   = useGlobalStore(s => s.loadLastWeekHotPick);
@@ -51,6 +53,12 @@ export function HomeScreen() {
   const loadUserRankByPool    = useGlobalStore(s => s.loadUserRankByPool);
   const loadAlignedPartners   = useGlobalStore(s => s.loadAlignedPartners);
   const loadPartnerIndicators = useGlobalStore(s => s.loadPartnerIndicators);
+
+  // Realtime subscription on competition_config — picks up week_state /
+  // current_phase changes pushed by the season simulator (or any admin
+  // tool). Without this, the simulator updates the DB but the app reads
+  // stale state until next foreground/cold start.
+  const subscribeToCompetitionConfig = useNFLStore(s => s.subscribeToCompetitionConfig);
 
   // ---------------------------------------------------------------------------
   // Resolve the home state.
@@ -102,11 +110,18 @@ export function HomeScreen() {
   // ---------------------------------------------------------------------------
   const allPoolIds = useMemo(() => visiblePools.map(p => p.id), [visiblePools]);
 
+  // Subscribe to competition_config Realtime changes for the whole Home
+  // session. Unsubscribes on unmount.
   useEffect(() => {
-    if (!userId) return;
-    loadLastWeekHotPick(userId, NFL_2026, currentWeek).catch(() => {});
-    loadRecentWeeks(userId, NFL_2026).catch(() => {});
-  }, [userId, currentWeek, loadLastWeekHotPick, loadRecentWeeks]);
+    const unsub = subscribeToCompetitionConfig();
+    return unsub;
+  }, [subscribeToCompetitionConfig]);
+
+  useEffect(() => {
+    if (!userId || !competition) return;
+    loadLastWeekHotPick(userId, competition, currentWeek).catch(() => {});
+    loadRecentWeeks(userId, competition).catch(() => {});
+  }, [userId, competition, currentWeek, loadLastWeekHotPick, loadRecentWeeks]);
 
   useEffect(() => {
     if (!userId) return;
