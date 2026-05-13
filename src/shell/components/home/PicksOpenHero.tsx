@@ -216,6 +216,6 @@ const styles = StyleSheet.create({
   countBadgeText: {
     color: '#FFFFFF',
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: 'Manrope-Bold',
   },
 });

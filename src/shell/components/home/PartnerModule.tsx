@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
   logoFallbackText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '900',
+    fontFamily: 'Manrope-Bold',
   },
   titleBlock: {
     flex: 1,
@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
   indicatorText: {
     color: '#FFFFFF',
     fontSize: 11,
-    fontWeight: '900',
+    fontFamily: 'Manrope-Bold',
     fontVariant: ['tabular-nums'] as ['tabular-nums'],
   },
   perkRow: {

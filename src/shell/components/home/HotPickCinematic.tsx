@@ -195,7 +195,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   flame: {fontSize: 12},
-  pillText: {fontSize: 11, fontWeight: '900', letterSpacing: 1},
+  pillText: {fontSize: 11, fontFamily: 'Manrope-Bold', letterSpacing: 1},
   pulseDot: {width: 6, height: 6, borderRadius: 999},
   matchupRow: {
     position: 'absolute',
@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
   cityText: {
     color: '#FFFFFF8C',
     fontSize: 10,
-    fontWeight: '700',
+    fontFamily: 'Manrope-Bold',
     letterSpacing: 1.4,
     marginBottom: 2,
   },
@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
   },
   pickedTeamText: {
     color: '#FFFFFF',
-    fontWeight: '700',
+    fontFamily: 'Manrope-Bold',
   },
   dividerDot: {color: '#FFFFFF80'},
 });

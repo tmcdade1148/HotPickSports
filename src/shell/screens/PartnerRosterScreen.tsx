@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
   logoFallbackText: {
     color: '#FFFFFF',
     fontSize: 32,
-    fontWeight: '900',
+    fontFamily: 'Manrope-Bold',
   },
   brandName: {
     fontSize:   displayType.size.h2,
@@ -450,7 +450,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   poolName: {flex: 1, fontSize: 15, paddingRight: spacing.sm},
-  poolCta:  {fontSize: 13, fontWeight: '700'},
+  poolCta:  {fontSize: 13, fontFamily: 'Manrope-Bold'},
 
   footer: {marginTop: spacing.xl, alignItems: 'center'},
 

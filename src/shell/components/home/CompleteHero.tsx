@@ -70,7 +70,7 @@ export function CompleteHero() {
 
         {typeof newRank === 'number' && (
           <Text style={[bodyType.regular, styles.standingText, {color: colors.textPrimary}]}>
-            You sit <Text style={{fontWeight: '700'}}>{ORDINAL(newRank)}</Text> in {poolName}.
+            You sit <Text style={{fontFamily: 'Manrope-Bold'}}>{ORDINAL(newRank)}</Text> in {poolName}.
           </Text>
         )}
 

@@ -61,7 +61,7 @@ export function LastWeekRecapChip() {
         <Text style={[bodyType.bold, styles.result, {color: colors.textPrimary}]} numberOfLines={1}>
           {recap.team} {positive ? '+' : '−'}
           {Math.abs(recap.points)}{' · '}
-          <Text style={{color: tileColor, fontWeight: '700'}}>
+          <Text style={{color: tileColor, fontFamily: 'Manrope-Bold'}}>
             {pointsStr} bonus
           </Text>
         </Text>
@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
   },
   tileGlyph: {
     fontSize: 22,
-    fontWeight: '900',
+    fontFamily: 'Manrope-Bold',
   },
   body: {
     flex: 1,

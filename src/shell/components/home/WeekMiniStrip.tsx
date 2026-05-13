@@ -94,5 +94,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   weekLabel:  {fontSize: 10, letterSpacing: 1, marginBottom: 2},
-  totalLabel: {fontSize: 16, fontWeight: '700'},
+  totalLabel: {fontSize: 16, fontFamily: 'Manrope-Bold'},
 });

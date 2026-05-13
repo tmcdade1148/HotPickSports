@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.full,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  rankText: {fontSize: 11, fontWeight: '700'},
+  rankText: {fontSize: 11, fontFamily: 'Manrope-Bold'},
   alignFooter: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
   indicatorText: {
     color: '#FFFFFF',
     fontSize: 11,
-    fontWeight: '900',
+    fontFamily: 'Manrope-Bold',
     fontVariant: ['tabular-nums'] as ['tabular-nums'],
   },
 });
