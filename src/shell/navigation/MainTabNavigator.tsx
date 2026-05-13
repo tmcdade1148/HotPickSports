@@ -468,6 +468,8 @@ export function MainTabNavigator() {
   // Initialize sport stores when activeSport or activePoolId changes
   const seasonInitialize = useSeasonStore(s => s.initialize);
   const seasonConfig = useSeasonStore(s => s.config);
+  const nflInitialize = useNFLStore(s => s.initialize);
+  const nflCompetitionInStore = useNFLStore(s => s.competition);
   const didInit = useRef(false);
 
   useEffect(() => {
@@ -487,6 +489,19 @@ export function MainTabNavigator() {
       }
     }
   }, [activeSport?.competition, activePoolId, seasonInitialize, seasonConfig?.competition]);
+
+  // nflStore initialization — was previously triggered by SeasonEventCard
+  // before the Home Redesign deleted that component. Now driven directly
+  // by activeSport.competition. Without this, nflStore sits on its
+  // hardcoded defaults (competition: 'nfl_2026', weekState: 'picks_open',
+  // currentPhase: 'REGULAR', currentWeek: 1) and the redesigned Home shows
+  // stale state regardless of what competition_config holds.
+  useEffect(() => {
+    if (!activeSport) return;
+    if (activeSport.templateType !== 'season') return;
+    if (nflCompetitionInStore === activeSport.competition) return;
+    nflInitialize(activeSport.competition).catch(() => {});
+  }, [activeSport?.competition, activeSport?.templateType, nflInitialize, nflCompetitionInStore]);
 
   return (
     <Tab.Navigator
