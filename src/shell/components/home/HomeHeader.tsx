@@ -1,17 +1,20 @@
 // src/shell/components/home/HomeHeader.tsx
-// Slim top row for the Home Screen — period pill only.
-// Wordmark removed per the May 13 design call ("we can remove the
-// workmark from the very top"); the period pill stays as a quiet
-// week / phase indicator at the top right.
+// Slim top row for the Home Screen.
 //
-//                                           [ NFL · W08 ]
+//   HOT PICK SPORTS                           [ NFL · W08 ]
+//
+// Left  — text-rendered wordmark (no image asset):
+//         "HOT" + "PICK" + " SPORTS"
+//         "HOT" + "SPORTS" in primary flame; "PICK" in textPrimary
+// Right — period pill (NFL · W08 / PRESEASON / WC / SB / etc.)
+//         primary-bordered italic pill
 
 import React from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
-import {bodyType, spacing, borderRadius} from '@shared/theme';
+import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
 import {getPeriodLabel} from './periodLabel';
 
 export function HomeHeader() {
@@ -24,6 +27,11 @@ export function HomeHeader() {
 
   return (
     <View style={styles.row}>
+      <View style={styles.wordmarkRow}>
+        <Text style={[displayType.display, styles.wordmark, {color: colors.primary}]}>HOT</Text>
+        <Text style={[displayType.display, styles.wordmark, {color: colors.textPrimary}]}>PICK</Text>
+        <Text style={[displayType.display, styles.wordmarkSmall, {color: colors.primary}]}> SPORTS</Text>
+      </View>
       <View style={[styles.pill, {borderColor: colors.primary}]}>
         <Text style={[bodyType.bold, styles.pillText, {color: colors.primary}]}>
           {period}
@@ -56,10 +64,24 @@ function shortPeriod(phase: string, week: number | null, playoffStart = 19): str
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
     paddingBottom: spacing.xs,
+  },
+  wordmarkRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  wordmark: {
+    fontSize: 15,
+    letterSpacing: 0.5,
+  },
+  wordmarkSmall: {
+    fontSize: 9,
+    letterSpacing: 0.5,
+    marginLeft: 1,
   },
   pill: {
     paddingHorizontal: spacing.sm + 2,
