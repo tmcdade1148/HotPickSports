@@ -6,15 +6,12 @@ import {useAppFonts} from '@shared/theme/fonts';
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
-  const {fontsLoaded, fontError} = useAppFonts();
 
-  // Hold render until fonts are loaded so the first paint uses the right
-  // typography. If loading fails, render anyway with system-font fallback —
-  // not a blocker. Per spec §6.3, display/body fonts anchor the visual
-  // identity but the app must still function without them.
-  if (!fontsLoaded && !fontError) {
-    return null; // SplashScreen stays visible during this window
-  }
+  // Kick off font loading in the background. We do NOT block the navigator
+  // on this — if the loader hangs (e.g. autolinking edge case on bare RN),
+  // we'd otherwise show a permanent white screen. System fonts substitute
+  // gracefully until Saira / Manrope finish loading.
+  useAppFonts();
 
   return (
     <SafeAreaProvider>
