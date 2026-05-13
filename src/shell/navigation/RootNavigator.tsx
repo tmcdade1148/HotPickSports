@@ -16,6 +16,7 @@ import {EventDetailScreen} from '@shell/screens/EventDetailScreen';
 import {ProfileScreen} from '@shell/screens/ProfileScreen';
 import {SettingsScreen} from '@shell/screens/SettingsScreen';
 import {PartnerAdminScreen} from '@shell/screens/PartnerAdminScreen';
+import {PartnerRosterScreen} from '@shell/screens/PartnerRosterScreen';
 import {PoolMembersScreen} from '@shell/screens/PoolMembersScreen';
 import {PoolSettingsScreen} from '@shell/screens/PoolSettingsScreen';
 import {FlaggedMessagesScreen} from '@shell/screens/FlaggedMessagesScreen';
@@ -203,6 +204,7 @@ export function RootNavigator() {
         <Stack.Screen name="FlaggedMessages" component={FlaggedMessagesScreen} />
         <Stack.Screen name="MessageCenter" component={MessageCenterScreen} />
         <Stack.Screen name="PartnerAdmin" component={PartnerAdminScreen} />
+        <Stack.Screen name="PartnerRoster" component={PartnerRosterScreen} />
         <Stack.Screen name="HardwareAdmin" component={HardwareAdminScreen} />
         <Stack.Screen name="About" component={AboutScreen} />
         <Stack.Screen name="Instructions" component={InstructionsScreen} />
