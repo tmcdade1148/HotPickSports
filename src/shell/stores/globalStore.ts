@@ -178,6 +178,23 @@ interface GlobalState {
   loadUserHardware: () => Promise<void>;
   updateHistoryVisibility: (v: 'private' | 'pools_only' | 'public') => Promise<void>;
   computePlayerArchetype: () => void;
+
+  // Home Redesign §6.6 — Last-week HotPick recap + Week Mini-Strip data.
+  // Computed server-side; clients never aggregate scores (Hard Rule #3).
+  lastWeekHotPick: {
+    team: string;
+    isCorrect: boolean;
+    points: number;
+  } | null;
+  loadLastWeekHotPick: (
+    userId: string,
+    competition: string,
+    currentWeek: number,
+  ) => Promise<void>;
+
+  // Last 4 weeks of pre-computed totals for the user.
+  recentWeeks: Array<{week: number; total: number}>;
+  loadRecentWeeks: (userId: string, competition: string) => Promise<void>;
 }
 
 export interface UserHardwareItem {
@@ -1178,5 +1195,70 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
 
     // No archetype threshold met — show nothing
     set({playerArchetype: null});
+  },
+
+  // ---------------------------------------------------------------------------
+  // Home Redesign §6.6 — Last-week HotPick recap + Week Mini-Strip
+  // ---------------------------------------------------------------------------
+  // Both queries respect Hard Rule #3 (client never computes scores). They
+  // read pre-computed values: season_picks.is_correct for the last-week
+  // HotPick chip, and season_user_totals.{week_points, playoff_points} for
+  // the week strip. No SUM or AVG happens here.
+  // ---------------------------------------------------------------------------
+  lastWeekHotPick: null,
+  recentWeeks: [],
+
+  loadLastWeekHotPick: async (userId, competition, currentWeek) => {
+    if (currentWeek <= 1) {
+      set({lastWeekHotPick: null});
+      return;
+    }
+    const targetWeek = currentWeek - 1;
+
+    // Read the user's HotPick row for the prior week. is_correct + points
+    // are server-computed by the scoring Edge Function; we only display.
+    const {data: pick} = await supabase
+      .from('season_picks')
+      .select('picked_team, is_correct, points')
+      .eq('user_id', userId)
+      .eq('competition', competition)
+      .eq('week', targetWeek)
+      .eq('is_hotpick', true)
+      .maybeSingle();
+
+    if (!pick || pick.is_correct == null) {
+      set({lastWeekHotPick: null});
+      return;
+    }
+
+    set({
+      lastWeekHotPick: {
+        team:      pick.picked_team,
+        isCorrect: pick.is_correct,
+        points:    pick.points ?? 0,
+      },
+    });
+  },
+
+  loadRecentWeeks: async (userId, competition) => {
+    // Pre-computed per-week totals. Last 4 weeks descending; display ascending.
+    const {data} = await supabase
+      .from('season_user_totals')
+      .select('week, week_points, playoff_points')
+      .eq('user_id', userId)
+      .eq('competition', competition)
+      .order('week', {ascending: false})
+      .limit(4);
+
+    const rows = (data ?? []) as Array<{
+      week: number;
+      week_points: number | null;
+      playoff_points: number | null;
+    }>;
+    const ascending = [...rows].reverse().map(r => ({
+      week:  r.week,
+      total: (r.week_points ?? 0) + (r.playoff_points ?? 0),
+    }));
+    set({recentWeeks: ascending});
   },
 }));
