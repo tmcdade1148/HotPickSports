@@ -210,6 +210,30 @@ interface GlobalState {
   // they're never ranked per the May 13 2026 locked product decision.
   userRankByPool: Record<string, {rank: number; memberCount: number; total: number}>;
   loadUserRankByPool: (userId: string, privatePoolIds: string[]) => Promise<void>;
+
+  // Partner Module data — spec §6.4.7.
+  // partnersById is the fetched partner record cache (one per distinct
+  // partner_id aligned to a visible pool). Only partners with
+  // is_active = true AND perk_text IS NOT NULL are loaded — partners
+  // without a configured perk should not appear as Modules.
+  partnersById: Record<string, {
+    id: string;
+    name: string;
+    slug: string;
+    perk_text: string;
+    perk_icon: string | null;
+    logo_url: string | null;
+    primary_color: string | null;
+  }>;
+  loadAlignedPartners: (visiblePoolPartnerIds: string[]) => Promise<void>;
+
+  // partnerIndicators — parallel to poolIndicators but keyed by partner_id.
+  // Sourced from partner_notifications + partner_notification_read_state.
+  partnerIndicators: Record<string, {unread: number; mostRecentAt: string | null}>;
+  loadPartnerIndicators: (userId: string, partnerIds: string[]) => Promise<void>;
+  /** Mark partner notifications read for this user/partner. Called on entry
+   *  to PartnerRosterScreen. Clears the indicator on Home. */
+  markPartnerNotificationsRead: (userId: string, partnerId: string) => Promise<void>;
 }
 
 export interface UserHardwareItem {
@@ -1387,5 +1411,131 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       };
     }
     set({userRankByPool: map});
+  },
+
+  // ---------------------------------------------------------------------------
+  // Home Redesign §6.4.7 — Partner Module data + indicators
+  // ---------------------------------------------------------------------------
+  partnersById: {},
+
+  loadAlignedPartners: async (partnerIds) => {
+    if (partnerIds.length === 0) {
+      set({partnersById: {}});
+      return;
+    }
+
+    // Only load partners that are active AND have a configured perk —
+    // partners without a perk are not rendered as Modules per spec §6.4.7.
+    const {data} = await supabase
+      .from('partners')
+      .select('id, name, slug, perk_text, perk_icon, brand_config')
+      .in('id', partnerIds)
+      .eq('is_active', true)
+      .not('perk_text', 'is', null);
+
+    const map: Record<string, {
+      id: string;
+      name: string;
+      slug: string;
+      perk_text: string;
+      perk_icon: string | null;
+      logo_url: string | null;
+      primary_color: string | null;
+    }> = {};
+
+    for (const row of (data ?? []) as Array<{
+      id: string;
+      name: string;
+      slug: string;
+      perk_text: string | null;
+      perk_icon: string | null;
+      brand_config: Record<string, unknown> | null;
+    }>) {
+      if (!row.perk_text) continue;
+      const bc = (row.brand_config ?? {}) as Record<string, unknown>;
+      const logo = (bc.logo ?? {}) as Record<string, unknown>;
+      map[row.id] = {
+        id:            row.id,
+        name:          row.name,
+        slug:          row.slug,
+        perk_text:     row.perk_text,
+        perk_icon:     row.perk_icon,
+        logo_url:      typeof logo.full === 'string' ? logo.full : null,
+        primary_color: typeof bc.primary_color === 'string' ? bc.primary_color : null,
+      };
+    }
+    set({partnersById: map});
+  },
+
+  partnerIndicators: {},
+
+  loadPartnerIndicators: async (userId, partnerIds) => {
+    if (partnerIds.length === 0) {
+      set({partnerIndicators: {}});
+      return;
+    }
+
+    // Parallel queries (notifications + read-state) — never per-Module.
+    const [notifResult, readStateResult] = await Promise.all([
+      supabase
+        .from('partner_notifications')
+        .select('partner_id, sent_at')
+        .in('partner_id', partnerIds)
+        .order('sent_at', {ascending: false}),
+      supabase
+        .from('partner_notification_read_state')
+        .select('partner_id, last_read_at')
+        .in('partner_id', partnerIds)
+        .eq('user_id', userId),
+    ]);
+
+    const lastReadByPartner = new Map<string, string>();
+    for (const row of (readStateResult.data ?? []) as Array<{
+      partner_id: string;
+      last_read_at: string;
+    }>) {
+      lastReadByPartner.set(row.partner_id, row.last_read_at);
+    }
+
+    const indicators: Record<string, {unread: number; mostRecentAt: string | null}> = {};
+    for (const pid of partnerIds) {
+      indicators[pid] = {unread: 0, mostRecentAt: null};
+    }
+
+    for (const row of (notifResult.data ?? []) as Array<{
+      partner_id: string;
+      sent_at: string;
+    }>) {
+      const cell = indicators[row.partner_id];
+      if (!cell) continue;
+      const lastRead = lastReadByPartner.get(row.partner_id);
+      if (!lastRead || row.sent_at > lastRead) {
+        cell.unread += 1;
+      }
+      if (!cell.mostRecentAt || row.sent_at > cell.mostRecentAt) {
+        cell.mostRecentAt = row.sent_at;
+      }
+    }
+
+    set({partnerIndicators: indicators});
+  },
+
+  markPartnerNotificationsRead: async (userId, partnerId) => {
+    const now = new Date().toISOString();
+    await supabase
+      .from('partner_notification_read_state')
+      .upsert(
+        {user_id: userId, partner_id: partnerId, last_read_at: now},
+        {onConflict: 'user_id,partner_id'},
+      );
+    set(state => ({
+      partnerIndicators: {
+        ...state.partnerIndicators,
+        [partnerId]: {
+          ...(state.partnerIndicators[partnerId] ?? {mostRecentAt: null}),
+          unread: 0,
+        },
+      },
+    }));
   },
 }));
