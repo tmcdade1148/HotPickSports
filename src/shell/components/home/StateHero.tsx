@@ -1,34 +1,34 @@
 // src/shell/components/home/StateHero.tsx
 // Spec §6.4.3 — StateHero is the Home Screen's hero block.
-// Routes between 9 sub-variants based on (current_phase, week_state).
+// Routes between 10 sub-variants based on (current_phase, week_state)
+// plus the zero-pools overlay.
 //
-// In-cycle variants (this sub-branch — feat/home-state-hero-in-cycle):
+// In-cycle variants:
 //   picks_open    → PicksOpenHero
 //   locked        → PicksLockedHero
 //   live          → GamesLiveHero
 //   settling      → SettlingHero
 //   complete      → CompleteHero
 //
-// Bridge/off-cycle variants land in sub-branch 7 (feat/home-bridge-states):
-//   zero_pools    → ZeroPoolsHero
-//   pre_season    → PreSeasonHero
+// Bridge / off-cycle variants:
+//   zero_pools              → ZeroPoolsHero      (overrides everything if no pools)
+//   pre_season_idle         → PreSeasonHero
 //   regular_complete_bridge → RegularCompleteHero
 //   superbowl_intro_bridge  → SuperBowlIntroHero
 //   season_complete         → SeasonCompleteHero
-//
-// For now, the bridge states render a placeholder so the screen never
-// shows a blank hero during PRE_SEASON / REGULAR_COMPLETE / etc.
 
 import React from 'react';
-import {StyleSheet, Text, View} from 'react-native';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
-import {useTheme} from '@shell/theme/hooks';
-import {bodyType, spacing} from '@shared/theme';
 import {PicksOpenHero} from './PicksOpenHero';
 import {PicksLockedHero} from './PicksLockedHero';
 import {GamesLiveHero} from './GamesLiveHero';
 import {SettlingHero} from './SettlingHero';
 import {CompleteHero} from './CompleteHero';
+import {ZeroPoolsHero} from './ZeroPoolsHero';
+import {PreSeasonHero} from './PreSeasonHero';
+import {RegularCompleteHero} from './RegularCompleteHero';
+import {SuperBowlIntroHero} from './SuperBowlIntroHero';
+import {SeasonCompleteHero} from './SeasonCompleteHero';
 
 export type HomeState =
   | 'zero_pools'
@@ -48,38 +48,23 @@ export interface StateHeroProps {
 }
 
 export function StateHero({state}: StateHeroProps) {
-  const {colors} = useTheme();
   const weekState    = useNFLStore(s => s.weekState);
   const currentPhase = useNFLStore(s => s.currentPhase);
 
   const resolved: HomeState = state ?? resolveFromConfig(currentPhase, weekState);
 
   switch (resolved) {
-    case 'picks_open':
-      return <PicksOpenHero />;
-    case 'picks_locked':
-      return <PicksLockedHero />;
-    case 'games_live':
-      return <GamesLiveHero />;
-    case 'settling':
-      return <SettlingHero />;
-    case 'complete':
-      return <CompleteHero />;
-
-    // Placeholder for bridge / idle states until sub-branch 7 ships them.
-    case 'zero_pools':
-    case 'pre_season_idle':
-    case 'regular_complete_bridge':
-    case 'superbowl_intro_bridge':
-    case 'season_complete':
-    default:
-      return (
-        <View style={styles.placeholder}>
-          <Text style={[bodyType.regular, {color: colors.textSecondary}]}>
-            {humanLabelForState(resolved)}
-          </Text>
-        </View>
-      );
+    case 'picks_open':              return <PicksOpenHero />;
+    case 'picks_locked':            return <PicksLockedHero />;
+    case 'games_live':              return <GamesLiveHero />;
+    case 'settling':                return <SettlingHero />;
+    case 'complete':                return <CompleteHero />;
+    case 'zero_pools':              return <ZeroPoolsHero />;
+    case 'pre_season_idle':         return <PreSeasonHero />;
+    case 'regular_complete_bridge': return <RegularCompleteHero />;
+    case 'superbowl_intro_bridge':  return <SuperBowlIntroHero />;
+    case 'season_complete':         return <SeasonCompleteHero />;
+    default:                        return <PreSeasonHero />;
   }
 }
 
@@ -105,21 +90,3 @@ function resolveFromConfig(phase: string, weekState: string): HomeState {
   }
 }
 
-function humanLabelForState(state: HomeState): string {
-  switch (state) {
-    case 'zero_pools':              return 'Welcome to HotPick. (Hero coming soon.)';
-    case 'pre_season_idle':         return 'Pre-season. The season is on the horizon.';
-    case 'regular_complete_bridge': return 'Regular season closed. Playoffs incoming.';
-    case 'superbowl_intro_bridge':  return 'Super Bowl week.';
-    case 'season_complete':         return 'The season is in the books.';
-    default:                        return '';
-  }
-}
-
-const styles = StyleSheet.create({
-  placeholder: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical:   spacing.xl,
-    alignItems: 'center',
-  },
-});
