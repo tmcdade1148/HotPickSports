@@ -11,6 +11,8 @@
     "eas-build-pre-install": "if [ -n \"$GOOGLE_SERVICES_JSON\" ]; then echo \"[eas-build-pre-install] Copying GOOGLE_SERVICES_JSON to android/app/google-services.json\"; cp \"$GOOGLE_SERVICES_JSON\" android/app/google-services.json; fi"
   },
   "dependencies": {
+    "@expo-google-fonts/manrope": "^0.4.2",
+    "@expo-google-fonts/saira-condensed": "^0.4.1",
     "@invertase/react-native-apple-authentication": "^2.5.1",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-clipboard/clipboard": "^1.16.3",
@@ -21,6 +23,7 @@
     "@supabase/supabase-js": "^2.96.0",
     "expo-constants": "^55.0.9",
     "expo-device": "^55.0.10",
+    "expo-font": "^55.0.7",
     "expo-notifications": "^55.0.13",
     "expo-updates": "~55.0.20",
     "lucide-react-native": "^0.574.0",

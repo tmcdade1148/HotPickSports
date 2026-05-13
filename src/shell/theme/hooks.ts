@@ -4,6 +4,8 @@ import {
   HOTPICK_DEFAULTS,
   SEMANTIC_COLORS,
   SEMANTIC_COLORS_DARK,
+  HOTPICK_EXTENDED_TOKENS,
+  HOTPICK_EXTENDED_TOKENS_DARK,
   deriveDarkColors,
 } from './defaults';
 import type {ThemeColors, BrandIdentity} from './types';
@@ -27,6 +29,7 @@ export function useTheme(): {colors: ThemeColors; isDark: boolean} {
   const lightConfig = brandConfig ?? HOTPICK_DEFAULTS;
   const config = isDark ? deriveDarkColors(lightConfig) : lightConfig;
   const semantic = isDark ? SEMANTIC_COLORS_DARK : SEMANTIC_COLORS;
+  const extended = isDark ? HOTPICK_EXTENDED_TOKENS_DARK : HOTPICK_EXTENDED_TOKENS;
 
   // HotPick uses blue (#34A4D1) in light mode and gold (#E39032) in dark mode.
   // Partners keep their own highlight in both modes.
@@ -44,6 +47,11 @@ export function useTheme(): {colors: ThemeColors; isDark: boolean} {
       highlight,
       textPrimary: config.text_primary,
       textSecondary: config.text_secondary,
+      // Extended tokens (spec §6.3) — always HotPick-managed.
+      surfaceElevated: extended.surface_elevated,
+      accentTeal: extended.accent_teal,
+      ink: extended.ink,
+      textTertiary: extended.text_tertiary,
       ...semantic,
     },
   };

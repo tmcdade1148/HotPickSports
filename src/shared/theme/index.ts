@@ -34,6 +34,50 @@ export const typography = {
   small: {fontSize: 12, fontWeight: '400' as const},
 };
 
+/**
+ * Home-redesign display typography (spec §6.3).
+ *
+ * Saira Condensed Italic Black for hero numerics + player names.
+ * Sizes mirror `colors_and_type.css`. Faux italic on upright 900Black
+ * until a true italic TTF is added to assets/fonts/.
+ */
+export const displayType = {
+  display: {
+    fontFamily: 'SairaCondensed_900Black',
+    fontStyle: 'italic' as const,
+    fontWeight: '900' as const,
+    letterSpacing: -0.5,
+  },
+  // Common sizes per the design system: 12 / 20 / 24 / 32 / 40 / 56 / 72 / 108 / 128
+  size: {
+    eyebrow: 12,
+    h4: 20,
+    h3: 24,
+    h2: 32,
+    h1: 40,
+    display1: 56,
+    display2: 72,
+    display3: 108,
+    display4: 128,
+  },
+} as const;
+
+/**
+ * Body text — Manrope. Used everywhere display isn't.
+ */
+export const bodyType = {
+  regular: {fontFamily: 'Manrope_400Regular', fontWeight: '400' as const},
+  bold: {fontFamily: 'Manrope_700Bold', fontWeight: '700' as const},
+} as const;
+
+/**
+ * Mono — system monospace. Scores, deltas, countdown digits, timestamps.
+ * No fontFamily set so RN picks SF Mono / Roboto Mono per platform.
+ */
+export const monoType = {
+  regular: {fontVariant: ['tabular-nums'] as const},
+} as const;
+
 export const borderRadius = {
   sm: 4,
   md: 8,

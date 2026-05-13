@@ -74,6 +74,13 @@ export interface ThemeColors {
   textPrimary: string;
   textSecondary: string;
 
+  // Extended HotPick tokens — added 2026-05-13 per Home Redesign spec §6.3.
+  // Never partner-overridable; always HotPick-managed.
+  surfaceElevated: string;  // Pool modules, partner modules, hero blocks
+  accentTeal: string;       // Pool-as-aligned visual connection accent
+  ink: string;              // Deep ink for high-contrast type
+  textTertiary: string;     // Captions, muted labels, placeholders
+
   // Semantic colors (always HotPick — never overridden by partners)
   success: string;
   warning: string;

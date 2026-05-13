@@ -20,12 +20,47 @@ export {
  *
  * Partners don't manage dark mode — we auto-derive it.
  * Brand primary/secondary stay the same; backgrounds and text flip.
+ *
+ * Updated 2026-05-13 per spec §6.3 to match `colors_and_type.css` dark theme:
+ *   --bg-1  #141414   (was #181818)
+ *   --bg-2  #1A1A1A   (was #262626)
+ *   --fg-1  #FFFFFF   (was #8A97AA — that was an a11y bug)
+ *   --fg-2  #B8B8B8   (was #A0A0A0)
  */
 export const HOTPICK_DARK_OVERRIDES = {
-  background_color: '#181818',
-  surface_color: '#262626',
-  text_primary: '#8A97AA',
-  text_secondary: '#A0A0A0',
+  background_color: '#141414',
+  surface_color: '#1A1A1A',
+  text_primary: '#FFFFFF',
+  text_secondary: '#B8B8B8',
+} as const;
+
+/**
+ * Extended tokens — HotPick-managed structural and accent values that
+ * augment the brand colors. Spec §6.3 adds these to the redesign system.
+ * Partners never override these; they're consistent across all pools.
+ *
+ * | Token            | Light    | Dark     | Usage                                |
+ * |------------------|----------|----------|--------------------------------------|
+ * | surface_elevated | #F4F4F4  | #242424  | Pool modules, partner modules, hero  |
+ * | accent_teal      | #45615E  | #45615E  | Pool-as-aligned visual connection    |
+ * | ink              | #303030  | #303030  | Deep ink for type on light surfaces  |
+ * | text_tertiary    | #8A8A8A  | #7A7A7A  | Captions, muted labels, placeholders |
+ *
+ * `accent_teal` preserves the prior `secondary` value before secondary was
+ * reassigned to amber (#E39032) per the new design system.
+ */
+export const HOTPICK_EXTENDED_TOKENS = {
+  surface_elevated: '#F4F4F4',
+  accent_teal: '#45615E',
+  ink: '#303030',
+  text_tertiary: '#8A8A8A',
+} as const;
+
+export const HOTPICK_EXTENDED_TOKENS_DARK = {
+  surface_elevated: '#242424',
+  accent_teal: '#45615E',
+  ink: '#303030',
+  text_tertiary: '#7A7A7A',
 } as const;
 
 /**

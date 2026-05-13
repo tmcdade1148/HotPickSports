@@ -3,25 +3,36 @@
 // All theme tokens derive from these values.
 // Do not hardcode these hex strings anywhere else in the codebase.
 // The ONE permitted exception is SplashScreen.tsx container background.
-// See CLAUDE.md Section 16 — Splash Screen Color Exception.
+// See CLAUDE.md Hard Rule #9 and §16 — Splash Screen Color Exception.
+//
+// Updated 2026-05-13 per spec §6.3 (260513_HotPick_HomeRedesign_Spec.docx)
+// to match the colors_and_type.css design system. Token names are stable;
+// `secondary` changes value (#45615E teal → #E39032 amber). The previous
+// teal value is preserved as the new `accent_teal` token so components
+// that genuinely need teal can still reach it via useTheme().accentTeal.
+//
+// Brand vs Extended tokens:
+//   • HOTPICK_BRAND_COLORS (this file) — the 4 partner-overridable values.
+//     Partners can rebrand these via brand_config.
+//   • HOTPICK_EXTENDED_TOKENS (defaults.ts) — semantic and structural
+//     tokens that are always HotPick-managed. Never overridden by partners.
 
 import type {BrandConfig, BrandLogoSet} from './types';
 
 /**
  * HotPick Sports locked brand color tokens.
- * These are the only 4 settable brand colors. All other colors
- * (surface, text) are auto-derived from background.
  *
  * | Token      | Hex       | Usage                                          |
  * |------------|-----------|------------------------------------------------|
- * | primary    | #F66321   | CTAs, active buttons, highlights               |
- * | secondary  | #45615E   | Accents, inactive states                       |
- * | highlight  | #34A4D1   | Accent color — blue in light mode, gold (#E39032) in dark mode |
- * | background | #FCFCFC   | App bg, splash bg, adaptive icon bg            |
+ * | primary    | #F66321   | Flame. CTAs, active buttons, highlights.       |
+ * | secondary  | #E39032   | Amber. Secondary accents. (was #45615E teal)   |
+ * | highlight  | #34A4D1   | Light-mode highlight (blue). Dark mode is gold.|
+ * | background | #FCFCFC   | App bg (LIGHT mode). Dark mode value lives     |
+ * |            |           | in HOTPICK_DARK_OVERRIDES (defaults.ts).       |
  */
 export const HOTPICK_BRAND_COLORS = {
   primary: '#F66321',
-  secondary: '#45615E',
+  secondary: '#E39032',
   highlight: '#34A4D1',
   background: '#FCFCFC',
 } as const;
@@ -44,9 +55,11 @@ export const HOTPICK_LOGOS: BrandLogoSet = {
 /**
  * HotPick Sports default brand configuration.
  *
- * Used when a pool has no brand_config (NULL) — i.e. every
- * non-partner pool. This is the canonical source of HotPick
- * brand values. Never hardcode these elsewhere.
+ * Used when a pool has no brand_config (NULL) — every non-partner pool.
+ * Partner pools have their own brand_config persisted as JSONB on pools;
+ * `useTheme()` merges that on top of these defaults at render time.
+ *
+ * Light-mode values. Dark mode is auto-derived in defaults.ts:deriveDarkColors.
  */
 export const HOTPICK_BRAND: BrandConfig = {
   partner_name: '',
