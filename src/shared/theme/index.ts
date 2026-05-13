@@ -43,7 +43,7 @@ export const typography = {
  */
 export const displayType = {
   display: {
-    fontFamily: 'SairaCondensed_900Black',
+    fontFamily: 'SairaCondensed-Black',
     fontStyle: 'italic' as const,
     fontWeight: '900' as const,
     letterSpacing: -0.5,
@@ -66,8 +66,8 @@ export const displayType = {
  * Body text — Manrope. Used everywhere display isn't.
  */
 export const bodyType = {
-  regular: {fontFamily: 'Manrope_400Regular', fontWeight: '400' as const},
-  bold: {fontFamily: 'Manrope_700Bold', fontWeight: '700' as const},
+  regular: {fontFamily: 'Manrope-Regular', fontWeight: '400' as const},
+  bold: {fontFamily: 'Manrope-Bold', fontWeight: '700' as const},
 } as const;
 
 /**
