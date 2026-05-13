@@ -224,29 +224,22 @@ function SettingsTabWrapper(props: any) {
 }
 
 /**
- * HomeTab — Home screen with unified pool switcher bar.
+ * HomeTab — Home screen.
+ *
+ * The PNG wordmark image that used to render above HomeScreen has been
+ * removed per the May 13 design call. Home now ships its own text-rendered
+ * wordmark via the HomeHeader component (and the spec's original §6.4.2
+ * stance was "no wordmark on Home" anyway — this returns us to that
+ * position with HomeHeader supplying a lighter-weight inline equivalent).
+ *
+ * Partner branding for partner-aligned pools is now handled inside the
+ * Home content via PoolModule's accent stripe + PartnerModule's logo,
+ * not as a top-of-screen banner.
  */
 function HomeTab(props: any) {
   const {colors} = useTheme();
-  const brand = useBrand();
-  const wordmark = isDarkBg(colors.background) ? wordmarkDark : wordmarkLight;
   return (
     <SafeAreaView style={{flex: 1, backgroundColor: colors.background}} edges={['top']}>
-      <View style={{alignItems: 'center', paddingTop: spacing.sm, paddingBottom: spacing.xs}}>
-        {brand.isBranded && brand.logo.full ? (
-          <Image
-            source={{uri: brand.logo.full}}
-            style={{height: 36, width: 190}}
-            resizeMode="contain"
-          />
-        ) : (
-          <Image
-            source={wordmark}
-            style={{height: 50, width: 280}}
-            resizeMode="contain"
-          />
-        )}
-      </View>
       <HomeScreen {...props} />
     </SafeAreaView>
   );
