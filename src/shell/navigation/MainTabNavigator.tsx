@@ -319,6 +319,12 @@ function GroupedTabBar({state, descriptors, navigation}: BottomTabBarProps) {
   const grouped = state.routes.slice(2, 4);   // Leaders + SmackTalk — always indices 2 & 3
   const trailing = state.routes.slice(4);
 
+  // Spec §6.4.8 — hide Leaders + SmackTalk tabs when Home is the focused tab.
+  // Routes stay registered (NOT unmounted) so direct navigation from
+  // PoolModule body/indicator still works.
+  const activeRouteName = state.routes[state.index]?.name;
+  const hideGroupedTabs = activeRouteName === 'HomeTab';
+
   return (
     <View style={[s.bar, {backgroundColor: colors.background, borderTopColor: colors.border}]}>
       {leading.map((route, i) => (
@@ -332,7 +338,8 @@ function GroupedTabBar({state, descriptors, navigation}: BottomTabBarProps) {
         </TouchableOpacity>
       ))}
 
-      {/* Underline spanning Leaders + SmackTalk */}
+      {/* Underline spanning Leaders + SmackTalk — suppressed on Home */}
+      {!hideGroupedTabs && (
       <View style={[s.groupBox, {borderBottomColor: colors.border}]}>
         {grouped.map((route, i) => {
           const index = i + 2;
@@ -348,6 +355,7 @@ function GroupedTabBar({state, descriptors, navigation}: BottomTabBarProps) {
           );
         })}
       </View>
+      )}
 
       {trailing.map((route, i) => {
         const index = i + 4;
