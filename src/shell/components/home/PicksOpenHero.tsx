@@ -1,11 +1,15 @@
 // src/shell/components/home/PicksOpenHero.tsx
 // Spec §6.4.3 — picks_open row.
 //
-// Eyebrow: "PICKS OPEN."
-// Hero: countdown to next pick lock (Thursday kickoff)
-//       + HotPick game card showing current designated HotPick + frozen_rank
-// CTA: "Continue picks" → Picks tab
-// Salutation above eyebrow.
+// Reference (May 13 2026 v2):
+//   NEXT LOCK IN                          ← flame eyebrow, tracked caps
+//   02 : 14 : 37                          ← split countdown, primary colons
+//   DAYS   HRS   MIN                      ← unit labels under each number
+//
+//   Thursday Night lock, 8:15 PM ET.
+//   Remaining games lock Sunday at 1 PM ET.
+//
+//   [ MAKE YOUR PICKS                0/13 ]   ← big flame CTA with count badge
 
 import React, {useEffect, useState} from 'react';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
@@ -13,74 +17,53 @@ import {useNavigation} from '@react-navigation/native';
 import {useTheme} from '@shell/theme/hooks';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {displayType, bodyType, monoType, spacing, borderRadius} from '@shared/theme';
-import {HotPickCinematic} from './HotPickCinematic';
-import {getTeamColors} from './teamColors';
-import {getContextGreeting} from './salutation';
+
+const TOTAL_PICKS_PER_WEEK = 13; // typical NFL week; can read from weekGames later
 
 export function PicksOpenHero() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
 
-  const userHotPick     = useNFLStore(s => s.userHotPick);
-  const userHotPickGame = useNFLStore(s => s.userHotPickGame);
-  const picksDeadline   = useNFLStore(s => s.picksDeadline);
-  const userPickCount   = useNFLStore(s => s.userPickCount);
-  const currentPhase    = useNFLStore(s => s.currentPhase);
-  const weekState       = useNFLStore(s => s.weekState);
-
-  const greeting = getContextGreeting(
-    currentPhase,
-    weekState,
-    userPickCount,
-    picksDeadline,
-  );
+  const userPickCount = useNFLStore(s => s.userPickCount);
+  const picksDeadline = useNFLStore(s => s.picksDeadline);
+  const sundayAnchor  = useNFLStore(s => s.sundayLockAnchor);
 
   const {days, hours, minutes} = useCountdown(picksDeadline);
+  const picksSet = userPickCount ?? 0;
 
-  const hasHotPick = !!(userHotPick && userHotPickGame);
-  const away = userHotPickGame?.away_team ?? '';
-  const home = userHotPickGame?.home_team ?? '';
-  const awayMeta = getTeamColors(away);
-  const homeMeta = getTeamColors(home);
+  const thursdayPretty = picksDeadline
+    ? picksDeadline.toLocaleString(undefined, {weekday: 'long', hour: 'numeric', minute: '2-digit', timeZoneName: 'short'})
+    : null;
+  const sundayPretty = sundayAnchor
+    ? sundayAnchor.toLocaleString(undefined, {weekday: 'long', hour: 'numeric', timeZoneName: 'short'})
+    : null;
 
   return (
     <View style={styles.wrap}>
-      <Text style={[bodyType.regular, styles.salutation, {color: colors.textSecondary}]}>
-        {greeting}
-      </Text>
       <Text style={[bodyType.bold, styles.eyebrow, {color: colors.primary}]}>
-        PICKS OPEN
+        NEXT LOCK IN
       </Text>
 
-      {/* Countdown */}
-      {picksDeadline && (
-        <View style={styles.countdownRow}>
-          <CountUnit n={days}    label="days"  color={colors.textPrimary} />
-          <Text style={[displayType.display, styles.colon, {color: colors.primary}]}>:</Text>
-          <CountUnit n={hours}   label="hrs"   color={colors.textPrimary} />
-          <Text style={[displayType.display, styles.colon, {color: colors.primary}]}>:</Text>
-          <CountUnit n={minutes} label="min"   color={colors.textPrimary} />
-        </View>
-      )}
+      {/* Split countdown — DAYS : HRS : MIN */}
+      <View style={styles.countdownRow}>
+        <CountUnit n={days}    label="DAYS" color={colors.textPrimary} subColor={colors.textTertiary} />
+        <Colon color={colors.primary} />
+        <CountUnit n={hours}   label="HRS"  color={colors.textPrimary} subColor={colors.textTertiary} />
+        <Colon color={colors.primary} />
+        <CountUnit n={minutes} label="MIN"  color={colors.textPrimary} subColor={colors.textTertiary} />
+      </View>
 
-      {hasHotPick && (
-        <View style={styles.hotPickWrap}>
-          <HotPickCinematic
-            mode="scheduled"
-            awayTeam={away}
-            awayCity={awayMeta.city}
-            awayColor={awayMeta.primary}
-            homeTeam={home}
-            homeCity={homeMeta.city}
-            homeColor={homeMeta.primary}
-            pickedTeam={userHotPick?.picked_team ?? undefined}
-            frozenRank={userHotPickGame?.frozen_rank ?? 0}
-            kickoffLabel={kickoffLabel(userHotPickGame!.kickoff_at)}
-            compact
-          />
-        </View>
-      )}
+      {/* Sub-line — Thursday lock + Sunday remaining-games lock */}
+      <Text style={[bodyType.regular, styles.subline, {color: colors.textSecondary}]}>
+        {thursdayPretty ? (
+          <>
+            Thursday Night lock, <Text style={{color: colors.textPrimary}}>{shortTime(picksDeadline!)}</Text>.{' '}
+          </>
+        ) : null}
+        {sundayPretty ? `Remaining games lock Sunday at ${shortTime(sundayAnchor!)}.` : null}
+      </Text>
 
+      {/* Primary CTA with pick-count badge on the right */}
       <Pressable
         onPress={() => navigation.navigate('Games')}
         style={({pressed}) => [
@@ -88,36 +71,58 @@ export function PicksOpenHero() {
           {backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1},
         ]}
         accessibilityRole="button"
-        accessibilityLabel="Continue your picks">
-        <Text style={[bodyType.bold, styles.ctaText]}>Continue picks</Text>
+        accessibilityLabel={`Make your picks — ${picksSet} of ${TOTAL_PICKS_PER_WEEK} set`}>
+        <Text style={[displayType.display, styles.ctaText]}>MAKE YOUR PICKS</Text>
+        <View style={styles.countBadge}>
+          <Text style={[monoType.regular, styles.countBadgeText]}>
+            {picksSet}/{TOTAL_PICKS_PER_WEEK}
+          </Text>
+        </View>
       </Pressable>
     </View>
   );
 }
 
-function CountUnit({n, label, color}: {n: string; label: string; color: string}) {
+function CountUnit({n, label, color, subColor}: {
+  n: string;
+  label: string;
+  color: string;
+  subColor: string;
+}) {
   return (
-    <View style={{alignItems: 'flex-start'}}>
+    <View style={styles.unit}>
       <Text
         style={[
           displayType.display,
           monoType.regular,
-          {fontSize: displayType.size.display1, color, lineHeight: displayType.size.display1 * 0.9},
+          {fontSize: 64, color, lineHeight: 64 * 0.9, letterSpacing: -1},
         ]}>
         {n}
       </Text>
-      <Text style={[bodyType.bold, styles.countLabel, {color: color + 'B3'}]}>{label}</Text>
+      <Text style={[bodyType.bold, styles.unitLabel, {color: subColor}]}>
+        {label}
+      </Text>
     </View>
   );
 }
 
-/** Lightweight countdown — updates every 30s. Component-local so it doesn't bloat the store. */
+function Colon({color}: {color: string}) {
+  return (
+    <View style={styles.colon}>
+      <View style={[styles.dot, {backgroundColor: color}]} />
+      <View style={[styles.dot, {backgroundColor: color}]} />
+    </View>
+  );
+}
+
 function useCountdown(deadline: Date | null) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
+    if (!deadline) return;
     const id = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(id);
-  }, []);
+  }, [deadline]);
+
   if (!deadline) return {days: '--', hours: '--', minutes: '--'};
   const diff = Math.max(0, deadline.getTime() - now);
   const totalMinutes = Math.floor(diff / 60_000);
@@ -125,45 +130,92 @@ function useCountdown(deadline: Date | null) {
   const hours   = Math.floor((totalMinutes % (60 * 24)) / 60);
   const minutes = totalMinutes % 60;
   return {
-    days:    String(days).padStart(2, '0'),
-    hours:   String(hours).padStart(2, '0'),
-    minutes: String(minutes).padStart(2, '0'),
+    days:    pad(days),
+    hours:   pad(hours),
+    minutes: pad(minutes),
   };
 }
 
-function kickoffLabel(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleString(undefined, {weekday: 'long', hour: 'numeric', minute: '2-digit'});
+function pad(n: number): string {
+  return String(n).padStart(2, '0');
+}
+
+function shortTime(d: Date): string {
+  return d.toLocaleString(undefined, {hour: 'numeric', minute: '2-digit', timeZoneName: 'short'});
 }
 
 const styles = StyleSheet.create({
   wrap: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
+    paddingTop: spacing.sm,
     paddingBottom: spacing.lg,
+    gap: spacing.md,
   },
-  salutation: {fontSize: 13, marginBottom: 4},
-  eyebrow:    {fontSize: 11, letterSpacing: 2, marginBottom: spacing.sm},
+  eyebrow: {
+    fontSize: 12,
+    letterSpacing: 2,
+  },
   countdownRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 6,
-    marginBottom: spacing.lg,
+    alignItems: 'flex-start',
+    gap: spacing.sm,
   },
-  colon:      {fontSize: 56, paddingHorizontal: 4, paddingBottom: 10},
-  countLabel: {fontSize: 10, letterSpacing: 2, marginTop: 2},
-  hotPickWrap: {marginBottom: spacing.lg},
-  cta: {
-    width: '100%',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: borderRadius.lg,
+  unit: {
+    minWidth: 80,
+    alignItems: 'flex-start',
+  },
+  unitLabel: {
+    fontSize: 11,
+    letterSpacing: 2,
+    marginTop: 6,
+  },
+  colon: {
+    width: 12,
+    height: 64,
+    justifyContent: 'center',
     alignItems: 'center',
+    gap: 10,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 999,
+  },
+  subline: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: spacing.sm,
+  },
+  cta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.md + 2,
+    paddingLeft: spacing.lg,
+    paddingRight: spacing.sm + 2,
+    borderRadius: borderRadius.lg,
+    marginTop: spacing.sm,
+    // Subtle flame glow (iOS)
+    shadowColor: '#F66321',
+    shadowOpacity: 0.35,
+    shadowRadius: 18,
+    shadowOffset: {width: 0, height: 0},
   },
   ctaText: {
-    fontSize: 16,
+    fontSize: 18,
     color: '#FFFFFF',
     letterSpacing: 0.5,
-    textTransform: 'uppercase',
+  },
+  countBadge: {
+    backgroundColor: '#FFFFFF33',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: borderRadius.full,
+    marginLeft: spacing.sm,
+  },
+  countBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

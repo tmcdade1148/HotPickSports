@@ -15,17 +15,18 @@
 // per-Module useEffect — every aggregation lives in globalStore loaders.
 
 import React, {useEffect, useMemo} from 'react';
-import {ScrollView, StyleSheet, View} from 'react-native';
+import {ScrollView, StyleSheet, Text, View} from 'react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useTheme} from '@shell/theme/hooks';
-import {spacing} from '@shared/theme';
+import {spacing, bodyType} from '@shared/theme';
 
 import {SystemMessageSlot} from '@shell/components/home/SystemMessageSlot';
+import {HomeHeader} from '@shell/components/home/HomeHeader';
 import {IdentityBar} from '@shell/components/home/IdentityBar';
 import {StateHero} from '@shell/components/home/StateHero';
+import {StatBlocks} from '@shell/components/home/StatBlocks';
 import {LastWeekRecapChip} from '@shell/components/home/LastWeekRecapChip';
-import {WeekMiniStrip} from '@shell/components/home/WeekMiniStrip';
 import {PoolModule} from '@shell/components/home/PoolModule';
 import {PartnerModule} from '@shell/components/home/PartnerModule';
 import {resolveHomeState} from '@shell/components/home/resolveHomeState';
@@ -69,8 +70,10 @@ export function HomeScreen() {
   );
 
   // Element-level visibility per spec §6.2 anatomy table.
-  const showRecapChip   = homeState === 'picks_open' || homeState === 'picks_locked';
-  const showWeekStrip   = (
+  const showRecapChip = homeState === 'picks_open' || homeState === 'picks_locked';
+  // StatBlocks (Season Total + Last Week) — visible in every in-cycle state
+  // per the May 13 v2 reference. Replaces the prior WeekMiniStrip.
+  const showStatBlocks = (
     homeState === 'picks_open'  ||
     homeState === 'picks_locked' ||
     homeState === 'games_live'  ||
@@ -150,15 +153,24 @@ export function HomeScreen() {
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}>
+        <HomeHeader />
         <SystemMessageSlot />
         <IdentityBar />
         <StateHero state={homeState} />
 
-        {showRecapChip && <LastWeekRecapChip />}
-        {showWeekStrip && <WeekMiniStrip />}
+        {showStatBlocks && <StatBlocks />}
+        {showRecapChip  && <LastWeekRecapChip />}
 
         {showPoolStack && visiblePools.length > 0 && (
           <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textPrimary}]}>
+                YOUR POOLS
+              </Text>
+              <Text style={[bodyType.regular, styles.sectionCount, {color: colors.textTertiary}]}>
+                {visiblePools.length} active
+              </Text>
+            </View>
             {visiblePools.map(p => (
               <PoolModule key={p.id} pool={p} />
             ))}
@@ -167,6 +179,14 @@ export function HomeScreen() {
 
         {showPartnerStack && partnerIds.length > 0 && (
           <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textPrimary}]}>
+                ALIGNED WITH
+              </Text>
+              <Text style={[bodyType.regular, styles.sectionCount, {color: colors.textTertiary}]}>
+                {partnerIds.length} partner{partnerIds.length === 1 ? '' : 's'}
+              </Text>
+            </View>
             {partnerIds.map(pid => (
               <PartnerModule
                 key={pid}
@@ -184,5 +204,19 @@ export function HomeScreen() {
 const styles = StyleSheet.create({
   wrap:    {flex: 1},
   scroll:  {paddingBottom: spacing.xxl},
-  section: {marginTop: spacing.md},
+  section: {marginTop: spacing.lg},
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    letterSpacing: 1.4,
+  },
+  sectionCount: {
+    fontSize: 12,
+  },
 });

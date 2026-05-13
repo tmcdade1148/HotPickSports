@@ -1,23 +1,27 @@
 // src/shell/components/home/LastWeekRecapChip.tsx
 // Spec §6.4.4 — single-line chip showing prior week's HotPick result.
 //
-// Visible: picks_open and picks_locked only (returns each new week).
-// Hidden: when the user has no prior-week HotPick (e.g. Week 1, late join).
+// Reference (May 13 2026 v2):
+//   ┌──────────────────────────────────────────────┐
+//   │ [✓]  WEEK 7 HOTPICK                       › │
+//   │      Panthers +8 · +13 bonus                 │
+//   └──────────────────────────────────────────────┘
 //
-// Format: "Week [N-1]'s HotPick: [team] [✓ or ✗] [±N]"
-// Tap   : navigate to Week [N-1] recap in History tab.
+// Left  — round icon tile (success green ✓ if hit, error red ✗ if miss)
+// Mid   — eyebrow "WEEK [N-1] HOTPICK" + bold result line
+// Right — chevron ›
+// Tap   → History screen for week N-1
 //
-// Data is loaded into globalStore.lastWeekHotPick by the parent screen
-// (HomeScreen calls loadLastWeekHotPick on mount + when currentWeek changes).
-// This component is render-only.
+// Hidden when no prior HotPick exists or currentWeek <= 1.
 
 import React from 'react';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
+import {ChevronRight} from 'lucide-react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
-import {bodyType, monoType, spacing, borderRadius} from '@shared/theme';
+import {bodyType, spacing, borderRadius} from '@shared/theme';
 
 export function LastWeekRecapChip() {
   const {colors} = useTheme();
@@ -25,12 +29,11 @@ export function LastWeekRecapChip() {
   const recap       = useGlobalStore(s => s.lastWeekHotPick);
   const currentWeek = useNFLStore(s => s.currentWeek);
 
-  // Hide when no prior HotPick to show.
   if (!recap || currentWeek <= 1) return null;
 
   const priorWeek = currentWeek - 1;
-  const glyph     = recap.isCorrect ? '✓' : '✗';
-  const glyphColor = recap.isCorrect ? colors.success : colors.error;
+  const positive  = recap.isCorrect;
+  const tileColor = positive ? colors.success : colors.error;
   const pointsStr = recap.points > 0 ? `+${recap.points}` : `${recap.points}`;
 
   return (
@@ -45,19 +48,25 @@ export function LastWeekRecapChip() {
         },
       ]}
       accessibilityRole="button"
-      accessibilityLabel={`Week ${priorWeek} HotPick recap: ${recap.team}, ${recap.isCorrect ? 'correct' : 'incorrect'}, ${pointsStr} points`}>
-      <Text style={[bodyType.regular, styles.label, {color: colors.textSecondary}]}>
-        Week {priorWeek}'s HotPick
-      </Text>
-      <View style={styles.right}>
-        <Text style={[bodyType.bold, styles.team, {color: colors.textPrimary}]}>
-          {recap.team}
-        </Text>
-        <Text style={[styles.glyph, {color: glyphColor}]}>{glyph}</Text>
-        <Text style={[monoType.regular, styles.points, {color: glyphColor}]}>
-          {pointsStr}
+      accessibilityLabel={`Week ${priorWeek} HotPick recap: ${recap.team}, ${positive ? 'hit' : 'miss'}, ${pointsStr} points`}>
+      <View style={[styles.tile, {backgroundColor: tileColor + '22', borderColor: tileColor + '66'}]}>
+        <Text style={[styles.tileGlyph, {color: tileColor}]}>
+          {positive ? '✓' : '✗'}
         </Text>
       </View>
+      <View style={styles.body}>
+        <Text style={[bodyType.bold, styles.eyebrow, {color: colors.textTertiary}]}>
+          WEEK {priorWeek} HOTPICK
+        </Text>
+        <Text style={[bodyType.bold, styles.result, {color: colors.textPrimary}]} numberOfLines={1}>
+          {recap.team} {positive ? '+' : '−'}
+          {Math.abs(recap.points)}{' · '}
+          <Text style={{color: tileColor, fontWeight: '700'}}>
+            {pointsStr} bonus
+          </Text>
+        </Text>
+      </View>
+      <ChevronRight size={18} color={colors.textTertiary} />
     </Pressable>
   );
 }
@@ -66,16 +75,31 @@ const styles = StyleSheet.create({
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 2,
     marginHorizontal: spacing.lg,
-    borderRadius: borderRadius.full,
+    marginTop: spacing.md,
+    borderRadius: borderRadius.lg,
     borderWidth: StyleSheet.hairlineWidth,
+    gap: spacing.md,
   },
-  label:  {fontSize: 12, letterSpacing: 0.4},
-  right:  {flexDirection: 'row', alignItems: 'center', gap: 8},
-  team:   {fontSize: 13, letterSpacing: 0.5},
-  glyph:  {fontSize: 14, fontWeight: '900'},
-  points: {fontSize: 13, fontWeight: '700'},
+  tile: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tileGlyph: {
+    fontSize: 22,
+    fontWeight: '900',
+  },
+  body: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  eyebrow: {fontSize: 10, letterSpacing: 1.6},
+  result:  {fontSize: 14},
 });
