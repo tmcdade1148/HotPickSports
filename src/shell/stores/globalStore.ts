@@ -195,6 +195,21 @@ interface GlobalState {
   // Last 4 weeks of pre-computed totals for the user.
   recentWeeks: Array<{week: number; total: number}>;
   loadRecentWeeks: (userId: string, competition: string) => Promise<void>;
+
+  // Pool Module indicators (per-pool unread counts + most-recent activity timestamp).
+  // Aggregated in ONE query in loadPoolIndicators — never per-pool useEffect
+  // (spec §6.4.6 Red Flag). Smack unread already lives in smackUnreadCounts;
+  // this slice adds organizer-notification unread + recency.
+  poolIndicators: Record<string, {orgUnread: number; mostRecentAt: string | null}>;
+  loadPoolIndicators: (userId: string, poolIds: string[]) => Promise<void>;
+  /** Mark organizer notifications as read for this user in this pool. */
+  markOrgNotificationsRead: (userId: string, poolId: string) => Promise<void>;
+
+  // Per-pool user rank for the Pool Module rank chip. Populated by the
+  // get_user_ranks_in_pools RPC. Partner-aligned pools are NOT passed —
+  // they're never ranked per the May 13 2026 locked product decision.
+  userRankByPool: Record<string, {rank: number; memberCount: number; total: number}>;
+  loadUserRankByPool: (userId: string, privatePoolIds: string[]) => Promise<void>;
 }
 
 export interface UserHardwareItem {
@@ -1260,5 +1275,117 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       total: (r.week_points ?? 0) + (r.playoff_points ?? 0),
     }));
     set({recentWeeks: ascending});
+  },
+
+  // ---------------------------------------------------------------------------
+  // Home Redesign §6.4.6 — Pool Module indicators + rank batch
+  // ---------------------------------------------------------------------------
+  poolIndicators: {},
+
+  loadPoolIndicators: async (userId, poolIds) => {
+    if (poolIds.length === 0) {
+      set({poolIndicators: {}});
+      return;
+    }
+
+    // One aggregated query across all pools — never N+1 per Module.
+    // Counts organizer_notifications.sent_at > notification_read_state.last_read_at.
+    const [unreadResult, readStateResult] = await Promise.all([
+      supabase
+        .from('organizer_notifications')
+        .select('pool_id, sent_at')
+        .in('pool_id', poolIds)
+        .order('sent_at', {ascending: false}),
+      supabase
+        .from('notification_read_state')
+        .select('pool_id, last_read_at')
+        .in('pool_id', poolIds)
+        .eq('user_id', userId),
+    ]);
+
+    const lastReadByPool = new Map<string, string>();
+    for (const row of (readStateResult.data ?? []) as Array<{
+      pool_id: string;
+      last_read_at: string;
+    }>) {
+      lastReadByPool.set(row.pool_id, row.last_read_at);
+    }
+
+    const indicators: Record<string, {orgUnread: number; mostRecentAt: string | null}> = {};
+    for (const pid of poolIds) {
+      indicators[pid] = {orgUnread: 0, mostRecentAt: null};
+    }
+
+    for (const row of (unreadResult.data ?? []) as Array<{
+      pool_id: string;
+      sent_at: string;
+    }>) {
+      const cell = indicators[row.pool_id];
+      if (!cell) continue;
+      const lastRead = lastReadByPool.get(row.pool_id);
+      // If we've never visited the pool's notifications, EVERYTHING is unread.
+      if (!lastRead || row.sent_at > lastRead) {
+        cell.orgUnread += 1;
+      }
+      // mostRecentAt = the newest sent_at we've seen for this pool (any read state).
+      if (!cell.mostRecentAt || row.sent_at > cell.mostRecentAt) {
+        cell.mostRecentAt = row.sent_at;
+      }
+    }
+
+    set({poolIndicators: indicators});
+  },
+
+  markOrgNotificationsRead: async (userId, poolId) => {
+    const now = new Date().toISOString();
+    // Upsert by (user_id, pool_id) — primary key composite. RLS allows
+    // user to insert/update their own rows only.
+    await supabase
+      .from('notification_read_state')
+      .upsert(
+        {user_id: userId, pool_id: poolId, last_read_at: now},
+        {onConflict: 'user_id,pool_id'},
+      );
+    set(state => ({
+      poolIndicators: {
+        ...state.poolIndicators,
+        [poolId]: {...(state.poolIndicators[poolId] ?? {mostRecentAt: null}), orgUnread: 0},
+      },
+    }));
+  },
+
+  userRankByPool: {},
+
+  loadUserRankByPool: async (userId, privatePoolIds) => {
+    if (privatePoolIds.length === 0) {
+      set({userRankByPool: {}});
+      return;
+    }
+
+    // One RPC round trip for all private pools at once.
+    const {data, error} = await supabase.rpc('get_user_ranks_in_pools', {
+      p_user_id:  userId,
+      p_pool_ids: privatePoolIds,
+    });
+
+    if (error || !data) {
+      set({userRankByPool: {}});
+      return;
+    }
+
+    const map: Record<string, {rank: number; memberCount: number; total: number}> = {};
+    for (const row of data as Array<{
+      pool_id: string;
+      user_rank: number;
+      member_count: number;
+      user_total: number;
+    }>) {
+      map[row.pool_id] = {
+        rank:        row.user_rank,
+        memberCount: row.member_count,
+        total:       row.user_total,
+      };
+    }
+    set({userRankByPool: map});
   },
 }));
