@@ -1,49 +1,30 @@
 // src/shared/theme/fonts.ts
-// HotPick Sports font family configuration + loader hook.
-// Spec: 260513_HotPick_HomeRedesign_Spec.docx §6.3
+// HotPick Sports font family configuration.
 //
-// Three font roles per spec:
-//   • display — Saira Condensed Italic Black. Player name, hero numbers.
-//                Currently faux-italic on upright 900Black; true italic TTF
-//                is a future enhancement (see commit notes).
-//   • body    — Manrope. Running text, button labels, microcopy.
-//   • mono    — System monospace (SF Mono on iOS, Roboto Mono on Android).
-//                Scores, deltas, countdown digits.
+// Note (2026-05-13): expo-font + @expo-google-fonts was tried first but
+// crashed at bundle-load time with "Cannot read property 'EventEmitter'
+// of undefined" — the native side of expo-font isn't bound on this bare
+// RN setup despite expo-modules-core being present.
+//
+// Until proper native font linking is wired up (TTFs in assets/fonts/
+// + react-native.config.js + native rebuild), the FONTS constants below
+// are just string references. Components style with fontFamily values
+// like 'SairaCondensed_900Black'; when those names don't resolve at
+// runtime, the system substitutes its default — design degrades to
+// system fonts but the app launches and is fully functional.
 
-import {useFonts as useSairaCondensed, SairaCondensed_900Black} from '@expo-google-fonts/saira-condensed';
-import {useFonts as useManrope, Manrope_400Regular, Manrope_700Bold} from '@expo-google-fonts/manrope';
-
-/**
- * Canonical font-family names (post-load) for use in StyleSheets and tokens.
- * These match the keys passed to expo-font's load map.
- */
 export const FONTS = {
-  display: 'SairaCondensed_900Black',
-  body: 'Manrope_400Regular',
+  display:  'SairaCondensed_900Black',
+  body:     'Manrope_400Regular',
   bodyBold: 'Manrope_700Bold',
-  // System monospace — RN auto-resolves via Platform.select if needed.
-  // No custom load required.
-  mono: undefined as string | undefined,
+  mono:     undefined as string | undefined,
 } as const;
 
 /**
- * Hook: load all HotPick fonts. Returns `[fontsLoaded, fontError]`.
- *
- * Mount once at App.tsx root; gate the navigator render on fontsLoaded.
- * Splash stays visible until both font families succeed. If either
- * fails, the app still renders — system fonts as a graceful fallback.
+ * No-op shim — kept so the App.tsx import still resolves while we
+ * sort out native font linking. Returns immediately "loaded" so any
+ * remaining caller doesn't hang.
  */
 export function useAppFonts(): {fontsLoaded: boolean; fontError: Error | null} {
-  const [sairaLoaded, sairaError] = useSairaCondensed({
-    SairaCondensed_900Black,
-  });
-  const [manropeLoaded, manropeError] = useManrope({
-    Manrope_400Regular,
-    Manrope_700Bold,
-  });
-
-  const fontsLoaded = sairaLoaded && manropeLoaded;
-  const fontError = sairaError ?? manropeError ?? null;
-
-  return {fontsLoaded, fontError};
+  return {fontsLoaded: true, fontError: null};
 }
