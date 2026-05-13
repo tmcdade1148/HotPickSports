@@ -39,6 +39,12 @@ interface Partner {
   slug: string;
   brand_config: unknown;
   created_at: string;
+  // Participation-perk fields added by migration 260513_partner_perks.
+  // perk_text is the customer-facing perk copy (max 120 chars, partner-managed).
+  // perk_icon is an emoji or lucide name; renders as a small icon on PartnerModule.
+  perk_text: string | null;
+  perk_icon: string | null;
+  perk_updated_at: string | null;
 }
 
 /** Partners set 4 colors — the rest are auto-derived */
@@ -133,6 +139,9 @@ export function PartnerAdminScreen() {
   const [editColors, setEditColors] = useState<Record<string, string>>({});
   const [editName, setEditName] = useState('');
   const [editLogoUrl, setEditLogoUrl] = useState('');
+  // Participation perk — partner-managed copy, never authored by HotPick.
+  const [editPerkText, setEditPerkText] = useState('');
+  const [editPerkIcon, setEditPerkIcon] = useState('');
   const [saving, setSaving] = useState(false);
 
   // Create form state
@@ -351,6 +360,8 @@ export function PartnerAdminScreen() {
       highlight_color: bc?.highlight_color ?? HOTPICK_DEFAULTS.highlight_color,
     });
     setEditLogoUrl(bc?.logo?.full ?? '');
+    setEditPerkText(partner.perk_text ?? '');
+    setEditPerkIcon(partner.perk_icon ?? '');
   };
 
   const handleSaveEdit = async (partner: Partner) => {
@@ -381,12 +392,23 @@ export function PartnerAdminScreen() {
         powered_by_hotpick: true,
       };
 
+      const trimmedPerk = editPerkText.trim();
+      if (trimmedPerk.length > 120) {
+        Alert.alert('Perk too long', 'Perk text must be 120 characters or fewer.');
+        setSaving(false);
+        return;
+      }
+
       const {error} = await supabase
         .from('partners')
         .update({
           name: editName.trim(),
           slug: slugify(editName.trim()),
           brand_config: updatedConfig as unknown,
+          perk_text: trimmedPerk.length === 0 ? null : trimmedPerk,
+          perk_icon: editPerkIcon.trim().length === 0 ? null : editPerkIcon.trim(),
+          // perk_updated_at is auto-stamped by the partners_touch_perk_updated_at
+          // trigger when perk_text or perk_icon changes.
         })
         .eq('id', partner.id);
 
@@ -736,6 +758,43 @@ export function PartnerAdminScreen() {
                         ),
                       )}
                     </View>
+
+                    {/* Participation perk — partner-managed; max 120 chars. */}
+                    <Text style={styles.colorsHeading}>Participation Perk</Text>
+                    <Text style={styles.colorsDerivedNote}>
+                      Partner-provided. Shows on Pool Module + Partner Roster.
+                      Max 120 chars. Leave blank to hide partner modules.
+                    </Text>
+                    <View style={styles.perkRow}>
+                      <TextInput
+                        style={styles.perkIconInput}
+                        value={editPerkIcon}
+                        onChangeText={setEditPerkIcon}
+                        placeholder="🎁"
+                        placeholderTextColor={colors.textSecondary}
+                        maxLength={4}
+                      />
+                      <TextInput
+                        style={styles.perkTextInput}
+                        value={editPerkText}
+                        onChangeText={text => {
+                          if (text.length <= 120) setEditPerkText(text);
+                        }}
+                        placeholder='$1 off any draft, Sundays.'
+                        placeholderTextColor={colors.textSecondary}
+                        multiline
+                        numberOfLines={2}
+                        maxLength={120}
+                      />
+                    </View>
+                    <Text style={styles.perkCharCount}>
+                      {editPerkText.length}/120
+                      {partner.perk_updated_at && editPerkText === (partner.perk_text ?? '')
+                        ? '  ·  last updated ' +
+                          new Date(partner.perk_updated_at).toLocaleDateString()
+                        : ''}
+                    </Text>
+
                     <TouchableOpacity
                       style={[
                         styles.createButton,
@@ -988,6 +1047,45 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 11,
     color: colors.textSecondary,
     marginBottom: spacing.sm,
+  },
+  perkRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    marginBottom: 4,
+  },
+  perkIconInput: {
+    width: 56,
+    minHeight: 56,
+    paddingVertical: 6,
+    paddingHorizontal: spacing.sm,
+    fontSize: 22,
+    textAlign: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    color: colors.textPrimary,
+  },
+  perkTextInput: {
+    flex: 1,
+    minHeight: 56,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    fontSize: 13,
+    lineHeight: 18,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    color: colors.textPrimary,
+    textAlignVertical: 'top',
+  },
+  perkCharCount: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    textAlign: 'right',
+    marginBottom: spacing.lg,
   },
   colorGrid: {
     flexDirection: 'row',
