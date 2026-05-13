@@ -75,8 +75,12 @@ export const bodyType = {
  * No fontFamily set so RN picks SF Mono / Roboto Mono per platform.
  */
 export const monoType = {
-  regular: {fontVariant: ['tabular-nums'] as const},
-} as const;
+  regular: {
+    // Mutable array so RN's TextStyle overloads match. Use `as` cast for
+    // the element literal type without freezing the outer array.
+    fontVariant: ['tabular-nums'] as ['tabular-nums'],
+  },
+};
 
 export const borderRadius = {
   sm: 4,
