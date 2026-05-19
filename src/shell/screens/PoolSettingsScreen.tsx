@@ -23,6 +23,7 @@ import {
   AlertTriangle,
   Plus,
   Star,
+  Users,
   XCircle,
 } from 'lucide-react-native';
 import {supabase} from '@shared/config/supabase';
@@ -449,6 +450,16 @@ export function PoolSettingsScreen() {
           onPress={() => setBroadcastVisible(true)}>
           <Megaphone size={18} color={accentColor} />
           <Text style={[styles.broadcastText, {color: accentColor}]}>Send Broadcast</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.sectionTitle}>Partner</Text>
+        <TouchableOpacity
+          style={[styles.broadcastButton, {borderColor: colors.primary}]}
+          onPress={() => navigation.navigate('PartnerDirectory', {poolId})}>
+          <Users size={18} color={colors.primary} />
+          <Text style={[styles.broadcastText, {color: colors.primary}]}>
+            {pool.partner_id ? 'Change roster alignment' : 'Align with a partner'}
+          </Text>
         </TouchableOpacity>
 
         <Text style={styles.sectionTitle}>Moderation</Text>
