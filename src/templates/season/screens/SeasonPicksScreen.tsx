@@ -5,7 +5,6 @@ import {useSeasonStore} from '../stores/seasonStore';
 import {WeekSelector} from '../components/WeekSelector';
 import {SeasonMatchCard} from '../components/SeasonMatchCard';
 import {PicksProgressHeader} from '../components/PicksProgressHeader';
-import {SubmitPicksButton} from '../components/SubmitPicksButton';
 import {useAuth} from '@shared/hooks/useAuth';
 import {spacing, borderRadius} from '@shared/theme';
 import type {DbSeasonGame} from '@shared/types/database';
@@ -415,26 +414,6 @@ export function SeasonPicksScreen() {
         />
       )}
 
-      {!isLoading && games.length > 0 && (
-        <SubmitPicksButton
-          pickCount={pickCount}
-          totalGames={games.length}
-          hotPickCount={hotPickCount}
-          hotPicksRequired={config.hotPicksPerWeek}
-          isWeekComplete={isWeekComplete}
-          allGamesFinal={allGamesFinal}
-          currentWeek={currentWeek}
-          allGamesLocked={games.length > 0 && games.every(g => {
-            const status = (g.status ?? '').toUpperCase();
-            if (status === 'FINAL' || status === 'STATUS_FINAL' || status === 'COMPLETED'
-              || status === 'IN_PROGRESS' || status === 'LIVE') return true;
-            if (g.lock_at && new Date(g.lock_at).getTime() <= Date.now()) return true;
-            return false;
-          })}
-          onSubmit={() => setWeekComplete(true)}
-          accentColor={config.color}
-        />
-      )}
     </View>
   );
 }
