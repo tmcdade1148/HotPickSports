@@ -28,6 +28,7 @@ export function HomeScreen() {
 
   const userId       = useGlobalStore(s => s.user?.id);
   const visiblePools = useGlobalStore(s => s.visiblePools);
+  const defaultPoolId = useGlobalStore(s => s.defaultPoolId);
   const currentPhase = useNFLStore(s => s.currentPhase);
   const weekState    = useNFLStore(s => s.weekState);
   const currentWeek  = useNFLStore(s => s.currentWeek);
@@ -94,6 +95,19 @@ export function HomeScreen() {
       partnerIds:            partners,
     };
   }, [visiblePools]);
+
+  // Default pool pins to the top of the Home pool stack; the rest sort
+  // alphabetically. Set via the star icon in Settings → My Pools.
+  const sortedVisiblePools = useMemo(() => {
+    const byName = [...visiblePools].sort((a, b) =>
+      (a.name ?? '').localeCompare(b.name ?? '', undefined, {sensitivity: 'base'}),
+    );
+    if (!defaultPoolId) return byName;
+    const idx = byName.findIndex(p => p.id === defaultPoolId);
+    if (idx <= 0) return byName;
+    const [pinned] = byName.splice(idx, 1);
+    return [pinned, ...byName];
+  }, [visiblePools, defaultPoolId]);
 
   const allPoolIds = useMemo(() => visiblePools.map(p => p.id), [visiblePools]);
   const liveScores = useNFLStore(s => s.liveScores);
@@ -235,7 +249,7 @@ export function HomeScreen() {
             <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textTertiary}]}>
               YOUR POOLS
             </Text>
-            {visiblePools.map(p => (
+            {sortedVisiblePools.map(p => (
               <PoolModule key={p.id} pool={p} />
             ))}
             <View style={styles.poolActionsRow}>

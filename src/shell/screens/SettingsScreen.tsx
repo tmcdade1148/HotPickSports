@@ -298,6 +298,10 @@ export function SettingsScreen({route}: any) {
 
       {poolsExpanded && (
         <View style={styles.poolsContent}>
+          <Text style={[styles.poolsHint, {color: colors.textSecondary}]}>
+            Tap a pool to make it active. Tap the ★ to pin a pool to the top
+            of your Home Screen — the rest sort alphabetically.
+          </Text>
           {/* Pool list — partner pools first, then HotPick pools (global pool hidden) */}
           {[
             ...userPools.filter(p => !!(p.brand_config as any)?.is_branded),
@@ -700,6 +704,13 @@ const styles = StyleSheet.create({
   poolsContent: {
     marginLeft: spacing.lg,
     marginBottom: spacing.md,
+  },
+  poolsHint: {
+    fontSize: 12,
+    lineHeight: 16,
+    marginRight: spacing.lg,
+    marginBottom: spacing.sm,
+    fontStyle: 'italic',
   },
   // Pool rows
   poolRow: {
