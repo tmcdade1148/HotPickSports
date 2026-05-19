@@ -105,7 +105,8 @@ interface PickedImage {
 interface LibraryItem {
   name: string;       // basename within _library, e.g. 'mes-que.png'
   displayName: string;
-  url: string;
+  url: string;        // canonical public URL — what gets saved on partner
+  updatedAt: string;  // for cache-busting at render time only
 }
 
 function libraryItemUrl(name: string): string {
@@ -121,35 +122,71 @@ function fileNameSlug(input: string): string {
   return `${slug}.${ext}`;
 }
 
-// Sanity-checks that a URL points to a reachable, square image. Used by
-// the Paste URL affordance — we don't re-upload the image, we just verify
-// it loads and is the right shape before letting the user reference it.
-async function probeRemoteLogo(url: string): Promise<{ok: true} | {ok: false; reason: string}> {
-  if (!/^https?:\/\//i.test(url)) {
-    return {ok: false, reason: 'URL must start with http:// or https://.'};
-  }
+async function probeImageSize(url: string): Promise<{w: number; h: number} | null> {
   return new Promise(resolve => {
-    Image.getSize(
-      url,
-      (w, h) => {
-        if (w <= 0 || h <= 0) {
-          resolve({ok: false, reason: "Couldn't read image dimensions."});
-        } else if (w !== h) {
-          resolve({ok: false, reason: `Logo must be square. URL image is ${w}×${h}.`});
-        } else {
-          resolve({ok: true});
-        }
-      },
-      () => resolve({ok: false, reason: "Couldn't load the image. Is the URL public and reachable?"}),
-    );
+    Image.getSize(url, (w, h) => resolve({w, h}), () => resolve(null));
   });
+}
+
+// Fetches a remote image and uploads it into the library so it appears
+// in the grid alongside picker-sourced logos. Uses supabase.storage.upload
+// (not the FormData REST endpoint) so a fetched Blob works directly in RN.
+async function uploadRemoteUrlToLibrary(url: string): Promise<string | null> {
+  if (!/^https?:\/\//i.test(url)) {
+    Alert.alert('URL Rejected', 'URL must start with http:// or https://.');
+    return null;
+  }
+
+  const dims = await probeImageSize(url);
+  if (!dims) {
+    Alert.alert('Fetch Failed', "Couldn't load the image. Is the URL public and reachable?");
+    return null;
+  }
+  if (dims.w !== dims.h) {
+    Alert.alert('Not Square', `Logo must be square. URL image is ${dims.w}×${dims.h}.`);
+    return null;
+  }
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    Alert.alert('Fetch Failed', `HTTP ${response.status}.`);
+    return null;
+  }
+  const blob = await response.blob();
+
+  if (blob.size > LOGO_MAX_BYTES) {
+    Alert.alert('Too Large', `Image is ${(blob.size / 1024 / 1024).toFixed(2)}MB. Max 2MB.`);
+    return null;
+  }
+  if (!ALLOWED_MIME.includes(blob.type.toLowerCase())) {
+    Alert.alert('Format Rejected', `Got "${blob.type || 'unknown'}". Need PNG, JPG, or WebP.`);
+    return null;
+  }
+
+  const cleanPath = url.split('?')[0];
+  const lastSegment = cleanPath.split('/').pop() || 'logo.png';
+  const ext = (lastSegment.split('.').pop() || 'png').toLowerCase();
+  const basename = fileNameSlug(lastSegment).replace(/\.[^.]+$/, '');
+  const storagePath = `${LIBRARY_PREFIX}/${basename}.${ext}`;
+
+  const {error} = await supabase.storage
+    .from(LOGO_BUCKET)
+    .upload(storagePath, blob, {contentType: blob.type, upsert: true});
+
+  if (error) {
+    Alert.alert('Upload Error', error.message);
+    return null;
+  }
+
+  const {data} = supabase.storage.from(LOGO_BUCKET).getPublicUrl(storagePath);
+  return data.publicUrl;
 }
 
 async function listLibraryItems(): Promise<LibraryItem[]> {
   const {data, error} = await supabase
     .storage
     .from(LOGO_BUCKET)
-    .list(LIBRARY_PREFIX, {limit: 200, sortBy: {column: 'name', order: 'asc'}});
+    .list(LIBRARY_PREFIX, {limit: 200, sortBy: {column: 'updated_at', order: 'desc'}});
   if (error || !data) return [];
   return data
     .filter(o => o.name && !o.name.endsWith('/'))
@@ -157,6 +194,7 @@ async function listLibraryItems(): Promise<LibraryItem[]> {
       name: o.name,
       displayName: o.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' '),
       url: libraryItemUrl(o.name),
+      updatedAt: o.updated_at ?? '',
     }));
 }
 
@@ -749,14 +787,12 @@ export function PartnerAdminScreen() {
     const onSelect = urlPromptFor;
     if (!url || !onSelect) return;
     setLibraryUploading(true);
-    const probe = await probeRemoteLogo(url);
+    const uploadedUrl = await uploadRemoteUrlToLibrary(url);
     setLibraryUploading(false);
-    if (!probe.ok) {
-      Alert.alert('URL Rejected', probe.reason);
-      return;
-    }
+    if (!uploadedUrl) return;
     setUrlPromptFor(null);
-    onSelect(url);
+    onSelect(uploadedUrl);
+    refreshLibrary();
   };
 
   /** Uploads a new logo to the shared library and auto-selects it. */
@@ -820,6 +856,11 @@ export function PartnerAdminScreen() {
         ) : (
           libraryItems.map(item => {
             const isSelected = item.url === selectedUrl;
+            // Bust RN's Image cache when the same path is overwritten;
+            // canonical URL stays clean for selection compare + persistence.
+            const renderUri = item.updatedAt
+              ? `${item.url}?v=${new Date(item.updatedAt).getTime()}`
+              : item.url;
             return (
               <TouchableOpacity
                 key={item.name}
@@ -832,7 +873,7 @@ export function PartnerAdminScreen() {
                   },
                 ]}
                 accessibilityLabel={`Select ${item.displayName}`}>
-                <Image source={{uri: item.url}} style={styles.libraryThumb} resizeMode="contain" />
+                <Image source={{uri: renderUri}} style={styles.libraryThumb} resizeMode="contain" />
               </TouchableOpacity>
             );
           })
