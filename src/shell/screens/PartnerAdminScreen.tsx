@@ -1324,18 +1324,22 @@ export function PartnerAdminScreen() {
                       />
                     </View>
 
-                    {/* Partner-owned pool — only meaningful when can_run_pools. */}
+                    {/* Club Pool — only meaningful when can_run_pools. */}
                     {editCanRunPools && (() => {
                       const existing = partnerPoolByPartnerId[partner.id];
                       if (existing) {
                         return (
                           <View style={styles.partnerPoolCard}>
-                            <Text style={styles.classLabel}>Club Pool</Text>
+                            <Text style={styles.classLabel}>
+                              Club Pool: {existing.name}
+                            </Text>
                             <Text style={styles.colorsDerivedNote}>
-                              {existing.name} · invite code{' '}
+                              Members join with invite code{' '}
                               <Text style={{fontWeight: '700'}}>
                                 {existing.invite_code ?? '—'}
                               </Text>
+                              . The organizer of this pool edits {partner.name}'s
+                              perk and sends partner broadcasts from Pool Settings.
                             </Text>
                           </View>
                         );

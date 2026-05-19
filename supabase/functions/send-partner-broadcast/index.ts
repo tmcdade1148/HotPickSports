@@ -6,11 +6,12 @@
 // not a pool. Writes one row to partner_notifications and enqueues push
 // notifications via notification_queue.
 //
-// Auth model (v2):
+// Auth model (v3):
 //   • Caller is super admin, OR
-//   • Caller is the organizer/admin of an active pool aligned with the
-//     partner. The Organizer of the partner-owned pool is the de facto
-//     Partner Admin and can broadcast on the partner's behalf.
+//   • Caller is the organizer/admin of the partner's CLUB POOL (the pool
+//     referenced by partners.club_pool_id). Other pools that joined the
+//     partner's roster have no broadcast rights — only the Club Pool's
+//     organizer can broadcast on the partner's behalf.
 //
 // Steps:
 //   1. Verify caller is super admin                              → 403
@@ -122,7 +123,7 @@ Deno.serve(async (req) => {
     // -----------------------------------------------------------------------
     const { data: partner, error: partnerErr } = await supabase
       .from("partners")
-      .select("id, name, slug, is_active, perk_text")
+      .select("id, name, slug, is_active, perk_text, club_pool_id")
       .eq("id", partnerId)
       .maybeSingle();
 
@@ -137,21 +138,27 @@ Deno.serve(async (req) => {
     }
 
     // -----------------------------------------------------------------------
-    // Authorize: super-admin OR organizer of any pool aligned with partner.
+    // Authorize: super-admin OR organizer of THIS partner's Club Pool.
+    // Sponsor-only partners (no club_pool_id) → super-admin only.
     // -----------------------------------------------------------------------
     if (!isSuperAdmin) {
+      if (!partner.club_pool_id) {
+        return json(
+          { error: "Only super-admin can broadcast for a sponsor-only partner." },
+          403,
+        );
+      }
       const { data: orgMembership } = await supabase
         .from("pool_members")
-        .select("pool_id, pools!inner(partner_id, is_archived)")
+        .select("pool_id")
         .eq("user_id", caller.id)
+        .eq("pool_id", partner.club_pool_id)
         .in("role", ["organizer", "admin"])
         .eq("status", "active")
-        .eq("pools.partner_id", partnerId)
-        .eq("pools.is_archived", false)
         .limit(1);
       if (!orgMembership || orgMembership.length === 0) {
         return json(
-          { error: "Not authorized to broadcast for this partner" },
+          { error: "Only this partner's Club Pool organizer can broadcast." },
           403,
         );
       }

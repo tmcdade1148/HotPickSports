@@ -81,6 +81,7 @@ export function PoolSettingsScreen() {
     name: string;
     perk_text: string | null;
     perk_icon: string | null;
+    club_pool_id: string | null;
   } | null>(null);
   const [perkText, setPerkText] = useState('');
   const [perkIcon, setPerkIcon] = useState('');
@@ -125,7 +126,7 @@ export function PoolSettingsScreen() {
     (async () => {
       const {data} = await supabase
         .from('partners')
-        .select('id, name, perk_text, perk_icon')
+        .select('id, name, perk_text, perk_icon, club_pool_id')
         .eq('id', pool.partner_id)
         .maybeSingle();
       if (cancelled || !data) return;
@@ -553,6 +554,16 @@ export function PoolSettingsScreen() {
         <Text style={styles.sectionTitle}>Partner</Text>
 
         {pool.partner_id && partnerRow && (
+          <View style={[styles.partnerCard, {marginBottom: 0}]}>
+            <Text style={[styles.partnerCardHint, {fontStyle: 'italic'}]}>
+              {partnerRow.club_pool_id === pool.id
+                ? `This pool is ${partnerRow.name}'s Club Pool.`
+                : `This pool is on ${partnerRow.name}'s roster.`}
+            </Text>
+          </View>
+        )}
+
+        {pool.partner_id && partnerRow && partnerRow.club_pool_id === pool.id && (
           <View style={styles.partnerCard}>
             <Text style={styles.partnerCardTitle}>
               {partnerRow.name} perk
@@ -598,7 +609,7 @@ export function PoolSettingsScreen() {
           </View>
         )}
 
-        {pool.partner_id && partnerRow && (
+        {pool.partner_id && partnerRow && partnerRow.club_pool_id === pool.id && (
           <TouchableOpacity
             style={[styles.broadcastButton, {borderColor: accentColor}]}
             onPress={() => {
@@ -612,14 +623,16 @@ export function PoolSettingsScreen() {
           </TouchableOpacity>
         )}
 
-        <TouchableOpacity
-          style={[styles.broadcastButton, {borderColor: colors.primary}]}
-          onPress={() => navigation.navigate('PartnerDirectory', {poolId})}>
-          <Users size={18} color={colors.primary} />
-          <Text style={[styles.broadcastText, {color: colors.primary}]}>
-            {pool.partner_id ? 'Change roster' : "Join a partner's roster"}
-          </Text>
-        </TouchableOpacity>
+        {!(partnerRow && partnerRow.club_pool_id === pool.id) && (
+          <TouchableOpacity
+            style={[styles.broadcastButton, {borderColor: colors.primary}]}
+            onPress={() => navigation.navigate('PartnerDirectory', {poolId})}>
+            <Users size={18} color={colors.primary} />
+            <Text style={[styles.broadcastText, {color: colors.primary}]}>
+              {pool.partner_id ? 'Change roster' : "Join a partner's roster"}
+            </Text>
+          </TouchableOpacity>
+        )}
 
         <Text style={styles.sectionTitle}>Moderation</Text>
         <TouchableOpacity
