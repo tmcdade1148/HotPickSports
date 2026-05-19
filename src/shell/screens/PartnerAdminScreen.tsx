@@ -10,6 +10,7 @@ import {
   StyleSheet,
   Share,
   Image,
+  Modal,
   Platform,
   Switch,
 } from 'react-native';
@@ -24,6 +25,7 @@ import {
   Share2,
   Pencil,
   Upload,
+  Link as LinkIcon,
 } from 'lucide-react-native';
 import QRCode from 'react-native-qrcode-svg';
 import {launchImageLibrary} from 'react-native-image-picker';
@@ -117,6 +119,30 @@ function fileNameSlug(input: string): string {
   const ext  = dot > 0 ? input.slice(dot + 1).toLowerCase() : 'png';
   const slug = base.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'logo';
   return `${slug}.${ext}`;
+}
+
+// Sanity-checks that a URL points to a reachable, square image. Used by
+// the Paste URL affordance — we don't re-upload the image, we just verify
+// it loads and is the right shape before letting the user reference it.
+async function probeRemoteLogo(url: string): Promise<{ok: true} | {ok: false; reason: string}> {
+  if (!/^https?:\/\//i.test(url)) {
+    return {ok: false, reason: 'URL must start with http:// or https://.'};
+  }
+  return new Promise(resolve => {
+    Image.getSize(
+      url,
+      (w, h) => {
+        if (w <= 0 || h <= 0) {
+          resolve({ok: false, reason: "Couldn't read image dimensions."});
+        } else if (w !== h) {
+          resolve({ok: false, reason: `Logo must be square. URL image is ${w}×${h}.`});
+        } else {
+          resolve({ok: true});
+        }
+      },
+      () => resolve({ok: false, reason: "Couldn't load the image. Is the URL public and reachable?"}),
+    );
+  });
 }
 
 async function listLibraryItems(): Promise<LibraryItem[]> {
@@ -286,6 +312,11 @@ export function PartnerAdminScreen() {
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
   const [libraryLoading, setLibraryLoading] = useState(false);
   const [libraryUploading, setLibraryUploading] = useState(false);
+
+  // URL-paste affordance — backup when the iOS picker is restricted (sim
+  // Limited Photos, empty Photos library, etc.). Holds the in-flight prompt.
+  const [urlPromptFor, setUrlPromptFor] = useState<((url: string) => void) | null>(null);
+  const [urlPromptValue, setUrlPromptValue] = useState('');
 
   const refreshLibrary = useCallback(async () => {
     setLibraryLoading(true);
@@ -708,6 +739,26 @@ export function PartnerAdminScreen() {
     </View>
   );
 
+  const openUrlPrompt = (onSelect: (url: string) => void) => {
+    setUrlPromptValue('');
+    setUrlPromptFor(() => onSelect);
+  };
+
+  const submitUrlPrompt = async () => {
+    const url = urlPromptValue.trim();
+    const onSelect = urlPromptFor;
+    if (!url || !onSelect) return;
+    setLibraryUploading(true);
+    const probe = await probeRemoteLogo(url);
+    setLibraryUploading(false);
+    if (!probe.ok) {
+      Alert.alert('URL Rejected', probe.reason);
+      return;
+    }
+    setUrlPromptFor(null);
+    onSelect(url);
+  };
+
   /** Uploads a new logo to the shared library and auto-selects it. */
   const addToLibrary = async (onSelect: (url: string) => void) => {
     await pickAssetForCreate('logo', async picked => {
@@ -795,9 +846,16 @@ export function PartnerAdminScreen() {
           ) : (
             <>
               <Upload size={18} color={colors.textSecondary} />
-              <Text style={styles.libraryAddText}>Add</Text>
+              <Text style={styles.libraryAddText}>Photos</Text>
             </>
           )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.libraryTile, styles.libraryAddTile, {borderColor: colors.border}]}
+          onPress={() => openUrlPrompt(onSelect)}
+          disabled={libraryUploading}>
+          <LinkIcon size={18} color={colors.textSecondary} />
+          <Text style={styles.libraryAddText}>URL</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -1334,6 +1392,48 @@ export function PartnerAdminScreen() {
           })
         )}
       </ScrollView>
+
+      <Modal
+        visible={urlPromptFor !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setUrlPromptFor(null)}>
+        <View style={styles.urlPromptBackdrop}>
+          <View style={styles.urlPromptCard}>
+            <Text style={styles.urlPromptTitle}>Add Logo by URL</Text>
+            <Text style={styles.urlPromptHint}>
+              Paste a direct image URL. Must be a square PNG/JPG/WebP, ≤2MB.
+              Tip: open a logo in the Supabase Storage dashboard and copy its
+              public URL.
+            </Text>
+            <TextInput
+              style={styles.urlPromptInput}
+              value={urlPromptValue}
+              onChangeText={setUrlPromptValue}
+              placeholder="https://…/logo.png"
+              placeholderTextColor={colors.textSecondary}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+              autoFocus
+            />
+            <View style={styles.urlPromptActions}>
+              <TouchableOpacity onPress={() => setUrlPromptFor(null)}>
+                <Text style={styles.urlPromptCancel}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={submitUrlPrompt}
+                disabled={urlPromptValue.trim().length === 0}
+                style={[
+                  styles.urlPromptSubmit,
+                  urlPromptValue.trim().length === 0 && styles.buttonDisabled,
+                ]}>
+                <Text style={styles.urlPromptSubmitText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1783,6 +1883,67 @@ const createStyles = (colors: any) => StyleSheet.create({
   libraryAddText: {
     fontSize: 11,
     color: colors.textSecondary,
+  },
+  urlPromptBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  urlPromptCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: colors.surfaceElevated || colors.surface,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+  },
+  urlPromptTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  urlPromptHint: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginBottom: spacing.md,
+    lineHeight: 17,
+  },
+  urlPromptInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    fontSize: 13,
+    color: colors.textPrimary,
+    backgroundColor: colors.background,
+    marginBottom: spacing.md,
+  },
+  urlPromptActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: spacing.lg,
+  },
+  urlPromptCancel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  urlPromptSubmit: {
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.md,
+  },
+  urlPromptSubmitText: {
+    color: colors.onPrimary,
+    fontSize: 14,
+    fontWeight: '700',
   },
   assetMetaCol: {
     flex: 1,
