@@ -52,6 +52,11 @@ export function useTheme(): {colors: ThemeColors; isDark: boolean} {
       accentTeal: extended.accent_teal,
       ink: extended.ink,
       textTertiary: extended.text_tertiary,
+      live: extended.live,
+      loss: extended.loss,
+      win: extended.win,
+      /** Foreground color for content sitting on `primary` (flame CTA). */
+      onPrimary: '#FFFFFF',
       ...semantic,
     },
   };

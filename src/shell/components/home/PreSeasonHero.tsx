@@ -101,7 +101,7 @@ export function PreSeasonHero() {
           ]}
           accessibilityRole="button"
           accessibilityLabel="Enter an invite code to join a pool">
-          <Text style={[bodyType.bold, styles.ctaPrimaryText]}>Enter invite code</Text>
+          <Text style={[bodyType.bold, styles.ctaPrimaryText, {color: colors.onPrimary}]}>Enter invite code</Text>
         </Pressable>
         <Pressable
           onPress={() => navigation.navigate('CreatePool')}
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     alignItems: 'center',
   },
-  ctaPrimaryText:   {fontSize: 14, color: '#FFFFFF', letterSpacing: 0.5, textTransform: 'uppercase'},
+  ctaPrimaryText:   {fontSize: 14, letterSpacing: 0.5, textTransform: 'uppercase'},
   ctaSecondary: {
     flex: 1,
     paddingVertical: spacing.md - 2,

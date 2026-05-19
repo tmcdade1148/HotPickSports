@@ -213,8 +213,14 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
 
     const games = (data as DbSeasonGame[]) ?? [];
 
+    // Cache by week regardless; only swap `games` to this week's data
+    // if the user is still viewing it.
+    const after = get();
+    const weekMatches = after.currentWeek === week;
+    const compMatches = after.config?.competition === config.competition;
+
     set(state => ({
-      games,
+      games: weekMatches && compMatches ? games : state.games,
       allWeekGames: {...state.allWeekGames, [week]: games},
       isLoading: false,
     }));
@@ -232,6 +238,9 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       .eq('user_id', userId)
       .eq('competition', config.competition)
       .eq('week', week);
+
+    const after = get();
+    if (after.currentWeek !== week || after.config?.competition !== config.competition) return;
 
     const picks = (data as DbSeasonPick[]) ?? [];
     const hasHotPick = picks.some(p => p.is_hotpick);

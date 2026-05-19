@@ -53,3 +53,27 @@ export function getTeamColors(abbr: string | null | undefined): TeamColors {
   if (!abbr) return FALLBACK;
   return NFL_TEAMS[abbr.toUpperCase()] ?? FALLBACK;
 }
+
+const titleCase = (s: string) =>
+  s
+    .toLowerCase()
+    .split(' ')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+
+/** "BAL" → "Baltimore Ravens"; unknown abbrs surface the raw code. */
+export function fullTeamName(abbr: string | null | undefined): string | null {
+  if (!abbr) return null;
+  const t = getTeamColors(abbr);
+  if (!t.city) return abbr;
+  return `${titleCase(t.city)} ${titleCase(t.name)}`;
+}
+
+/** Two-letter initials for a partner/team name fallback ("Miller's Tavern" → "MT"). */
+export function partnerInitials(name: string | null | undefined): string {
+  if (!name) return '··';
+  const words = name.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return '··';
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[1][0]).toUpperCase();
+}

@@ -1,0 +1,365 @@
+// Right-aligned strip of the last up-to-3 weeks. Current-week pill
+// pulses while the week is settling; past weeks render with a Lock glyph.
+
+import React, {useEffect, useMemo, useRef} from 'react';
+import {Animated, StyleSheet, Text, View} from 'react-native';
+import {Lock} from 'lucide-react-native';
+import {useGlobalStore} from '@shell/stores/globalStore';
+import {useNFLStore} from '@sports/nfl/stores/nflStore';
+import {useSeasonStore} from '@templates/season/stores/seasonStore';
+import {useTheme} from '@shell/theme/hooks';
+import {displayType, bodyType, monoType, spacing, borderRadius} from '@shared/theme';
+import {hexToRgba} from '@shared/utils/color';
+import {isFinalStatus, isLiveStatus} from '@sports/nfl/utils/gameStatus';
+
+interface WeekSlot {
+  week: number;
+  earned: number;
+  ceiling: number | null;
+  correctPicks: number | null;
+  totalPicks: number | null;
+  isCurrent: boolean;
+}
+
+export function WeeklyTrend() {
+  const {colors} = useTheme();
+
+  const recentWeeks    = useGlobalStore(s => s.recentWeeks);
+  const currentWeek    = useNFLStore(s => s.currentWeek);
+  const weekResult     = useNFLStore(s => s.weekResult);
+  const userPickCount  = useNFLStore(s => s.userPickCount);
+  const userHotPick    = useNFLStore(s => s.userHotPick);
+  const userHotPickGame = useNFLStore(s => s.userHotPickGame);
+  const liveScores     = useNFLStore(s => s.liveScores);
+  const weekPicks      = useSeasonStore(s => s.weekPicks);
+  const games          = useSeasonStore(s => s.games);
+
+  // Current-week ceiling — mirrors SeasonPicksScreen's potentialWeekScore.
+  const currentCeiling = useMemo(() => {
+    const picks = userPickCount ?? 0;
+    if (picks === 0) return null;
+    const hotPickRank =
+      userHotPick && (userHotPickGame?.frozen_rank ?? userHotPickGame?.rank ?? null);
+    if (hotPickRank == null) {
+      // No HotPick yet — every pick worth 1.
+      return picks;
+    }
+    // (#picks − 1 non-hotpicks @ 1pt each) + hotpick @ rank pts.
+    return Math.max(0, picks - 1) + hotPickRank;
+  }, [userPickCount, userHotPick, userHotPickGame]);
+
+  // Live earned — sums up the user's picks against game outcomes:
+  //   • Game final + pick correct  →  + (rank if hotpick, else +1)
+  //   • Game final + pick incorrect →  − rank if hotpick, else 0
+  //   • Game live + currently winning →  + (rank if hotpick, else +1)
+  //   • Game live + currently losing →  − rank if hotpick, else 0
+  //   • Game scheduled (not started) →  0 (no contribution)
+  // Mirrors the server-side scoring shape so the display estimate
+  // converges with the authoritative settled total. This is for display
+  // only — Rule #3's "server-side scoring" still owns the recorded value.
+  const live = useMemo(() => {
+    if (weekPicks.length === 0 || games.length === 0) {
+      return {
+        earned: weekResult?.weekPoints ?? null,
+        correctPicks: weekResult?.correctPicks ?? null,
+        totalPicks: weekResult?.totalPicks ?? null,
+      };
+    }
+    const gameById = new Map(games.map(g => [g.game_id, g]));
+    let total = 0;
+    let correct = 0;
+    let counted = 0; // picks with a known outcome (live winning + final)
+    for (const pick of weekPicks) {
+      const game = gameById.get(pick.game_id);
+      if (!game) continue;
+      const rank = game.frozen_rank ?? game.rank ?? 1;
+      const value = pick.is_hotpick ? rank : 1;
+      const score = liveScores[pick.game_id];
+      if (!score) continue;
+      const pickedHome = pick.picked_team === game.home_team;
+      const userScore = pickedHome ? score.homeScore : score.awayScore;
+      const oppScore  = pickedHome ? score.awayScore : score.homeScore;
+      if (isFinalStatus(score.status)) {
+        counted += 1;
+        const isCorrect = userScore > oppScore;
+        if (isCorrect) correct += 1;
+        total += isCorrect ? value : pick.is_hotpick ? -rank : 0;
+      } else if (isLiveStatus(score.status)) {
+        if (userScore > oppScore) {
+          correct += 1; // running win (mirrors UI of "games won so far")
+          counted += 1;
+          total += value;
+        } else if (userScore < oppScore) {
+          counted += 1;
+          if (pick.is_hotpick) total -= rank;
+        }
+      }
+      // scheduled / pre-game contributes 0
+    }
+    return {
+      earned: total,
+      correctPicks: correct,
+      totalPicks: counted || weekPicks.length,
+    };
+  }, [weekPicks, games, liveScores, weekResult]);
+  const liveEarned = live.earned;
+
+  const slots: WeekSlot[] = useMemo(() => {
+    const past: WeekSlot[] = recentWeeks
+      .filter(r => r.week !== currentWeek) // dedupe against current
+      .map(r => ({
+        week: r.week,
+        earned: r.total,
+        ceiling: null,
+        correctPicks: r.correctPicks,
+        totalPicks: r.totalPicks,
+        isCurrent: false,
+      }));
+
+    // Pull the current-week row out of recentWeeks if it exists — this
+    // is the authoritative settled total for the current week and
+    // ensures the slot still renders when weekResult/liveEarned haven't
+    // been computed yet (notably on iOS cold-launches in complete state).
+    const currentRow = recentWeeks.find(r => r.week === currentWeek);
+    const fallbackEarned =
+      liveEarned ?? weekResult?.weekPoints ?? currentRow?.total ?? null;
+    // Always show the current-week slot once the week exists — even
+    // with zero data — so the strip advances visually on week rollover.
+    // The pill renders as a placeholder until picks/scores populate.
+    const current: WeekSlot[] =
+      currentWeek > 0
+        ? [{
+            week: currentWeek,
+            earned: fallbackEarned ?? 0,
+            ceiling: currentCeiling,
+            correctPicks:
+              live.correctPicks ??
+              weekResult?.correctPicks ??
+              currentRow?.correctPicks ??
+              null,
+            totalPicks:
+              live.totalPicks ??
+              weekResult?.totalPicks ??
+              currentRow?.totalPicks ??
+              null,
+            isCurrent: true,
+          }]
+        : [];
+
+    return [...past, ...current]
+      .sort((a, b) => a.week - b.week)
+      .slice(-3); // keep the 3 most recent, oldest on the left
+  }, [recentWeeks, currentWeek, weekResult, userPickCount, currentCeiling, liveEarned]);
+
+  // Single walk over liveScores — derives the live-game count and the
+  // "every game final" flag in one pass.
+  const {liveGameCount, weekComplete} = useMemo(() => {
+    const all = Object.values(liveScores);
+    let live = 0;
+    let allFinal = all.length > 0;
+    for (const g of all) {
+      if (isLiveStatus(g.status)) live += 1;
+      if (!isFinalStatus(g.status)) allFinal = false;
+    }
+    return {liveGameCount: live, weekComplete: allFinal};
+  }, [liveScores]);
+  const hasLiveGame = liveGameCount > 0;
+  const pulse = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!weekComplete) {
+      pulse.setValue(1);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {toValue: 0, duration: 900, useNativeDriver: false}),
+        Animated.timing(pulse, {toValue: 1, duration: 900, useNativeDriver: false}),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [weekComplete, pulse]);
+  const pulsingBorder = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [colors.border, colors.primary],
+  });
+
+  if (slots.length === 0) return null;
+
+  return (
+    <View style={styles.outer}>
+      {hasLiveGame && (
+        <View style={styles.liveLead}>
+          <View style={styles.liveDotWrap}>
+            <View
+              style={[styles.liveDotGlow, {backgroundColor: hexToRgba(colors.live, 0.18)}]}
+            />
+            <View style={[styles.liveDot, {backgroundColor: colors.live}]} />
+          </View>
+          <Text style={[bodyType.bold, styles.liveLabel, {color: colors.live}]}>
+            {liveGameCount === 1 ? 'GAME IN PROGRESS' : 'GAMES IN PROGRESS'}
+          </Text>
+        </View>
+      )}
+      <View style={styles.row}>
+      {slots.map(s => (
+        <Animated.View
+          key={s.week}
+          style={[
+            styles.slot,
+            {
+              backgroundColor: s.isCurrent ? colors.surface : 'transparent',
+              borderColor:
+                s.isCurrent && weekComplete
+                  ? pulsingBorder
+                  : s.isCurrent
+                  ? colors.primary
+                  : colors.border,
+            },
+          ]}
+          accessible
+          accessibilityLabel={
+            s.ceiling != null
+              ? `Week ${s.week}: ${s.earned} of ${s.ceiling} ceiling points${
+                  s.totalPicks != null && s.correctPicks != null
+                    ? `, ${s.correctPicks} of ${s.totalPicks} games won`
+                    : ''
+                }`
+              : `Week ${s.week}: ${s.earned} points${
+                  s.totalPicks != null && s.correctPicks != null
+                    ? `, ${s.correctPicks} of ${s.totalPicks} games won`
+                    : ''
+                }`
+          }>
+          <View style={styles.weekLabelRow}>
+            <Text style={[bodyType.bold, styles.weekLabel, {color: colors.textTertiary}]}>
+              WEEK {s.week}
+            </Text>
+            {!s.isCurrent && (
+              <Lock size={9} color={colors.loss} strokeWidth={2.5} />
+            )}
+          </View>
+          <View style={styles.numericStack}>
+            <Text
+              style={[
+                displayType.display,
+                styles.earned,
+                {
+                  color:
+                    s.earned > 0
+                      ? colors.win
+                      : s.earned < 0
+                      ? colors.loss
+                      : s.isCurrent
+                      ? colors.primary
+                      : colors.textPrimary,
+                },
+              ]}
+              numberOfLines={1}>
+              {s.earned > 0 ? `+${s.earned}` : s.earned}
+            </Text>
+            {s.totalPicks != null && s.totalPicks > 0 && s.correctPicks != null && (
+              <Text style={[monoType.regular, styles.pickCount, {color: colors.textTertiary}]}>
+                <Text style={styles.pickCountWon}>{s.correctPicks}</Text>
+                /{s.totalPicks}
+              </Text>
+            )}
+          </View>
+        </Animated.View>
+      ))}
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  outer: {
+    marginTop: spacing.md,
+  },
+  liveLead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 6,
+    marginBottom: 6,
+  },
+  liveDotWrap: {
+    width: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  liveDotGlow: {
+    position: 'absolute',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+  },
+  liveDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  liveLabel: {
+    fontSize: 15,
+    letterSpacing: 1.4,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing.sm,
+  },
+  slot: {
+    minWidth: 86,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: borderRadius.md + 2,
+    borderWidth: 1,
+    // Pill contents are centered as a block; the numeric lines
+    // (score + games-won) are right-justified to EACH OTHER inside
+    // their own column below.
+    alignItems: 'center',
+    // iOS compresses or hides flex children in a flex-end row when
+    // the measured width is tight; lock each pill's footprint.
+    flexShrink: 0,
+    flexGrow: 0,
+  },
+  numericStack: {
+    alignItems: 'center',
+  },
+  weekLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginBottom: 3,
+  },
+  weekLabel: {
+    fontSize: 9,
+    letterSpacing: 1.2,
+  },
+  scoreRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  earned: {
+    fontSize: 18,
+    lineHeight: 20,
+  },
+  ceiling: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginLeft: 1,
+  },
+  pickCount: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
+    letterSpacing: 0.3,
+  },
+  // Win count gets the heavier weight — the total denominator stays
+  // lighter so the eye lands on what the user actually won.
+  pickCountWon: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+});

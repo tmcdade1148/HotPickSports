@@ -289,7 +289,7 @@ export function ProfileScreen({navigation}: any) {
             onPress={handleSave}
             disabled={!canSave}>
             {saving ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color={colors.onPrimary} />
             ) : saved ? (
               <Text style={styles.saveButtonText}>Saved!</Text>
             ) : (
@@ -430,7 +430,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     opacity: 0.4,
   },
   saveButtonText: {
-    color: '#FFFFFF',
+    color: colors.onPrimary,
     fontSize: 16,
     fontWeight: '600',
   },

@@ -1,4 +1,4 @@
-import React, {useState, useMemo} from 'react';
+import React, {useState, useMemo, useEffect, useCallback} from 'react';
 import {
   View,
   Text,
@@ -21,13 +21,26 @@ import {
   Award,
   Megaphone,
   AlertTriangle,
+  Plus,
+  Star,
+  XCircle,
 } from 'lucide-react-native';
+import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {BroadcastComposer} from '@shell/components/BroadcastComposer';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 import type {BrandConfig} from '@shell/theme/types';
 import {HOTPICK_DEFAULTS} from '@shell/theme/defaults';
+
+interface InviteCodeRow {
+  id: string;
+  code: string;
+  label: string | null;
+  is_primary: boolean;
+  is_active: boolean;
+  created_at: string;
+}
 
 export function PoolSettingsScreen() {
   const {colors} = useTheme();
@@ -55,6 +68,33 @@ export function PoolSettingsScreen() {
   const [poolName, setPoolName] = useState(pool?.name ?? '');
   const [saving, setSaving] = useState(false);
   const [broadcastVisible, setBroadcastVisible] = useState(false);
+
+  // Invite codes — full list for this pool. Only organizers can read these
+  // (RLS policy on pool_invite_codes). Writes go through SECURITY DEFINER RPCs.
+  const [codes, setCodes] = useState<InviteCodeRow[]>([]);
+  const [codesLoading, setCodesLoading] = useState(false);
+  const [newCode, setNewCode] = useState('');
+  const [newLabel, setNewLabel] = useState('');
+  const [addingCode, setAddingCode] = useState(false);
+  const [codeError, setCodeError] = useState<string | null>(null);
+
+  const fetchCodes = useCallback(async () => {
+    if (!poolId) return;
+    setCodesLoading(true);
+    const {data} = await supabase
+      .from('pool_invite_codes')
+      .select('id, code, label, is_primary, is_active, created_at')
+      .eq('pool_id', poolId)
+      .eq('is_active', true)
+      .order('is_primary', {ascending: false})
+      .order('created_at', {ascending: true});
+    setCodes((data ?? []) as InviteCodeRow[]);
+    setCodesLoading(false);
+  }, [poolId]);
+
+  useEffect(() => {
+    fetchCodes();
+  }, [fetchCodes]);
 
   if (!pool) {
     return (
@@ -96,21 +136,97 @@ export function PoolSettingsScreen() {
     }
   };
 
-  const handleShareInvite = async () => {
-    if (!pool.invite_code) return;
-    try {
-      await Share.share({
-        message: `Join my pool "${pool.name}" on HotPick Sports! Use invite code: ${pool.invite_code}`,
-      });
-    } catch {
-      // User cancelled share
+  const handleAddCode = async () => {
+    setCodeError(null);
+    const normalized = newCode.toUpperCase().replace(/[\s-]/g, '');
+    if (normalized.length < 6 || normalized.length > 12) {
+      setCodeError('Code must be 6–12 characters.');
+      return;
     }
+    if (!/^[0-9A-Z]+$/.test(normalized)) {
+      setCodeError('Letters and numbers only.');
+      return;
+    }
+    setAddingCode(true);
+    const {data, error} = await supabase.rpc('add_pool_invite_code', {
+      p_pool_id: poolId,
+      p_code: normalized,
+      p_label: newLabel.trim() || null,
+      p_is_primary: false,
+    });
+    setAddingCode(false);
+    if (error || data?.error) {
+      const msg = data?.error === 'CODE_TAKEN'
+        ? 'That code is already in use. Try another.'
+        : data?.error === 'INVALID_CODE'
+          ? 'Code must be 6–12 letters and numbers.'
+          : data?.error === 'NOT_ORGANIZER'
+            ? 'Only the organizer can add codes.'
+            : (error?.message ?? 'Could not add code.');
+      setCodeError(msg);
+      return;
+    }
+    setNewCode('');
+    setNewLabel('');
+    fetchCodes();
   };
 
-  const handleCopyCode = () => {
-    if (!pool.invite_code) return;
-    Clipboard.setString(pool.invite_code);
-    Alert.alert('Copied', 'Invite code copied to clipboard.');
+  const handleSetPrimary = async (codeId: string) => {
+    const {data, error} = await supabase.rpc('set_pool_invite_code_primary', {
+      p_code_id: codeId,
+    });
+    if (error || data?.error) {
+      Alert.alert('Error', error?.message ?? data?.error ?? 'Could not set primary.');
+      return;
+    }
+    fetchCodes();
+  };
+
+  const handleDeactivateCode = (row: InviteCodeRow) => {
+    if (row.is_primary) {
+      Alert.alert(
+        'Cannot deactivate primary',
+        'Set another code as primary first, then you can deactivate this one.',
+      );
+      return;
+    }
+    Alert.alert(
+      'Deactivate code?',
+      `"${row.code}" will stop working immediately. This cannot be undone.`,
+      [
+        {text: 'Cancel', style: 'cancel'},
+        {
+          text: 'Deactivate',
+          style: 'destructive',
+          onPress: async () => {
+            const {data, error} = await supabase.rpc(
+              'deactivate_pool_invite_code',
+              {p_code_id: row.id},
+            );
+            if (error || data?.error) {
+              Alert.alert('Error', error?.message ?? data?.error ?? 'Could not deactivate.');
+              return;
+            }
+            fetchCodes();
+          },
+        },
+      ],
+    );
+  };
+
+  const handleCopyAnyCode = (code: string) => {
+    Clipboard.setString(code);
+    Alert.alert('Copied', `${code} copied to clipboard.`);
+  };
+
+  const handleShareAnyCode = async (code: string) => {
+    try {
+      await Share.share({
+        message: `Join my pool "${pool!.name}" on HotPick Sports! Use invite code: ${code}`,
+      });
+    } catch {
+      // user cancelled
+    }
   };
 
   const handleArchive = () => {
@@ -180,26 +296,112 @@ export function PoolSettingsScreen() {
           )}
         </View>
 
-        {/* Invite Code */}
-        {pool.invite_code && !pool.is_global && (
+        {/* Invite Codes — list view, multiple codes per pool. */}
+        {!pool.is_global && (
           <>
-            <Text style={styles.sectionTitle}>Invite Code</Text>
-            <View style={styles.inviteCard}>
-              <Text style={[styles.inviteCodeLarge, {color: accentColor}]}>{pool.invite_code}</Text>
-              <View style={styles.inviteActions}>
-                <TouchableOpacity
-                  style={[styles.inviteButton, {borderColor: accentColor}]}
-                  onPress={handleCopyCode}>
-                  <Copy size={16} color={accentColor} />
-                  <Text style={[styles.inviteButtonText, {color: accentColor}]}>Copy</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.inviteButton, {borderColor: accentColor}]}
-                  onPress={handleShareInvite}>
-                  <Share2 size={16} color={accentColor} />
-                  <Text style={[styles.inviteButtonText, {color: accentColor}]}>Share</Text>
-                </TouchableOpacity>
-              </View>
+            <Text style={styles.sectionTitle}>Invite Codes</Text>
+            {codesLoading && codes.length === 0 ? (
+              <Text style={styles.codesHint}>Loading…</Text>
+            ) : codes.length === 0 ? (
+              <Text style={styles.codesHint}>No active invite codes yet.</Text>
+            ) : (
+              codes.map(row => (
+                <View key={row.id} style={styles.codeCard}>
+                  <View style={styles.codeHeaderRow}>
+                    <Text style={[styles.codeText, {color: accentColor}]}>
+                      {row.code}
+                    </Text>
+                    {row.is_primary && (
+                      <View style={[styles.primaryBadge, {borderColor: accentColor}]}>
+                        <Star size={10} color={accentColor} />
+                        <Text style={[styles.primaryBadgeText, {color: accentColor}]}>
+                          PRIMARY
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  {row.label && (
+                    <Text style={styles.codeLabel}>{row.label}</Text>
+                  )}
+                  <View style={styles.codeActions}>
+                    <TouchableOpacity
+                      style={[styles.codeButton, {borderColor: accentColor}]}
+                      onPress={() => handleCopyAnyCode(row.code)}>
+                      <Copy size={14} color={accentColor} />
+                      <Text style={[styles.codeButtonText, {color: accentColor}]}>Copy</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.codeButton, {borderColor: accentColor}]}
+                      onPress={() => handleShareAnyCode(row.code)}>
+                      <Share2 size={14} color={accentColor} />
+                      <Text style={[styles.codeButtonText, {color: accentColor}]}>Share</Text>
+                    </TouchableOpacity>
+                    {!row.is_primary && (
+                      <>
+                        <TouchableOpacity
+                          style={[styles.codeButton, {borderColor: accentColor}]}
+                          onPress={() => handleSetPrimary(row.id)}>
+                          <Star size={14} color={accentColor} />
+                          <Text style={[styles.codeButtonText, {color: accentColor}]}>
+                            Make primary
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.codeButton, {borderColor: colors.error}]}
+                          onPress={() => handleDeactivateCode(row)}>
+                          <XCircle size={14} color={colors.error} />
+                          <Text style={[styles.codeButtonText, {color: colors.error}]}>
+                            Deactivate
+                          </Text>
+                        </TouchableOpacity>
+                      </>
+                    )}
+                  </View>
+                </View>
+              ))
+            )}
+
+            {/* Add new code */}
+            <View style={styles.addCodeCard}>
+              <Text style={styles.addCodeTitle}>Add another code</Text>
+              <Text style={styles.codesHint}>
+                6–12 letters and numbers. Memorable codes work better on signage
+                — e.g. WINGS26, BARNIGHT, MAIN.
+              </Text>
+              <TextInput
+                style={styles.addCodeInput}
+                value={newCode}
+                onChangeText={text =>
+                  setNewCode(text.toUpperCase().replace(/[\s-]/g, ''))
+                }
+                placeholder="WINGS26"
+                placeholderTextColor={colors.textSecondary}
+                maxLength={12}
+                autoCapitalize="characters"
+                autoCorrect={false}
+              />
+              <TextInput
+                style={styles.addCodeInput}
+                value={newLabel}
+                onChangeText={setNewLabel}
+                placeholder='Label (optional, e.g. "Bar night poster")'
+                placeholderTextColor={colors.textSecondary}
+                maxLength={40}
+              />
+              {codeError && <Text style={styles.codeErrorText}>{codeError}</Text>}
+              <TouchableOpacity
+                style={[
+                  styles.addCodeButton,
+                  {backgroundColor: accentColor},
+                  (addingCode || newCode.length < 6) && styles.codeButtonDisabled,
+                ]}
+                onPress={handleAddCode}
+                disabled={addingCode || newCode.length < 6}>
+                <Plus size={14} color={colors.onPrimary} />
+                <Text style={[styles.addCodeButtonText, {color: colors.onPrimary}]}>
+                  {addingCode ? 'Adding…' : 'Add code'}
+                </Text>
+              </TouchableOpacity>
             </View>
           </>
         )}
@@ -337,41 +539,122 @@ const createStyles = (colors: any) => StyleSheet.create({
     opacity: 0.5,
   },
   saveButtonText: {
-    color: '#FFFFFF',
+    color: colors.onPrimary,
     fontSize: 15,
     fontWeight: '600',
   },
-  inviteCard: {
+  // Invite-code list
+  codeCard: {
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
     marginHorizontal: spacing.lg,
-    alignItems: 'center',
-    gap: spacing.md,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  inviteCodeLarge: {
-    fontSize: 28,
+  codeHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: 4,
+  },
+  codeText: {
+    fontSize: 22,
     fontWeight: '800',
-    color: colors.primary,
-    letterSpacing: 4,
+    letterSpacing: 2,
   },
-  inviteActions: {
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  inviteButton: {
+  primaryBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+  },
+  primaryBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+  },
+  codeLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+    fontStyle: 'italic',
+  },
+  codeActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 6,
-    backgroundColor: colors.primary + '15',
+    marginTop: spacing.xs,
+  },
+  codeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 5,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+  },
+  codeButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  codeButtonDisabled: {
+    opacity: 0.5,
+  },
+  codesHint: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  addCodeCard: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+    gap: spacing.sm,
+  },
+  addCodeTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  addCodeInput: {
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderRadius: borderRadius.md,
-  },
-  inviteButtonText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: colors.primary,
+    color: colors.textPrimary,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  codeErrorText: {
+    fontSize: 12,
+    color: colors.error,
+  },
+  addCodeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.lg,
+  },
+  addCodeButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
   infoCard: {
     backgroundColor: colors.surface,
@@ -449,7 +732,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.onPrimary,
   },
   toggleDotOn: {
     alignSelf: 'flex-end',

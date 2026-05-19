@@ -120,7 +120,7 @@ export function ResetPasswordScreen({navigation}: any) {
             onPress={handleReset}
             disabled={!isValid || loading}>
             {loading ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color={colors.onPrimary} />
             ) : (
               <Text style={styles.buttonText}>Reset Password</Text>
             )}
@@ -189,7 +189,7 @@ const createStyles = (colors: any) =>
       opacity: 0.4,
     },
     buttonText: {
-      color: '#FFFFFF',
+      color: colors.onPrimary,
       fontSize: 16,
       fontWeight: '600',
     },

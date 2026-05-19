@@ -989,7 +989,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   sender: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#A0A0A0',
+    color: colors.textTertiary,
     marginBottom: 2,
   },
   messageText: {
@@ -997,11 +997,11 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textPrimary,
   },
   messageTextMe: {
-    color: '#FFFFFF',
+    color: colors.onPrimary,
   },
   time: {
     fontSize: 10,
-    color: '#A0A0A0',
+    color: colors.textTertiary,
     marginTop: 4,
     alignSelf: 'flex-end',
   },
@@ -1071,7 +1071,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   reportText: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.error ?? '#E53935',
+    color: colors.error,
   },
   // ── Reactor list modal ───────────────────────────────────────────
   reactorContainer: {
@@ -1123,7 +1123,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     opacity: 0.5,
   },
   sendText: {
-    color: '#FFFFFF',
+    color: colors.onPrimary,
     fontSize: 15,
     fontWeight: '600',
   },

@@ -1,8 +1,5 @@
 // src/shell/components/home/HotPickCinematic.tsx
 // Cinematic full-bleed HotPick matchup card.
-// Shared primitive used by PicksLockedHero (mode='locked') and GamesLiveHero (mode='live').
-// Spec: 260513_HotPick_HomeRedesign_Spec.docx §6.4.3 (picks_locked + games_live rows)
-//       Visual reference: HomeScreens.jsx HotPickCinematic in the design handoff.
 //
 // Composition:
 //   - Diagonal team-color split background with dark scrim

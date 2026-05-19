@@ -247,6 +247,22 @@ export function SeasonPicksScreen() {
     [pickCount, hotPickCount, setCurrentWeek],
   );
 
+  // Wave-lock fallback: earliest kickoff of any live/final game this week.
+  // Used by SeasonMatchCard to lock games without lock_at that kicked off at
+  // or before this time. Games with lock_at use lock_at as authoritative.
+  const liveAnchorTime = useMemo(() => {
+    if (weekState !== 'live') return null;
+    const liveOrFinalKickoffs = games
+      .filter(g => {
+        const s = (g.status ?? '').toUpperCase();
+        return s === 'IN_PROGRESS' || s === 'LIVE' || s === 'FINAL' || s === 'STATUS_FINAL' || s === 'COMPLETED';
+      })
+      .map(g => new Date(g.kickoff_at).getTime());
+    return liveOrFinalKickoffs.length > 0 ? Math.min(...liveOrFinalKickoffs) : null;
+  }, [weekState, games]);
+
+  const sections = useMemo(() => groupGamesByWave(games), [games]);
+
   if (!config) {
     return (
       <View style={styles.centered}>
@@ -275,22 +291,6 @@ export function SeasonPicksScreen() {
   // Picks remain interactive through 'live' — individual games lock per-card via
   // status, lock_at, or wave inference. 'locked' state and beyond are fully locked.
   const picksAreOpen = (weekState === 'picks_open' || weekState === 'live') && currentWeek === dbCurrentWeek;
-
-  // Wave-lock fallback: earliest kickoff of any live/final game this week.
-  // Used by SeasonMatchCard to lock games without lock_at that kicked off at
-  // or before this time. Games with lock_at use lock_at as authoritative.
-  const liveAnchorTime = useMemo(() => {
-    if (weekState !== 'live') return null;
-    const liveOrFinalKickoffs = games
-      .filter(g => {
-        const s = (g.status ?? '').toUpperCase();
-        return s === 'IN_PROGRESS' || s === 'LIVE' || s === 'FINAL' || s === 'STATUS_FINAL' || s === 'COMPLETED';
-      })
-      .map(g => new Date(g.kickoff_at).getTime());
-    return liveOrFinalKickoffs.length > 0 ? Math.min(...liveOrFinalKickoffs) : null;
-  }, [weekState, games]);
-
-  const sections = useMemo(() => groupGamesByWave(games), [games]);
 
   const renderGame = ({item}: {item: DbSeasonGame}) => (
     <View style={styles.cardWrapper}>
@@ -345,13 +345,13 @@ export function SeasonPicksScreen() {
                 <View style={styles.widgetValueRow}>
                   <Text style={[
                     styles.widgetValue,
-                    {color: weekEarned >= 0 ? '#1b9a06' : colors.error},
+                    {color: weekEarned >= 0 ? colors.success : colors.error},
                   ]}>
                     {weekEarned >= 0 ? '+' : ''}{weekEarned}
                   </Text>
                   <Text style={[
                     styles.widgetPts,
-                    {color: weekEarned >= 0 ? '#1b9a06' : colors.error},
+                    {color: weekEarned >= 0 ? colors.success : colors.error},
                   ]}>pts</Text>
                   <Text style={styles.widgetTarget}>/{potentialWeekScore} ceiling pts</Text>
                 </View>
@@ -376,7 +376,7 @@ export function SeasonPicksScreen() {
                 <View style={styles.widgetValueRow}>
                   <Text style={[
                     styles.widgetValue,
-                    weekEarned != null && weekEarned > 0 && {color: '#1b9a06'},
+                    weekEarned != null && weekEarned > 0 && {color: colors.success},
                     weekEarned != null && weekEarned < 0 && {color: colors.error},
                   ]}>
                     {weekEarned == null

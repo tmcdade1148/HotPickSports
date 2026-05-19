@@ -209,7 +209,7 @@ export function EmailEntryScreen({navigation, route}: any) {
             onPress={handleSubmit}
             disabled={!canSubmit || loading}>
             {loading ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color={colors.onPrimary} />
             ) : (
               <Text style={styles.buttonText}>
                 {mode === 'sign_in' ? 'Sign In' : 'Create Account'}
@@ -310,7 +310,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     opacity: 0.4,
   },
   buttonText: {
-    color: '#FFFFFF',
+    color: colors.onPrimary,
     fontSize: 16,
     fontWeight: '600',
   },

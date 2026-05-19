@@ -11,6 +11,7 @@ import {
   Share,
   Image,
   Platform,
+  Switch,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
@@ -45,6 +46,11 @@ interface Partner {
   perk_text: string | null;
   perk_icon: string | null;
   perk_updated_at: string | null;
+  // When true, the partner can be selected as the presenting partner of new
+  // pools and partner-staff can join pools in the partner role. When false
+  // (default), the partner is sponsor-only — brand surfaces via perk /
+  // broadcasts / roster, but cannot run pools. Migration 260515.
+  can_run_pools: boolean;
 }
 
 /** Partners set 4 colors — the rest are auto-derived */
@@ -142,6 +148,7 @@ export function PartnerAdminScreen() {
   // Participation perk — partner-managed copy, never authored by HotPick.
   const [editPerkText, setEditPerkText] = useState('');
   const [editPerkIcon, setEditPerkIcon] = useState('');
+  const [editCanRunPools, setEditCanRunPools] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // Create form state
@@ -293,6 +300,18 @@ export function PartnerAdminScreen() {
   };
 
   const handleAssignToPool = async (partner: Partner, poolId: string) => {
+    // Gate: only partners flagged as can_run_pools may be assigned to a
+    // pool. Sponsor-only partners still surface via perk / broadcasts /
+    // roster but cannot be a pool's presenting partner. Server-side
+    // trigger (260515_partner_can_run_pools) enforces this independently.
+    if (!partner.can_run_pools) {
+      Alert.alert(
+        'Partner is sponsor-only',
+        `${partner.name} is set to sponsor-only. Flip the "Partner Class" switch in this partner's settings to allow pool assignment.`,
+      );
+      return;
+    }
+
     const brandConfig = partner.brand_config as unknown as BrandConfig;
     const partnerSlug = partner.slug;
 
@@ -312,10 +331,35 @@ export function PartnerAdminScreen() {
 
     updatePoolBrandConfig(poolId, brandConfig);
 
+    // Add the partner slug as an additional invite code on the pool (6–12
+    // chars, alphanumeric). Letters-only of the slug, uppercased.
+    // The primary auto-generated code on the pool is unchanged; this is an
+    // extra code so signage / posters can use the partner name. If the
+    // sluggified result doesn't fit the rules, we silently skip — the pool
+    // is still joinable via its primary code.
+    const partnerCode = partnerSlug.replace(/[^0-9a-z]/gi, '').toUpperCase();
+    let partnerCodeAdded = false;
+    if (partnerCode.length >= 6 && partnerCode.length <= 12) {
+      const {data: rpcData} = await supabase.rpc('add_pool_invite_code', {
+        p_pool_id: poolId,
+        p_code: partnerCode,
+        p_label: `${partner.name} signage`,
+        p_is_primary: false,
+      });
+      // CODE_TAKEN is non-fatal — somebody else already has this code or
+      // this pool already has it. Treat as "fine, move on."
+      partnerCodeAdded = !rpcData?.error;
+    }
+
     const pool = userPools.find(p => p.id === poolId);
+    const codeNote = partnerCodeAdded
+      ? `\n\nExtra invite code for signage: ${partnerCode}`
+      : partnerCode.length >= 6 && partnerCode.length <= 12
+        ? `\n\n(Signage code "${partnerCode}" was already taken — primary pool code still works.)`
+        : '';
     Alert.alert(
       'Assigned',
-      `${partner.name} brand applied to ${pool?.name ?? 'pool'}.\n\nInvite code for signage: ${partnerSlug.toUpperCase()}`,
+      `${partner.name} brand applied to ${pool?.name ?? 'pool'}.${codeNote}`,
     );
     setExpandedPartnerId(null);
   };
@@ -362,6 +406,7 @@ export function PartnerAdminScreen() {
     setEditLogoUrl(bc?.logo?.full ?? '');
     setEditPerkText(partner.perk_text ?? '');
     setEditPerkIcon(partner.perk_icon ?? '');
+    setEditCanRunPools(partner.can_run_pools ?? false);
   };
 
   const handleSaveEdit = async (partner: Partner) => {
@@ -409,6 +454,7 @@ export function PartnerAdminScreen() {
           perk_icon: editPerkIcon.trim().length === 0 ? null : editPerkIcon.trim(),
           // perk_updated_at is auto-stamped by the partners_touch_perk_updated_at
           // trigger when perk_text or perk_icon changes.
+          can_run_pools: editCanRunPools,
         })
         .eq('id', partner.id);
 
@@ -622,7 +668,7 @@ export function PartnerAdminScreen() {
               onPress={handleCreate}
               disabled={!formName.trim() || creating}>
               {creating ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
+                <ActivityIndicator size="small" color={colors.onPrimary} />
               ) : (
                 <Text style={styles.createButtonText}>Create Partner</Text>
               )}
@@ -688,6 +734,11 @@ export function PartnerAdminScreen() {
                       </View>
                     ) : null}
                     <Text style={styles.partnerName}>{partner.name}</Text>
+                    {!partner.can_run_pools && (
+                      <View style={styles.classBadge}>
+                        <Text style={styles.classBadgeText}>SPONSOR ONLY</Text>
+                      </View>
+                    )}
                   </TouchableOpacity>
                   <View style={styles.partnerHeaderActions}>
                     <TouchableOpacity
@@ -759,6 +810,32 @@ export function PartnerAdminScreen() {
                       )}
                     </View>
 
+                    {/* Partner class — controls whether this partner can be
+                        selected as a pool's presenting partner and whether
+                        partner-staff can join pools in the partner role. */}
+                    <Text style={styles.colorsHeading}>Partner Class</Text>
+                    <View style={styles.classRow}>
+                      <View style={styles.classCopy}>
+                        <Text style={styles.classLabel}>
+                          {editCanRunPools
+                            ? 'Can create & join pools as a partner'
+                            : 'Sponsor only — cannot run or join pools'}
+                        </Text>
+                        <Text style={styles.colorsDerivedNote}>
+                          {editCanRunPools
+                            ? 'Partner-staff accounts can be added to pools in the partner role, and this partner appears in the new-pool partner picker.'
+                            : 'Brand still appears via perk, broadcasts, and roster — but the partner cannot organize or join pools.'}
+                        </Text>
+                      </View>
+                      <Switch
+                        value={editCanRunPools}
+                        onValueChange={setEditCanRunPools}
+                        trackColor={{false: colors.border, true: colors.primary}}
+                        thumbColor={colors.onPrimary}
+                        ios_backgroundColor={colors.border}
+                      />
+                    </View>
+
                     {/* Participation perk — partner-managed; max 120 chars. */}
                     <Text style={styles.colorsHeading}>Participation Perk</Text>
                     <Text style={styles.colorsDerivedNote}>
@@ -803,7 +880,7 @@ export function PartnerAdminScreen() {
                       onPress={() => handleSaveEdit(partner)}
                       disabled={!editName.trim() || saving}>
                       {saving ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
+                        <ActivityIndicator size="small" color={colors.onPrimary} />
                       ) : (
                         <Text style={styles.createButtonText}>Save Changes</Text>
                       )}
@@ -1048,6 +1125,27 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: spacing.sm,
   },
+  classRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.md,
+  },
+  classCopy: {
+    flex: 1,
+  },
+  classLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: 2,
+  },
   perkRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -1142,7 +1240,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     opacity: 0.4,
   },
   createButtonText: {
-    color: '#FFFFFF',
+    color: colors.onPrimary,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -1229,6 +1327,21 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: '600',
     color: colors.textPrimary,
   },
+  classBadge: {
+    marginLeft: spacing.sm,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  classBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    color: colors.textTertiary,
+  },
 
   // Pool assign
   poolList: {
@@ -1271,7 +1384,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderRadius: borderRadius.sm,
   },
   assignButtonText: {
-    color: '#FFFFFF',
+    color: colors.onPrimary,
     fontSize: 13,
     fontWeight: '600',
   },

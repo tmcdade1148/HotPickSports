@@ -4,7 +4,9 @@ import {SYSTEM_AVATARS} from '@shell/components/AvatarSelector';
 import {useTheme} from '@shell/theme';
 
 /** O(1) lookup by avatar_key instead of .find() on every render. */
-const AVATAR_MAP = new Map(SYSTEM_AVATARS.map(a => [a.key, a]));
+const AVATAR_MAP = new Map<string, (typeof SYSTEM_AVATARS)[number]>(
+  SYSTEM_AVATARS.map(a => [a.key, a]),
+);
 
 interface AvatarBadgeProps {
   avatarKey: string | null | undefined;

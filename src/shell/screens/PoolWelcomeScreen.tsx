@@ -199,7 +199,7 @@ export function PoolWelcomeScreen({navigation}: any) {
                 onPress={handleSubmitCode}
                 disabled={!inviteCode.trim() || joining}>
                 {joining ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <ActivityIndicator size="small" color={colors.onPrimary} />
                 ) : (
                   <Text style={styles.joinButtonText}>Join</Text>
                 )}
@@ -319,7 +319,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     opacity: 0.4,
   },
   joinButtonText: {
-    color: '#FFFFFF',
+    color: colors.onPrimary,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -336,7 +336,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     width: '100%',
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: colors.onPrimary,
     fontSize: 16,
     fontWeight: '600',
   },

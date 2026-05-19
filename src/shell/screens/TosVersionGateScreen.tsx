@@ -81,7 +81,7 @@ export function TosVersionGateScreen({navigation, route}: any) {
           disabled={loading}
           activeOpacity={0.8}>
           {loading ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={colors.onPrimary} />
           ) : (
             <Text style={styles.agreeButtonText}>
               I am 18 or older and I agree to the{'\n'}Terms of Service and Privacy Policy
@@ -151,7 +151,7 @@ const createStyles = (colors: any) =>
     agreeButtonText: {
       fontSize: 14,
       fontWeight: '600',
-      color: '#FFFFFF',
+      color: colors.onPrimary,
       textAlign: 'center',
       lineHeight: 20,
     },

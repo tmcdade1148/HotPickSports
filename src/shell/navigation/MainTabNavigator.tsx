@@ -499,12 +499,19 @@ export function MainTabNavigator() {
   return (
     <Tab.Navigator
       initialRouteName="HomeTab"
-      tabBar={(props) => (
-        <SafeAreaView style={{backgroundColor: colors.background}} edges={['bottom']}>
-          <PoweredByHotPick />
-          <GroupedTabBar {...props} />
-        </SafeAreaView>
-      )}
+      tabBar={(props) => {
+        // Brief (redesign-v3): hide the entire bottom-nav region on Home —
+        // PoweredByHotPick included. Home owns the full screen; other tabs
+        // continue to show the bar.
+        const activeRouteName = props.state.routes[props.state.index]?.name;
+        if (activeRouteName === 'HomeTab') return null;
+        return (
+          <SafeAreaView style={{backgroundColor: colors.background}} edges={['bottom']}>
+            <PoweredByHotPick />
+            <GroupedTabBar {...props} />
+          </SafeAreaView>
+        );
+      }}
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.primary,

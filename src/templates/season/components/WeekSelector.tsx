@@ -77,7 +77,7 @@ export function WeekSelector({
               style={[
                 styles.chipText,
                 isActiveWeek && styles.chipTextSelected,
-                isViewedWeek && {color: '#333333', fontWeight: '700'},
+                isViewedWeek && {color: colors.ink, fontWeight: '700'},
                 isPast && {color: colors.textPrimary},
                 isFuture && {color: colors.textSecondary + '80'},
               ]}>
@@ -113,6 +113,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
   },
   chipTextSelected: {
-    color: '#181818',
+    color: colors.ink,
   },
 });

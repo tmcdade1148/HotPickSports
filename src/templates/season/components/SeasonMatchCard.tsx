@@ -94,7 +94,7 @@ function TeamRow({
 
     Alert.alert(
       'Game Locked',
-      'Games lock in two waves:\n\n\u2022 Any game before the 1pm (ET) window locks at its own kickoff.\n\n\u2022 All remaining games lock together at the 1pm (ET) kickoff.',
+      'This game has already kicked off, so its pick is locked. Other games stay editable until each one kicks off individually.',
       [{text: 'Got it'}],
     );
   };
@@ -429,7 +429,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 14,
     fontWeight: '900',
     fontStyle: 'italic',
-    color: '#1B9A06',
+    color: colors.success,
   },
   finalRow: {
     flexDirection: 'row',
@@ -453,7 +453,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   hotPickPointsHeader: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#FFB800',
+    color: colors.warning,
   },
   pointsEarned: {
     fontSize: 14,
@@ -461,7 +461,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
   },
   pointsEarnedPositive: {
-    color: '#1B9A06',
+    color: colors.success,
   },
   pointsEarnedNegative: {
     color: colors.error,
@@ -494,7 +494,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   rankNumber: {
     fontSize: 16,
     fontWeight: '900',
-    color: '#FFFFFF',
+    color: colors.onPrimary,
   },
   rankLabel: {
     fontSize: 9,
@@ -584,7 +584,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   inlineScoreWinner: {
-    color: '#1B9A06',
+    color: colors.success,
   },
 
   // @ separator row between teams

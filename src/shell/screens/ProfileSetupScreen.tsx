@@ -178,7 +178,7 @@ export function ProfileSetupScreen({navigation}: any) {
             onPress={handleSubmit}
             disabled={!canSubmit}>
             {saving ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color={colors.onPrimary} />
             ) : (
               <Text style={styles.buttonText}>Let's Go</Text>
             )}
@@ -249,7 +249,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginTop: spacing.xs,
   },
   available: {
-    color: colors.success ?? '#1DC24C',
+    color: colors.success,
     fontSize: 13,
     marginTop: spacing.xs,
   },
@@ -265,7 +265,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     opacity: 0.4,
   },
   buttonText: {
-    color: '#FFFFFF',
+    color: colors.onPrimary,
     fontSize: 16,
     fontWeight: '600',
   },

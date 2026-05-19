@@ -37,16 +37,14 @@ export function PicksProgressHeader({
   const allPicked = pickCount >= totalGames && totalGames > 0;
   const hasPicks = pickCount > 0;
 
-  const ACTION_GREEN = '#1B9A06';
-
   const barColor = allPicked
-    ? ACTION_GREEN
+    ? colors.success
     : hasPicks
       ? colors.warning
       : colors.border;
 
   const countColor = allPicked
-    ? ACTION_GREEN
+    ? colors.success
     : hasPicks
       ? colors.warning
       : colors.textSecondary;

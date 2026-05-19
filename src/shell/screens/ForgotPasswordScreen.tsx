@@ -152,7 +152,7 @@ export function ForgotPasswordScreen({navigation, route}: any) {
             onPress={handleSendReset}
             disabled={!isValidEmail || loading}>
             {loading ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color={colors.onPrimary} />
             ) : (
               <Text style={styles.buttonText}>Send Reset Link</Text>
             )}
@@ -246,7 +246,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     opacity: 0.4,
   },
   buttonText: {
-    color: '#FFFFFF',
+    color: colors.onPrimary,
     fontSize: 16,
     fontWeight: '600',
   },

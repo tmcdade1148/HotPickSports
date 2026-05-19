@@ -1,23 +1,15 @@
-// src/shell/screens/HomeScreen.tsx
-// Spec: 260513_HotPick_HomeRedesign_Spec.docx §6.1 + §6.2
-//
-// v1 production Home Screen. Composes the new component suite:
-//
-//   SystemMessageSlot           (top of stack)
-//   IdentityBar                 (always visible)
-//   StateHero                   (always visible; routes 10 sub-variants)
-//   LastWeekRecapChip           (picks_open + picks_locked only)
-//   WeekMiniStrip               (in-cycle states only)
-//   PoolModule × N              (one per visible pool)
-//   PartnerModule × N           (one per DISTINCT aligned partner)
-//
-// All data loaders fire on mount + when their dependencies change. No
-// per-Module useEffect — every aggregation lives in globalStore loaders.
+// Home composes the redesigned hero suite (HomeHeader → IdentityBar →
+// StateHero → Insight → Pool/Partner stacks). All Supabase reads live
+// in store loaders fired here so child modules can stay presentational.
 
 import React, {useEffect, useMemo} from 'react';
-import {ScrollView, StyleSheet, Text, View} from 'react-native';
+import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {KeyRound, Plus} from 'lucide-react-native';
+import {useNavigation} from '@react-navigation/native';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
+import {isScheduledStatus} from '@sports/nfl/utils/gameStatus';
+import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {useTheme} from '@shell/theme/hooks';
 import {spacing, bodyType} from '@shared/theme';
 
@@ -25,61 +17,56 @@ import {SystemMessageSlot} from '@shell/components/home/SystemMessageSlot';
 import {HomeHeader} from '@shell/components/home/HomeHeader';
 import {IdentityBar} from '@shell/components/home/IdentityBar';
 import {StateHero} from '@shell/components/home/StateHero';
-import {StatBlocks} from '@shell/components/home/StatBlocks';
-import {LastWeekRecapChip} from '@shell/components/home/LastWeekRecapChip';
+import {Insight} from '@shell/components/home/Insight';
 import {PoolModule} from '@shell/components/home/PoolModule';
 import {PartnerModule} from '@shell/components/home/PartnerModule';
 import {resolveHomeState} from '@shell/components/home/resolveHomeState';
 
 export function HomeScreen() {
   const {colors} = useTheme();
+  const navigation = useNavigation<any>();
 
-  // ---------------------------------------------------------------------------
-  // Inputs from the existing stores. These are READS only; no aggregation.
-  // ---------------------------------------------------------------------------
   const userId       = useGlobalStore(s => s.user?.id);
   const visiblePools = useGlobalStore(s => s.visiblePools);
   const currentPhase = useNFLStore(s => s.currentPhase);
   const weekState    = useNFLStore(s => s.weekState);
   const currentWeek  = useNFLStore(s => s.currentWeek);
-  // Pull the active competition straight from the store — never hardcode.
-  // Per the May 13 memory note, nfl_2025_sim is the default for everyone
-  // until Sept 2026; nfl_2026 is parked.
   const competition  = useNFLStore(s => s.competition);
 
-  // Loaders — pulled once per render so the deps below stay stable.
   const loadLastWeekHotPick   = useGlobalStore(s => s.loadLastWeekHotPick);
   const loadRecentWeeks       = useGlobalStore(s => s.loadRecentWeeks);
+  const loadHotPickHitRate    = useGlobalStore(s => s.loadHotPickHitRate);
   const loadPoolIndicators    = useGlobalStore(s => s.loadPoolIndicators);
   const loadUserRankByPool    = useGlobalStore(s => s.loadUserRankByPool);
+  const loadWeekRankByPool    = useGlobalStore(s => s.loadWeekRankByPool);
   const loadAlignedPartners   = useGlobalStore(s => s.loadAlignedPartners);
+  const loadActivePartners    = useGlobalStore(s => s.loadActivePartners);
+  const activePartnerIds      = useGlobalStore(s => s.activePartnerIds);
   const loadPartnerIndicators = useGlobalStore(s => s.loadPartnerIndicators);
-
-  // Realtime subscription on competition_config — picks up week_state /
-  // current_phase changes pushed by the season simulator (or any admin
-  // tool). Without this, the simulator updates the DB but the app reads
-  // stale state until next foreground/cold start.
+  const fetchUserPickStatus    = useNFLStore(s => s.fetchUserPickStatus);
+  const fetchUserHotPick       = useNFLStore(s => s.fetchUserHotPick);
+  const fetchLiveScores        = useNFLStore(s => s.fetchLiveScores);
+  const subscribeToLiveScores  = useNFLStore(s => s.subscribeToLiveScores);
+  const fetchHighestRankedGame = useNFLStore(s => s.fetchHighestRankedGame);
+  const fetchSeasonUserPicks   = useSeasonStore(s => s.fetchUserPicks);
+  const fetchSeasonWeekGames   = useSeasonStore(s => s.fetchWeekGames);
+  const fetchSeasonLeaderboard = useSeasonStore(s => s.fetchLeaderboard);
+  const seasonInitialize       = useSeasonStore(s => s.initialize);
+  const seasonConfig           = useSeasonStore(s => s.config);
+  const activeSport            = useGlobalStore(s => s.activeSport);
+  const activePoolId           = useGlobalStore(s => s.activePoolId);
   const subscribeToCompetitionConfig = useNFLStore(s => s.subscribeToCompetitionConfig);
 
-  // ---------------------------------------------------------------------------
-  // Resolve the home state.
-  // ---------------------------------------------------------------------------
   const homeState = useMemo(
     () => resolveHomeState(visiblePools.length, currentPhase, weekState),
     [visiblePools.length, currentPhase, weekState],
   );
 
-  // Element-level visibility per spec §6.2 anatomy table.
-  const showRecapChip = homeState === 'picks_open' || homeState === 'picks_locked';
-  // StatBlocks (Season Total + Last Week) — visible in every in-cycle state
-  // per the May 13 v2 reference. Replaces the prior WeekMiniStrip.
-  const showStatBlocks = (
-    homeState === 'picks_open'  ||
+  const isPicksFlow =
+    homeState === 'picks_open'   ||
     homeState === 'picks_locked' ||
-    homeState === 'games_live'  ||
-    homeState === 'settling'    ||
-    homeState === 'complete'
-  );
+    homeState === 'games_live';
+  const showInsight      = isPicksFlow;
   const showPoolStack    = homeState !== 'zero_pools';
   const showPartnerStack = homeState !== 'zero_pools';
 
@@ -108,13 +95,28 @@ export function HomeScreen() {
     };
   }, [visiblePools]);
 
-  // ---------------------------------------------------------------------------
-  // Fire all loaders. Each loader is store-cached; safe to call repeatedly.
-  // ---------------------------------------------------------------------------
   const allPoolIds = useMemo(() => visiblePools.map(p => p.id), [visiblePools]);
+  const liveScores = useNFLStore(s => s.liveScores);
 
-  // Subscribe to competition_config Realtime changes for the whole Home
-  // session. Unsubscribes on unmount.
+  // Derived flags — kept stable so dependent effects don't re-fire on
+  // every Realtime score push.
+  const someGameStarted = useMemo(
+    () => Object.values(liveScores).some(g => !isScheduledStatus(g.status)),
+    [liveScores],
+  );
+  const pastKickoff =
+    homeState === 'picks_locked' ||
+    homeState === 'games_live'   ||
+    homeState === 'settling'     ||
+    homeState === 'complete';
+
+  // Partner render order: aligned first, then the rest of the active
+  // partner roster.
+  const partnerRenderIds = useMemo(() => {
+    const unaligned = activePartnerIds.filter(id => !partnerIds.includes(id));
+    return [...partnerIds, ...unaligned];
+  }, [partnerIds, activePartnerIds]);
+
   useEffect(() => {
     const unsub = subscribeToCompetitionConfig();
     return unsub;
@@ -124,7 +126,8 @@ export function HomeScreen() {
     if (!userId || !competition) return;
     loadLastWeekHotPick(userId, competition, currentWeek).catch(() => {});
     loadRecentWeeks(userId, competition).catch(() => {});
-  }, [userId, competition, currentWeek, loadLastWeekHotPick, loadRecentWeeks]);
+    loadHotPickHitRate(userId, competition).catch(() => {});
+  }, [userId, competition, currentWeek, loadLastWeekHotPick, loadRecentWeeks, loadHotPickHitRate]);
 
   useEffect(() => {
     if (!userId) return;
@@ -133,21 +136,88 @@ export function HomeScreen() {
 
   useEffect(() => {
     if (!userId) return;
-    loadUserRankByPool(userId, privatePoolIds).catch(() => {});
-  }, [userId, privatePoolIds, loadUserRankByPool]);
+    loadUserRankByPool(userId, allPoolIds).catch(() => {});
+  }, [userId, allPoolIds, loadUserRankByPool]);
+
+  useEffect(() => {
+    if (!userId || !competition || currentWeek <= 0 || allPoolIds.length === 0) return;
+    if (!someGameStarted && !pastKickoff) return;
+    loadWeekRankByPool(userId, allPoolIds, competition, currentWeek).catch(() => {});
+  }, [userId, competition, currentWeek, allPoolIds, someGameStarted, pastKickoff, loadWeekRankByPool]);
 
   useEffect(() => {
     loadAlignedPartners(partnerIds).catch(() => {});
   }, [partnerIds, loadAlignedPartners]);
 
   useEffect(() => {
+    loadActivePartners().catch(() => {});
+  }, [loadActivePartners]);
+
+  useEffect(() => {
     if (!userId) return;
     loadPartnerIndicators(userId, partnerIds).catch(() => {});
   }, [userId, partnerIds, loadPartnerIndicators]);
 
-  // ---------------------------------------------------------------------------
-  // Render — spec §6.2 element stack, top to bottom.
-  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!userId || !competition || currentWeek <= 0) return;
+    fetchUserPickStatus(userId).catch(() => {});
+    fetchUserHotPick(userId, currentWeek).catch(() => {});
+  }, [userId, competition, currentWeek, fetchUserPickStatus, fetchUserHotPick]);
+
+  // Live scores re-fetch on currentWeek change — fetchLiveScores REPLACES
+  // (not merges) so last week's final entries are wiped, preventing
+  // "every game final" weekComplete from sticking after rollover.
+  useEffect(() => {
+    if (!competition || currentWeek <= 0) return;
+    fetchLiveScores().catch(() => {});
+    fetchHighestRankedGame().catch(() => {});
+    const unsub = subscribeToLiveScores();
+    return unsub;
+  }, [competition, currentWeek, fetchLiveScores, fetchHighestRankedGame, subscribeToLiveScores]);
+
+  // Bootstrap seasonStore.config from Home too — MainTabNavigator runs
+  // initialize as well, but only after activeSport + activePoolId resolve.
+  // On iOS that can land later than the first Home render.
+  useEffect(() => {
+    if (!activeSport || activeSport.templateType !== 'season') return;
+    if (!activePoolId) return;
+    if (seasonConfig && seasonConfig.competition === activeSport.competition) return;
+    seasonInitialize(activeSport, activePoolId).catch(() => {});
+  }, [activeSport, activePoolId, seasonConfig, seasonInitialize]);
+
+  useEffect(() => {
+    if (!userId || currentWeek <= 0) return;
+    fetchSeasonUserPicks(userId, currentWeek).catch(() => {});
+    fetchSeasonWeekGames(currentWeek).catch(() => {});
+  }, [userId, currentWeek, fetchSeasonUserPicks, fetchSeasonWeekGames, seasonConfig]);
+
+  useEffect(() => {
+    if (!seasonConfig) return;
+    fetchSeasonLeaderboard().catch(() => {});
+  }, [seasonConfig, currentWeek, homeState, fetchSeasonLeaderboard]);
+
+  // While the backend is computing final scores, season_user_totals
+  // updates aren't pushed via Realtime — poll the season aggregates so
+  // SEASON PTS / recent weeks / hit rate roll forward.
+  useEffect(() => {
+    if (homeState !== 'settling') return;
+    if (!userId || !competition) return;
+    const tick = () => {
+      fetchSeasonLeaderboard().catch(() => {});
+      loadRecentWeeks(userId, competition).catch(() => {});
+      loadHotPickHitRate(userId, competition).catch(() => {});
+    };
+    tick();
+    const id = setInterval(tick, 10_000);
+    return () => clearInterval(id);
+  }, [
+    homeState,
+    userId,
+    competition,
+    fetchSeasonLeaderboard,
+    loadRecentWeeks,
+    loadHotPickHitRate,
+  ]);
   return (
     <View style={[styles.wrap, {backgroundColor: colors.background}]}>
       <ScrollView
@@ -158,36 +228,67 @@ export function HomeScreen() {
         <IdentityBar />
         <StateHero state={homeState} />
 
-        {showStatBlocks && <StatBlocks />}
-        {showRecapChip  && <LastWeekRecapChip />}
+        {showInsight && <Insight />}
 
         {showPoolStack && visiblePools.length > 0 && (
           <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textPrimary}]}>
-                YOUR POOLS
-              </Text>
-              <Text style={[bodyType.regular, styles.sectionCount, {color: colors.textTertiary}]}>
-                {visiblePools.length} active
-              </Text>
-            </View>
+            <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textTertiary}]}>
+              YOUR POOLS
+            </Text>
             {visiblePools.map(p => (
               <PoolModule key={p.id} pool={p} />
             ))}
+            <View style={styles.poolActionsRow}>
+              <Pressable
+                onPress={() => navigation.navigate('JoinPool')}
+                style={({pressed}) => [
+                  styles.poolActionBtn,
+                  {borderColor: colors.border, opacity: pressed ? 0.7 : 1},
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Join a pool with an invite code">
+                <KeyRound size={16} color={colors.textSecondary} strokeWidth={2} />
+                <View style={styles.poolActionLabel}>
+                  <Text
+                    style={[bodyType.bold, styles.poolActionPrimary, {color: colors.textPrimary}]}>
+                    Join a pool
+                  </Text>
+                  <Text
+                    style={[bodyType.regular, styles.poolActionSecondary, {color: colors.textTertiary}]}>
+                    with invite code
+                  </Text>
+                </View>
+              </Pressable>
+              <Pressable
+                onPress={() => navigation.navigate('CreatePool')}
+                style={({pressed}) => [
+                  styles.poolActionBtn,
+                  {borderColor: colors.border, opacity: pressed ? 0.7 : 1},
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Create a new pool and invite friends">
+                <Plus size={16} color={colors.textSecondary} strokeWidth={2} />
+                <View style={styles.poolActionLabel}>
+                  <Text
+                    style={[bodyType.bold, styles.poolActionPrimary, {color: colors.textPrimary}]}>
+                    Create a pool
+                  </Text>
+                  <Text
+                    style={[bodyType.regular, styles.poolActionSecondary, {color: colors.textTertiary}]}>
+                    and invite friends
+                  </Text>
+                </View>
+              </Pressable>
+            </View>
           </View>
         )}
 
-        {showPartnerStack && partnerIds.length > 0 && (
+        {showPartnerStack && (partnerIds.length > 0 || activePartnerIds.length > 0) && (
           <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textPrimary}]}>
-                ALIGNED WITH
-              </Text>
-              <Text style={[bodyType.regular, styles.sectionCount, {color: colors.textTertiary}]}>
-                {partnerIds.length} partner{partnerIds.length === 1 ? '' : 's'}
-              </Text>
-            </View>
-            {partnerIds.map(pid => (
+            <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textTertiary}]}>
+              YOUR PARTNERS
+            </Text>
+            {partnerRenderIds.map(pid => (
               <PartnerModule
                 key={pid}
                 partnerId={pid}
@@ -205,18 +306,40 @@ const styles = StyleSheet.create({
   wrap:    {flex: 1},
   scroll:  {paddingBottom: spacing.xxl},
   section: {marginTop: spacing.lg},
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-  },
   sectionTitle: {
-    fontSize: 13,
-    letterSpacing: 1.4,
+    fontSize: 11,
+    letterSpacing: 1.8,
+    paddingHorizontal: spacing.lg,
+    marginBottom: 10,
   },
-  sectionCount: {
-    fontSize: 12,
+  poolActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginHorizontal: spacing.lg,
+    marginTop: 4,
+  },
+  poolActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+  },
+  poolActionLabel: {
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  poolActionPrimary: {
+    fontSize: 14,
+    lineHeight: 17,
+  },
+  poolActionSecondary: {
+    fontSize: 11,
+    fontStyle: 'italic',
+    marginTop: 1,
   },
 });

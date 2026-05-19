@@ -88,6 +88,7 @@ export function SettingsScreen({route}: any) {
     textSecondary: config.text_secondary,
     border: semantic.border,
     error: semantic.error,
+    onPrimary: '#FFFFFF',
   };
 
   const [inviteCode, setInviteCode] = useState('');
@@ -117,12 +118,21 @@ export function SettingsScreen({route}: any) {
   };
 
   const handleJoinPool = async () => {
-    if (!inviteCode.trim() || !user?.id) return;
+    if (!user?.id) return;
+    const normalized = inviteCode.toUpperCase().replace(/[\s-]/g, '');
+    if (normalized.length < 6 || normalized.length > 12) {
+      setJoinError('Invite code must be 6–12 characters.');
+      return;
+    }
+    if (!/^[0-9A-Z]+$/.test(normalized)) {
+      setJoinError('Invite code can only contain letters and numbers.');
+      return;
+    }
 
     setJoining(true);
     setJoinError('');
 
-    const result = await joinPool(user.id, inviteCode.trim());
+    const result = await joinPool(user.id, normalized);
 
     if (result.pool) {
       setInviteCode('');
@@ -443,7 +453,7 @@ export function SettingsScreen({route}: any) {
                 }}
                 autoCapitalize="characters"
                 autoCorrect={false}
-                maxLength={6}
+                maxLength={12}
                 returnKeyType="go"
                 onSubmitEditing={handleJoinPool}
               />
@@ -456,7 +466,7 @@ export function SettingsScreen({route}: any) {
                 onPress={handleJoinPool}
                 disabled={!inviteCode.trim() || joining}>
                 {joining ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <ActivityIndicator size="small" color={colors.onPrimary} />
                 ) : (
                   <Text style={styles.joinButtonText}>Join</Text>
                 )}

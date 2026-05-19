@@ -282,7 +282,7 @@ export function SeasonBoardScreen() {
     const hotPickColor = item.is_hotpick_correct === true
       ? colors.success
       : item.is_hotpick_correct === false
-        ? colors.error ?? '#E53935'
+        ? colors.error
         : colors.textSecondary;
 
     const hotPickSign = item.is_hotpick_correct === true
@@ -495,7 +495,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
   },
   toggleTextActive: {
-    color: '#FFFFFF',
+    color: colors.onPrimary,
   },
   leaderboard: {
     padding: spacing.md,
@@ -542,14 +542,14 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: '700',
   },
   rankUp: {
-    color: colors.success ?? '#1DC24C',
+    color: colors.success,
   },
   rankDown: {
-    color: colors.error ?? '#C21D1D',
+    color: colors.error,
   },
   rankSame: {
     fontSize: 9,
-    color: colors.highlight ?? '#E39032',
+    color: colors.highlight,
   },
   userInfo: {
     flex: 1,
@@ -582,7 +582,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   hotpickRankNumber: {
     fontSize: 11,
     fontWeight: '900',
-    color: '#FFFFFF',
+    color: colors.onPrimary,
   },
   hotpickMatchupRow: {
     flexDirection: 'row',

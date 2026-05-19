@@ -97,7 +97,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
   },
   chipTextSelected: {
-    color: '#FFFFFF',
+    color: colors.onPrimary,
   },
   megaChipText: {
     color: colors.warning,

@@ -135,7 +135,7 @@ export function CreatePoolScreen({navigation}: any) {
             onPress={handleCreate}
             disabled={creating}>
             {creating ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color={colors.onPrimary} />
             ) : (
               <Text style={styles.createButtonText}>Create Pool</Text>
             )}
@@ -228,7 +228,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     opacity: 0.6,
   },
   createButtonText: {
-    color: '#FFFFFF',
+    color: colors.onPrimary,
     fontSize: 16,
     fontWeight: '600',
   },

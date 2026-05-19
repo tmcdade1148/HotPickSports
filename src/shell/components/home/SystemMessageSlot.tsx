@@ -14,10 +14,12 @@
 
 import React, {useCallback, useEffect, useState} from 'react';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
+import {Flame, ChevronRight} from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useTheme} from '@shell/theme/hooks';
 import {supabase} from '@shared/config/supabase';
 import {bodyType, spacing, borderRadius} from '@shared/theme';
+import {hexToRgba} from '@shared/utils/color';
 
 const DISMISSED_KEY = '@hotpick/dismissed_system_messages';
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
@@ -90,23 +92,37 @@ export function SystemMessageSlot() {
   if (!message) return null;
   if (dismissedIds.has(message.id)) return null;
 
+  // Brief: flame-tinted pill. Border = flame @ 32%, bg = flame @ 6%.
+  // The flame circle (left) + chevron right serve the "tappable" affordance;
+  // long-press dismisses (kept from prior behavior).
   return (
-    <View style={[styles.wrap, {backgroundColor: colors.surfaceElevated, borderColor: colors.border}]}>
-      <View style={[styles.accent, {backgroundColor: colors.primary}]} />
+    <Pressable
+      onLongPress={handleDismiss}
+      delayLongPress={400}
+      style={({pressed}) => [
+        styles.wrap,
+        {
+          backgroundColor: hexToRgba(colors.primary, 0.06),
+          borderColor: hexToRgba(colors.primary, 0.32),
+          opacity: pressed ? 0.85 : 1,
+        },
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel="System message — long press to dismiss">
+      <View
+        style={[
+          styles.iconCircle,
+          {backgroundColor: hexToRgba(colors.primary, 0.18)},
+        ]}>
+        <Flame size={15} color={colors.primary} strokeWidth={2} />
+      </View>
       <Text
         style={[bodyType.regular, styles.message, {color: colors.textPrimary}]}
         numberOfLines={2}>
         {message.message}
       </Text>
-      <Pressable
-        onPress={handleDismiss}
-        hitSlop={10}
-        style={({pressed}) => [styles.dismiss, {opacity: pressed ? 0.6 : 1}]}
-        accessibilityRole="button"
-        accessibilityLabel="Dismiss this system message">
-        <Text style={[styles.dismissText, {color: colors.textSecondary}]}>×</Text>
-      </Pressable>
-    </View>
+      <ChevronRight size={16} color={colors.textTertiary} strokeWidth={2} />
+    </Pressable>
   );
 }
 
@@ -114,24 +130,26 @@ const styles = StyleSheet.create({
   wrap: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
     marginHorizontal: spacing.lg,
     marginTop: spacing.sm,
     marginBottom: spacing.sm,
-    borderRadius: borderRadius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: 'hidden',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: borderRadius.lg - 2,
+    borderWidth: 1,
   },
-  accent: {width: 3, alignSelf: 'stretch'},
+  iconCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   message: {
     flex: 1,
     fontSize: 13,
-    paddingVertical: spacing.sm + 2,
-    paddingHorizontal: spacing.md,
     lineHeight: 18,
+    fontWeight: '500',
   },
-  dismiss: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  dismissText: {fontSize: 22, lineHeight: 22, fontWeight: '400'},
 });

@@ -135,7 +135,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   headerText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: colors.onPrimary,
   },
   headerHint: {
     fontSize: 12,
@@ -170,7 +170,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
   },
   checkmarkText: {
-    color: '#FFFFFF',
+    color: colors.onPrimary,
     fontSize: 14,
     fontWeight: '700',
   },

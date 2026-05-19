@@ -5,8 +5,8 @@
 //
 // In-cycle variants:
 //   picks_open    → PicksOpenHero
-//   locked        → PicksLockedHero
-//   live          → GamesLiveHero
+//   picks_locked  → PicksOpenHero  (unified with picks_open per redesign-v3)
+//   games_live    → PicksOpenHero  (unified)
 //   settling      → SettlingHero
 //   complete      → CompleteHero
 //
@@ -20,8 +20,6 @@
 import React from 'react';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {PicksOpenHero} from './PicksOpenHero';
-import {PicksLockedHero} from './PicksLockedHero';
-import {GamesLiveHero} from './GamesLiveHero';
 import {SettlingHero} from './SettlingHero';
 import {CompleteHero} from './CompleteHero';
 import {ZeroPoolsHero} from './ZeroPoolsHero';
@@ -55,8 +53,12 @@ export function StateHero({state}: StateHeroProps) {
 
   switch (resolved) {
     case 'picks_open':              return <PicksOpenHero />;
-    case 'picks_locked':            return <PicksLockedHero />;
-    case 'games_live':              return <GamesLiveHero />;
+    // Brief (redesign-v3): picks_locked AND games_live share the
+    // PicksOpenHero layout — both pre-result states (countdown,
+    // HotPick card, live score). `settling` has its own purpose-built
+    // result layout (big ±N pts card + HotPick hit/miss + recap CTA).
+    case 'picks_locked':            return <PicksOpenHero />;
+    case 'games_live':              return <PicksOpenHero />;
     case 'settling':                return <SettlingHero />;
     case 'complete':                return <CompleteHero />;
     case 'zero_pools':              return <ZeroPoolsHero />;

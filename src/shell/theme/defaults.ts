@@ -54,6 +54,9 @@ export const HOTPICK_EXTENDED_TOKENS = {
   accent_teal: '#45615E',
   ink: '#303030',
   text_tertiary: '#8A8A8A',
+  live: '#22C55E',
+  loss: '#DC2626',
+  win: '#22C55E',
 } as const;
 
 export const HOTPICK_EXTENDED_TOKENS_DARK = {
@@ -61,6 +64,9 @@ export const HOTPICK_EXTENDED_TOKENS_DARK = {
   accent_teal: '#45615E',
   ink: '#303030',
   text_tertiary: '#7A7A7A',
+  live: '#22C55E',
+  loss: '#DC2626',
+  win: '#22C55E',
 } as const;
 
 /**

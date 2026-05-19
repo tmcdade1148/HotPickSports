@@ -71,7 +71,7 @@ export function SubmitPicksButton(props: SubmitPicksButtonProps) {
     },
     submitted: {
       label: 'Submitted',
-      bgColor: '#1B9A06',
+      bgColor: colors.success,
       enabled: false,
     },
   };
@@ -102,14 +102,14 @@ export function SubmitPicksButton(props: SubmitPicksButtonProps) {
         {state === 'submitted' && (
           <CheckCircle
             size={18}
-            color="#FFFFFF"
-            fill="#FFFFFF"
+            color={colors.onPrimary}
+            fill={colors.onPrimary}
             strokeWidth={2}
           />
         )}
         <Text style={[
           styles.buttonText,
-          state === 'in_progress' && {color: '#181818'},
+          state === 'in_progress' && {color: colors.ink},
           state === 'locked' && {color: colors.textSecondary},
         ]}>{label}</Text>
       </TouchableOpacity>
@@ -144,6 +144,6 @@ const createStyles = (colors: any) => StyleSheet.create({
   buttonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: colors.onPrimary,
   },
 });

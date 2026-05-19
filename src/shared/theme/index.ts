@@ -1,3 +1,5 @@
+import {Platform} from 'react-native';
+
 export const colors = {
   primary: '#FF6B35',
   secondary: '#004E89',
@@ -41,11 +43,20 @@ export const typography = {
  * Sizes mirror `colors_and_type.css`. Faux italic on upright 900Black
  * until a true italic TTF is added to assets/fonts/.
  */
+// Home redesign-v3: swapped Saira Condensed for platform system fonts to
+// eliminate the iOS/Android render divergence. iOS gets San Francisco at
+// default width ("System"); Android gets Roboto at default width
+// ("sans-serif"). Both ship real italics at weight 800 so we no longer
+// rely on faux-italic and the widths now match across platforms.
 export const displayType = {
   display: {
-    fontFamily: 'SairaCondensed-Black',
+    fontFamily: Platform.select({
+      ios: 'System',
+      android: 'sans-serif',
+      default: 'System',
+    }),
     fontStyle: 'italic' as const,
-    fontWeight: '900' as const,
+    fontWeight: '800' as const,
     letterSpacing: -0.5,
   },
   // Common sizes per the design system: 12 / 20 / 24 / 32 / 40 / 56 / 72 / 108 / 128

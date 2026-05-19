@@ -15,6 +15,3 @@ export const SMACK_REACTIONS = {
   /** Maximum reaction types in the system (ceiling for future expansion) */
   maxTotalTypes: 8,
 };
-
-/** Type-safe reaction emoji literal */
-export type SmackReaction = (typeof SMACK_REACTIONS.allowed)[number];

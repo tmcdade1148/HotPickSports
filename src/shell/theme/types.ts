@@ -80,6 +80,10 @@ export interface ThemeColors {
   accentTeal: string;       // Pool-as-aligned visual connection accent
   ink: string;              // Deep ink for high-contrast type
   textTertiary: string;     // Captions, muted labels, placeholders
+  live: string;             // Live-green dot for in-progress states
+  loss: string;             // Negative delta numerals (mono)
+  win: string;              // Positive delta numerals (mono)
+  onPrimary: string;        // Foreground on `primary` surface (flame CTA)
 
   // Semantic colors (always HotPick — never overridden by partners)
   success: string;

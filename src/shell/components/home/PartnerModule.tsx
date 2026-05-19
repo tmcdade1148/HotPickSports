@@ -1,34 +1,23 @@
-// src/shell/components/home/PartnerModule.tsx
-// Spec: 260513_HotPick_HomeRedesign_Spec.docx §6.4.7
-//
-// Compact card per aligned partner (one per DISTINCT partner_id across
-// the user's active aligned pools). Shorter than PoolModule. Tapping
-// anywhere — body or indicator — routes to PartnerRosterScreen.
-//
-// Multi-alignment dedupe: if the user belongs to multiple aligned pools
-// for the same partner, ONE module renders. The "via [Pool]" subtitle
-// picks the first aligned pool by visiblePools order.
-//
-// Visibility rules (parent decides which partner_ids to pass — we just
-// render). Generally: only partners with is_active = true AND
-// perk_text IS NOT NULL get loaded into partnersById, so missing
-// perks → no module. See globalStore.loadAlignedPartners.
+// Compact partner card: logo, name, "via Pool" subtitle, perk row.
+// Tap → PartnerRosterScreen. Perk content is partner-authored (we
+// don't verify it).
 
 import React, {useMemo} from 'react';
 import {Image, Pressable, StyleSheet, Text, View} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
+import {Megaphone} from 'lucide-react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useGlobalStore} from '@shell/stores/globalStore';
-import {bodyType, spacing, borderRadius} from '@shared/theme';
+import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
 import type {DbPool} from '@shared/types/database';
+import {hexToRgba} from '@shared/utils/color';
+import {LogoMark} from './LogoMark';
+import {partnerInitials} from './teamColors';
 
 const RECENT_WINDOW_MS = 60 * 60 * 1000;
 
 export interface PartnerModuleProps {
-  /** The partner UUID to render. Must already exist in globalStore.partnersById. */
   partnerId: string;
-  /** All aligned pools the user belongs to with this partner. Used to pick
-   *  the "via [Pool Name]" subtitle (first by visiblePools order). */
   alignedPools: DbPool[];
 }
 
@@ -44,12 +33,12 @@ export function PartnerModule({partnerId, alignedPools}: PartnerModuleProps) {
     if (!indicator?.mostRecentAt) return false;
     return Date.now() - new Date(indicator.mostRecentAt).getTime() < RECENT_WINDOW_MS;
   }, [indicator?.mostRecentAt]);
+  const showNewBadge = unread > 0 && isRecent;
 
-  // Fallbacks: if partner isn't loaded yet (race condition), render nothing.
   if (!partner) return null;
 
+  const tint = partner.primary_color ?? colors.primary;
   const firstAlignedPool = alignedPools[0];
-  const stripeColor      = partner.primary_color ?? colors.primary;
 
   const openRoster = () => {
     navigation.navigate('PartnerRoster', {slug: partner.slug});
@@ -63,72 +52,73 @@ export function PartnerModule({partnerId, alignedPools}: PartnerModuleProps) {
         {
           backgroundColor: colors.surfaceElevated,
           borderColor: colors.border,
-          opacity: pressed ? 0.85 : 1,
+          opacity: pressed ? 0.9 : 1,
         },
       ]}
       accessibilityRole="button"
       accessibilityLabel={`Open ${partner.name} roster`}>
-      <View style={[styles.stripe, {backgroundColor: stripeColor}]} />
+      <View style={styles.topRow}>
+        {partner.logo_url ? (
+          <Image
+            source={{uri: partner.logo_url}}
+            style={[styles.logoImg, {borderColor: tint}]}
+            accessible={false}
+          />
+        ) : (
+          <LogoMark initials={partnerInitials(partner.name)} tint={tint} size={40} />
+        )}
 
-      <View style={styles.body}>
-        <View style={styles.topRow}>
-          {partner.logo_url ? (
-            <Image
-              source={{uri: partner.logo_url}}
-              style={styles.logo}
-              accessible={false}
-            />
-          ) : (
-            <View style={[styles.logoFallback, {backgroundColor: stripeColor}]}>
-              <Text style={styles.logoFallbackText}>
-                {partner.name.charAt(0).toUpperCase()}
-              </Text>
-            </View>
-          )}
-          <View style={styles.titleBlock}>
-            <Text
-              style={[bodyType.bold, styles.partnerName, {color: colors.ink}]}
-              numberOfLines={1}>
-              {partner.name}
-            </Text>
-            {firstAlignedPool && (
-              <Text
-                style={[bodyType.regular, styles.viaText, {color: colors.textSecondary}]}
-                numberOfLines={1}>
-                via {firstAlignedPool.name_display || firstAlignedPool.name}
-              </Text>
-            )}
-          </View>
-
-          {unread > 0 && (
-            <View style={styles.indicatorWrap}>
-              {isRecent && (
-                <View
-                  style={[
-                    styles.pulseRing,
-                    {borderColor: colors.primary},
-                  ]}
-                />
-              )}
-              <View style={[styles.indicator, {backgroundColor: colors.primary}]}>
-                <Text style={styles.indicatorText} numberOfLines={1}>
-                  {unread > 9 ? '9+' : unread}
-                </Text>
-              </View>
-            </View>
-          )}
-        </View>
-
-        <View style={[styles.perkRow, {borderTopColor: colors.border}]}>
-          <Text style={styles.perkIcon} numberOfLines={1}>
-            {partner.perk_icon ?? '🎁'}
-          </Text>
+        <View style={styles.titleBlock}>
           <Text
-            style={[bodyType.regular, styles.perkText, {color: colors.ink}]}
+            style={[displayType.display, styles.partnerName, {color: colors.textPrimary}]}
             numberOfLines={1}>
-            {partner.perk_text}
+            {partner.name.toUpperCase()}
           </Text>
+          {firstAlignedPool && (
+            <Text
+              style={[bodyType.regular, styles.viaText, {color: colors.textTertiary}]}
+              numberOfLines={1}>
+              via{' '}
+              <Text style={{color: colors.textSecondary}}>
+                {firstAlignedPool.name_display || firstAlignedPool.name}
+              </Text>
+            </Text>
+          )}
         </View>
+
+        {showNewBadge && (
+          <View
+            style={[
+              styles.newBadge,
+              {
+                backgroundColor: hexToRgba(colors.primary, 0.14),
+                borderColor: hexToRgba(colors.primary, 0.4),
+              },
+            ]}>
+            <Megaphone size={12} color={colors.primary} strokeWidth={2} />
+            <Text style={[bodyType.bold, styles.newText, {color: colors.primary}]}>
+              {unread > 9 ? '9+ new' : `${unread} new`}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      <View style={[styles.perkRow, {borderTopColor: colors.border}]}>
+        {partner.perk_icon ? (
+          <Text style={styles.perkIcon} numberOfLines={1}>
+            {partner.perk_icon}
+          </Text>
+        ) : (
+          <View style={[styles.perkDot, {backgroundColor: tint}]} />
+        )}
+        <Text
+          style={[bodyType.regular, styles.perkText, {color: colors.textSecondary}]}
+          numberOfLines={1}>
+          {partner.perk_text}
+        </Text>
+        <Text style={[bodyType.bold, styles.perkEyebrow, {color: colors.textTertiary}]}>
+          PARTNER PERK
+        </Text>
       </View>
     </Pressable>
   );
@@ -136,87 +126,79 @@ export function PartnerModule({partnerId, alignedPools}: PartnerModuleProps) {
 
 const styles = StyleSheet.create({
   card: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
     marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm + 2,
+    marginBottom: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     borderRadius: borderRadius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: 'hidden',
-  },
-  stripe: {width: 4, alignSelf: 'stretch'},
-  body: {
-    flex: 1,
-    paddingVertical: spacing.sm + 2,
+    borderWidth: 1,
   },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    gap: spacing.md - 2,
+    gap: 12,
   },
-  logo: {
-    width: 36,
-    height: 36,
-    borderRadius: 999,
-  },
-  logoFallback: {
-    width: 36,
-    height: 36,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoFallbackText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontFamily: 'Manrope-Bold',
+  logoImg: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1.5,
   },
   titleBlock: {
     flex: 1,
     minWidth: 0,
   },
-  partnerName: {fontSize: 15},
-  viaText:     {fontSize: 11, marginTop: 1},
-  indicatorWrap: {
-    paddingLeft: spacing.sm,
+  partnerName: {
+    fontSize: 20,
+    lineHeight: 20,
+  },
+  viaText: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 5,
+  },
+  newBadge: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
+    gap: 5,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+    flexShrink: 0,
   },
-  pulseRing: {
-    position: 'absolute',
-    top: -2,
-    bottom: -2,
-    left: spacing.sm - 2,
-    right: -2,
-    borderRadius: 999,
-    borderWidth: 2,
-    opacity: 0.3,
-  },
-  indicator: {
-    minWidth: 22,
-    height: 22,
-    borderRadius: 999,
-    paddingHorizontal: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  indicatorText: {
-    color: '#FFFFFF',
+  newText: {
     fontSize: 11,
-    fontFamily: 'Manrope-Bold',
-    fontVariant: ['tabular-nums'] as ['tabular-nums'],
   },
   perkRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    marginTop: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    gap: spacing.sm,
+    gap: 9,
+    marginTop: 12,
+    paddingTop: 11,
+    // RN doesn't render dashed top borders consistently across platforms;
+    // a solid hairline reads as the same separator visually in dark mode.
+    borderTopWidth: 1,
   },
-  perkIcon: {fontSize: 16, width: 22, textAlign: 'center'},
-  perkText: {fontSize: 13, flex: 1, lineHeight: 18},
+  perkIcon: {
+    fontSize: 14,
+    width: 18,
+    textAlign: 'center',
+  },
+  perkDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginHorizontal: 5,
+  },
+  perkText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  perkEyebrow: {
+    fontSize: 10,
+    letterSpacing: 1.2,
+    marginLeft: 8,
+  },
 });

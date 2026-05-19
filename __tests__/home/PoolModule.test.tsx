@@ -33,6 +33,13 @@ jest.mock('@shell/theme/hooks', () => ({
       textPrimary: '#FFFFFF',
       textSecondary: '#B8B8B8',
       textTertiary: '#7A7A7A',
+      // Added 2026-05-14 (Home redesign-v3): PoolModule now reads these
+      // tokens for the unread badge tint, "New" megaphone, and the
+      // win/loss/live delta colors.
+      error: '#DC2626',
+      win:   '#22C55E',
+      loss:  '#DC2626',
+      live:  '#22C55E',
     },
     isDark: true,
   }),
@@ -46,6 +53,7 @@ const mockStoreState = {
   smackUnreadCounts: {} as Record<string, number>,
   poolIndicators:   {} as Record<string, {orgUnread: number; mostRecentAt: string | null}>,
   userRankByPool:   {} as Record<string, {rank: number; memberCount: number; total: number}>,
+  weekRankByPool:   {} as Record<string, {rank: number; memberCount: number; weekPoints: number}>,
 };
 
 jest.mock('@shell/stores/globalStore', () => ({
@@ -122,7 +130,7 @@ describe('PoolModule tap routing (spec §6.4.6)', () => {
     });
 
     expect(mockSetActivePoolId).toHaveBeenCalledWith('pool-abc');
-    expect(mockNavigate).toHaveBeenCalledWith('Leaders');
+    expect(mockNavigate).toHaveBeenCalledWith('LeaderboardTab');
   });
 
   test('tap indicator navigates to SmackTalk + sets activePoolId', () => {
@@ -136,16 +144,22 @@ describe('PoolModule tap routing (spec §6.4.6)', () => {
     });
 
     const pressables = findPressables(tree!.root);
-    // Indicator Pressable is the second one (card body is first).
-    expect(pressables.length).toBeGreaterThanOrEqual(2);
-    const indicatorPress = pressables[1].props.onPress;
+    // Pressable order (redesign-v3, settings gear added):
+    //   [0] card body
+    //   [1] settings gear (lower-right)
+    //   [2] SmackTalk badge
+    expect(pressables.length).toBeGreaterThanOrEqual(3);
+    const smackPress = pressables.find(p =>
+      String(p.props.accessibilityLabel ?? '').toLowerCase().includes('smacktalk'),
+    )?.props.onPress;
+    expect(typeof smackPress).toBe('function');
 
     ReactTestRenderer.act(() => {
-      indicatorPress();
+      smackPress();
     });
 
     expect(mockSetActivePoolId).toHaveBeenCalledWith('pool-abc');
-    expect(mockNavigate).toHaveBeenCalledWith('SmackTalk');
+    expect(mockNavigate).toHaveBeenCalledWith('SmackTalkTab');
   });
 
   test('partner-aligned pool: tap body still routes to Leaders + sets pool', () => {
@@ -166,16 +180,19 @@ describe('PoolModule tap routing (spec §6.4.6)', () => {
     });
 
     expect(mockSetActivePoolId).toHaveBeenCalledWith('pool-mesq');
-    expect(mockNavigate).toHaveBeenCalledWith('Leaders');
+    expect(mockNavigate).toHaveBeenCalledWith('LeaderboardTab');
   });
 
-  test('partner-aligned pool: no rank chip rendered (renders only 1 Pressable when no unread)', () => {
+  test('partner-aligned pool: no rank chip rendered (renders card + gear + SmackTalk + partner roster link)', () => {
     let tree: ReactTestRenderer.ReactTestRenderer;
     ReactTestRenderer.act(() => {
       tree = ReactTestRenderer.create(<PoolModule pool={partnerPool} />);
     });
-    // With zero unread, partner pool renders only the card body Pressable.
-    // (Rank chip is intentionally absent for partner pools.)
-    expect(findPressables(tree!.root)).toHaveLength(1);
+    // Redesign-v3: SmackTalk badge is always visible (even with zero
+    // unread — muted state), a settings gear sits in the lower-right,
+    // and the "Aligned with…" row is a Pressable that opens the partner
+    // roster. So a partner-aligned pool renders four Pressables: card
+    // body, settings gear, SmackTalk badge, partner roster link.
+    expect(findPressables(tree!.root)).toHaveLength(4);
   });
 });

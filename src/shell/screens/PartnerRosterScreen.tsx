@@ -189,7 +189,7 @@ export function PartnerRosterScreen() {
             <Image source={{uri: logoUrl}} style={styles.brandLogo} />
           ) : (
             <View style={[styles.brandLogo, styles.logoFallback, {backgroundColor: partnerPrimary}]}>
-              <Text style={styles.logoFallbackText}>
+              <Text style={[styles.logoFallbackText, {color: colors.onPrimary}]}>
                 {partner.name.charAt(0).toUpperCase()}
               </Text>
             </View>
@@ -226,13 +226,21 @@ export function PartnerRosterScreen() {
           </View>
         )}
 
-        {/* Perk hero — only when partner is active AND has a perk */}
+        {/* Perk hero — only when partner is active AND has a perk.
+            Tinted with partner color so the perk feels owned by the
+            partner, not generic HotPick chrome. */}
         {partner.is_active && partner.perk_text && (
           <View
             style={[
               styles.perkHero,
-              {backgroundColor: colors.surfaceElevated, borderColor: colors.border},
+              {
+                backgroundColor: partnerPrimary + '14',
+                borderColor: partnerPrimary,
+              },
             ]}>
+            <Text style={[bodyType.bold, styles.perkEyebrow, {color: partnerPrimary}]}>
+              PARTNER PERK
+            </Text>
             <Text style={styles.perkIcon}>{partner.perk_icon ?? '🎁'}</Text>
             <Text
               style={[
@@ -248,33 +256,42 @@ export function PartnerRosterScreen() {
           </View>
         )}
 
-        {/* Broadcast feed */}
-        {broadcasts.length > 0 && (
-          <View style={styles.section}>
-            <Text style={[bodyType.bold, styles.sectionLabel, {color: colors.textSecondary}]}>
-              FROM {partner.name.toUpperCase()}
-            </Text>
-            {broadcasts.map(b => (
+        {/* Broadcast feed — rows use a left accent stripe in partner color
+            so the messages read as coming from the partner, not HotPick. */}
+        <View style={styles.section}>
+          <Text style={[bodyType.bold, styles.sectionLabel, {color: partnerPrimary}]}>
+            FROM {partner.name.toUpperCase()}
+          </Text>
+          {broadcasts.length > 0 ? (
+            broadcasts.map(b => (
               <View
                 key={b.id}
                 style={[
                   styles.broadcastRow,
                   {backgroundColor: colors.surface, borderColor: colors.border},
                 ]}>
-                <Text style={[bodyType.regular, styles.broadcastText, {color: colors.textPrimary}]}>
-                  {b.message}
-                </Text>
-                <Text style={[bodyType.regular, styles.broadcastTime, {color: colors.textTertiary}]}>
-                  {formatRelative(b.sent_at)}
-                </Text>
+                <View style={[styles.broadcastStripe, {backgroundColor: partnerPrimary}]} />
+                <View style={styles.broadcastBody}>
+                  <Text style={[bodyType.regular, styles.broadcastText, {color: colors.textPrimary}]}>
+                    {b.message}
+                  </Text>
+                  <Text style={[bodyType.regular, styles.broadcastTime, {color: colors.textTertiary}]}>
+                    {formatRelative(b.sent_at)}
+                  </Text>
+                </View>
               </View>
-            ))}
-          </View>
-        )}
+            ))
+          ) : (
+            <Text style={[bodyType.regular, styles.emptyLine, {color: colors.textTertiary}]}>
+              No recent messages from {partner.name}.
+            </Text>
+          )}
+        </View>
 
-        {/* Aligned pools — flat list, never ranked */}
+        {/* Aligned pools — flat list, never ranked. Left accent stripe
+            in partner color ties pool rows to the partner brand. */}
         <View style={styles.section}>
-          <Text style={[bodyType.bold, styles.sectionLabel, {color: colors.textSecondary}]}>
+          <Text style={[bodyType.bold, styles.sectionLabel, {color: partnerPrimary}]}>
             YOUR POOLS WITH {partner.name.toUpperCase()}
           </Text>
           {alignedPools.map(pool => (
@@ -294,6 +311,7 @@ export function PartnerRosterScreen() {
               ]}
               accessibilityRole="button"
               accessibilityLabel={`View ${pool.name} pool`}>
+              <View style={[styles.broadcastStripe, {backgroundColor: partnerPrimary}]} />
               <Text
                 style={[bodyType.bold, styles.poolName, {color: colors.textPrimary}]}
                 numberOfLines={1}>
@@ -342,7 +360,7 @@ function DenialState({
           styles.denialCta,
           {backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1},
         ]}>
-        <Text style={[bodyType.bold, styles.denialCtaText]}>Return to HotPick Home</Text>
+        <Text style={[bodyType.bold, styles.denialCtaText, {color: colors.onPrimary}]}>Return to HotPick Home</Text>
       </Pressable>
     </SafeAreaView>
   );
@@ -389,7 +407,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logoFallbackText: {
-    color: '#FFFFFF',
     fontSize: 32,
     fontFamily: 'Manrope-Bold',
   },
@@ -413,10 +430,11 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     padding: spacing.xl,
     borderRadius: borderRadius.lg + 4,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     alignItems: 'center',
     gap: spacing.md,
   },
+  perkEyebrow: {fontSize: 10, letterSpacing: 1.6},
   perkIcon:   {fontSize: 48},
   perkText: {
     fontSize: displayType.size.h2,
@@ -431,11 +449,20 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   sectionLabel: {fontSize: 11, letterSpacing: 1.6, marginBottom: 2},
+  emptyLine: {fontSize: 13, fontStyle: 'italic', paddingVertical: spacing.sm},
 
   broadcastRow: {
-    padding: spacing.md,
+    flexDirection: 'row',
     borderRadius: borderRadius.md,
     borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+  },
+  broadcastStripe: {
+    width: 3,
+  },
+  broadcastBody: {
+    flex: 1,
+    padding: spacing.md,
     gap: 4,
   },
   broadcastText: {fontSize: 14, lineHeight: 20},
@@ -445,11 +472,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: spacing.md,
+    paddingVertical: spacing.md,
+    paddingRight: spacing.md,
     borderRadius: borderRadius.md,
     borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
   },
-  poolName: {flex: 1, fontSize: 15, paddingRight: spacing.sm},
+  poolName: {flex: 1, fontSize: 15, paddingLeft: spacing.md, paddingRight: spacing.sm},
   poolCta:  {fontSize: 13, fontFamily: 'Manrope-Bold'},
 
   footer: {marginTop: spacing.xl, alignItems: 'center'},
@@ -460,5 +489,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     borderRadius: borderRadius.lg,
   },
-  denialCtaText: {color: '#FFFFFF', fontSize: 14, letterSpacing: 0.5, textTransform: 'uppercase'},
+  denialCtaText: {fontSize: 14, letterSpacing: 0.5, textTransform: 'uppercase'},
 });

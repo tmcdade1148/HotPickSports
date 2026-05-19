@@ -120,7 +120,7 @@ interface NFLState {
   fetchNextKickoff: () => Promise<void>;
   subscribeToGamePickStats: (poolId: string) => () => void;
   subscribeToLiveScores: () => () => void;
-  subscribeToWeekEarned: () => () => void;
+  subscribeToWeekEarned: (userId: string) => () => void;
   subscribeToCompetitionConfig: () => () => void;
 }
 
@@ -276,17 +276,22 @@ export const useNFLStore = create<NFLState>((set, get) => ({
 
   fetchUserHotPick: async (userId: string, week: number) => {
     const {competition} = get();
-    const currentWeek = week;
 
     const {data: pick} = await supabase
       .from('season_picks')
       .select('*')
       .eq('user_id', userId)
       .eq('competition', competition)
-      .eq('week', currentWeek)
+      .eq('week', week)
       .eq('is_hotpick', true)
       .limit(1)
       .maybeSingle();
+
+    // Guard: if the user has advanced to a different week while this
+    // request was in flight, discard the result. Without this, an
+    // older week's response can land after a newer one and clobber
+    // userHotPick with stale data (iOS slow-network race).
+    if (get().currentWeek !== week || get().competition !== competition) return;
 
     set({userHotPick: (pick as DbSeasonPick) ?? null});
 
@@ -299,6 +304,8 @@ export const useNFLStore = create<NFLState>((set, get) => ({
         .eq('competition', competition)
         .maybeSingle();
 
+      // Same guard before writing the game record.
+      if (get().currentWeek !== week || get().competition !== competition) return;
       set({userHotPickGame: (game as DbSeasonGame) ?? null});
     } else {
       set({userHotPickGame: null});
@@ -320,6 +327,7 @@ export const useNFLStore = create<NFLState>((set, get) => ({
         .order('frozen_rank', {ascending: false})
         .limit(1)
         .maybeSingle();
+      if (get().currentWeek !== currentWeek || get().competition !== competition) return;
       set({highestRankedGame: (data as DbSeasonGame) ?? null});
       return;
     }
@@ -347,6 +355,9 @@ export const useNFLStore = create<NFLState>((set, get) => ({
         .maybeSingle(),
     ]);
 
+    // Discard if the user advanced weeks while this request was inflight.
+    if (get().currentWeek !== currentWeek || get().competition !== competition) return;
+
     set({
       highestRankedGame: (ranked as DbSeasonGame) ?? null,
       weekFirstKickoff: earliest?.kickoff_at
@@ -372,6 +383,8 @@ export const useNFLStore = create<NFLState>((set, get) => ({
       .eq('user_id', userId)
       .eq('competition', competition)
       .eq('week', currentWeek);
+
+    if (get().currentWeek !== currentWeek || get().competition !== competition) return;
 
     const pickedGameIds = new Set((picks ?? []).map(p => p.game_id));
     const pickCount = pickedGameIds.size;
@@ -589,6 +602,8 @@ export const useNFLStore = create<NFLState>((set, get) => ({
       .eq('week', currentWeek)
       .in('status', ['IN_PROGRESS', 'LIVE', 'FINAL', 'COMPLETED', 'STATUS_FINAL']);
 
+    if (get().currentWeek !== currentWeek || get().competition !== competition) return;
+
     const scores: Record<string, GameScore> = {};
     for (const row of data ?? []) {
       scores[row.game_id] = {
@@ -620,6 +635,7 @@ export const useNFLStore = create<NFLState>((set, get) => ({
       .order('kickoff_at', {ascending: true})
       .limit(1)
       .maybeSingle();
+    if (get().currentWeek !== currentWeek || get().competition !== competition) return;
     set({nextKickoff: data?.kickoff_at ? new Date(data.kickoff_at) : null});
   },
 
@@ -699,7 +715,7 @@ export const useNFLStore = create<NFLState>((set, get) => ({
             return;
           }
           const prevScores = get().liveScores;
-          const updatedScores = {
+          const updatedScores: Record<string, GameScore> = {
             ...prevScores,
             [row.game_id]: {
               homeScore: row.home_score ?? 0,
@@ -750,8 +766,8 @@ export const useNFLStore = create<NFLState>((set, get) => ({
    * currentWeekPoints updates live as the scoring Edge Function writes results.
    * Returns an unsubscribe function.
    */
-  subscribeToWeekEarned: () => {
-    const {competition, currentWeek, userId} = get();
+  subscribeToWeekEarned: (userId: string) => {
+    const {competition, currentWeek} = get();
     if (!userId) return () => {};
 
     const channel = supabase

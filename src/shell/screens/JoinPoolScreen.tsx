@@ -14,9 +14,15 @@ import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 
 /**
- * JoinPoolScreen — Enter a 6-character invite code to join an existing pool.
- * Auto-uppercases input. Sets the joined pool as active on success.
+ * JoinPoolScreen — Enter a pool invite code (6–12 alphanumeric chars).
+ * Auto-uppercases input, strips whitespace and hyphens (forgiving entry —
+ * "JOES-2026" works just like "JOES2026"). Sets the joined pool as active
+ * on success. Server-side `join_pool_by_invite` is authoritative.
  */
+const INVITE_CODE_RE = /^[0-9A-Z]+$/;
+const INVITE_CODE_MIN = 6;
+const INVITE_CODE_MAX = 12;
+
 export function JoinPoolScreen({navigation}: any) {
   const {colors} = useTheme();
   const styles = createStyles(colors);
@@ -27,10 +33,17 @@ export function JoinPoolScreen({navigation}: any) {
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const normalizeCode = (raw: string) =>
+    raw.toUpperCase().replace(/[\s-]/g, '');
+
   const handleJoin = async () => {
-    const code = inviteCode.trim().toUpperCase();
-    if (code.length !== 6) {
-      setError('Invite code must be 6 characters.');
+    const code = normalizeCode(inviteCode);
+    if (code.length < INVITE_CODE_MIN || code.length > INVITE_CODE_MAX) {
+      setError(`Invite code must be ${INVITE_CODE_MIN}–${INVITE_CODE_MAX} characters.`);
+      return;
+    }
+    if (!INVITE_CODE_RE.test(code)) {
+      setError('Invite code can only contain letters and numbers.');
       return;
     }
     if (!user?.id) {
@@ -72,15 +85,15 @@ export function JoinPoolScreen({navigation}: any) {
             placeholder="ABC123"
             placeholderTextColor={colors.textSecondary}
             value={inviteCode}
-            onChangeText={text => setInviteCode(text.toUpperCase())}
-            maxLength={6}
+            onChangeText={text => setInviteCode(normalizeCode(text))}
+            maxLength={INVITE_CODE_MAX}
             autoCapitalize="characters"
             autoCorrect={false}
             autoFocus
           />
 
           <Text style={styles.hint}>
-            Ask a friend for their 6-character pool invite code.
+            Ask a friend for their pool invite code ({INVITE_CODE_MIN}–{INVITE_CODE_MAX} letters and numbers).
           </Text>
 
           {error && <Text style={styles.error}>{error}</Text>}
@@ -90,7 +103,7 @@ export function JoinPoolScreen({navigation}: any) {
             onPress={handleJoin}
             disabled={joining}>
             {joining ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color={colors.onPrimary} />
             ) : (
               <Text style={styles.joinButtonText}>Join Pool</Text>
             )}
@@ -169,7 +182,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     opacity: 0.6,
   },
   joinButtonText: {
-    color: '#FFFFFF',
+    color: colors.onPrimary,
     fontSize: 16,
     fontWeight: '600',
   },
