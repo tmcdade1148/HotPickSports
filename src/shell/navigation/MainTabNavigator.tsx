@@ -321,11 +321,11 @@ function GroupedTabBar({state, descriptors, navigation}: BottomTabBarProps) {
   const grouped = visibleRoutes.slice(2, 4);
   const trailing = visibleRoutes.slice(4);
 
-  // Spec §6.4.8 — hide Leaders + SmackTalk tabs when Home is the focused tab.
-  // Routes stay registered (NOT unmounted) so direct navigation from
-  // PoolModule body/indicator still works.
+  // Hide Leaders + SmackTalk grouped box on Home AND Picks tabs — both are
+  // "pick-flow" surfaces where the user shouldn't be hopping over to the
+  // social side of the app. Routes stay registered so direct nav still works.
   const activeRouteName = state.routes[state.index]?.name;
-  const hideGroupedTabs = activeRouteName === 'HomeTab';
+  const hideGroupedTabs = activeRouteName === 'HomeTab' || activeRouteName === 'PicksTab';
 
   return (
     <View style={[s.bar, {backgroundColor: colors.background, borderTopColor: colors.border}]}>
