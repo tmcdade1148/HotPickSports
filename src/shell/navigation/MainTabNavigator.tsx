@@ -22,6 +22,7 @@ import {useGlobalStore} from '@shell/stores/globalStore';
 import {PoweredByHotPick} from '@shell/components/PoweredByHotPick';
 import {PoolSwitcherBar} from '@shell/components/PoolSwitcherBar';
 import {PoolHeader} from '@shell/components/PoolHeader';
+import {PicksHeader} from '@shell/components/PicksHeader';
 import {spacing, typography, borderRadius} from '@shared/theme';
 import {useForegroundRefetch} from '@shared/hooks/useForegroundRefetch';
 
@@ -111,7 +112,7 @@ function PicksTab() {
 
   return (
     <SafeAreaView style={{flex: 1, backgroundColor: colors.background}} edges={['top']}>
-      <PoolSwitcherBar mode="picks" />
+      <PicksHeader />
       {screen}
     </SafeAreaView>
   );
@@ -308,10 +309,17 @@ function GroupedTabBar({state, descriptors, navigation}: BottomTabBarProps) {
     );
   };
 
-  // Tab indices: 0=Home, 1=Games, 2=Leaders, 3=SmackTalk, 4+=History/Settings
-  const leading = state.routes.slice(0, 2);
-  const grouped = state.routes.slice(2, 4);   // Leaders + SmackTalk — always indices 2 & 3
-  const trailing = state.routes.slice(4);
+  // Settings is reachable via the gear in each tab's header (HomeHeader /
+  // PoolHeader / PicksHeader). Hide it from the bottom bar so the bar can
+  // focus on tab navigation, but keep the route registered.
+  const visibleRoutes = state.routes.filter(r => r.name !== 'SettingsTab');
+  const indexOfVisible = (visible: typeof state.routes[number]) =>
+    state.routes.findIndex(r => r.key === visible.key);
+
+  // Tab indices: 0=Home, 1=Games, 2=Leaders, 3=SmackTalk, 4+=trailing
+  const leading = visibleRoutes.slice(0, 2);
+  const grouped = visibleRoutes.slice(2, 4);
+  const trailing = visibleRoutes.slice(4);
 
   // Spec §6.4.8 — hide Leaders + SmackTalk tabs when Home is the focused tab.
   // Routes stay registered (NOT unmounted) so direct navigation from
@@ -321,46 +329,49 @@ function GroupedTabBar({state, descriptors, navigation}: BottomTabBarProps) {
 
   return (
     <View style={[s.bar, {backgroundColor: colors.background, borderTopColor: colors.border}]}>
-      {leading.map((route, i) => (
-        <TouchableOpacity
-          key={route.key}
-          onPress={() => onTabPress(route, i)}
-          style={i === 0 ? s.tabHome : s.tab}
-          accessibilityRole="button"
-          accessibilityState={state.index === i ? {selected: true} : {}}>
-          {renderTabContent(route, i)}
-        </TouchableOpacity>
-      ))}
+      {leading.map((route, i) => {
+        const realIndex = indexOfVisible(route);
+        return (
+          <TouchableOpacity
+            key={route.key}
+            onPress={() => onTabPress(route, realIndex)}
+            style={i === 0 ? s.tabHome : s.tab}
+            accessibilityRole="button"
+            accessibilityState={state.index === realIndex ? {selected: true} : {}}>
+            {renderTabContent(route, realIndex)}
+          </TouchableOpacity>
+        );
+      })}
 
       {/* Underline spanning Leaders + SmackTalk — suppressed on Home */}
       {!hideGroupedTabs && (
       <View style={[s.groupBox, {borderBottomColor: colors.border}]}>
-        {grouped.map((route, i) => {
-          const index = i + 2;
+        {grouped.map(route => {
+          const realIndex = indexOfVisible(route);
           return (
             <TouchableOpacity
               key={route.key}
-              onPress={() => onTabPress(route, index)}
+              onPress={() => onTabPress(route, realIndex)}
               style={s.groupTab}
               accessibilityRole="button"
-              accessibilityState={state.index === index ? {selected: true} : {}}>
-              {renderTabContent(route, index)}
+              accessibilityState={state.index === realIndex ? {selected: true} : {}}>
+              {renderTabContent(route, realIndex)}
             </TouchableOpacity>
           );
         })}
       </View>
       )}
 
-      {trailing.map((route, i) => {
-        const index = i + 4;
+      {trailing.map(route => {
+        const realIndex = indexOfVisible(route);
         return (
           <TouchableOpacity
             key={route.key}
-            onPress={() => onTabPress(route, index)}
+            onPress={() => onTabPress(route, realIndex)}
             style={s.tab}
             accessibilityRole="button"
-            accessibilityState={state.index === index ? {selected: true} : {}}>
-            {renderTabContent(route, index)}
+            accessibilityState={state.index === realIndex ? {selected: true} : {}}>
+            {renderTabContent(route, realIndex)}
           </TouchableOpacity>
         );
       })}
