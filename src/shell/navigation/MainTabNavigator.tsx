@@ -21,6 +21,7 @@ import {useBrand} from '@shell/theme';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {PoweredByHotPick} from '@shell/components/PoweredByHotPick';
 import {PoolSwitcherBar} from '@shell/components/PoolSwitcherBar';
+import {PoolHeader} from '@shell/components/PoolHeader';
 import {spacing, typography, borderRadius} from '@shared/theme';
 import {useForegroundRefetch} from '@shared/hooks/useForegroundRefetch';
 
@@ -135,7 +136,7 @@ function LeaderboardTab() {
 
   return (
     <SafeAreaView style={{flex: 1, backgroundColor: colors.background}} edges={['top']}>
-      <PoolSwitcherBar mode="pool" />
+      <PoolHeader />
       {screen}
     </SafeAreaView>
   );
@@ -157,7 +158,7 @@ function SmackTalkTab() {
   }
   return (
     <SafeAreaView style={{flex: 1, backgroundColor: colors.background}} edges={['top']}>
-      <PoolSwitcherBar mode="pool" />
+      <PoolHeader />
       <SmackTalkScreen poolId={smackPoolId} />
     </SafeAreaView>
   );
