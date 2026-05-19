@@ -94,9 +94,12 @@ export function PartnerModule({partnerId, alignedPools}: PartnerModuleProps) {
       </View>
 
       <View style={[styles.perkRow, {borderTopColor: colors.border}]}>
-        <View style={styles.perkIconBox}>
-          <PerkIcon name={partner.perk_icon} size={14} color={tint} />
-        </View>
+        <PerkIcon
+          name={partner.perk_icon}
+          size={14}
+          color={tint}
+          containerStyle={styles.perkIconBox}
+        />
         <Text
           style={[bodyType.regular, styles.perkText, {color: colors.textSecondary}]}
           numberOfLines={1}>
@@ -168,8 +171,6 @@ const styles = StyleSheet.create({
   },
   perkIconBox: {
     width: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   perkText: {
     flex: 1,

@@ -329,8 +329,6 @@ export function PartnerRosterScreen() {
               </Text>
             </Pressable>
           ))}
-          {/* SmackTalk roadmap placeholder. Static, non-interactive — feature
-              roadmapped, not built. Spec 260519 §6.4. */}
           <Text
             style={[bodyType.regular, styles.smackPlaceholder, {color: colors.textTertiary}]}>
             💬 Cross-pool chat coming to your roster — stay tuned.

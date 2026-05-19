@@ -34,7 +34,7 @@ import type {BrandConfig} from '@shell/theme/types';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 
-// Five-value app-side enum (DB column is plain text). Spec 260519 §2.
+// DB column is plain text — the union narrows it app-side.
 type PartnerType = 'hospitality' | 'operator' | 'media' | 'brand' | 'other';
 
 const PARTNER_TYPES: PartnerType[] = ['hospitality', 'operator', 'media', 'brand', 'other'];
@@ -47,8 +47,6 @@ const PARTNER_TYPE_LABELS: Record<PartnerType, string> = {
   other: 'Other',
 };
 
-// On type change in the create form, default can_run_pools to this. The
-// toggle remains user-editable; edit-form type changes don't re-default.
 const DEFAULT_CAN_RUN_POOLS_BY_TYPE: Record<PartnerType, boolean> = {
   hospitality: false,
   operator: true,
@@ -78,9 +76,7 @@ interface Partner {
   partner_type: PartnerType | null;
 }
 
-// Image validation rules (spec §2 / §6.5). Banner is optional and not
-// rendered yet — upload is wired so partners can be set up now.
-const ALLOWED_MIME = ['image/png', 'image/jpeg', 'image/webp'] as const;
+const ALLOWED_MIME: readonly string[] = ['image/png', 'image/jpeg', 'image/webp'];
 const LOGO_MAX_BYTES   = 2 * 1024 * 1024;
 const BANNER_MAX_BYTES = 3 * 1024 * 1024;
 const BANNER_RATIO     = 1200 / 630; // 1.9047…
@@ -96,14 +92,14 @@ interface PickedImage {
 }
 
 function validateLogoAsset(a: PickedImage): string | null {
-  if (!ALLOWED_MIME.includes(a.type as any)) return 'Logo must be PNG, JPG, or WebP.';
+  if (!ALLOWED_MIME.includes(a.type)) return 'Logo must be PNG, JPG, or WebP.';
   if (a.fileSize > LOGO_MAX_BYTES) return 'Logo must be 2MB or smaller.';
   if (a.width !== a.height) return `Logo must be square. You picked ${a.width}×${a.height}.`;
   return null;
 }
 
 function validateBannerAsset(a: PickedImage): string | null {
-  if (!ALLOWED_MIME.includes(a.type as any)) return 'Banner must be PNG, JPG, or WebP.';
+  if (!ALLOWED_MIME.includes(a.type)) return 'Banner must be PNG, JPG, or WebP.';
   if (a.fileSize > BANNER_MAX_BYTES) return 'Banner must be 3MB or smaller.';
   const ratio = a.width / a.height;
   if (Math.abs(ratio - BANNER_RATIO) / BANNER_RATIO > BANNER_RATIO_TOLERANCE) {
@@ -127,9 +123,8 @@ function slugify(name: string): string {
     .replace(/^-|-$/g, '');
 }
 
-/** Upload a partner image (logo or banner) to Supabase Storage and return
- *  the public URL. Path prefix is the partner.id (preferred — stable across
- *  rename) or the slug (legacy edit path). Kind is the file basename. */
+// Path prefix is partner.id (preferred — stable across rename) or the
+// slug (legacy edit-flow path).
 async function uploadPartnerImage(
   pathPrefix: string,
   kind: 'logo' | 'banner',
@@ -224,19 +219,30 @@ export function PartnerAdminScreen() {
     background_color: HOTPICK_DEFAULTS.background_color,
     highlight_color: HOTPICK_DEFAULTS.highlight_color,
   });
-  // In the create flow we hold the picked file locally until INSERT returns
-  // a partner.id, then upload. Spec 260519 §6.5.
   const [formLogoPick, setFormLogoPick]     = useState<PickedImage | null>(null);
   const [formBannerPick, setFormBannerPick] = useState<PickedImage | null>(null);
-  // Default for new partners. Set when the partner_type changes; user can
-  // still flip the switch before submit.
   const [formPartnerType, setFormPartnerType] = useState<PartnerType>('other');
   const [formCanRunPools, setFormCanRunPools] = useState<boolean>(
     DEFAULT_CAN_RUN_POOLS_BY_TYPE.other,
   );
-  // Edit-flow logo upload (existing, slug-keyed path) stays unchanged.
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [creating, setCreating] = useState(false);
+
+  const resetCreateForm = useCallback(() => {
+    setFormName('');
+    setFormSlug('');
+    setFormSlugError('');
+    setFormColors({
+      primary_color: HOTPICK_DEFAULTS.primary_color,
+      secondary_color: HOTPICK_DEFAULTS.secondary_color,
+      background_color: HOTPICK_DEFAULTS.background_color,
+      highlight_color: HOTPICK_DEFAULTS.highlight_color,
+    });
+    setFormLogoPick(null);
+    setFormBannerPick(null);
+    setFormPartnerType('other');
+    setFormCanRunPools(DEFAULT_CAN_RUN_POOLS_BY_TYPE.other);
+  }, []);
 
   const fetchPartners = useCallback(async () => {
     setLoading(true);
@@ -252,8 +258,6 @@ export function PartnerAdminScreen() {
     fetchPartners();
   }, [fetchPartners]);
 
-  /** Edit-flow: pick a logo and upload immediately to the slug-keyed
-   *  storage path. Used by the edit form which already knows the partner. */
   const pickAndUploadLogo = async (
     slug: string,
     onSuccess: (url: string) => void,
@@ -305,8 +309,8 @@ export function PartnerAdminScreen() {
     }
   };
 
-  /** Create-flow: pick a file and validate, but defer the upload until we
-   *  have a partner.id. Spec 260519 §6.5 — id-keyed storage path. */
+  // Deferred upload — INSERT must return a partner.id before we know
+  // the storage path. Edit-flow uploads immediately by contrast.
   const pickAssetForCreate = async (
     kind: 'logo' | 'banner',
     onPick: (picked: PickedImage) => void,
@@ -386,8 +390,6 @@ export function PartnerAdminScreen() {
       formColors.highlight_color,
     );
 
-    // 1. INSERT the partner without logo/banner URLs — we don't have a
-    //    partner.id to key storage paths on yet.
     const brandConfig: BrandConfig = {
       partner_name: name,
       pool_label: name,
@@ -426,43 +428,30 @@ export function PartnerAdminScreen() {
 
     const partnerId = inserted.id as string;
 
-    // 2. Upload any picked assets to id-keyed storage paths. Failures
-    //    leave the partner intact (logo/banner blank) — user can retry
-    //    from the edit form.
-    let uploadedLogoUrl: string | null = null;
-    let uploadedBannerUrl: string | null = null;
+    // Failed uploads leave the partner intact (logo/banner blank) — user
+    // can retry from the edit form.
+    const [uploadedLogoUrl, uploadedBannerUrl] = await Promise.all([
+      formLogoPick
+        ? uploadPartnerImage(partnerId, 'logo', formLogoPick.uri, formLogoPick.fileName)
+        : Promise.resolve(null),
+      formBannerPick
+        ? uploadPartnerImage(partnerId, 'banner', formBannerPick.uri, formBannerPick.fileName)
+        : Promise.resolve(null),
+    ]);
 
-    if (formLogoPick) {
-      uploadedLogoUrl = await uploadPartnerImage(
-        partnerId,
-        'logo',
-        formLogoPick.uri,
-        formLogoPick.fileName,
+    if (formLogoPick && !uploadedLogoUrl) {
+      Alert.alert(
+        'Logo Upload Failed',
+        'The partner was created but the logo did not upload. You can retry from the edit form.',
       );
-      if (!uploadedLogoUrl) {
-        Alert.alert(
-          'Logo Upload Failed',
-          'The partner was created but the logo did not upload. You can retry from the edit form.',
-        );
-      }
+    }
+    if (formBannerPick && !uploadedBannerUrl) {
+      Alert.alert(
+        'Banner Upload Failed',
+        'The partner was created but the banner did not upload. You can retry from the edit form.',
+      );
     }
 
-    if (formBannerPick) {
-      uploadedBannerUrl = await uploadPartnerImage(
-        partnerId,
-        'banner',
-        formBannerPick.uri,
-        formBannerPick.fileName,
-      );
-      if (!uploadedBannerUrl) {
-        Alert.alert(
-          'Banner Upload Failed',
-          'The partner was created but the banner did not upload. You can retry from the edit form.',
-        );
-      }
-    }
-
-    // 3. If anything uploaded, UPDATE brand_config with the URLs.
     if (uploadedLogoUrl || uploadedBannerUrl) {
       const updatedConfig: BrandConfig = {
         ...brandConfig,
@@ -470,8 +459,6 @@ export function PartnerAdminScreen() {
           ...brandConfig.logo,
           full: uploadedLogoUrl ?? '',
         },
-        // Banner is wired but not rendered yet (spec §2). Store on
-        // brand_config so the snapshot owns it once render lands.
         ...(uploadedBannerUrl
           ? ({banner: {full: uploadedBannerUrl}} as Partial<BrandConfig>)
           : {}),
@@ -485,17 +472,7 @@ export function PartnerAdminScreen() {
       }
     }
 
-    setFormName('');
-    setFormColors({
-      primary_color: HOTPICK_DEFAULTS.primary_color,
-      secondary_color: HOTPICK_DEFAULTS.secondary_color,
-      background_color: HOTPICK_DEFAULTS.background_color,
-      highlight_color: HOTPICK_DEFAULTS.highlight_color,
-    });
-    setFormLogoPick(null);
-    setFormBannerPick(null);
-    setFormPartnerType('other');
-    setFormCanRunPools(DEFAULT_CAN_RUN_POOLS_BY_TYPE.other);
+    resetCreateForm();
     setShowForm(false);
     fetchPartners();
     setCreating(false);
@@ -725,7 +702,6 @@ export function PartnerAdminScreen() {
     </View>
   );
 
-  /** Edit-flow logo renderer — uploads to slug-keyed path immediately. */
   const renderLogoSection = (
     logoUrl: string,
     slug: string,
@@ -733,7 +709,7 @@ export function PartnerAdminScreen() {
   ) => (
     <View style={styles.logoSection}>
       <Text style={styles.colorLabel}>Logo</Text>
-      <Text style={styles.colorHint}>Square (1:1), max 2MB. PNG, JPG, or WebP.</Text>
+      <Text style={styles.colorHint}>Square 1:1 · 512×512px recommended · max 2MB · PNG, JPG, or WebP.</Text>
       {logoUrl ? (
         <View style={styles.logoPreviewRow}>
           <Image
@@ -770,7 +746,6 @@ export function PartnerAdminScreen() {
     </View>
   );
 
-  /** Partner-type selector — 5 pills, single-select. Spec 260519 §2. */
   const renderPartnerTypeSelector = (
     value: PartnerType,
     onChange: (next: PartnerType) => void,
@@ -801,7 +776,6 @@ export function PartnerAdminScreen() {
     </View>
   );
 
-  /** Create-flow asset picker — defers upload until INSERT returns id. */
   const renderCreateAssetPicker = (
     kind: 'logo' | 'banner',
     picked: PickedImage | null,
@@ -863,7 +837,10 @@ export function PartnerAdminScreen() {
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Partner Admin</Text>
           <TouchableOpacity
-            onPress={() => setShowForm(!showForm)}
+            onPress={() => {
+              if (showForm) resetCreateForm();
+              setShowForm(!showForm);
+            }}
             hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
             {showForm ? (
               <X size={24} color={colors.textPrimary} />
@@ -919,7 +896,6 @@ export function PartnerAdminScreen() {
               ) : null}
             </View>
 
-            {/* Partner type — drives can_run_pools default on selection. */}
             <Text style={styles.colorsHeading}>Partner Type</Text>
             <Text style={styles.colorsDerivedNote}>
               Sets a sensible default for "Can run pools" — you can still flip it.
@@ -929,7 +905,6 @@ export function PartnerAdminScreen() {
               setFormCanRunPools(DEFAULT_CAN_RUN_POOLS_BY_TYPE[next]);
             })}
 
-            {/* Partner class toggle (parity with edit form). */}
             <View style={styles.classRow}>
               <View style={styles.classCopy}>
                 <Text style={styles.classLabel}>
@@ -952,18 +927,17 @@ export function PartnerAdminScreen() {
               />
             </View>
 
-            {/* Logo + banner — deferred upload (after INSERT returns id). */}
             {renderCreateAssetPicker(
               'logo',
               formLogoPick,
               setFormLogoPick,
-              'Square (1:1), max 2MB. PNG, JPG, or WebP.',
+              'Square 1:1 · 512×512px recommended · max 2MB · PNG, JPG, or WebP.',
             )}
             {renderCreateAssetPicker(
               'banner',
               formBannerPick,
               setFormBannerPick,
-              '1.91:1 (e.g. 1200×630), max 3MB. PNG, JPG, or WebP. Wired now, rendered later.',
+              '1.91:1 · 1200×630px recommended · max 3MB · PNG, JPG, or WebP. Wired now, rendered later.',
             )}
 
             {/* 3 color fields */}
@@ -1056,21 +1030,25 @@ export function PartnerAdminScreen() {
                         />
                       </View>
                     ) : null}
-                    <Text style={styles.partnerName}>{partner.name}</Text>
-                    {partner.partner_type && (
-                      <View style={styles.typeBadge}>
-                        <Text style={styles.typeBadgeText}>
-                          {PARTNER_TYPE_LABELS[
-                            (partner.partner_type as PartnerType) ?? 'other'
-                          ]?.toUpperCase() ?? 'OTHER'}
-                        </Text>
-                      </View>
-                    )}
-                    {!partner.can_run_pools && (
-                      <View style={styles.classBadge}>
-                        <Text style={styles.classBadgeText}>SPONSOR ONLY</Text>
-                      </View>
-                    )}
+                    <View style={styles.partnerNameCol}>
+                      <Text style={styles.partnerName}>{partner.name}</Text>
+                      {(partner.partner_type || !partner.can_run_pools) && (
+                        <View style={styles.partnerBadgeRow}>
+                          {partner.partner_type && (
+                            <View style={styles.typeBadge}>
+                              <Text style={styles.typeBadgeText}>
+                                {PARTNER_TYPE_LABELS[partner.partner_type].toUpperCase()}
+                              </Text>
+                            </View>
+                          )}
+                          {!partner.can_run_pools && (
+                            <View style={styles.classBadge}>
+                              <Text style={styles.classBadgeText}>SPONSOR ONLY</Text>
+                            </View>
+                          )}
+                        </View>
+                      )}
+                    </View>
                   </TouchableOpacity>
                   <View style={styles.partnerHeaderActions}>
                     <TouchableOpacity
@@ -1120,8 +1098,8 @@ export function PartnerAdminScreen() {
                       autoCapitalize="words"
                     />
 
-                    {/* Partner type — editable. Changing here does NOT
-                        re-default can_run_pools (avoid surprise overrides). */}
+                    {/* Editing here does NOT re-default can_run_pools —
+                        that would surprise-override existing partners. */}
                     <Text style={styles.colorsHeading}>Partner Type</Text>
                     {renderPartnerTypeSelector(editPartnerType, setEditPartnerType)}
 
@@ -1664,8 +1642,17 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: '600',
     color: colors.textPrimary,
   },
+  partnerNameCol: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4,
+  },
+  partnerBadgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
   classBadge: {
-    marginLeft: spacing.sm,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
@@ -1680,7 +1667,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textTertiary,
   },
   typeBadge: {
-    marginLeft: spacing.sm,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,

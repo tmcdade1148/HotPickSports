@@ -20,6 +20,17 @@ export interface PoolModuleProps {
   pool: DbPool;
 }
 
+// Tolerates two BrandConfig shapes seen in the wild: nested `logo.full`
+// (what PartnerAdminScreen writes) and flat `logo_url` (per REFERENCE.md §15).
+function resolveSnapshotLogoUrl(brandConfig: unknown): string | null {
+  if (!brandConfig || typeof brandConfig !== 'object') return null;
+  const bc = brandConfig as Record<string, unknown>;
+  const nested = (bc.logo ?? {}) as Record<string, unknown>;
+  if (typeof nested.full === 'string' && nested.full.length > 0) return nested.full;
+  if (typeof bc.logo_url === 'string' && bc.logo_url.length > 0) return bc.logo_url;
+  return null;
+}
+
 export function PoolModule({pool}: PoolModuleProps) {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
@@ -46,20 +57,6 @@ export function PoolModule({pool}: PoolModuleProps) {
   // Hard Rule #23: read partner brand from the pool's brand_config snapshot,
   // never from a live join to partners. If the snapshot is missing the
   // primary_color, render no stripe — we don't fabricate one.
-  // Partner logo URL also from the snapshot — Hard Rule #23.
-  // Tolerates two in-the-wild shapes: nested `logo.full` (what
-  // PartnerAdminScreen writes) and flat `logo_url` (per REFERENCE.md §15).
-  const partnerLogoUrl = useMemo(() => {
-    if (!isPartnerAligned || !pool.brand_config || typeof pool.brand_config !== 'object') {
-      return null;
-    }
-    const bc = pool.brand_config as Record<string, unknown>;
-    const nested = (bc.logo ?? {}) as Record<string, unknown>;
-    if (typeof nested.full === 'string' && nested.full.length > 0) return nested.full;
-    if (typeof bc.logo_url === 'string' && bc.logo_url.length > 0) return bc.logo_url;
-    return null;
-  }, [isPartnerAligned, pool.brand_config]);
-
   const {stripeColor, partnerName} = useMemo(() => {
     if (
       isPartnerAligned &&
@@ -314,13 +311,12 @@ export function PoolModule({pool}: PoolModuleProps) {
             </Pressable>
             {partner?.perk_text && (
               <View style={styles.perkRow}>
-                <View style={styles.perkIconBox}>
-                  <PerkIcon
-                    name={partner.perk_icon}
-                    size={13}
-                    color={stripeColor ?? colors.primary}
-                  />
-                </View>
+                <PerkIcon
+                  name={partner.perk_icon}
+                  size={13}
+                  color={stripeColor ?? colors.primary}
+                  containerStyle={styles.perkIconBox}
+                />
                 <Text
                   style={[bodyType.regular, styles.perkText, {color: colors.textSecondary}]}
                   numberOfLines={2}>
@@ -332,9 +328,9 @@ export function PoolModule({pool}: PoolModuleProps) {
         )}
       </View>
 
-      {isPartnerAligned && (
+      {isPartnerAligned && popoverOpen && (
         <Modal
-          visible={popoverOpen}
+          visible
           transparent
           animationType="fade"
           onRequestClose={() => setPopoverOpen(false)}>
@@ -360,21 +356,24 @@ export function PoolModule({pool}: PoolModuleProps) {
               </Pressable>
 
               <View style={styles.modalHeader}>
-                {partnerLogoUrl ? (
-                  <Image
-                    source={{uri: partnerLogoUrl}}
-                    style={[
-                      styles.modalLogo,
-                      {borderColor: stripeColor ?? colors.border},
-                    ]}
-                  />
-                ) : (
-                  <LogoMark
-                    initials={partnerInitials(partnerName ?? 'P')}
-                    tint={stripeColor ?? colors.primary}
-                    size={48}
-                  />
-                )}
+                {(() => {
+                  const logoUrl = resolveSnapshotLogoUrl(pool.brand_config);
+                  return logoUrl ? (
+                    <Image
+                      source={{uri: logoUrl}}
+                      style={[
+                        styles.modalLogo,
+                        {borderColor: stripeColor ?? colors.border},
+                      ]}
+                    />
+                  ) : (
+                    <LogoMark
+                      initials={partnerInitials(partnerName ?? 'P')}
+                      tint={stripeColor ?? colors.primary}
+                      size={48}
+                    />
+                  );
+                })()}
                 <Text
                   style={[displayType.display, styles.modalName, {color: colors.textPrimary}]}
                   numberOfLines={2}>
@@ -388,13 +387,12 @@ export function PoolModule({pool}: PoolModuleProps) {
                     styles.modalPerkRow,
                     {borderTopColor: colors.border, borderBottomColor: colors.border},
                   ]}>
-                  <View style={styles.modalPerkIcon}>
-                    <PerkIcon
-                      name={partner.perk_icon}
-                      size={20}
-                      color={stripeColor ?? colors.primary}
-                    />
-                  </View>
+                  <PerkIcon
+                    name={partner.perk_icon}
+                    size={20}
+                    color={stripeColor ?? colors.primary}
+                    containerStyle={styles.modalPerkIcon}
+                  />
                   <Text
                     style={[bodyType.regular, styles.modalPerkText, {color: colors.textSecondary}]}>
                     {partner.perk_text}
@@ -589,8 +587,6 @@ const styles = StyleSheet.create({
   },
   perkIconBox: {
     width: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   perkText: {
     flex: 1,
@@ -666,8 +662,6 @@ const styles = StyleSheet.create({
   },
   modalPerkIcon: {
     width: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   modalPerkText: {
     flex: 1,
