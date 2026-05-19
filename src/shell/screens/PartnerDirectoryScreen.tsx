@@ -99,8 +99,8 @@ export function PartnerDirectoryScreen() {
     updatePoolBrandConfig(poolId, (partner.brand_config as any) ?? null);
     setCurrentPartnerId(partner.id);
     Alert.alert(
-      'Roster joined',
-      `Your pool is now on ${partner.name}'s roster. Their brand and perk will surface to your members.`,
+      'Added to roster',
+      `Your pool is now a member of ${partner.name}'s roster. Their brand and perk will surface to your members.`,
       [{text: 'OK', onPress: () => navigation.goBack()}],
     );
   };
@@ -132,15 +132,15 @@ export function PartnerDirectoryScreen() {
           <ChevronLeft color={colors.textPrimary} size={24} />
         </Pressable>
         <Text style={[displayType.display, styles.title, {color: colors.textPrimary}]}>
-          ALIGN WITH A PARTNER
+          JOIN A ROSTER
         </Text>
         <View style={{width: 24}} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={[bodyType.regular, styles.intro, {color: colors.textSecondary}]}>
-          Pick a partner to join their roster. Your pool will inherit their brand,
-          surface their perk, and receive their broadcasts.
+          Pick a partner to add your pool to their roster. Your pool will pick up
+          their brand, surface their perk, and receive their broadcasts.
         </Text>
 
         {aligned && (
@@ -153,7 +153,7 @@ export function PartnerDirectoryScreen() {
               disabled={aligning === '__none__'}
               style={({pressed}) => [{opacity: pressed ? 0.6 : 1}]}>
               <Text style={[bodyType.bold, {color: colors.error, marginTop: 4}]}>
-                {aligning === '__none__' ? 'Removing…' : 'Remove alignment'}
+                {aligning === '__none__' ? 'Leaving…' : 'Leave this roster'}
               </Text>
             </Pressable>
           </View>

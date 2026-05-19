@@ -558,7 +558,7 @@ export function PoolSettingsScreen() {
               {partnerRow.name} perk
             </Text>
             <Text style={styles.partnerCardHint}>
-              Shows on every pool aligned with {partnerRow.name}. Max 120 chars.
+              Shows on every pool on {partnerRow.name}'s roster. Max 120 chars.
             </Text>
             <View style={styles.perkInputRow}>
               <TextInput
@@ -617,7 +617,7 @@ export function PoolSettingsScreen() {
           onPress={() => navigation.navigate('PartnerDirectory', {poolId})}>
           <Users size={18} color={colors.primary} />
           <Text style={[styles.broadcastText, {color: colors.primary}]}>
-            {pool.partner_id ? 'Change roster alignment' : 'Align with a partner'}
+            {pool.partner_id ? 'Change roster' : "Join a partner's roster"}
           </Text>
         </TouchableOpacity>
 
@@ -657,7 +657,7 @@ export function PoolSettingsScreen() {
               Broadcast from {partnerRow?.name ?? 'Partner'}
             </Text>
             <Text style={styles.modalHint}>
-              Sends to every member of every pool aligned with this partner.
+              Sends to every member of every pool on this partner's roster.
               Max 280 chars. Rate limit: 3 per 24h.
             </Text>
             <TextInput

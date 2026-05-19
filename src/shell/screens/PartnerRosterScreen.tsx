@@ -148,8 +148,8 @@ export function PartnerRosterScreen() {
   if (alignedPools.length === 0) {
     return (
       <DenialState
-        title="You're not in any pool for this partner"
-        body="Join an aligned pool to see this roster again."
+        title="You're not on this partner's roster"
+        body="Join a pool on their roster to see it again."
         onHome={() => navigation.navigate('Home')}
       />
     );
@@ -299,7 +299,7 @@ export function PartnerRosterScreen() {
             in partner color ties pool rows to the partner brand. */}
         <View style={styles.section}>
           <Text style={[bodyType.bold, styles.sectionLabel, {color: partnerPrimary}]}>
-            YOUR POOLS WITH {partner.name.toUpperCase()}
+            YOUR POOLS ON THIS ROSTER
           </Text>
           {alignedPools.map(pool => (
             <Pressable

@@ -649,8 +649,8 @@ export function PartnerAdminScreen() {
         },
       }));
       Alert.alert(
-        'Partner Pool Created',
-        `${partner.name} pool is live. Invite code: ${row.invite_code ?? '—'} · Signage slug: ${row.invite_slug ?? partner.slug}`,
+        'Club Pool Created',
+        `${partner.name}'s Club Pool is live. Invite code: ${row.invite_code ?? '—'} · Signage slug: ${row.invite_slug ?? partner.slug}`,
       );
     }
   };
@@ -1311,8 +1311,8 @@ export function PartnerAdminScreen() {
                         </Text>
                         <Text style={styles.colorsDerivedNote}>
                           {editCanRunPools
-                            ? 'Operator partner: can run their own pool with their invite code.'
-                            : 'Sponsor-only: brand surfaces via perk + broadcasts + roster, but the partner cannot run a pool. Organizers find them in the partner directory.'}
+                            ? 'Operator: runs their own Club Pool with an invite code. Organizers can also add their pool to this partner’s roster.'
+                            : 'Sponsor-only: no Club Pool. Brand surfaces via perk + broadcasts. Organizers find them in the directory and add the partner to their pool’s roster.'}
                         </Text>
                       </View>
                       <Switch
@@ -1330,7 +1330,7 @@ export function PartnerAdminScreen() {
                       if (existing) {
                         return (
                           <View style={styles.partnerPoolCard}>
-                            <Text style={styles.classLabel}>Partner Pool</Text>
+                            <Text style={styles.classLabel}>Club Pool</Text>
                             <Text style={styles.colorsDerivedNote}>
                               {existing.name} · invite code{' '}
                               <Text style={{fontWeight: '700'}}>
@@ -1352,7 +1352,7 @@ export function PartnerAdminScreen() {
                           {creatingPoolForPartnerId === partner.id ? (
                             <ActivityIndicator size="small" color={colors.onPrimary} />
                           ) : (
-                            <Text style={styles.createButtonText}>Create Partner Pool</Text>
+                            <Text style={styles.createButtonText}>Create Club Pool</Text>
                           )}
                         </TouchableOpacity>
                       );

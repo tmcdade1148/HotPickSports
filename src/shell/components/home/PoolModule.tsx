@@ -266,10 +266,11 @@ export function PoolModule({pool}: PoolModuleProps) {
               <Text
                 style={[bodyType.regular, styles.alignText, {color: colors.textSecondary}]}
                 numberOfLines={1}>
-                Aligned with{' '}
+                On{' '}
                 <Text style={[bodyType.bold, {color: colors.textPrimary}]}>
                   {partnerName}
                 </Text>
+                {"'s roster"}
               </Text>
               {partnerUnread > 0 && (
                 <View
