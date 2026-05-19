@@ -306,7 +306,7 @@ export function PartnerRosterScreen() {
               key={pool.id}
               onPress={() => {
                 setActivePoolId(pool.id);
-                navigation.navigate('Leaders');
+                navigation.navigate('LeaderboardTab');
               }}
               style={({pressed}) => [
                 styles.poolRow,

@@ -201,7 +201,7 @@ export function CompleteHero() {
 
       {/* CTA — dimmed flame, two-line label, arrow aligned to top. */}
       <Pressable
-        onPress={() => navigation.navigate('Leaders')}
+        onPress={() => navigation.navigate('LeaderboardTab')}
         style={({pressed}) => [
           styles.cta,
           {backgroundColor: colors.primary, shadowColor: colors.primary, opacity: pressed ? 0.6 : 0.7},

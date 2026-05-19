@@ -72,7 +72,7 @@ export function SettlingHero() {
       </View>
 
       <Pressable
-        onPress={() => navigation.navigate('Leaders')}
+        onPress={() => navigation.navigate('LeaderboardTab')}
         style={({pressed}) => [
           styles.cta,
           {borderColor: colors.border, opacity: pressed ? 0.7 : 1},
