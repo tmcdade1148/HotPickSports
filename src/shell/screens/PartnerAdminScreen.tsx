@@ -76,7 +76,16 @@ interface Partner {
   partner_type: PartnerType | null;
 }
 
-const ALLOWED_MIME: readonly string[] = ['image/png', 'image/jpeg', 'image/webp'];
+// react-native-image-picker returns `asset.type` inconsistently across
+// platforms: MIME on Android, sometimes a UTI like `public.png` on iOS,
+// `image/jpg` instead of `image/jpeg`, or empty. Accept either a MIME or
+// a file-extension match so a real PNG isn't rejected for label drift.
+const LOGO_BUCKET = 'partner-logos';
+const LIBRARY_PREFIX = '_library';
+
+const ALLOWED_MIME: readonly string[] = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+const ALLOWED_EXT = /\.(png|jpe?g|webp)$/i;
+
 const LOGO_MAX_BYTES   = 2 * 1024 * 1024;
 const BANNER_MAX_BYTES = 3 * 1024 * 1024;
 const BANNER_RATIO     = 1200 / 630; // 1.9047…
@@ -91,15 +100,57 @@ interface PickedImage {
   fileSize: number;
 }
 
+interface LibraryItem {
+  name: string;       // basename within _library, e.g. 'mes-que.png'
+  displayName: string;
+  url: string;
+}
+
+function libraryItemUrl(name: string): string {
+  const {data} = supabase.storage.from(LOGO_BUCKET).getPublicUrl(`${LIBRARY_PREFIX}/${name}`);
+  return data.publicUrl;
+}
+
+function fileNameSlug(input: string): string {
+  const dot = input.lastIndexOf('.');
+  const base = dot > 0 ? input.slice(0, dot) : input;
+  const ext  = dot > 0 ? input.slice(dot + 1).toLowerCase() : 'png';
+  const slug = base.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'logo';
+  return `${slug}.${ext}`;
+}
+
+async function listLibraryItems(): Promise<LibraryItem[]> {
+  const {data, error} = await supabase
+    .storage
+    .from(LOGO_BUCKET)
+    .list(LIBRARY_PREFIX, {limit: 200, sortBy: {column: 'name', order: 'asc'}});
+  if (error || !data) return [];
+  return data
+    .filter(o => o.name && !o.name.endsWith('/'))
+    .map(o => ({
+      name: o.name,
+      displayName: o.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' '),
+      url: libraryItemUrl(o.name),
+    }));
+}
+
+function hasAllowedFormat(a: PickedImage): boolean {
+  return ALLOWED_MIME.includes(a.type.toLowerCase()) || ALLOWED_EXT.test(a.fileName);
+}
+
 function validateLogoAsset(a: PickedImage): string | null {
-  if (!ALLOWED_MIME.includes(a.type)) return 'Logo must be PNG, JPG, or WebP.';
+  if (!hasAllowedFormat(a)) {
+    return `Logo must be PNG, JPG, or WebP. Got "${a.type || 'unknown'}" / "${a.fileName}".`;
+  }
   if (a.fileSize > LOGO_MAX_BYTES) return 'Logo must be 2MB or smaller.';
   if (a.width !== a.height) return `Logo must be square. You picked ${a.width}×${a.height}.`;
   return null;
 }
 
 function validateBannerAsset(a: PickedImage): string | null {
-  if (!ALLOWED_MIME.includes(a.type)) return 'Banner must be PNG, JPG, or WebP.';
+  if (!hasAllowedFormat(a)) {
+    return `Banner must be PNG, JPG, or WebP. Got "${a.type || 'unknown'}" / "${a.fileName}".`;
+  }
   if (a.fileSize > BANNER_MAX_BYTES) return 'Banner must be 3MB or smaller.';
   const ratio = a.width / a.height;
   if (Math.abs(ratio - BANNER_RATIO) / BANNER_RATIO > BANNER_RATIO_TOLERANCE) {
@@ -123,17 +174,19 @@ function slugify(name: string): string {
     .replace(/^-|-$/g, '');
 }
 
-// Path prefix is partner.id (preferred — stable across rename) or the
-// slug (legacy edit-flow path).
+// pathPrefix is `${LIBRARY_PREFIX}` for shared logos, or a partner.id for
+// partner-keyed assets (banner). `basename` is the file basename within
+// the prefix — for logos it's a slugified original filename so the
+// library shows readable names; for banners it's just "banner".
 async function uploadPartnerImage(
   pathPrefix: string,
-  kind: 'logo' | 'banner',
+  basename: string,
   uri: string,
   fileName: string,
 ): Promise<string | null> {
   try {
     const ext = fileName.split('.').pop()?.toLowerCase() || 'png';
-    const storagePath = `${pathPrefix}/${kind}.${ext}`;
+    const storagePath = `${pathPrefix}/${basename}.${ext}`;
     const mimeType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
 
     // Get auth token for the upload
@@ -146,12 +199,12 @@ async function uploadPartnerImage(
 
     // React Native: upload directly via REST API using fetch + FormData
     const SUPABASE_URL = 'https://mzqtrpdiqhopjmxjccwy.supabase.co';
-    const uploadUrl = `${SUPABASE_URL}/storage/v1/object/partner-logos/${storagePath}`;
+    const uploadUrl = `${SUPABASE_URL}/storage/v1/object/${LOGO_BUCKET}/${storagePath}`;
 
     const formData = new FormData();
     formData.append('file', {
       uri,
-      name: `${kind}.${ext}`,
+      name: `${basename}.${ext}`,
       type: mimeType,
     } as any);
 
@@ -172,7 +225,7 @@ async function uploadPartnerImage(
     }
 
     const {data} = supabase.storage
-      .from('partner-logos')
+      .from(LOGO_BUCKET)
       .getPublicUrl(storagePath);
 
     return data.publicUrl;
@@ -219,14 +272,30 @@ export function PartnerAdminScreen() {
     background_color: HOTPICK_DEFAULTS.background_color,
     highlight_color: HOTPICK_DEFAULTS.highlight_color,
   });
-  const [formLogoPick, setFormLogoPick]     = useState<PickedImage | null>(null);
+  const [formLogoLibraryUrl, setFormLogoLibraryUrl] = useState<string | null>(null);
   const [formBannerPick, setFormBannerPick] = useState<PickedImage | null>(null);
   const [formPartnerType, setFormPartnerType] = useState<PartnerType>('other');
   const [formCanRunPools, setFormCanRunPools] = useState<boolean>(
     DEFAULT_CAN_RUN_POOLS_BY_TYPE.other,
   );
-  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [creating, setCreating] = useState(false);
+
+  // Shared logo library — surfaced in both the create form and the edit form.
+  // Tom's logos live at partner-logos/_library/. Adding to the library
+  // uploads + auto-selects in the active form.
+  const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
+  const [libraryLoading, setLibraryLoading] = useState(false);
+  const [libraryUploading, setLibraryUploading] = useState(false);
+
+  const refreshLibrary = useCallback(async () => {
+    setLibraryLoading(true);
+    setLibraryItems(await listLibraryItems());
+    setLibraryLoading(false);
+  }, []);
+
+  useEffect(() => {
+    refreshLibrary();
+  }, [refreshLibrary]);
 
   const resetCreateForm = useCallback(() => {
     setFormName('');
@@ -238,7 +307,7 @@ export function PartnerAdminScreen() {
       background_color: HOTPICK_DEFAULTS.background_color,
       highlight_color: HOTPICK_DEFAULTS.highlight_color,
     });
-    setFormLogoPick(null);
+    setFormLogoLibraryUrl(null);
     setFormBannerPick(null);
     setFormPartnerType('other');
     setFormCanRunPools(DEFAULT_CAN_RUN_POOLS_BY_TYPE.other);
@@ -257,57 +326,6 @@ export function PartnerAdminScreen() {
   useEffect(() => {
     fetchPartners();
   }, [fetchPartners]);
-
-  const pickAndUploadLogo = async (
-    slug: string,
-    onSuccess: (url: string) => void,
-  ) => {
-    try {
-      const result = await launchImageLibrary({
-        mediaType: 'photo',
-        quality: 0.9,
-        includeBase64: false,
-      });
-
-      if (result.didCancel || !result.assets?.[0]) return;
-
-      const asset = result.assets[0];
-      if (!asset.uri) return;
-
-      const picked: PickedImage = {
-        uri: asset.uri,
-        fileName: asset.fileName || 'logo.png',
-        type: asset.type || 'image/png',
-        width: asset.width ?? 0,
-        height: asset.height ?? 0,
-        fileSize: asset.fileSize ?? 0,
-      };
-
-      const err = validateLogoAsset(picked);
-      if (err) {
-        Alert.alert('Logo Rejected', err);
-        return;
-      }
-
-      setUploadingLogo(true);
-      const publicUrl = await uploadPartnerImage(
-        slug,
-        'logo',
-        picked.uri,
-        picked.fileName,
-      );
-      setUploadingLogo(false);
-
-      if (publicUrl) {
-        onSuccess(publicUrl);
-      } else {
-        Alert.alert('Upload Failed', 'Upload returned null. See previous error alerts for details.');
-      }
-    } catch (err: any) {
-      setUploadingLogo(false);
-      Alert.alert('Pick/Upload Error', err?.message || String(err));
-    }
-  };
 
   // Deferred upload — INSERT must return a partner.id before we know
   // the storage path. Edit-flow uploads immediately by contrast.
@@ -395,7 +413,7 @@ export function PartnerAdminScreen() {
       pool_label: name,
       ...derived,
       logo: {
-        full: '',
+        full: formLogoLibraryUrl ?? '',
         mark: '',
         wordmark: '',
         mono_light: '',
@@ -428,40 +446,28 @@ export function PartnerAdminScreen() {
 
     const partnerId = inserted.id as string;
 
-    // Failed uploads leave the partner intact (logo/banner blank) — user
-    // can retry from the edit form.
-    const [uploadedLogoUrl, uploadedBannerUrl] = await Promise.all([
-      formLogoPick
-        ? uploadPartnerImage(partnerId, 'logo', formLogoPick.uri, formLogoPick.fileName)
-        : Promise.resolve(null),
-      formBannerPick
-        ? uploadPartnerImage(partnerId, 'banner', formBannerPick.uri, formBannerPick.fileName)
-        : Promise.resolve(null),
-    ]);
-
-    if (formLogoPick && !uploadedLogoUrl) {
-      Alert.alert(
-        'Logo Upload Failed',
-        'The partner was created but the logo did not upload. You can retry from the edit form.',
+    // Banner is partner-keyed (one banner per partner, not shared). Failed
+    // banner upload leaves the partner intact — user can retry from edit.
+    let uploadedBannerUrl: string | null = null;
+    if (formBannerPick) {
+      uploadedBannerUrl = await uploadPartnerImage(
+        partnerId,
+        'banner',
+        formBannerPick.uri,
+        formBannerPick.fileName,
       );
-    }
-    if (formBannerPick && !uploadedBannerUrl) {
-      Alert.alert(
-        'Banner Upload Failed',
-        'The partner was created but the banner did not upload. You can retry from the edit form.',
-      );
+      if (!uploadedBannerUrl) {
+        Alert.alert(
+          'Banner Upload Failed',
+          'The partner was created but the banner did not upload. You can retry from the edit form.',
+        );
+      }
     }
 
-    if (uploadedLogoUrl || uploadedBannerUrl) {
+    if (uploadedBannerUrl) {
       const updatedConfig: BrandConfig = {
         ...brandConfig,
-        logo: {
-          ...brandConfig.logo,
-          full: uploadedLogoUrl ?? '',
-        },
-        ...(uploadedBannerUrl
-          ? ({banner: {full: uploadedBannerUrl}} as Partial<BrandConfig>)
-          : {}),
+        ...({banner: {full: uploadedBannerUrl}} as Partial<BrandConfig>),
       };
       const {error: updateErr} = await supabase
         .from('partners')
@@ -702,47 +708,98 @@ export function PartnerAdminScreen() {
     </View>
   );
 
-  const renderLogoSection = (
-    logoUrl: string,
-    slug: string,
-    onLogoUploaded: (url: string) => void,
+  /** Uploads a new logo to the shared library and auto-selects it. */
+  const addToLibrary = async (onSelect: (url: string) => void) => {
+    await pickAssetForCreate('logo', async picked => {
+      setLibraryUploading(true);
+      const basename = fileNameSlug(picked.fileName).replace(/\.[^.]+$/, '');
+      const url = await uploadPartnerImage(
+        LIBRARY_PREFIX,
+        basename,
+        picked.uri,
+        picked.fileName,
+      );
+      setLibraryUploading(false);
+      if (!url) {
+        Alert.alert('Upload Failed', 'Logo did not upload to the library.');
+        return;
+      }
+      onSelect(url);
+      refreshLibrary();
+    });
+  };
+
+  /** Shared logo picker — read-only grid of library items + Add-to-Library
+   *  affordance. Used by both create and edit forms. */
+  const renderLogoLibraryPicker = (
+    selectedUrl: string | null,
+    onSelect: (url: string | null) => void,
   ) => (
     <View style={styles.logoSection}>
       <Text style={styles.colorLabel}>Logo</Text>
-      <Text style={styles.colorHint}>Square 1:1 · 512×512px recommended · max 2MB · PNG, JPG, or WebP.</Text>
-      {logoUrl ? (
+      <Text style={styles.colorHint}>
+        Pick from the HotPick Sports Logos library, or add a new one.
+        Square 1:1 · 512×512px recommended · max 2MB · PNG, JPG, or WebP.
+      </Text>
+
+      {selectedUrl && (
         <View style={styles.logoPreviewRow}>
           <Image
-            source={{uri: logoUrl}}
+            source={{uri: selectedUrl}}
             style={styles.logoPreview}
             resizeMode="contain"
           />
-          <TouchableOpacity
-            style={styles.logoChangeButton}
-            onPress={() => pickAndUploadLogo(slug, onLogoUploaded)}
-            disabled={uploadingLogo}>
-            {uploadingLogo ? (
-              <ActivityIndicator size="small" color={colors.primary} />
-            ) : (
-              <Text style={styles.logoChangeText}>Change</Text>
-            )}
-          </TouchableOpacity>
+          <View style={styles.assetMetaCol}>
+            <Text style={styles.colorHint} numberOfLines={2}>
+              Selected
+            </Text>
+            <TouchableOpacity onPress={() => onSelect(null)} hitSlop={6}>
+              <Text style={styles.resetText}>Clear</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      ) : (
+      )}
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.libraryRow}>
+        {libraryLoading && libraryItems.length === 0 ? (
+          <ActivityIndicator size="small" color={colors.primary} />
+        ) : (
+          libraryItems.map(item => {
+            const isSelected = item.url === selectedUrl;
+            return (
+              <TouchableOpacity
+                key={item.name}
+                onPress={() => onSelect(item.url)}
+                style={[
+                  styles.libraryTile,
+                  {
+                    borderColor: isSelected ? colors.primary : colors.border,
+                    borderWidth: isSelected ? 2 : 1,
+                  },
+                ]}
+                accessibilityLabel={`Select ${item.displayName}`}>
+                <Image source={{uri: item.url}} style={styles.libraryThumb} resizeMode="contain" />
+              </TouchableOpacity>
+            );
+          })
+        )}
         <TouchableOpacity
-          style={styles.logoUploadButton}
-          onPress={() => pickAndUploadLogo(slug, onLogoUploaded)}
-          disabled={uploadingLogo}>
-          {uploadingLogo ? (
+          style={[styles.libraryTile, styles.libraryAddTile, {borderColor: colors.border}]}
+          onPress={() => addToLibrary(onSelect)}
+          disabled={libraryUploading}>
+          {libraryUploading ? (
             <ActivityIndicator size="small" color={colors.primary} />
           ) : (
             <>
               <Upload size={18} color={colors.textSecondary} />
-              <Text style={styles.logoUploadText}>Upload Logo</Text>
+              <Text style={styles.libraryAddText}>Add</Text>
             </>
           )}
         </TouchableOpacity>
-      )}
+      </ScrollView>
     </View>
   );
 
@@ -927,12 +984,7 @@ export function PartnerAdminScreen() {
               />
             </View>
 
-            {renderCreateAssetPicker(
-              'logo',
-              formLogoPick,
-              setFormLogoPick,
-              'Square 1:1 · 512×512px recommended · max 2MB · PNG, JPG, or WebP.',
-            )}
+            {renderLogoLibraryPicker(formLogoLibraryUrl, setFormLogoLibraryUrl)}
             {renderCreateAssetPicker(
               'banner',
               formBannerPick,
@@ -1103,9 +1155,8 @@ export function PartnerAdminScreen() {
                     <Text style={styles.colorsHeading}>Partner Type</Text>
                     {renderPartnerTypeSelector(editPartnerType, setEditPartnerType)}
 
-                    {/* Logo in edit mode */}
-                    {renderLogoSection(editLogoUrl, partner.slug, url =>
-                      setEditLogoUrl(url),
+                    {renderLogoLibraryPicker(editLogoUrl || null, url =>
+                      setEditLogoUrl(url ?? ''),
                     )}
 
                     <Text style={styles.colorsHeading}>Brand Colors</Text>
@@ -1705,6 +1756,33 @@ const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  libraryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  libraryTile: {
+    width: 64,
+    height: 64,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  libraryThumb: {
+    width: 60,
+    height: 60,
+  },
+  libraryAddTile: {
+    borderStyle: 'dashed',
+    gap: 2,
+  },
+  libraryAddText: {
+    fontSize: 11,
+    color: colors.textSecondary,
   },
   assetMetaCol: {
     flex: 1,
