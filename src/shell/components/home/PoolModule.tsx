@@ -2,10 +2,10 @@
 // indicators, settings gear, partner-alignment footer when applicable.
 // Reads from globalStore — HomeScreen owns the loaders.
 
-import React, {useMemo} from 'react';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
+import React, {useMemo, useState} from 'react';
+import {Image, Modal, Pressable, StyleSheet, Text, View} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
-import {MessageCircle, Megaphone, Settings} from 'lucide-react-native';
+import {Info, MessageCircle, Megaphone, Settings, X} from 'lucide-react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
@@ -14,6 +14,7 @@ import {ordinalSuffix} from '@shared/utils/format';
 import type {DbPool} from '@shared/types/database';
 import {LogoMark} from './LogoMark';
 import {partnerInitials} from './teamColors';
+import {PerkIcon} from './PerkIcon';
 
 export interface PoolModuleProps {
   pool: DbPool;
@@ -22,6 +23,7 @@ export interface PoolModuleProps {
 export function PoolModule({pool}: PoolModuleProps) {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
+  const [popoverOpen, setPopoverOpen] = useState(false);
 
   const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
   // Two independent unread streams — kept separate so each badge has a
@@ -41,6 +43,23 @@ export function PoolModule({pool}: PoolModuleProps) {
   );
   const partnerUnread = partnerIndicator?.unread ?? 0;
 
+  // Hard Rule #23: read partner brand from the pool's brand_config snapshot,
+  // never from a live join to partners. If the snapshot is missing the
+  // primary_color, render no stripe — we don't fabricate one.
+  // Partner logo URL also from the snapshot — Hard Rule #23.
+  // Tolerates two in-the-wild shapes: nested `logo.full` (what
+  // PartnerAdminScreen writes) and flat `logo_url` (per REFERENCE.md §15).
+  const partnerLogoUrl = useMemo(() => {
+    if (!isPartnerAligned || !pool.brand_config || typeof pool.brand_config !== 'object') {
+      return null;
+    }
+    const bc = pool.brand_config as Record<string, unknown>;
+    const nested = (bc.logo ?? {}) as Record<string, unknown>;
+    if (typeof nested.full === 'string' && nested.full.length > 0) return nested.full;
+    if (typeof bc.logo_url === 'string' && bc.logo_url.length > 0) return bc.logo_url;
+    return null;
+  }, [isPartnerAligned, pool.brand_config]);
+
   const {stripeColor, partnerName} = useMemo(() => {
     if (
       isPartnerAligned &&
@@ -51,12 +70,12 @@ export function PoolModule({pool}: PoolModuleProps) {
       const primary = typeof bc.primary_color === 'string' ? bc.primary_color : null;
       const name = typeof bc.partner_name === 'string' ? bc.partner_name : null;
       return {
-        stripeColor: primary && primary.length > 0 ? primary : colors.primary,
+        stripeColor: primary && primary.length > 0 ? primary : null,
         partnerName: name && name.length > 0 ? name : null,
       };
     }
     return {stripeColor: null as string | null, partnerName: null as string | null};
-  }, [isPartnerAligned, pool.brand_config, colors.primary]);
+  }, [isPartnerAligned, pool.brand_config]);
 
   const goToLeaderboard = () => {
     setActivePoolId(pool.id);
@@ -76,6 +95,13 @@ export function PoolModule({pool}: PoolModuleProps) {
   const goToPartnerRoster = () => {
     if (!partner) return;
     navigation.navigate('PartnerRoster', {slug: partner.slug});
+  };
+
+  const goToPartnerRosterFromPopover = () => {
+    setPopoverOpen(false);
+    if (partner) {
+      navigation.navigate('PartnerRoster', {slug: partner.slug});
+    }
   };
 
   return (
@@ -268,20 +294,33 @@ export function PoolModule({pool}: PoolModuleProps) {
                 </View>
               )}
             </Pressable>
+            {/* Accessibility affordance — non-color path to partner info.
+                Color-only signaling (the brand stripe) fails for ~8% of male
+                users; this provides a tap target that reveals the same info. */}
+            <Pressable
+              onPress={() => setPopoverOpen(true)}
+              hitSlop={8}
+              style={({pressed}) => [
+                styles.connectionPill,
+                {borderColor: colors.border, opacity: pressed ? 0.6 : 1},
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Show partner connection details">
+              <Info size={11} color={colors.textTertiary} strokeWidth={2} />
+              <Text
+                style={[bodyType.regular, styles.connectionText, {color: colors.textTertiary}]}>
+                Partner connection
+              </Text>
+            </Pressable>
             {partner?.perk_text && (
               <View style={styles.perkRow}>
-                {partner.perk_icon ? (
-                  <Text style={styles.perkIcon} numberOfLines={1}>
-                    {partner.perk_icon}
-                  </Text>
-                ) : (
-                  <View
-                    style={[
-                      styles.perkDot,
-                      {backgroundColor: stripeColor ?? colors.primary},
-                    ]}
+                <View style={styles.perkIconBox}>
+                  <PerkIcon
+                    name={partner.perk_icon}
+                    size={13}
+                    color={stripeColor ?? colors.primary}
                   />
-                )}
+                </View>
                 <Text
                   style={[bodyType.regular, styles.perkText, {color: colors.textSecondary}]}
                   numberOfLines={2}>
@@ -292,6 +331,94 @@ export function PoolModule({pool}: PoolModuleProps) {
           </View>
         )}
       </View>
+
+      {isPartnerAligned && (
+        <Modal
+          visible={popoverOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setPopoverOpen(false)}>
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setPopoverOpen(false)}
+            accessibilityLabel="Close partner connection details">
+            <Pressable
+              style={[
+                styles.modalCard,
+                {backgroundColor: colors.surfaceElevated, borderColor: colors.border},
+              ]}
+              onPress={() => {
+                /* swallow tap so backdrop press doesn't close when tapping inside */
+              }}>
+              <Pressable
+                onPress={() => setPopoverOpen(false)}
+                hitSlop={10}
+                style={styles.modalClose}
+                accessibilityRole="button"
+                accessibilityLabel="Close">
+                <X size={18} color={colors.textTertiary} strokeWidth={2} />
+              </Pressable>
+
+              <View style={styles.modalHeader}>
+                {partnerLogoUrl ? (
+                  <Image
+                    source={{uri: partnerLogoUrl}}
+                    style={[
+                      styles.modalLogo,
+                      {borderColor: stripeColor ?? colors.border},
+                    ]}
+                  />
+                ) : (
+                  <LogoMark
+                    initials={partnerInitials(partnerName ?? 'P')}
+                    tint={stripeColor ?? colors.primary}
+                    size={48}
+                  />
+                )}
+                <Text
+                  style={[displayType.display, styles.modalName, {color: colors.textPrimary}]}
+                  numberOfLines={2}>
+                  {(partnerName ?? partner?.name ?? '').toUpperCase()}
+                </Text>
+              </View>
+
+              {partner?.perk_text && (
+                <View
+                  style={[
+                    styles.modalPerkRow,
+                    {borderTopColor: colors.border, borderBottomColor: colors.border},
+                  ]}>
+                  <View style={styles.modalPerkIcon}>
+                    <PerkIcon
+                      name={partner.perk_icon}
+                      size={20}
+                      color={stripeColor ?? colors.primary}
+                    />
+                  </View>
+                  <Text
+                    style={[bodyType.regular, styles.modalPerkText, {color: colors.textSecondary}]}>
+                    {partner.perk_text}
+                  </Text>
+                </View>
+              )}
+
+              <Pressable
+                onPress={goToPartnerRosterFromPopover}
+                disabled={!partner}
+                style={({pressed}) => [
+                  styles.modalCta,
+                  {backgroundColor: stripeColor ?? colors.primary, opacity: pressed ? 0.85 : 1},
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={`Open ${partnerName ?? 'partner'} roster`}>
+                <Text style={[bodyType.bold, styles.modalCtaText, {color: colors.onPrimary}]}>
+                  View partner roster
+                </Text>
+              </Pressable>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      )}
     </Pressable>
   );
 }
@@ -308,11 +435,9 @@ const styles = StyleSheet.create({
   stripe: {
     position: 'absolute',
     left: 0,
-    top: 14,
-    bottom: 14,
+    top: 0,
+    bottom: 0,
     width: 3,
-    borderTopRightRadius: 3,
-    borderBottomRightRadius: 3,
   },
   gearBtn: {
     position: 'absolute',
@@ -462,16 +587,10 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingLeft: 34,
   },
-  perkIcon: {
-    fontSize: 13,
+  perkIconBox: {
     width: 16,
-    textAlign: 'center',
-  },
-  perkDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginHorizontal: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   perkText: {
     flex: 1,
@@ -481,5 +600,89 @@ const styles = StyleSheet.create({
   alignText: {
     fontSize: 12.5,
     fontWeight: '500',
+  },
+  connectionPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    gap: 4,
+    paddingVertical: 3,
+    paddingHorizontal: 7,
+    marginTop: 6,
+    borderRadius: borderRadius.full,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  connectionText: {
+    fontSize: 10,
+    letterSpacing: 0.3,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 340,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
+  },
+  modalClose: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    padding: 4,
+    zIndex: 1,
+  },
+  modalHeader: {
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+    paddingTop: 8,
+  },
+  modalLogo: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1.5,
+  },
+  modalName: {
+    fontSize: 17,
+    lineHeight: 19,
+    textAlign: 'center',
+  },
+  modalPerkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginBottom: spacing.md,
+  },
+  modalPerkIcon: {
+    width: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalPerkText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  modalCta: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+  },
+  modalCtaText: {
+    fontSize: 13,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
 });

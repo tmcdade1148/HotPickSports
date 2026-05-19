@@ -34,6 +34,29 @@ import type {BrandConfig} from '@shell/theme/types';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 
+// Five-value app-side enum (DB column is plain text). Spec 260519 §2.
+type PartnerType = 'hospitality' | 'operator' | 'media' | 'brand' | 'other';
+
+const PARTNER_TYPES: PartnerType[] = ['hospitality', 'operator', 'media', 'brand', 'other'];
+
+const PARTNER_TYPE_LABELS: Record<PartnerType, string> = {
+  hospitality: 'Hospitality',
+  operator: 'Operator',
+  media: 'Media',
+  brand: 'Brand',
+  other: 'Other',
+};
+
+// On type change in the create form, default can_run_pools to this. The
+// toggle remains user-editable; edit-form type changes don't re-default.
+const DEFAULT_CAN_RUN_POOLS_BY_TYPE: Record<PartnerType, boolean> = {
+  hospitality: false,
+  operator: true,
+  media: false,
+  brand: false,
+  other: false,
+};
+
 interface Partner {
   id: string;
   name: string;
@@ -51,6 +74,42 @@ interface Partner {
   // (default), the partner is sponsor-only — brand surfaces via perk /
   // broadcasts / roster, but cannot run pools. Migration 260515.
   can_run_pools: boolean;
+  // Stored as text in the DB; the app constrains to the PartnerType union.
+  partner_type: PartnerType | null;
+}
+
+// Image validation rules (spec §2 / §6.5). Banner is optional and not
+// rendered yet — upload is wired so partners can be set up now.
+const ALLOWED_MIME = ['image/png', 'image/jpeg', 'image/webp'] as const;
+const LOGO_MAX_BYTES   = 2 * 1024 * 1024;
+const BANNER_MAX_BYTES = 3 * 1024 * 1024;
+const BANNER_RATIO     = 1200 / 630; // 1.9047…
+const BANNER_RATIO_TOLERANCE = 0.05;
+
+interface PickedImage {
+  uri: string;
+  fileName: string;
+  type: string;
+  width: number;
+  height: number;
+  fileSize: number;
+}
+
+function validateLogoAsset(a: PickedImage): string | null {
+  if (!ALLOWED_MIME.includes(a.type as any)) return 'Logo must be PNG, JPG, or WebP.';
+  if (a.fileSize > LOGO_MAX_BYTES) return 'Logo must be 2MB or smaller.';
+  if (a.width !== a.height) return `Logo must be square. You picked ${a.width}×${a.height}.`;
+  return null;
+}
+
+function validateBannerAsset(a: PickedImage): string | null {
+  if (!ALLOWED_MIME.includes(a.type as any)) return 'Banner must be PNG, JPG, or WebP.';
+  if (a.fileSize > BANNER_MAX_BYTES) return 'Banner must be 3MB or smaller.';
+  const ratio = a.width / a.height;
+  if (Math.abs(ratio - BANNER_RATIO) / BANNER_RATIO > BANNER_RATIO_TOLERANCE) {
+    return `Banner must be ~1.91:1 (e.g. 1200×630). You picked ${a.width}×${a.height}.`;
+  }
+  return null;
 }
 
 /** Partners set 4 colors — the rest are auto-derived */
@@ -68,15 +127,18 @@ function slugify(name: string): string {
     .replace(/^-|-$/g, '');
 }
 
-/** Upload an image to Supabase Storage and return the public URL */
-async function uploadPartnerLogo(
-  slug: string,
+/** Upload a partner image (logo or banner) to Supabase Storage and return
+ *  the public URL. Path prefix is the partner.id (preferred — stable across
+ *  rename) or the slug (legacy edit path). Kind is the file basename. */
+async function uploadPartnerImage(
+  pathPrefix: string,
+  kind: 'logo' | 'banner',
   uri: string,
   fileName: string,
 ): Promise<string | null> {
   try {
     const ext = fileName.split('.').pop()?.toLowerCase() || 'png';
-    const storagePath = `${slug}/logo.${ext}`;
+    const storagePath = `${pathPrefix}/${kind}.${ext}`;
     const mimeType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
 
     // Get auth token for the upload
@@ -94,7 +156,7 @@ async function uploadPartnerLogo(
     const formData = new FormData();
     formData.append('file', {
       uri,
-      name: `logo.${ext}`,
+      name: `${kind}.${ext}`,
       type: mimeType,
     } as any);
 
@@ -149,6 +211,7 @@ export function PartnerAdminScreen() {
   const [editPerkText, setEditPerkText] = useState('');
   const [editPerkIcon, setEditPerkIcon] = useState('');
   const [editCanRunPools, setEditCanRunPools] = useState(false);
+  const [editPartnerType, setEditPartnerType] = useState<PartnerType>('other');
   const [saving, setSaving] = useState(false);
 
   // Create form state
@@ -161,7 +224,17 @@ export function PartnerAdminScreen() {
     background_color: HOTPICK_DEFAULTS.background_color,
     highlight_color: HOTPICK_DEFAULTS.highlight_color,
   });
-  const [formLogoUrl, setFormLogoUrl] = useState('');
+  // In the create flow we hold the picked file locally until INSERT returns
+  // a partner.id, then upload. Spec 260519 §6.5.
+  const [formLogoPick, setFormLogoPick]     = useState<PickedImage | null>(null);
+  const [formBannerPick, setFormBannerPick] = useState<PickedImage | null>(null);
+  // Default for new partners. Set when the partner_type changes; user can
+  // still flip the switch before submit.
+  const [formPartnerType, setFormPartnerType] = useState<PartnerType>('other');
+  const [formCanRunPools, setFormCanRunPools] = useState<boolean>(
+    DEFAULT_CAN_RUN_POOLS_BY_TYPE.other,
+  );
+  // Edit-flow logo upload (existing, slug-keyed path) stays unchanged.
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [creating, setCreating] = useState(false);
 
@@ -179,6 +252,8 @@ export function PartnerAdminScreen() {
     fetchPartners();
   }, [fetchPartners]);
 
+  /** Edit-flow: pick a logo and upload immediately to the slug-keyed
+   *  storage path. Used by the edit form which already knows the partner. */
   const pickAndUploadLogo = async (
     slug: string,
     onSuccess: (url: string) => void,
@@ -186,9 +261,8 @@ export function PartnerAdminScreen() {
     try {
       const result = await launchImageLibrary({
         mediaType: 'photo',
-        quality: 0.8,
-        maxWidth: 512,
-        maxHeight: 512,
+        quality: 0.9,
+        includeBase64: false,
       });
 
       if (result.didCancel || !result.assets?.[0]) return;
@@ -196,11 +270,27 @@ export function PartnerAdminScreen() {
       const asset = result.assets[0];
       if (!asset.uri) return;
 
+      const picked: PickedImage = {
+        uri: asset.uri,
+        fileName: asset.fileName || 'logo.png',
+        type: asset.type || 'image/png',
+        width: asset.width ?? 0,
+        height: asset.height ?? 0,
+        fileSize: asset.fileSize ?? 0,
+      };
+
+      const err = validateLogoAsset(picked);
+      if (err) {
+        Alert.alert('Logo Rejected', err);
+        return;
+      }
+
       setUploadingLogo(true);
-      const publicUrl = await uploadPartnerLogo(
+      const publicUrl = await uploadPartnerImage(
         slug,
-        asset.uri,
-        asset.fileName || 'logo.png',
+        'logo',
+        picked.uri,
+        picked.fileName,
       );
       setUploadingLogo(false);
 
@@ -212,6 +302,44 @@ export function PartnerAdminScreen() {
     } catch (err: any) {
       setUploadingLogo(false);
       Alert.alert('Pick/Upload Error', err?.message || String(err));
+    }
+  };
+
+  /** Create-flow: pick a file and validate, but defer the upload until we
+   *  have a partner.id. Spec 260519 §6.5 — id-keyed storage path. */
+  const pickAssetForCreate = async (
+    kind: 'logo' | 'banner',
+    onPick: (picked: PickedImage) => void,
+  ) => {
+    try {
+      const result = await launchImageLibrary({
+        mediaType: 'photo',
+        quality: 0.9,
+        includeBase64: false,
+      });
+      if (result.didCancel || !result.assets?.[0]) return;
+      const asset = result.assets[0];
+      if (!asset.uri) return;
+
+      const picked: PickedImage = {
+        uri: asset.uri,
+        fileName: asset.fileName || `${kind}.png`,
+        type: asset.type || 'image/png',
+        width: asset.width ?? 0,
+        height: asset.height ?? 0,
+        fileSize: asset.fileSize ?? 0,
+      };
+
+      const err =
+        kind === 'logo' ? validateLogoAsset(picked) : validateBannerAsset(picked);
+      if (err) {
+        Alert.alert(`${kind === 'logo' ? 'Logo' : 'Banner'} Rejected`, err);
+        return;
+      }
+
+      onPick(picked);
+    } catch (err: any) {
+      Alert.alert('Pick Error', err?.message || String(err));
     }
   };
 
@@ -258,12 +386,14 @@ export function PartnerAdminScreen() {
       formColors.highlight_color,
     );
 
+    // 1. INSERT the partner without logo/banner URLs — we don't have a
+    //    partner.id to key storage paths on yet.
     const brandConfig: BrandConfig = {
       partner_name: name,
       pool_label: name,
       ...derived,
       logo: {
-        full: formLogoUrl,
+        full: '',
         mark: '',
         wordmark: '',
         mono_light: '',
@@ -275,27 +405,99 @@ export function PartnerAdminScreen() {
       powered_by_hotpick: true,
     };
 
-    const {error} = await supabase.from('partners').insert({
-      name,
-      slug: finalSlug,
-      brand_config: brandConfig as unknown,
-      created_by: user.id,
-    });
+    const {data: inserted, error} = await supabase
+      .from('partners')
+      .insert({
+        name,
+        slug: finalSlug,
+        brand_config: brandConfig as unknown,
+        created_by: user.id,
+        partner_type: formPartnerType,
+        can_run_pools: formCanRunPools,
+      })
+      .select('id')
+      .single();
 
-    if (error) {
-      Alert.alert('Error', error.message);
-    } else {
-      setFormName('');
-      setFormColors({
-        primary_color: HOTPICK_DEFAULTS.primary_color,
-        secondary_color: HOTPICK_DEFAULTS.secondary_color,
-        background_color: HOTPICK_DEFAULTS.background_color,
-        highlight_color: HOTPICK_DEFAULTS.highlight_color,
-      });
-      setFormLogoUrl('');
-      setShowForm(false);
-      fetchPartners();
+    if (error || !inserted) {
+      Alert.alert('Error', error?.message ?? 'Failed to create partner.');
+      setCreating(false);
+      return;
     }
+
+    const partnerId = inserted.id as string;
+
+    // 2. Upload any picked assets to id-keyed storage paths. Failures
+    //    leave the partner intact (logo/banner blank) — user can retry
+    //    from the edit form.
+    let uploadedLogoUrl: string | null = null;
+    let uploadedBannerUrl: string | null = null;
+
+    if (formLogoPick) {
+      uploadedLogoUrl = await uploadPartnerImage(
+        partnerId,
+        'logo',
+        formLogoPick.uri,
+        formLogoPick.fileName,
+      );
+      if (!uploadedLogoUrl) {
+        Alert.alert(
+          'Logo Upload Failed',
+          'The partner was created but the logo did not upload. You can retry from the edit form.',
+        );
+      }
+    }
+
+    if (formBannerPick) {
+      uploadedBannerUrl = await uploadPartnerImage(
+        partnerId,
+        'banner',
+        formBannerPick.uri,
+        formBannerPick.fileName,
+      );
+      if (!uploadedBannerUrl) {
+        Alert.alert(
+          'Banner Upload Failed',
+          'The partner was created but the banner did not upload. You can retry from the edit form.',
+        );
+      }
+    }
+
+    // 3. If anything uploaded, UPDATE brand_config with the URLs.
+    if (uploadedLogoUrl || uploadedBannerUrl) {
+      const updatedConfig: BrandConfig = {
+        ...brandConfig,
+        logo: {
+          ...brandConfig.logo,
+          full: uploadedLogoUrl ?? '',
+        },
+        // Banner is wired but not rendered yet (spec §2). Store on
+        // brand_config so the snapshot owns it once render lands.
+        ...(uploadedBannerUrl
+          ? ({banner: {full: uploadedBannerUrl}} as Partial<BrandConfig>)
+          : {}),
+      };
+      const {error: updateErr} = await supabase
+        .from('partners')
+        .update({brand_config: updatedConfig as unknown})
+        .eq('id', partnerId);
+      if (updateErr) {
+        console.warn('Partner brand_config update failed:', updateErr.message);
+      }
+    }
+
+    setFormName('');
+    setFormColors({
+      primary_color: HOTPICK_DEFAULTS.primary_color,
+      secondary_color: HOTPICK_DEFAULTS.secondary_color,
+      background_color: HOTPICK_DEFAULTS.background_color,
+      highlight_color: HOTPICK_DEFAULTS.highlight_color,
+    });
+    setFormLogoPick(null);
+    setFormBannerPick(null);
+    setFormPartnerType('other');
+    setFormCanRunPools(DEFAULT_CAN_RUN_POOLS_BY_TYPE.other);
+    setShowForm(false);
+    fetchPartners();
     setCreating(false);
   };
 
@@ -407,6 +609,7 @@ export function PartnerAdminScreen() {
     setEditPerkText(partner.perk_text ?? '');
     setEditPerkIcon(partner.perk_icon ?? '');
     setEditCanRunPools(partner.can_run_pools ?? false);
+    setEditPartnerType((partner.partner_type as PartnerType) ?? 'other');
   };
 
   const handleSaveEdit = async (partner: Partner) => {
@@ -455,6 +658,7 @@ export function PartnerAdminScreen() {
           // perk_updated_at is auto-stamped by the partners_touch_perk_updated_at
           // trigger when perk_text or perk_icon changes.
           can_run_pools: editCanRunPools,
+          partner_type: editPartnerType,
         })
         .eq('id', partner.id);
 
@@ -521,7 +725,7 @@ export function PartnerAdminScreen() {
     </View>
   );
 
-  /** Shared logo section renderer */
+  /** Edit-flow logo renderer — uploads to slug-keyed path immediately. */
   const renderLogoSection = (
     logoUrl: string,
     slug: string,
@@ -529,6 +733,7 @@ export function PartnerAdminScreen() {
   ) => (
     <View style={styles.logoSection}>
       <Text style={styles.colorLabel}>Logo</Text>
+      <Text style={styles.colorHint}>Square (1:1), max 2MB. PNG, JPG, or WebP.</Text>
       {logoUrl ? (
         <View style={styles.logoPreviewRow}>
           <Image
@@ -560,6 +765,84 @@ export function PartnerAdminScreen() {
               <Text style={styles.logoUploadText}>Upload Logo</Text>
             </>
           )}
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
+  /** Partner-type selector — 5 pills, single-select. Spec 260519 §2. */
+  const renderPartnerTypeSelector = (
+    value: PartnerType,
+    onChange: (next: PartnerType) => void,
+  ) => (
+    <View style={styles.typeRow}>
+      {PARTNER_TYPES.map(type => {
+        const selected = type === value;
+        return (
+          <TouchableOpacity
+            key={type}
+            onPress={() => onChange(type)}
+            style={[
+              styles.typePill,
+              selected
+                ? {backgroundColor: colors.primary, borderColor: colors.primary}
+                : {borderColor: colors.border},
+            ]}>
+            <Text
+              style={[
+                styles.typePillText,
+                {color: selected ? colors.onPrimary : colors.textSecondary},
+              ]}>
+              {PARTNER_TYPE_LABELS[type]}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+
+  /** Create-flow asset picker — defers upload until INSERT returns id. */
+  const renderCreateAssetPicker = (
+    kind: 'logo' | 'banner',
+    picked: PickedImage | null,
+    onPick: (p: PickedImage | null) => void,
+    helpCopy: string,
+  ) => (
+    <View style={styles.logoSection}>
+      <Text style={styles.colorLabel}>{kind === 'logo' ? 'Logo' : 'Banner (optional)'}</Text>
+      <Text style={styles.colorHint}>{helpCopy}</Text>
+      {picked ? (
+        <View style={styles.logoPreviewRow}>
+          <Image
+            source={{uri: picked.uri}}
+            style={kind === 'logo' ? styles.logoPreview : styles.bannerPreview}
+            resizeMode="contain"
+          />
+          <View style={styles.assetMetaCol}>
+            <Text style={styles.colorHint}>{picked.width}×{picked.height}</Text>
+            <Text style={styles.colorHint}>
+              {(picked.fileSize / 1024).toFixed(0)} KB
+            </Text>
+            <View style={styles.assetActionRow}>
+              <TouchableOpacity
+                style={styles.logoChangeButton}
+                onPress={() => pickAssetForCreate(kind, onPick)}>
+                <Text style={styles.logoChangeText}>Change</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => onPick(null)} hitSlop={6}>
+                <Text style={[styles.resetText, {marginLeft: spacing.md}]}>Remove</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      ) : (
+        <TouchableOpacity
+          style={styles.logoUploadButton}
+          onPress={() => pickAssetForCreate(kind, onPick)}>
+          <Upload size={18} color={colors.textSecondary} />
+          <Text style={styles.logoUploadText}>
+            Pick {kind === 'logo' ? 'Logo' : 'Banner'}
+          </Text>
         </TouchableOpacity>
       )}
     </View>
@@ -636,12 +919,52 @@ export function PartnerAdminScreen() {
               ) : null}
             </View>
 
-            {/* Logo upload */}
-            {formName.trim()
-              ? renderLogoSection(formLogoUrl, slugify(formName.trim()), url =>
-                  setFormLogoUrl(url),
-                )
-              : null}
+            {/* Partner type — drives can_run_pools default on selection. */}
+            <Text style={styles.colorsHeading}>Partner Type</Text>
+            <Text style={styles.colorsDerivedNote}>
+              Sets a sensible default for "Can run pools" — you can still flip it.
+            </Text>
+            {renderPartnerTypeSelector(formPartnerType, next => {
+              setFormPartnerType(next);
+              setFormCanRunPools(DEFAULT_CAN_RUN_POOLS_BY_TYPE[next]);
+            })}
+
+            {/* Partner class toggle (parity with edit form). */}
+            <View style={styles.classRow}>
+              <View style={styles.classCopy}>
+                <Text style={styles.classLabel}>
+                  {formCanRunPools
+                    ? 'Can create & join pools as a partner'
+                    : 'Sponsor only — cannot run or join pools'}
+                </Text>
+                <Text style={styles.colorsDerivedNote}>
+                  {formCanRunPools
+                    ? 'Partner-staff accounts can be added to pools in the partner role.'
+                    : 'Brand still surfaces via perks, broadcasts, and roster.'}
+                </Text>
+              </View>
+              <Switch
+                value={formCanRunPools}
+                onValueChange={setFormCanRunPools}
+                trackColor={{false: colors.border, true: colors.primary}}
+                thumbColor={colors.onPrimary}
+                ios_backgroundColor={colors.border}
+              />
+            </View>
+
+            {/* Logo + banner — deferred upload (after INSERT returns id). */}
+            {renderCreateAssetPicker(
+              'logo',
+              formLogoPick,
+              setFormLogoPick,
+              'Square (1:1), max 2MB. PNG, JPG, or WebP.',
+            )}
+            {renderCreateAssetPicker(
+              'banner',
+              formBannerPick,
+              setFormBannerPick,
+              '1.91:1 (e.g. 1200×630), max 3MB. PNG, JPG, or WebP. Wired now, rendered later.',
+            )}
 
             {/* 3 color fields */}
             <Text style={styles.colorsHeading}>Brand Colors</Text>
@@ -734,6 +1057,15 @@ export function PartnerAdminScreen() {
                       </View>
                     ) : null}
                     <Text style={styles.partnerName}>{partner.name}</Text>
+                    {partner.partner_type && (
+                      <View style={styles.typeBadge}>
+                        <Text style={styles.typeBadgeText}>
+                          {PARTNER_TYPE_LABELS[
+                            (partner.partner_type as PartnerType) ?? 'other'
+                          ]?.toUpperCase() ?? 'OTHER'}
+                        </Text>
+                      </View>
+                    )}
                     {!partner.can_run_pools && (
                       <View style={styles.classBadge}>
                         <Text style={styles.classBadgeText}>SPONSOR ONLY</Text>
@@ -787,6 +1119,11 @@ export function PartnerAdminScreen() {
                       placeholderTextColor={colors.textSecondary}
                       autoCapitalize="words"
                     />
+
+                    {/* Partner type — editable. Changing here does NOT
+                        re-default can_run_pools (avoid surprise overrides). */}
+                    <Text style={styles.colorsHeading}>Partner Type</Text>
+                    {renderPartnerTypeSelector(editPartnerType, setEditPartnerType)}
 
                     {/* Logo in edit mode */}
                     {renderLogoSection(editLogoUrl, partner.slug, url =>
@@ -1341,6 +1678,56 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.8,
     color: colors.textTertiary,
+  },
+  typeBadge: {
+    marginLeft: spacing.sm,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: 'transparent',
+  },
+  typeBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    color: colors.primary,
+  },
+  typeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginBottom: spacing.md,
+  },
+  typePill: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+    backgroundColor: 'transparent',
+  },
+  typePillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+  bannerPreview: {
+    width: 120,
+    height: 63,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  assetMetaCol: {
+    flex: 1,
+    gap: 2,
+  },
+  assetActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.xs,
   },
 
   // Pool assign

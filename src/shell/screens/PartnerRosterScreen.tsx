@@ -28,6 +28,7 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation, useRoute, type RouteProp} from '@react-navigation/native';
 import {ChevronLeft} from 'lucide-react-native';
+import {PerkIcon} from '@shell/components/home/PerkIcon';
 import {useTheme} from '@shell/theme/hooks';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {supabase} from '@shared/config/supabase';
@@ -241,7 +242,13 @@ export function PartnerRosterScreen() {
             <Text style={[bodyType.bold, styles.perkEyebrow, {color: partnerPrimary}]}>
               PARTNER PERK
             </Text>
-            <Text style={styles.perkIcon}>{partner.perk_icon ?? '🎁'}</Text>
+            <PerkIcon
+              name={partner.perk_icon}
+              size={48}
+              color={partnerPrimary}
+              emojiStyle={styles.perkIcon}
+            />
+
             <Text
               style={[
                 displayType.display,
@@ -315,13 +322,19 @@ export function PartnerRosterScreen() {
               <Text
                 style={[bodyType.bold, styles.poolName, {color: colors.textPrimary}]}
                 numberOfLines={1}>
-                {pool.name_display || pool.name}
+                {pool.name}
               </Text>
               <Text style={[bodyType.regular, styles.poolCta, {color: partnerPrimary}]}>
                 View pool ›
               </Text>
             </Pressable>
           ))}
+          {/* SmackTalk roadmap placeholder. Static, non-interactive — feature
+              roadmapped, not built. Spec 260519 §6.4. */}
+          <Text
+            style={[bodyType.regular, styles.smackPlaceholder, {color: colors.textTertiary}]}>
+            💬 Cross-pool chat coming to your roster — stay tuned.
+          </Text>
         </View>
 
         <View style={styles.footer}>
@@ -480,6 +493,12 @@ const styles = StyleSheet.create({
   },
   poolName: {flex: 1, fontSize: 15, paddingLeft: spacing.md, paddingRight: spacing.sm},
   poolCta:  {fontSize: 13, fontFamily: 'Manrope-Bold'},
+  smackPlaceholder: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    paddingTop: spacing.md,
+    paddingHorizontal: spacing.xs,
+  },
 
   footer: {marginTop: spacing.xl, alignItems: 'center'},
 

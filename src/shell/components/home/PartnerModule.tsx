@@ -13,6 +13,7 @@ import type {DbPool} from '@shared/types/database';
 import {hexToRgba} from '@shared/utils/color';
 import {LogoMark} from './LogoMark';
 import {partnerInitials} from './teamColors';
+import {PerkIcon} from './PerkIcon';
 
 const RECENT_WINDOW_MS = 60 * 60 * 1000;
 
@@ -38,7 +39,6 @@ export function PartnerModule({partnerId, alignedPools}: PartnerModuleProps) {
   if (!partner) return null;
 
   const tint = partner.primary_color ?? colors.primary;
-  const firstAlignedPool = alignedPools[0];
 
   const openRoster = () => {
     navigation.navigate('PartnerRoster', {slug: partner.slug});
@@ -74,16 +74,6 @@ export function PartnerModule({partnerId, alignedPools}: PartnerModuleProps) {
             numberOfLines={1}>
             {partner.name.toUpperCase()}
           </Text>
-          {firstAlignedPool && (
-            <Text
-              style={[bodyType.regular, styles.viaText, {color: colors.textTertiary}]}
-              numberOfLines={1}>
-              via{' '}
-              <Text style={{color: colors.textSecondary}}>
-                {firstAlignedPool.name_display || firstAlignedPool.name}
-              </Text>
-            </Text>
-          )}
         </View>
 
         {showNewBadge && (
@@ -104,13 +94,9 @@ export function PartnerModule({partnerId, alignedPools}: PartnerModuleProps) {
       </View>
 
       <View style={[styles.perkRow, {borderTopColor: colors.border}]}>
-        {partner.perk_icon ? (
-          <Text style={styles.perkIcon} numberOfLines={1}>
-            {partner.perk_icon}
-          </Text>
-        ) : (
-          <View style={[styles.perkDot, {backgroundColor: tint}]} />
-        )}
+        <View style={styles.perkIconBox}>
+          <PerkIcon name={partner.perk_icon} size={14} color={tint} />
+        </View>
         <Text
           style={[bodyType.regular, styles.perkText, {color: colors.textSecondary}]}
           numberOfLines={1}>
@@ -180,16 +166,10 @@ const styles = StyleSheet.create({
     // a solid hairline reads as the same separator visually in dark mode.
     borderTopWidth: 1,
   },
-  perkIcon: {
-    fontSize: 14,
+  perkIconBox: {
     width: 18,
-    textAlign: 'center',
-  },
-  perkDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginHorizontal: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   perkText: {
     flex: 1,
