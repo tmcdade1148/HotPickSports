@@ -5,6 +5,8 @@ import {
   TextInput,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
+  Modal,
   ScrollView,
   Share,
   StyleSheet,
@@ -70,6 +72,23 @@ export function PoolSettingsScreen() {
   const [saving, setSaving] = useState(false);
   const [broadcastVisible, setBroadcastVisible] = useState(false);
 
+  // Partner perk + broadcast — only when pool.partner_id is set. The
+  // organizer of a partner-aligned pool is the de facto Partner Admin
+  // for that partner; update_partner_perk RPC and the
+  // send-partner-broadcast Edge Function authorize on the same shape.
+  const [partnerRow, setPartnerRow] = useState<{
+    id: string;
+    name: string;
+    perk_text: string | null;
+    perk_icon: string | null;
+  } | null>(null);
+  const [perkText, setPerkText] = useState('');
+  const [perkIcon, setPerkIcon] = useState('');
+  const [perkSaving, setPerkSaving] = useState(false);
+  const [partnerBroadcastVisible, setPartnerBroadcastVisible] = useState(false);
+  const [partnerBroadcastMessage, setPartnerBroadcastMessage] = useState('');
+  const [partnerBroadcastSending, setPartnerBroadcastSending] = useState(false);
+
   // Invite codes — full list for this pool. Only organizers can read these
   // (RLS policy on pool_invite_codes). Writes go through SECURITY DEFINER RPCs.
   const [codes, setCodes] = useState<InviteCodeRow[]>([]);
@@ -96,6 +115,85 @@ export function PoolSettingsScreen() {
   useEffect(() => {
     fetchCodes();
   }, [fetchCodes]);
+
+  useEffect(() => {
+    if (!pool?.partner_id) {
+      setPartnerRow(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const {data} = await supabase
+        .from('partners')
+        .select('id, name, perk_text, perk_icon')
+        .eq('id', pool.partner_id)
+        .maybeSingle();
+      if (cancelled || !data) return;
+      setPartnerRow(data as any);
+      setPerkText(data.perk_text ?? '');
+      setPerkIcon(data.perk_icon ?? '');
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [pool?.partner_id]);
+
+  const perkDirty =
+    partnerRow !== null &&
+    (perkText.trim() !== (partnerRow.perk_text ?? '') ||
+      perkIcon.trim() !== (partnerRow.perk_icon ?? ''));
+
+  const handleSavePerk = async () => {
+    if (!partnerRow || !perkDirty) return;
+    if (perkText.length > 120) {
+      Alert.alert('Perk too long', 'Max 120 characters.');
+      return;
+    }
+    setPerkSaving(true);
+    const {error} = await supabase.rpc('update_partner_perk', {
+      p_partner_id: partnerRow.id,
+      p_perk_text: perkText.trim().length === 0 ? null : perkText.trim(),
+      p_perk_icon: perkIcon.trim().length === 0 ? null : perkIcon.trim(),
+    });
+    setPerkSaving(false);
+    if (error) {
+      Alert.alert('Could not save', error.message);
+      return;
+    }
+    setPartnerRow(prev =>
+      prev
+        ? {
+            ...prev,
+            perk_text: perkText.trim() || null,
+            perk_icon: perkIcon.trim() || null,
+          }
+        : prev,
+    );
+    Alert.alert('Saved', `${partnerRow.name}'s perk updated.`);
+  };
+
+  const handleSendPartnerBroadcast = async () => {
+    if (!partnerRow) return;
+    const message = partnerBroadcastMessage.trim();
+    if (message.length === 0) return;
+    setPartnerBroadcastSending(true);
+    const {data, error} = await supabase.functions.invoke('send-partner-broadcast', {
+      body: {partner_id: partnerRow.id, message},
+    });
+    setPartnerBroadcastSending(false);
+    if (error) {
+      Alert.alert('Could not send', error.message ?? 'Unknown error');
+      return;
+    }
+    setPartnerBroadcastVisible(false);
+    setPartnerBroadcastMessage('');
+    Alert.alert(
+      'Broadcast sent',
+      `Reached ${data?.recipient_count ?? '—'} ${
+        (data?.recipient_count ?? 0) === 1 ? 'person' : 'people'
+      } on ${partnerRow.name}'s roster.`,
+    );
+  };
 
   if (!pool) {
     return (
@@ -453,6 +551,67 @@ export function PoolSettingsScreen() {
         </TouchableOpacity>
 
         <Text style={styles.sectionTitle}>Partner</Text>
+
+        {pool.partner_id && partnerRow && (
+          <View style={styles.partnerCard}>
+            <Text style={styles.partnerCardTitle}>
+              {partnerRow.name} perk
+            </Text>
+            <Text style={styles.partnerCardHint}>
+              Shows on every pool aligned with {partnerRow.name}. Max 120 chars.
+            </Text>
+            <View style={styles.perkInputRow}>
+              <TextInput
+                style={styles.perkIconInput}
+                value={perkIcon}
+                onChangeText={setPerkIcon}
+                placeholder="🎁"
+                placeholderTextColor={colors.textSecondary}
+                maxLength={16}
+              />
+              <TextInput
+                style={styles.perkTextInput}
+                value={perkText}
+                onChangeText={text => {
+                  if (text.length <= 120) setPerkText(text);
+                }}
+                placeholder="$1 off any draft, Sundays."
+                placeholderTextColor={colors.textSecondary}
+                multiline
+                maxLength={120}
+              />
+            </View>
+            <Text style={styles.perkCharCount}>{perkText.length}/120</Text>
+            <TouchableOpacity
+              style={[
+                styles.perkSaveButton,
+                (!perkDirty || perkSaving) && styles.perkSaveButtonDisabled,
+              ]}
+              onPress={handleSavePerk}
+              disabled={!perkDirty || perkSaving}>
+              {perkSaving ? (
+                <ActivityIndicator size="small" color={colors.onPrimary} />
+              ) : (
+                <Text style={styles.perkSaveText}>Save Perk</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {pool.partner_id && partnerRow && (
+          <TouchableOpacity
+            style={[styles.broadcastButton, {borderColor: accentColor}]}
+            onPress={() => {
+              setPartnerBroadcastMessage('');
+              setPartnerBroadcastVisible(true);
+            }}>
+            <Megaphone size={18} color={accentColor} />
+            <Text style={[styles.broadcastText, {color: accentColor}]}>
+              Send {partnerRow.name} Broadcast
+            </Text>
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity
           style={[styles.broadcastButton, {borderColor: colors.primary}]}
           onPress={() => navigation.navigate('PartnerDirectory', {poolId})}>
@@ -486,6 +645,64 @@ export function PoolSettingsScreen() {
         visible={broadcastVisible}
         onClose={() => setBroadcastVisible(false)}
       />
+
+      <Modal
+        visible={partnerBroadcastVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPartnerBroadcastVisible(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>
+              Broadcast from {partnerRow?.name ?? 'Partner'}
+            </Text>
+            <Text style={styles.modalHint}>
+              Sends to every member of every pool aligned with this partner.
+              Max 280 chars. Rate limit: 3 per 24h.
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              value={partnerBroadcastMessage}
+              onChangeText={text => {
+                if (text.length <= 280) setPartnerBroadcastMessage(text);
+              }}
+              placeholder="Game day at the bar — $1 drafts, kickoff at 1pm…"
+              placeholderTextColor={colors.textSecondary}
+              multiline
+              autoFocus
+              maxLength={280}
+            />
+            <Text style={styles.perkCharCount}>
+              {partnerBroadcastMessage.length}/280
+            </Text>
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                onPress={() => setPartnerBroadcastVisible(false)}
+                disabled={partnerBroadcastSending}>
+                <Text style={styles.modalCancel}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalSubmit,
+                  (partnerBroadcastMessage.trim().length === 0 ||
+                    partnerBroadcastSending) &&
+                    styles.perkSaveButtonDisabled,
+                ]}
+                onPress={handleSendPartnerBroadcast}
+                disabled={
+                  partnerBroadcastMessage.trim().length === 0 ||
+                  partnerBroadcastSending
+                }>
+                {partnerBroadcastSending ? (
+                  <ActivityIndicator size="small" color={colors.onPrimary} />
+                ) : (
+                  <Text style={styles.modalSubmitText}>Send</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -759,6 +976,143 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderColor: colors.primary,
     padding: spacing.md,
     marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  partnerCard: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    gap: 4,
+  },
+  partnerCardTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  partnerCardHint: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+  perkInputRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  perkIconInput: {
+    width: 56,
+    minHeight: 48,
+    paddingVertical: 6,
+    paddingHorizontal: spacing.sm,
+    fontSize: 22,
+    textAlign: 'center',
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    color: colors.textPrimary,
+  },
+  perkTextInput: {
+    flex: 1,
+    minHeight: 48,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    fontSize: 13,
+    lineHeight: 18,
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    color: colors.textPrimary,
+    textAlignVertical: 'top',
+  },
+  perkCharCount: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    textAlign: 'right',
+    marginTop: 4,
+  },
+  perkSaveButton: {
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+  perkSaveButtonDisabled: {
+    opacity: 0.4,
+  },
+  perkSaveText: {
+    color: colors.onPrimary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: 4,
+  },
+  modalHint: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginBottom: spacing.md,
+    lineHeight: 17,
+  },
+  modalInput: {
+    minHeight: 96,
+    padding: spacing.md,
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.textPrimary,
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    textAlignVertical: 'top',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: spacing.lg,
+    marginTop: spacing.md,
+  },
+  modalCancel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  modalSubmit: {
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.md,
+  },
+  modalSubmitText: {
+    color: colors.onPrimary,
+    fontSize: 14,
+    fontWeight: '700',
   },
   broadcastText: {
     fontSize: 15,

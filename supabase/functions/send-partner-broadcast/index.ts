@@ -6,10 +6,11 @@
 // not a pool. Writes one row to partner_notifications and enqueues push
 // notifications via notification_queue.
 //
-// Auth model (v1):
-//   • Caller MUST be a super admin (profiles.is_super_admin = true).
-//   • Partners do not self-serve. Tom (or a HotPick operator) sends
-//     on the partner's behalf from PartnerAdminScreen.
+// Auth model (v2):
+//   • Caller is super admin, OR
+//   • Caller is the organizer/admin of an active pool aligned with the
+//     partner. The Organizer of the partner-owned pool is the de facto
+//     Partner Admin and can broadcast on the partner's behalf.
 //
 // Steps:
 //   1. Verify caller is super admin                              → 403
@@ -86,14 +87,12 @@ Deno.serve(async (req) => {
       return json({ error: "Invalid auth token" }, 403);
     }
 
-    const { data: profile, error: profileErr } = await supabase
+    const { data: profile } = await supabase
       .from("profiles")
       .select("is_super_admin")
       .eq("id", caller.id)
       .maybeSingle();
-    if (profileErr || !profile?.is_super_admin) {
-      return json({ error: "Super admin required" }, 403);
-    }
+    const isSuperAdmin = profile?.is_super_admin === true;
 
     // -----------------------------------------------------------------------
     // Body validation.
@@ -135,6 +134,27 @@ Deno.serve(async (req) => {
         { error: "Partner must have a perk configured before broadcasting." },
         409,
       );
+    }
+
+    // -----------------------------------------------------------------------
+    // Authorize: super-admin OR organizer of any pool aligned with partner.
+    // -----------------------------------------------------------------------
+    if (!isSuperAdmin) {
+      const { data: orgMembership } = await supabase
+        .from("pool_members")
+        .select("pool_id, pools!inner(partner_id, is_archived)")
+        .eq("user_id", caller.id)
+        .in("role", ["organizer", "admin"])
+        .eq("status", "active")
+        .eq("pools.partner_id", partnerId)
+        .eq("pools.is_archived", false)
+        .limit(1);
+      if (!orgMembership || orgMembership.length === 0) {
+        return json(
+          { error: "Not authorized to broadcast for this partner" },
+          403,
+        );
+      }
     }
 
     // -----------------------------------------------------------------------

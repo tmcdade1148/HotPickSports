@@ -76,9 +76,6 @@ interface Partner {
   can_run_pools: boolean;
   // Stored as text in the DB; the app constrains to the PartnerType union.
   partner_type: PartnerType | null;
-  // User assigned to manage this partner's perk and broadcasts. Null if
-  // no admin yet — super-admin still has full control.
-  admin_user_id: string | null;
 }
 
 // react-native-image-picker returns `asset.type` inconsistently across
@@ -315,10 +312,8 @@ export function PartnerAdminScreen() {
   const styles = createStyles(colors);
   const navigation = useNavigation<any>();
   const user = useGlobalStore(s => s.user);
-  const userProfile = useGlobalStore(s => s.userProfile);
   const userPools = useGlobalStore(s => s.userPools);
   const updatePoolBrandConfig = useGlobalStore(s => s.updatePoolBrandConfig);
-  const isSuperAdmin = !!userProfile?.is_super_admin;
 
   const [partners, setPartners] = useState<Partner[]>([]);
   const [loading, setLoading] = useState(true);
@@ -335,7 +330,6 @@ export function PartnerAdminScreen() {
   const [editPerkIcon, setEditPerkIcon] = useState('');
   const [editCanRunPools, setEditCanRunPools] = useState(false);
   const [editPartnerType, setEditPartnerType] = useState<PartnerType>('other');
-  const [editAdminUserId, setEditAdminUserId] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [creatingPoolForPartnerId, setCreatingPoolForPartnerId] = useState<string | null>(null);
   // partner_id → existing pool id+name, so we know whether to show
@@ -405,14 +399,10 @@ export function PartnerAdminScreen() {
   const fetchPartners = useCallback(async () => {
     if (!user?.id) return;
     setLoading(true);
-    // Super-admin sees all partners; everyone else sees only the partners
-    // they administer. Server-side RLS doesn't filter SELECT (public read),
-    // so the scope is enforced here on the client.
-    let query = supabase.from('partners').select('*').order('created_at', {ascending: false});
-    if (!isSuperAdmin) {
-      query = query.eq('admin_user_id', user.id);
-    }
-    const {data} = await query;
+    const {data} = await supabase
+      .from('partners')
+      .select('*')
+      .order('created_at', {ascending: false});
     setPartners((data as Partner[]) ?? []);
 
     // Pool count per partner — drives the create-vs-view CTA in each card.
@@ -430,7 +420,7 @@ export function PartnerAdminScreen() {
     setPartnerPoolByPartnerId(byPartner);
 
     setLoading(false);
-  }, [user?.id, isSuperAdmin]);
+  }, [user?.id]);
 
   useEffect(() => {
     fetchPartners();
@@ -636,7 +626,6 @@ export function PartnerAdminScreen() {
     setEditPerkIcon(partner.perk_icon ?? '');
     setEditCanRunPools(partner.can_run_pools ?? false);
     setEditPartnerType((partner.partner_type as PartnerType) ?? 'other');
-    setEditAdminUserId(partner.admin_user_id ?? '');
   };
 
   const handleCreatePartnerPool = async (partner: Partner) => {
@@ -701,26 +690,17 @@ export function PartnerAdminScreen() {
         return;
       }
 
-      // Partner admins can update their perk + brand only. Super-admin
-      // owns name/slug/type/can_run_pools/admin assignment; sending those
-      // fields when not super_admin would 403 against the partner_admin
-      // RLS policy. Two-shape update keeps the path explicit.
-      const updatePayload: Record<string, unknown> = {
-        brand_config: updatedConfig as unknown,
-        perk_text: trimmedPerk.length === 0 ? null : trimmedPerk,
-        perk_icon: editPerkIcon.trim().length === 0 ? null : editPerkIcon.trim(),
-      };
-      if (isSuperAdmin) {
-        updatePayload.name = editName.trim();
-        updatePayload.slug = slugify(editName.trim());
-        updatePayload.can_run_pools = editCanRunPools;
-        updatePayload.partner_type = editPartnerType;
-        updatePayload.admin_user_id =
-          editAdminUserId.trim().length === 0 ? null : editAdminUserId.trim();
-      }
       const {error} = await supabase
         .from('partners')
-        .update(updatePayload)
+        .update({
+          name: editName.trim(),
+          slug: slugify(editName.trim()),
+          brand_config: updatedConfig as unknown,
+          perk_text: trimmedPerk.length === 0 ? null : trimmedPerk,
+          perk_icon: editPerkIcon.trim().length === 0 ? null : editPerkIcon.trim(),
+          can_run_pools: editCanRunPools,
+          partner_type: editPartnerType,
+        })
         .eq('id', partner.id);
 
       if (error) {
@@ -1288,95 +1268,61 @@ export function PartnerAdminScreen() {
                 {/* Edit form */}
                 {isEditing && (
                   <View style={styles.editSection}>
-                    {isSuperAdmin ? (
-                      <TextInput
-                        style={styles.nameInput}
-                        value={editName}
-                        onChangeText={setEditName}
-                        placeholder="Partner name"
-                        placeholderTextColor={colors.textSecondary}
-                        autoCapitalize="words"
-                      />
-                    ) : (
-                      <Text style={[styles.nameInput, {color: colors.textPrimary, paddingVertical: spacing.md}]}>
-                        {editName}
-                      </Text>
-                    )}
+                    <TextInput
+                      style={styles.nameInput}
+                      value={editName}
+                      onChangeText={setEditName}
+                      placeholder="Partner name"
+                      placeholderTextColor={colors.textSecondary}
+                      autoCapitalize="words"
+                    />
 
-                    {isSuperAdmin && (
-                      <>
-                        <Text style={styles.colorsHeading}>Partner Type</Text>
-                        {renderPartnerTypeSelector(editPartnerType, setEditPartnerType)}
-                      </>
-                    )}
+                    <Text style={styles.colorsHeading}>Partner Type</Text>
+                    {renderPartnerTypeSelector(editPartnerType, setEditPartnerType)}
 
                     {renderLogoLibraryPicker(partner.slug, editLogoUrl || null, url =>
                       setEditLogoUrl(url ?? ''),
                     )}
 
-                    {isSuperAdmin && (
-                      <>
-                        <Text style={styles.colorsHeading}>Brand Colors</Text>
-                        <Text style={styles.colorsDerivedNote}>
-                          Surface and text colors are auto-derived.
-                        </Text>
-                        <View style={styles.colorGrid}>
-                          {COLOR_FIELDS.map(({key, label, hint}) =>
-                            renderColorField(
-                              key,
-                              label,
-                              hint,
-                              editColors[key] || '',
-                              text =>
-                                setEditColors(prev => ({...prev, [key]: text})),
-                            ),
-                          )}
-                        </View>
-                      </>
-                    )}
+                    <Text style={styles.colorsHeading}>Brand Colors</Text>
+                    <Text style={styles.colorsDerivedNote}>
+                      Surface and text colors are auto-derived.
+                    </Text>
+                    <View style={styles.colorGrid}>
+                      {COLOR_FIELDS.map(({key, label, hint}) =>
+                        renderColorField(
+                          key,
+                          label,
+                          hint,
+                          editColors[key] || '',
+                          text =>
+                            setEditColors(prev => ({...prev, [key]: text})),
+                        ),
+                      )}
+                    </View>
 
-                    {isSuperAdmin && (
-                      <>
-                        <Text style={styles.colorsHeading}>Partner Class</Text>
-                        <View style={styles.classRow}>
-                          <View style={styles.classCopy}>
-                            <Text style={styles.classLabel}>
-                              {editCanRunPools
-                                ? 'Can create & join pools as a partner'
-                                : 'Sponsor only — cannot run or join pools'}
-                            </Text>
-                            <Text style={styles.colorsDerivedNote}>
-                              {editCanRunPools
-                                ? 'Operator partner: can run their own pool with their invite code.'
-                                : 'Sponsor-only: brand surfaces via perk + broadcasts + roster, but the partner cannot run a pool. Organizers find them in the partner directory.'}
-                            </Text>
-                          </View>
-                          <Switch
-                            value={editCanRunPools}
-                            onValueChange={setEditCanRunPools}
-                            trackColor={{false: colors.border, true: colors.primary}}
-                            thumbColor={colors.onPrimary}
-                            ios_backgroundColor={colors.border}
-                          />
-                        </View>
-
-                        <Text style={styles.colorsHeading}>Partner Admin (User ID)</Text>
-                        <Text style={styles.colorsDerivedNote}>
-                          Assign a real user as this partner's admin. They can edit the
-                          perk and send broadcasts. Paste their profile id, or leave
-                          blank to keep super-admin-only.
+                    <Text style={styles.colorsHeading}>Partner Class</Text>
+                    <View style={styles.classRow}>
+                      <View style={styles.classCopy}>
+                        <Text style={styles.classLabel}>
+                          {editCanRunPools
+                            ? 'Can create & join pools as a partner'
+                            : 'Sponsor only — cannot run or join pools'}
                         </Text>
-                        <TextInput
-                          style={styles.nameInput}
-                          value={editAdminUserId}
-                          onChangeText={setEditAdminUserId}
-                          placeholder="00000000-0000-0000-0000-000000000000"
-                          placeholderTextColor={colors.textSecondary}
-                          autoCapitalize="none"
-                          autoCorrect={false}
-                        />
-                      </>
-                    )}
+                        <Text style={styles.colorsDerivedNote}>
+                          {editCanRunPools
+                            ? 'Operator partner: can run their own pool with their invite code.'
+                            : 'Sponsor-only: brand surfaces via perk + broadcasts + roster, but the partner cannot run a pool. Organizers find them in the partner directory.'}
+                        </Text>
+                      </View>
+                      <Switch
+                        value={editCanRunPools}
+                        onValueChange={setEditCanRunPools}
+                        trackColor={{false: colors.border, true: colors.primary}}
+                        thumbColor={colors.onPrimary}
+                        ios_backgroundColor={colors.border}
+                      />
+                    </View>
 
                     {/* Partner-owned pool — only meaningful when can_run_pools. */}
                     {editCanRunPools && (() => {
