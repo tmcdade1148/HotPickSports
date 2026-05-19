@@ -313,7 +313,6 @@ export function PartnerAdminScreen() {
   const navigation = useNavigation<any>();
   const user = useGlobalStore(s => s.user);
   const userPools = useGlobalStore(s => s.userPools);
-  const activePoolId = useGlobalStore(s => s.activePoolId);
   const updatePoolBrandConfig = useGlobalStore(s => s.updatePoolBrandConfig);
 
   const [partners, setPartners] = useState<Partner[]>([]);
@@ -578,71 +577,6 @@ export function PartnerAdminScreen() {
     setCreating(false);
   };
 
-  const handleAssignToPool = async (partner: Partner, poolId: string) => {
-    // Gate: only partners flagged as can_run_pools may be assigned to a
-    // pool. Sponsor-only partners still surface via perk / broadcasts /
-    // roster but cannot be a pool's presenting partner. Server-side
-    // trigger (260515_partner_can_run_pools) enforces this independently.
-    if (!partner.can_run_pools) {
-      Alert.alert(
-        'Partner is sponsor-only',
-        `${partner.name} is set to sponsor-only. Flip the "Partner Class" switch in this partner's settings to allow pool assignment.`,
-      );
-      return;
-    }
-
-    const brandConfig = partner.brand_config as unknown as BrandConfig;
-    const partnerSlug = partner.slug;
-
-    const {error} = await supabase
-      .from('pools')
-      .update({
-        brand_config: brandConfig as unknown,
-        partner_id: partner.id,
-        invite_slug: partnerSlug,
-      })
-      .eq('id', poolId);
-
-    if (error) {
-      Alert.alert('Error', error.message);
-      return;
-    }
-
-    updatePoolBrandConfig(poolId, brandConfig);
-
-    // Add the partner slug as an additional invite code on the pool (6–12
-    // chars, alphanumeric). Letters-only of the slug, uppercased.
-    // The primary auto-generated code on the pool is unchanged; this is an
-    // extra code so signage / posters can use the partner name. If the
-    // sluggified result doesn't fit the rules, we silently skip — the pool
-    // is still joinable via its primary code.
-    const partnerCode = partnerSlug.replace(/[^0-9a-z]/gi, '').toUpperCase();
-    let partnerCodeAdded = false;
-    if (partnerCode.length >= 6 && partnerCode.length <= 12) {
-      const {data: rpcData} = await supabase.rpc('add_pool_invite_code', {
-        p_pool_id: poolId,
-        p_code: partnerCode,
-        p_label: `${partner.name} signage`,
-        p_is_primary: false,
-      });
-      // CODE_TAKEN is non-fatal — somebody else already has this code or
-      // this pool already has it. Treat as "fine, move on."
-      partnerCodeAdded = !rpcData?.error;
-    }
-
-    const pool = userPools.find(p => p.id === poolId);
-    const codeNote = partnerCodeAdded
-      ? `\n\nExtra invite code for signage: ${partnerCode}`
-      : partnerCode.length >= 6 && partnerCode.length <= 12
-        ? `\n\n(Signage code "${partnerCode}" was already taken — primary pool code still works.)`
-        : '';
-    Alert.alert(
-      'Assigned',
-      `${partner.name} brand applied to ${pool?.name ?? 'pool'}.${codeNote}`,
-    );
-    setExpandedPartnerId(null);
-  };
-
   const handleShareQR = async (partner: Partner) => {
     const url = `https://hotpick.app/${partner.slug}`;
     try {
@@ -653,23 +587,6 @@ export function PartnerAdminScreen() {
     } catch {
       // User cancelled share
     }
-  };
-
-  const handleResetPool = async (poolId: string) => {
-    const {error} = await supabase
-      .from('pools')
-      .update({brand_config: null, partner_id: null})
-      .eq('id', poolId);
-
-    if (error) {
-      Alert.alert('Error', error.message);
-      return;
-    }
-
-    updatePoolBrandConfig(poolId, null);
-
-    const pool = userPools.find(p => p.id === poolId);
-    Alert.alert('Reset', `${pool?.name ?? 'Pool'} reverted to HotPick defaults.`);
   };
 
   const startEditing = (partner: Partner) => {
@@ -1417,49 +1334,11 @@ export function PartnerAdminScreen() {
                   </View>
                 )}
 
-                {/* Assign to Pool + QR Code — expanded view */}
+                {/* Signage + QR Code — expanded view. Pool alignment moves
+                    to the organizer side (PartnerDirectoryScreen); see
+                    260519 Partner-Pool model rework. */}
                 {isExpanded && (
                   <>
-                    <View style={styles.poolList}>
-                      <Text style={styles.poolListLabel}>Assign to pool:</Text>
-                      {userPools.map(pool => {
-                        const hasBrand = pool.brand_config != null;
-                        return (
-                          <View key={pool.id} style={styles.poolAssignRow}>
-                            <Text
-                              style={styles.poolAssignName}
-                              numberOfLines={1}>
-                              {pool.name}
-                              {pool.id === activePoolId ? ' (Active)' : ''}
-                            </Text>
-                            <View style={styles.poolAssignActions}>
-                              {hasBrand && (
-                                <TouchableOpacity
-                                  onPress={() => handleResetPool(pool.id)}
-                                  hitSlop={{
-                                    top: 6,
-                                    bottom: 6,
-                                    left: 6,
-                                    right: 6,
-                                  }}>
-                                  <Text style={styles.resetText}>Reset</Text>
-                                </TouchableOpacity>
-                              )}
-                              <TouchableOpacity
-                                style={styles.assignButton}
-                                onPress={() =>
-                                  handleAssignToPool(partner, pool.id)
-                                }>
-                                <Text style={styles.assignButtonText}>
-                                  Apply
-                                </Text>
-                              </TouchableOpacity>
-                            </View>
-                          </View>
-                        );
-                      })}
-                    </View>
-
                     {/* Invite Code for Signage */}
                     <View style={styles.signageSection}>
                       <Text style={styles.poolListLabel}>Invite Code for Signage</Text>
