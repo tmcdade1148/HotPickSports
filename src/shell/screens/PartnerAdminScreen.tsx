@@ -83,7 +83,6 @@ interface Partner {
 // `image/jpg` instead of `image/jpeg`, or empty. Accept either a MIME or
 // a file-extension match so a real PNG isn't rejected for label drift.
 const LOGO_BUCKET = 'partner-logos';
-const LIBRARY_PREFIX = '_library';
 
 const ALLOWED_MIME: readonly string[] = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
 const ALLOWED_EXT = /\.(png|jpe?g|webp)$/i;
@@ -109,8 +108,8 @@ interface LibraryItem {
   updatedAt: string;  // for cache-busting at render time only
 }
 
-function libraryItemUrl(name: string): string {
-  const {data} = supabase.storage.from(LOGO_BUCKET).getPublicUrl(`${LIBRARY_PREFIX}/${name}`);
+function libraryItemUrl(prefix: string, name: string): string {
+  const {data} = supabase.storage.from(LOGO_BUCKET).getPublicUrl(`${prefix}/${name}`);
   return data.publicUrl;
 }
 
@@ -128,10 +127,7 @@ async function probeImageSize(url: string): Promise<{w: number; h: number} | nul
   });
 }
 
-// Fetches a remote image and uploads it into the library so it appears
-// in the grid alongside picker-sourced logos. Uses supabase.storage.upload
-// (not the FormData REST endpoint) so a fetched Blob works directly in RN.
-async function uploadRemoteUrlToLibrary(url: string): Promise<string | null> {
+async function uploadRemoteUrlToLibrary(prefix: string, url: string): Promise<string | null> {
   if (!/^https?:\/\//i.test(url)) {
     Alert.alert('URL Rejected', 'URL must start with http:// or https://.');
     return null;
@@ -167,7 +163,7 @@ async function uploadRemoteUrlToLibrary(url: string): Promise<string | null> {
   const lastSegment = cleanPath.split('/').pop() || 'logo.png';
   const ext = (lastSegment.split('.').pop() || 'png').toLowerCase();
   const basename = fileNameSlug(lastSegment).replace(/\.[^.]+$/, '');
-  const storagePath = `${LIBRARY_PREFIX}/${basename}.${ext}`;
+  const storagePath = `${prefix}/${basename}.${ext}`;
 
   const {error} = await supabase.storage
     .from(LOGO_BUCKET)
@@ -182,20 +178,32 @@ async function uploadRemoteUrlToLibrary(url: string): Promise<string | null> {
   return data.publicUrl;
 }
 
-async function listLibraryItems(): Promise<LibraryItem[]> {
+async function listLibraryItems(prefix: string): Promise<LibraryItem[]> {
   const {data, error} = await supabase
     .storage
     .from(LOGO_BUCKET)
-    .list(LIBRARY_PREFIX, {limit: 200, sortBy: {column: 'updated_at', order: 'desc'}});
+    .list(prefix, {limit: 200, sortBy: {column: 'updated_at', order: 'desc'}});
   if (error || !data) return [];
   return data
     .filter(o => o.name && !o.name.endsWith('/'))
     .map(o => ({
       name: o.name,
       displayName: o.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' '),
-      url: libraryItemUrl(o.name),
+      url: libraryItemUrl(prefix, o.name),
       updatedAt: o.updated_at ?? '',
     }));
+}
+
+async function deleteLibraryItem(prefix: string, name: string): Promise<boolean> {
+  const {error} = await supabase
+    .storage
+    .from(LOGO_BUCKET)
+    .remove([`${prefix}/${name}`]);
+  if (error) {
+    Alert.alert('Delete Failed', error.message);
+    return false;
+  }
+  return true;
 }
 
 function hasAllowedFormat(a: PickedImage): boolean {
@@ -238,10 +246,9 @@ function slugify(name: string): string {
     .replace(/^-|-$/g, '');
 }
 
-// pathPrefix is `${LIBRARY_PREFIX}` for shared logos, or a partner.id for
-// partner-keyed assets (banner). `basename` is the file basename within
-// the prefix — for logos it's a slugified original filename so the
-// library shows readable names; for banners it's just "banner".
+// pathPrefix is the partner's slug folder (or partner.id for banner).
+// basename is the file basename within the prefix — slugified for logos
+// so the library shows readable names; just "banner" for banners.
 async function uploadPartnerImage(
   pathPrefix: string,
   basename: string,
@@ -336,7 +343,10 @@ export function PartnerAdminScreen() {
     background_color: HOTPICK_DEFAULTS.background_color,
     highlight_color: HOTPICK_DEFAULTS.highlight_color,
   });
-  const [formLogoLibraryUrl, setFormLogoLibraryUrl] = useState<string | null>(null);
+  // Create form holds a local pick (uploaded after INSERT into the new
+  // partner's slug folder). No library grid pre-create — the partner
+  // doesn't exist yet, so it has no folder.
+  const [formLogoPick, setFormLogoPick] = useState<PickedImage | null>(null);
   const [formBannerPick, setFormBannerPick] = useState<PickedImage | null>(null);
   const [formPartnerType, setFormPartnerType] = useState<PartnerType>('other');
   const [formCanRunPools, setFormCanRunPools] = useState<boolean>(
@@ -344,27 +354,26 @@ export function PartnerAdminScreen() {
   );
   const [creating, setCreating] = useState(false);
 
-  // Shared logo library — surfaced in both the create form and the edit form.
-  // Tom's logos live at partner-logos/_library/. Adding to the library
-  // uploads + auto-selects in the active form.
-  const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
-  const [libraryLoading, setLibraryLoading] = useState(false);
+  // Per-partner logo library. Surfaced only in the edit form (where we
+  // have a slug). Cached by slug so switching between expanded edit cards
+  // doesn't repeatedly refetch.
+  const [libraryItemsBySlug, setLibraryItemsBySlug] = useState<Record<string, LibraryItem[]>>({});
+  const [libraryLoadingSlug, setLibraryLoadingSlug] = useState<string | null>(null);
   const [libraryUploading, setLibraryUploading] = useState(false);
 
-  // URL-paste affordance — backup when the iOS picker is restricted (sim
-  // Limited Photos, empty Photos library, etc.). Holds the in-flight prompt.
-  const [urlPromptFor, setUrlPromptFor] = useState<((url: string) => void) | null>(null);
+  const [urlPromptFor, setUrlPromptFor] = useState<{
+    prefix: string;
+    onSelect: (url: string) => void;
+  } | null>(null);
   const [urlPromptValue, setUrlPromptValue] = useState('');
 
-  const refreshLibrary = useCallback(async () => {
-    setLibraryLoading(true);
-    setLibraryItems(await listLibraryItems());
-    setLibraryLoading(false);
+  const refreshLibraryForSlug = useCallback(async (slug: string) => {
+    if (!slug) return;
+    setLibraryLoadingSlug(slug);
+    const items = await listLibraryItems(slug);
+    setLibraryItemsBySlug(prev => ({...prev, [slug]: items}));
+    setLibraryLoadingSlug(null);
   }, []);
-
-  useEffect(() => {
-    refreshLibrary();
-  }, [refreshLibrary]);
 
   const resetCreateForm = useCallback(() => {
     setFormName('');
@@ -376,7 +385,7 @@ export function PartnerAdminScreen() {
       background_color: HOTPICK_DEFAULTS.background_color,
       highlight_color: HOTPICK_DEFAULTS.highlight_color,
     });
-    setFormLogoLibraryUrl(null);
+    setFormLogoPick(null);
     setFormBannerPick(null);
     setFormPartnerType('other');
     setFormCanRunPools(DEFAULT_CAN_RUN_POOLS_BY_TYPE.other);
@@ -482,7 +491,7 @@ export function PartnerAdminScreen() {
       pool_label: name,
       ...derived,
       logo: {
-        full: formLogoLibraryUrl ?? '',
+        full: '',
         mark: '',
         wordmark: '',
         mono_light: '',
@@ -515,28 +524,44 @@ export function PartnerAdminScreen() {
 
     const partnerId = inserted.id as string;
 
-    // Banner is partner-keyed (one banner per partner, not shared). Failed
-    // banner upload leaves the partner intact — user can retry from edit.
-    let uploadedBannerUrl: string | null = null;
-    if (formBannerPick) {
-      uploadedBannerUrl = await uploadPartnerImage(
-        partnerId,
-        'banner',
-        formBannerPick.uri,
-        formBannerPick.fileName,
+    // Failed uploads leave the partner intact — user can retry from edit.
+    const [uploadedLogoUrl, uploadedBannerUrl] = await Promise.all([
+      formLogoPick
+        ? uploadPartnerImage(
+            finalSlug,
+            fileNameSlug(formLogoPick.fileName).replace(/\.[^.]+$/, ''),
+            formLogoPick.uri,
+            formLogoPick.fileName,
+          )
+        : Promise.resolve(null),
+      formBannerPick
+        ? uploadPartnerImage(partnerId, 'banner', formBannerPick.uri, formBannerPick.fileName)
+        : Promise.resolve(null),
+    ]);
+
+    if (formLogoPick && !uploadedLogoUrl) {
+      Alert.alert(
+        'Logo Upload Failed',
+        'The partner was created but the logo did not upload. You can retry from the edit form.',
       );
-      if (!uploadedBannerUrl) {
-        Alert.alert(
-          'Banner Upload Failed',
-          'The partner was created but the banner did not upload. You can retry from the edit form.',
-        );
-      }
+    }
+    if (formBannerPick && !uploadedBannerUrl) {
+      Alert.alert(
+        'Banner Upload Failed',
+        'The partner was created but the banner did not upload. You can retry from the edit form.',
+      );
     }
 
-    if (uploadedBannerUrl) {
+    if (uploadedLogoUrl || uploadedBannerUrl) {
       const updatedConfig: BrandConfig = {
         ...brandConfig,
-        ...({banner: {full: uploadedBannerUrl}} as Partial<BrandConfig>),
+        logo: {
+          ...brandConfig.logo,
+          full: uploadedLogoUrl ?? '',
+        },
+        ...(uploadedBannerUrl
+          ? ({banner: {full: uploadedBannerUrl}} as Partial<BrandConfig>)
+          : {}),
       };
       const {error: updateErr} = await supabase
         .from('partners')
@@ -777,130 +802,164 @@ export function PartnerAdminScreen() {
     </View>
   );
 
-  const openUrlPrompt = (onSelect: (url: string) => void) => {
+  const openUrlPrompt = (prefix: string, onSelect: (url: string) => void) => {
     setUrlPromptValue('');
-    setUrlPromptFor(() => onSelect);
+    setUrlPromptFor({prefix, onSelect});
   };
 
   const submitUrlPrompt = async () => {
     const url = urlPromptValue.trim();
-    const onSelect = urlPromptFor;
-    if (!url || !onSelect) return;
+    const target = urlPromptFor;
+    if (!url || !target) return;
     setLibraryUploading(true);
-    const uploadedUrl = await uploadRemoteUrlToLibrary(url);
+    const uploadedUrl = await uploadRemoteUrlToLibrary(target.prefix, url);
     setLibraryUploading(false);
     if (!uploadedUrl) return;
     setUrlPromptFor(null);
-    onSelect(uploadedUrl);
-    refreshLibrary();
+    target.onSelect(uploadedUrl);
+    refreshLibraryForSlug(target.prefix);
   };
 
-  /** Uploads a new logo to the shared library and auto-selects it. */
-  const addToLibrary = async (onSelect: (url: string) => void) => {
+  const addToLibrary = async (prefix: string, onSelect: (url: string) => void) => {
     await pickAssetForCreate('logo', async picked => {
       setLibraryUploading(true);
       const basename = fileNameSlug(picked.fileName).replace(/\.[^.]+$/, '');
-      const url = await uploadPartnerImage(
-        LIBRARY_PREFIX,
-        basename,
-        picked.uri,
-        picked.fileName,
-      );
+      const url = await uploadPartnerImage(prefix, basename, picked.uri, picked.fileName);
       setLibraryUploading(false);
       if (!url) {
-        Alert.alert('Upload Failed', 'Logo did not upload to the library.');
+        Alert.alert('Upload Failed', 'Logo did not upload.');
         return;
       }
       onSelect(url);
-      refreshLibrary();
+      refreshLibraryForSlug(prefix);
     });
   };
 
-  /** Shared logo picker — read-only grid of library items + Add-to-Library
-   *  affordance. Used by both create and edit forms. */
-  const renderLogoLibraryPicker = (
+  const confirmDeleteLibraryItem = (
+    prefix: string,
+    item: LibraryItem,
     selectedUrl: string | null,
     onSelect: (url: string | null) => void,
-  ) => (
-    <View style={styles.logoSection}>
-      <Text style={styles.colorLabel}>Logo</Text>
-      <Text style={styles.colorHint}>
-        Pick from the HotPick Sports Logos library, or add a new one.
-        Square 1:1 · 512×512px recommended · max 2MB · PNG, JPG, or WebP.
-      </Text>
+  ) => {
+    Alert.alert(
+      'Delete this logo?',
+      `Remove "${item.displayName}" from this partner's logo library. Cannot be undone.`,
+      [
+        {text: 'Cancel', style: 'cancel'},
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const ok = await deleteLibraryItem(prefix, item.name);
+            if (!ok) return;
+            if (selectedUrl === item.url) onSelect(null);
+            refreshLibraryForSlug(prefix);
+          },
+        },
+      ],
+    );
+  };
 
-      {selectedUrl && (
-        <View style={styles.logoPreviewRow}>
-          <Image
-            source={{uri: selectedUrl}}
-            style={styles.logoPreview}
-            resizeMode="contain"
-          />
-          <View style={styles.assetMetaCol}>
-            <Text style={styles.colorHint} numberOfLines={2}>
-              Selected
-            </Text>
-            <TouchableOpacity onPress={() => onSelect(null)} hitSlop={6}>
-              <Text style={styles.resetText}>Clear</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
+  /** Edit-form logo picker — grid scoped to a single partner's slug folder.
+   *  Items can be selected, added (Photos or URL), or deleted. */
+  const renderLogoLibraryPicker = (
+    prefix: string,
+    selectedUrl: string | null,
+    onSelect: (url: string | null) => void,
+  ) => {
+    const items = libraryItemsBySlug[prefix];
+    const loading = libraryLoadingSlug === prefix;
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.libraryRow}>
-        {libraryLoading && libraryItems.length === 0 ? (
-          <ActivityIndicator size="small" color={colors.primary} />
-        ) : (
-          libraryItems.map(item => {
-            const isSelected = item.url === selectedUrl;
-            // Bust RN's Image cache when the same path is overwritten;
-            // canonical URL stays clean for selection compare + persistence.
-            const renderUri = item.updatedAt
-              ? `${item.url}?v=${new Date(item.updatedAt).getTime()}`
-              : item.url;
-            return (
-              <TouchableOpacity
-                key={item.name}
-                onPress={() => onSelect(item.url)}
-                style={[
-                  styles.libraryTile,
-                  {
-                    borderColor: isSelected ? colors.primary : colors.border,
-                    borderWidth: isSelected ? 2 : 1,
-                  },
-                ]}
-                accessibilityLabel={`Select ${item.displayName}`}>
-                <Image source={{uri: renderUri}} style={styles.libraryThumb} resizeMode="contain" />
+    if (items === undefined && !loading) {
+      // Kick off load on first render for this prefix.
+      refreshLibraryForSlug(prefix);
+    }
+
+    return (
+      <View style={styles.logoSection}>
+        <Text style={styles.colorLabel}>Logo</Text>
+        <Text style={styles.colorHint}>
+          Pick from this partner's logo library, or add a new one. Square 1:1 ·
+          512×512px recommended · max 2MB · PNG, JPG, or WebP.
+        </Text>
+
+        {selectedUrl && (
+          <View style={styles.logoPreviewRow}>
+            <Image
+              source={{uri: selectedUrl}}
+              style={styles.logoPreview}
+              resizeMode="contain"
+            />
+            <View style={styles.assetMetaCol}>
+              <Text style={styles.colorHint} numberOfLines={2}>Selected</Text>
+              <TouchableOpacity onPress={() => onSelect(null)} hitSlop={6}>
+                <Text style={styles.resetText}>Clear</Text>
               </TouchableOpacity>
-            );
-          })
+            </View>
+          </View>
         )}
-        <TouchableOpacity
-          style={[styles.libraryTile, styles.libraryAddTile, {borderColor: colors.border}]}
-          onPress={() => addToLibrary(onSelect)}
-          disabled={libraryUploading}>
-          {libraryUploading ? (
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.libraryRow}>
+          {loading && !items?.length ? (
             <ActivityIndicator size="small" color={colors.primary} />
           ) : (
-            <>
-              <Upload size={18} color={colors.textSecondary} />
-              <Text style={styles.libraryAddText}>Photos</Text>
-            </>
+            (items ?? []).map(item => {
+              const isSelected = item.url === selectedUrl;
+              const renderUri = item.updatedAt
+                ? `${item.url}?v=${new Date(item.updatedAt).getTime()}`
+                : item.url;
+              return (
+                <View key={item.name} style={styles.libraryTileWrap}>
+                  <TouchableOpacity
+                    onPress={() => onSelect(item.url)}
+                    style={[
+                      styles.libraryTile,
+                      {
+                        borderColor: isSelected ? colors.primary : colors.border,
+                        borderWidth: isSelected ? 2 : 1,
+                      },
+                    ]}
+                    accessibilityLabel={`Select ${item.displayName}`}>
+                    <Image source={{uri: renderUri}} style={styles.libraryThumb} resizeMode="contain" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => confirmDeleteLibraryItem(prefix, item, selectedUrl, onSelect)}
+                    style={[styles.libraryDeleteBadge, {backgroundColor: colors.error}]}
+                    hitSlop={6}
+                    accessibilityLabel={`Delete ${item.displayName}`}>
+                    <X size={11} color={colors.onPrimary} strokeWidth={3} />
+                  </TouchableOpacity>
+                </View>
+              );
+            })
           )}
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.libraryTile, styles.libraryAddTile, {borderColor: colors.border}]}
-          onPress={() => openUrlPrompt(onSelect)}
-          disabled={libraryUploading}>
-          <LinkIcon size={18} color={colors.textSecondary} />
-          <Text style={styles.libraryAddText}>URL</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </View>
-  );
+          <TouchableOpacity
+            style={[styles.libraryTile, styles.libraryAddTile, {borderColor: colors.border}]}
+            onPress={() => addToLibrary(prefix, url => onSelect(url))}
+            disabled={libraryUploading}>
+            {libraryUploading ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <>
+                <Upload size={18} color={colors.textSecondary} />
+                <Text style={styles.libraryAddText}>Photos</Text>
+              </>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.libraryTile, styles.libraryAddTile, {borderColor: colors.border}]}
+            onPress={() => openUrlPrompt(prefix, url => onSelect(url))}
+            disabled={libraryUploading}>
+            <LinkIcon size={18} color={colors.textSecondary} />
+            <Text style={styles.libraryAddText}>URL</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+    );
+  };
 
   const renderPartnerTypeSelector = (
     value: PartnerType,
@@ -1083,7 +1142,12 @@ export function PartnerAdminScreen() {
               />
             </View>
 
-            {renderLogoLibraryPicker(formLogoLibraryUrl, setFormLogoLibraryUrl)}
+            {renderCreateAssetPicker(
+              'logo',
+              formLogoPick,
+              setFormLogoPick,
+              'Square 1:1 · 512×512px recommended · max 2MB · PNG, JPG, or WebP. Uploaded to this partner’s library after create.',
+            )}
             {renderCreateAssetPicker(
               'banner',
               formBannerPick,
@@ -1254,7 +1318,7 @@ export function PartnerAdminScreen() {
                     <Text style={styles.colorsHeading}>Partner Type</Text>
                     {renderPartnerTypeSelector(editPartnerType, setEditPartnerType)}
 
-                    {renderLogoLibraryPicker(editLogoUrl || null, url =>
+                    {renderLogoLibraryPicker(partner.slug, editLogoUrl || null, url =>
                       setEditLogoUrl(url ?? ''),
                     )}
 
@@ -1904,6 +1968,11 @@ const createStyles = (colors: any) => StyleSheet.create({
     gap: spacing.sm,
     paddingVertical: spacing.sm,
   },
+  libraryTileWrap: {
+    position: 'relative',
+    width: 64,
+    height: 64,
+  },
   libraryTile: {
     width: 64,
     height: 64,
@@ -1912,6 +1981,21 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
+  },
+  libraryDeleteBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowOffset: {width: 0, height: 1},
+    shadowRadius: 2,
+    elevation: 2,
   },
   libraryThumb: {
     width: 60,
