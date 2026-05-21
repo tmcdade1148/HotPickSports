@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 import {useSeasonStore} from '../stores/seasonStore';
 import type {SeasonLeaderboardEntry, WeekLeaderboardEntry} from '../stores/seasonStore';
-import {SeasonProgress} from '../components/SeasonProgress';
 import {useAuth} from '@shared/hooks/useAuth';
 import {supabase} from '@shared/config/supabase';
 import {spacing, borderRadius} from '@shared/theme';
@@ -18,7 +17,6 @@ import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 import {AvatarBadge} from '@shared/components/AvatarBadge';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
-import {useGlobalStore} from '@shell/stores/globalStore';
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
@@ -55,7 +53,6 @@ export function SeasonBoardScreen() {
 
   const pathBackNarrative = useNFLStore(s => s.pathBackNarrative);
   const weekState = useNFLStore(s => s.weekState);
-  const activePoolId = useGlobalStore(s => s.activePoolId);
 
   // Last finalized week: if current week is settling/complete, it's this week.
   // Otherwise it's the previous week (current week is still in play).
@@ -101,6 +98,10 @@ export function SeasonBoardScreen() {
       fetchWeekLeaderboard();
     }
     return unsub;
+    // Intentional empty deps: Zustand's subscribe handles state-change reactivity
+    // internally. Re-running this effect on every config/poolId change would
+    // tear down and rebuild the subscription on every render-trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Realtime: week leaderboard updates live during games
@@ -278,18 +279,6 @@ export function SeasonBoardScreen() {
   const renderWeekRow = ({item, index}: {item: WeekLeaderboardEntry; index: number}) => {
     const isMe = item.user_id === user?.id;
     const rank = index + 1;
-
-    const hotPickColor = item.is_hotpick_correct === true
-      ? colors.success
-      : item.is_hotpick_correct === false
-        ? colors.error
-        : colors.textSecondary;
-
-    const hotPickSign = item.is_hotpick_correct === true
-      ? '+'
-      : item.is_hotpick_correct === false
-        ? '-'
-        : '';
 
     return (
       <View

@@ -76,8 +76,6 @@ export function SeasonPicksScreen() {
   const isLoading = useSeasonStore(s => s.isLoading);
   const hotPickCount = useSeasonStore(s => s.getHotPickCount());
   const pickCount = useSeasonStore(s => s.getPickCount());
-  const isWeekComplete = useSeasonStore(s => s.isWeekComplete);
-  const setWeekComplete = useSeasonStore(s => s.setWeekComplete);
   const setCurrentWeek = useSeasonStore(s => s.setCurrentWeek);
   const fetchWeekGames = useSeasonStore(s => s.fetchWeekGames);
   const fetchUserPicks = useSeasonStore(s => s.fetchUserPicks);
@@ -141,7 +139,7 @@ export function SeasonPicksScreen() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id, config?.competition, currentWeek]);
+  }, [user?.id, config, currentWeek]);
 
   // Pick split stats per game (from game_pick_stats table)
   const [pickStats, setPickStats] = useState<Record<string, any>>({});
@@ -170,7 +168,7 @@ export function SeasonPicksScreen() {
       }
     };
     fetchStats();
-  }, [config?.competition, activePoolId, currentWeek, games.length]);
+  }, [config, activePoolId, currentWeek, games.length]);
 
   // Compute potential week score from current picks
   const potentialWeekScore = (() => {
@@ -211,7 +209,7 @@ export function SeasonPicksScreen() {
       }
     };
     load();
-  }, [config?.competition, currentWeek, weekState, user?.id, fetchWeekGames, fetchUserPicks]);
+  }, [config, currentWeek, weekState, user?.id, fetchWeekGames, fetchUserPicks]);
 
   // Re-fetch games when Picks tab regains focus so lock_at changes are picked up
   // even if weekState hasn't changed (e.g. new wave kicks off during 'live')
@@ -219,7 +217,7 @@ export function SeasonPicksScreen() {
     useCallback(() => {
       if (!config) return;
       fetchWeekGames(currentWeek);
-    }, [config?.competition, currentWeek, fetchWeekGames]),
+    }, [config, currentWeek, fetchWeekGames]),
   );
 
   // Subscribe to live game updates (scores, status, lock_at) whenever the
@@ -229,7 +227,7 @@ export function SeasonPicksScreen() {
     if (!config) return;
     const unsub = subscribeToGameScores();
     return unsub;
-  }, [config?.competition, subscribeToGameScores]);
+  }, [config, subscribeToGameScores]);
 
   // Block week navigation if user has picks but no HotPick
   const handleSelectWeek = useCallback(
