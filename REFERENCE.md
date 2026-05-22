@@ -222,11 +222,21 @@ Free organizers: can create up to 1 pool per competition, max 10 members (no sub
 - User joins via invite code (`invite_code_used IS NOT NULL`) → visible like any other pool
 - Visibility is per-user — two users in the same global pool may have different visibility
 
-### Partner Pools
+### Partner-Aligned Pools (Roster Model)
+
+**Users join pools. Organizers join rosters.** A partner has a roster — the set of pools aligned with them. Two ways a pool ends up on a roster:
+
+1. **Club Pool** — the partner's own pool. Created via `create_partner_pool(partner_id)` RPC (super-admin only). `partners.club_pool_id` points at this pool; the pool's organizer is the de facto Partner Admin (edits perk, sends partner broadcasts). Exactly one Club Pool per partner.
+2. **Roster member** — any other pool that aligns with the partner via PartnerDirectoryScreen. Surfaces the partner's brand + perk to its members but has no admin rights over the partner.
+
+`pools.partner_id` is the alignment edge (set for *both* shapes). `partners.club_pool_id` distinguishes the Club Pool from roster members. Auth checks (perk edits, partner broadcasts) gate on `partners.club_pool_id = <this pool>`.
+
 - `invite_slug` doubles as invite code (e.g., "MESQUE")
 - `join_pool_by_invite` RPC checks BOTH `invite_code` AND `UPPER(invite_slug)`
 - Slugs: alphanumeric + hyphens, max 12 chars, stored lowercase, matched case-insensitive
-- `brand_config JSONB` on pool — NULL = HotPick defaults, populated = partner branding
+- `brand_config JSONB` on pool — NULL = HotPick defaults, populated = partner brand snapshot (Hard Rule #23 — never live-join to partners for rendering)
+- `can_run_pools` on the partner gates Club Pool *creation* only; sponsor-only partners can still be added to any organizer's roster
+- Pool-level "perk text/icon" and partner broadcasts are managed from `PoolSettings` of the Club Pool — not from PartnerAdminScreen
 
 ### Organizer Acknowledgment (Legal Requirement)
 Every pool creation shows a native Alert requiring acknowledgment that collecting money from participants is prohibited. Logs to `organizer_acknowledgments`: `{user_id, timestamp, version: "1.0"}`. Cannot be skipped without legal approval.
@@ -329,6 +339,7 @@ Both views always available via toggle. Both use `pool_start_date` filter.
 | `espn-health-check` | Cron | Hourly at :17 |
 | `season-simulator` | Manual (admin) | On demand |
 | `send-broadcast-email` | Client-triggered (non-blocking) | On broadcast send |
+| `send-partner-broadcast` | Client-triggered (super-admin OR Club Pool organizer) | On broadcast send |
 | `compute-hardware` | weekly_settle / season_settle / manual_override | — |
 
 **Cron jobs require hardcoded service role JWT** — `current_setting('app.service_role_key', true)` does not resolve in cron context.
@@ -411,6 +422,13 @@ The Home Screen is a **Smart Home Screen**, not a dashboard. Context-aware. Rend
 
 Card priority computed in globalStore — never in the component.
 
+### Pool Stack Order
+Below the event hero, the home screen renders `visiblePools` as a stack. Sort:
+1. Default pool (`globalStore.defaultPoolId`, set via the ★ in Settings → My Pools) pinned to index 0
+2. Remaining pools sorted alphabetically by `pools.name`, locale-aware, case-insensitive
+
+Sort happens at render time in HomeScreen — store data stays unsorted.
+
 ### Week State Machine
 ```
 picks_open → locked → live → settling → complete → picks_open (next week)
@@ -444,9 +462,22 @@ Above is the in-cycle progression during REGULAR, PLAYOFFS, and SUPERBOWL. Outsi
 - No dismiss button — the module IS the CTA
 
 ### Bottom Tab Order
-Dashboard (far left, raised Target icon) | Games | Leaders | SmackTalk | (History) | Settings
+Dashboard (far left, raised Target icon) | Games | Leaders | SmackTalk | (History)
 
 Leaders and SmackTalk share a single underline via custom `GroupedTabBar` in `MainTabNavigator.tsx`.
+
+**Tab-bar context awareness** (`GroupedTabBar`):
+- **On HomeTab and PicksTab:** Leaders + SmackTalk grouped box hides (both are pick-flow surfaces — no jump to social mid-flow).
+- **On PicksTab:** the freed right half of the bar renders `<SubmitPicksBarSlot />` — the Submit Picks button hoisted from the screen. Single source of truth driven by the `useSeasonSubmitState()` hook reading from seasonStore + nflStore. Five states (locked / no_picks / needs_hotpick / in_progress / submitted), each with its own bg color + enabled state.
+- **Settings is not in the bar.** Reached via the gear icon in `HomeHeader`, `PoolHeader`, and `PicksHeader`. `SettingsTab` is filtered out of `state.routes` in `GroupedTabBar` before the leading/grouped/trailing partition. Route is still registered so `navigation.navigate('SettingsTab')` from any header works.
+
+### Per-Tab Headers
+Three slim, HomeHeader-styled headers (HotPick wordmark + period pill + gear, ~one row each):
+- `HomeHeader` — top of Home tab. Wordmark + period pill + gear.
+- `PoolHeader` — top of Leaderboard and SmackTalk tabs. Adds a second row: pool name (large bold italic, capped at 50% width, auto-fit font via sizing-probe + scale).
+- `PicksHeader` — top of Picks tab. Second row: poolie name (capped at ⅓ width, same auto-fit) on the left, "Pick once. Play everywhere." tagline on the right.
+
+The dropdown-style `PoolSwitcherBar` is no longer used on Leaderboard / SmackTalk / Picks; it remains on `EventDetailScreen` only. Pool switching now happens via Settings → My Pools (★ to pin default to top of Home; rest sort alphabetically).
 
 ---
 
@@ -561,7 +592,15 @@ interface BrandConfig {
   surface_color: string;
   text_primary: string;
   text_secondary: string;
-  logo_url: string;           // CDN URL, PNG or SVG
+  logo: {                     // nested shape used by PartnerAdminScreen writes
+    full: string;             // primary logo URL
+    mark: string;
+    wordmark: string;
+    mono_light: string;
+    mono_dark: string;
+  };
+  logo_url?: string;          // flat-shape legacy field; still read on some rows
+  banner?: { full: string };  // wired but not yet rendered
   app_name: string;           // always "HotPick"
   invite_slug: string;
   is_branded: boolean;
@@ -571,20 +610,44 @@ interface BrandConfig {
 
 Lives in `src/shell/theme/types.ts`. One definition, never duplicated.
 
+**Logo shape drift:** Some partner rows in production have `logo_url` (flat) instead of `logo.full` (nested). Renderers MUST tolerate both — check nested first, fall back to flat. Don't normalize at write time; let consumers handle the union until a proper migration cleans it up.
+
+### Partner Schema (current)
+Columns on `partners` worth knowing:
+- `partner_type` (text, app-side enum: hospitality / operator / media / brand / other)
+- `can_run_pools` (bool) — gates Club Pool creation only, not roster alignment
+- `perk_text` (text, ≤120 chars), `perk_icon` (text — lucide name or emoji), `perk_updated_at`
+- `club_pool_id` (uuid → pools.id, ON DELETE SET NULL) — the partner's own pool
+- `is_active` (bool)
+- `brand_config` (jsonb) — snapshot per `BrandConfig`
+
+### Partner-Owned Auth (RPCs + Edge Function)
+- `create_partner_pool(p_partner_id, p_competition)` — SECURITY DEFINER, super-admin only, sets `partners.club_pool_id` atomically. Rejects if partner has `can_run_pools = false` or already has a Club Pool.
+- `update_partner_perk(p_partner_id, p_perk_text, p_perk_icon)` — SECURITY DEFINER, super-admin OR organizer/admin of the partner's Club Pool.
+- `send-partner-broadcast` Edge Function — same auth shape as `update_partner_perk`. Sponsor-only partners (no `club_pool_id`) → super-admin only.
+
+### Partner Logo Library
+- Bucket: `partner-logos` (existing). Per-partner folder = `<partner.slug>/`. Files named freely; PartnerAdminScreen's library grid lists everything in that folder, lets the user pick / add (Photos picker or URL paste) / delete.
+- DELETE policy added: any authenticated user can delete (gated UI-side to super-admin-reachable screens). RLS still blocks anon.
+- The shared `_library/` prefix from an earlier design was scrapped — left empty.
+
 ### White Label Build Status
 
 | Phase | Status | Notes |
 |---|---|---|
-| 1 | ✅ Done | Database: `partners` table, `pools.partner_id`, `pools.invite_slug` |
+| 1 | ✅ Done | DB schema: `partners` table + columns above, `pools.partner_id`, `pools.invite_slug` |
 | 2 | ✅ Done | ThemeProvider + useBrand() wiring |
 | 3 | ⏳ Deferred | Branch.io SDK — requires real device, high risk |
 | 4 | ⏳ Deferred | Deep link handler (basic handler exists, needs Branch.io + partner slug lookup) |
 | 5 | ⏳ Deferred | Branded pool join flow (3 screens) |
 | 6 | ✅ Done | PoweredByHotPick component |
-| 7 | ✅ Done | Partner Admin Screen (super_admin only) |
+| 7 | ✅ Done | Partner Admin Screen (super_admin only) — creates partners, sets type, creates Club Pool |
 | 8 | ✅ Done | QR code generation in Partner Admin |
 | 9 | ✅ Done | Partner color editing (4 colors + `deriveFullBrandColors()` auto-compute) |
-| 10 | ✅ Done | Partner logo upload via Supabase Storage REST API |
+| 10 | ✅ Done | Partner logo library (per-slug folder, Photos + URL ingestion, in-app delete) |
+| 11 | ✅ Done | Roster model: organizers add their pool to a partner's roster via PartnerDirectoryScreen |
+| 12 | ✅ Done | Club Pool concept (`partners.club_pool_id`) — Club Pool organizer = de facto Partner Admin |
+| 13 | ✅ Done | Inline perk editor + partner-broadcast composer in PoolSettings (Club Pool only) |
 
 Partner dark mode: backgrounds use HotPick dark overrides; primary/secondary/highlight keep partner values. Bottom tab bar always uses HotPick colors (not partner).
 
@@ -679,10 +742,17 @@ Template-agnostic `event_recaps` table. One row per pool per scoring period. Gen
 ```
 /src/shell/screens/
   PoolMembersScreen.tsx       ← FlatList of active members, promote/demote/remove
-  PoolSettingsScreen.tsx      ← Edit name, share invite, archive, broadcast, moderation
+  PoolSettingsScreen.tsx      ← Edit name, share invite, archive, broadcast, moderation;
+                                Partner section (Club Pool only: perk editor + partner
+                                broadcast composer; roster members: "Change roster")
   FlaggedMessagesScreen.tsx   ← Moderation queue: approve/remove, send notes
   MessageCenterScreen.tsx     ← User inbox: broadcasts + moderator notes (30 days)
-  PartnerAdminScreen.tsx      ← Super admin only. Create partners, edit colors/logo, assign pools
+  PartnerAdminScreen.tsx      ← Super admin only. Create partners, edit type/colors/logo
+                                library, create Club Pool. Pool ↔ partner alignment
+                                moved off this screen (see PartnerDirectoryScreen).
+  PartnerDirectoryScreen.tsx  ← Organizer-side. Reachable from PoolSettings → "Join a
+                                partner's roster". Picks any active partner and snapshots
+                                its brand_config onto the calling pool.
   PrivacyPolicyScreen.tsx     ← Native ScrollView (no WebView). Linked from login + Settings
   AboutScreen.tsx, InstructionsScreen.tsx, WelcomeScreen.tsx
 ```
