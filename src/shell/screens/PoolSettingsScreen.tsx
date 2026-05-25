@@ -7,6 +7,7 @@ import {
   Alert,
   ActivityIndicator,
   Modal,
+  Pressable,
   ScrollView,
   Share,
   StyleSheet,
@@ -664,8 +665,17 @@ export function PoolSettingsScreen() {
         transparent
         animationType="fade"
         onRequestClose={() => setPartnerBroadcastVisible(false)}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => {
+            if (!partnerBroadcastSending) setPartnerBroadcastVisible(false);
+          }}
+          accessibilityLabel="Dismiss broadcast dialog">
+          <Pressable
+            style={styles.modalCard}
+            onPress={() => {
+              /* swallow taps inside the card so backdrop dismiss doesn't fire */
+            }}>
             <Text style={styles.modalTitle}>
               Broadcast from {partnerRow?.name ?? 'Partner'}
             </Text>
@@ -691,7 +701,9 @@ export function PoolSettingsScreen() {
             <View style={styles.modalActions}>
               <TouchableOpacity
                 onPress={() => setPartnerBroadcastVisible(false)}
-                disabled={partnerBroadcastSending}>
+                disabled={partnerBroadcastSending}
+                accessibilityRole="button"
+                accessibilityLabel="Cancel">
                 <Text style={styles.modalCancel}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -705,7 +717,12 @@ export function PoolSettingsScreen() {
                 disabled={
                   partnerBroadcastMessage.trim().length === 0 ||
                   partnerBroadcastSending
-                }>
+                }
+                accessibilityRole="button"
+                accessibilityLabel="Send broadcast"
+                accessibilityState={{
+                  disabled: partnerBroadcastMessage.trim().length === 0 || partnerBroadcastSending,
+                }}>
                 {partnerBroadcastSending ? (
                   <ActivityIndicator size="small" color={colors.onPrimary} />
                 ) : (
@@ -713,8 +730,8 @@ export function PoolSettingsScreen() {
                 )}
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
     </SafeAreaView>
   );

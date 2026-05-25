@@ -90,10 +90,15 @@ export function PartnerDirectoryScreen() {
         partner_id: partner.id,
         invite_slug: partner.slug,
       })
-      .eq('id', poolId);
+      .eq('id', poolId)
+      .select('id')
+      .single();
     setAligning(null);
     if (error) {
-      Alert.alert('Could not align', error.message);
+      const msg = error.code === 'PGRST116'
+        ? "Couldn’t add to roster — you may not be the organizer of this pool."
+        : error.message;
+      Alert.alert('Could not add', msg);
       return;
     }
     updatePoolBrandConfig(poolId, (partner.brand_config as any) ?? null);
@@ -105,19 +110,38 @@ export function PartnerDirectoryScreen() {
     );
   };
 
-  const handleRemoveAlignment = async () => {
-    setAligning('__none__');
-    const {error} = await supabase
-      .from('pools')
-      .update({brand_config: null, partner_id: null})
-      .eq('id', poolId);
-    setAligning(null);
-    if (error) {
-      Alert.alert('Could not remove', error.message);
-      return;
-    }
-    updatePoolBrandConfig(poolId, null);
-    setCurrentPartnerId(null);
+  const handleRemoveAlignment = () => {
+    const partnerName = aligned?.name ?? 'this partner';
+    Alert.alert(
+      `Leave ${partnerName}'s roster?`,
+      'Your pool will lose this partner’s brand, perk, and broadcasts. You can re-join any time.',
+      [
+        {text: 'Cancel', style: 'cancel'},
+        {
+          text: 'Leave',
+          style: 'destructive',
+          onPress: async () => {
+            setAligning('__none__');
+            const {error} = await supabase
+              .from('pools')
+              .update({brand_config: null, partner_id: null})
+              .eq('id', poolId)
+              .select('id')
+              .single();
+            setAligning(null);
+            if (error) {
+              const msg = error.code === 'PGRST116'
+                ? "Couldn’t leave — you may not be the organizer of this pool."
+                : error.message;
+              Alert.alert('Could not leave', msg);
+              return;
+            }
+            updatePoolBrandConfig(poolId, null);
+            setCurrentPartnerId(null);
+          },
+        },
+      ],
+    );
   };
 
   const aligned = useMemo(

@@ -12,6 +12,7 @@ import {
   Image,
   Modal,
   Platform,
+  Pressable,
   Switch,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -1480,8 +1481,15 @@ export function PartnerAdminScreen() {
         transparent
         animationType="fade"
         onRequestClose={() => setUrlPromptFor(null)}>
-        <View style={styles.urlPromptBackdrop}>
-          <View style={styles.urlPromptCard}>
+        <Pressable
+          style={styles.urlPromptBackdrop}
+          onPress={() => setUrlPromptFor(null)}
+          accessibilityLabel="Dismiss add logo dialog">
+          <Pressable
+            style={styles.urlPromptCard}
+            onPress={() => {
+              /* swallow taps inside the card so backdrop dismiss doesn't fire */
+            }}>
             <Text style={styles.urlPromptTitle}>Add Logo by URL</Text>
             <Text style={styles.urlPromptHint}>
               Paste a direct image URL. Must be a square PNG/JPG/WebP, ≤2MB.
@@ -1500,12 +1508,18 @@ export function PartnerAdminScreen() {
               autoFocus
             />
             <View style={styles.urlPromptActions}>
-              <TouchableOpacity onPress={() => setUrlPromptFor(null)}>
+              <TouchableOpacity
+                onPress={() => setUrlPromptFor(null)}
+                accessibilityRole="button"
+                accessibilityLabel="Cancel">
                 <Text style={styles.urlPromptCancel}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={submitUrlPrompt}
                 disabled={urlPromptValue.trim().length === 0}
+                accessibilityRole="button"
+                accessibilityLabel="Add logo from URL"
+                accessibilityState={{disabled: urlPromptValue.trim().length === 0}}
                 style={[
                   styles.urlPromptSubmit,
                   urlPromptValue.trim().length === 0 && styles.buttonDisabled,
@@ -1513,8 +1527,8 @@ export function PartnerAdminScreen() {
                 <Text style={styles.urlPromptSubmitText}>Add</Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
     </SafeAreaView>
   );
