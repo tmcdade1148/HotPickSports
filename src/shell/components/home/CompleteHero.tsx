@@ -207,13 +207,13 @@ export function CompleteHero() {
           {backgroundColor: colors.primary, shadowColor: colors.primary, opacity: pressed ? 0.6 : 0.7},
         ]}
         accessibilityRole="button"
-        accessibilityLabel={`Week ${currentWeek} complete — see how it played out`}>
+        accessibilityLabel={`Week ${currentWeek} complete — review your picks`}>
         <View style={styles.ctaLabel}>
           <Text style={[displayType.display, styles.ctaText, {color: colors.onPrimary}]} numberOfLines={1}>
             WEEK {currentWeek} COMPLETE
           </Text>
           <Text style={[bodyType.regular, styles.ctaFollowOn, {color: colors.onPrimary}]}>
-            see how it played out
+            review your picks
           </Text>
         </View>
         <ArrowRight size={22} color={colors.onPrimary} strokeWidth={3} />
