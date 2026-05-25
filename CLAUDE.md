@@ -14,7 +14,7 @@ Do not default to worldCup2026 or any other event.
 
 ---
 
-## 23 Hard Rules
+## 24 Hard Rules
 
 These are non-negotiable. If a task requires violating one, stop and ask.
 
@@ -41,6 +41,7 @@ These are non-negotiable. If a task requires violating one, stop and ask.
 21. **Next week's picks never open until current week reaches `complete`** — states are sequential: `picks_open → locked → live → settling → complete → picks_open`
 22. **Season phases are sequential and admin-initiated** — `PRE_SEASON → REGULAR → REGULAR_COMPLETE → PLAYOFFS → SUPERBOWL_INTRO → SUPERBOWL → SEASON_COMPLETE`. Weekly cycle only runs inside REGULAR, PLAYOFFS, and SUPERBOWL.
 23. **Partner brand config is copied to pool at creation** — rendering never depends on a live join to `partners`. Pools are self-contained.
+24. **Partners attract pools to their roster, not the other way around** — `pools.partner_id` is set by the pool's organizer via `PartnerDirectoryScreen`, never by super-admin push. Each partner has at most one Club Pool (`partners.club_pool_id`); that pool's organizer is the de facto Partner Admin. Perk edits and partner broadcasts route through the Club Pool's `PoolSettings` — not `PartnerAdminScreen`.
 
 ---
 
@@ -75,6 +76,9 @@ If you find yourself writing any of the following, stop and revise.
 ### Auth & Security
 - `supabase.auth.admin` or service role key in client code → server only
 - `apply_migration` vs `execute_sql`: schema changes and RLS-protected DML require `apply_migration`; `execute_sql` runs under anon role and RLS silently blocks writes
+- **Silent RLS-filtered writes** — `from('table').update(...).eq(...)` with no `.select()` returns success with zero rows affected when RLS filters the write. Always chain `.select('id').single()` so a filtered write throws `PGRST116`, or move the mutation to a SECURITY DEFINER RPC that explicitly authorizes.
+- **Direct client UPDATE of `pools.partner_id`, `pools.brand_config`, or `pools.invite_slug`** — the `pools_update` RLS only checks who can write *which row*, not *what values*. Route through a SECURITY DEFINER RPC (e.g. `join_partner_roster`) that validates the target partner is active and reads `brand_config` server-side.
+- **Storage policies gated only by `bucket_id`** — grants every authenticated user blanket access across the bucket. Always include a path-prefix check or role check (e.g. `(storage.foldername(name))[1] = auth.uid()::text` OR a super_admin `EXISTS` clause).
 
 ### Config & State
 - Competition state hardcoded in a component or Edge Function → always read from `competition_config`
@@ -132,6 +136,9 @@ Power-ups, career hardware awards, AI archetypes, tier system, pool discovery, S
 
 **Sport store isolation:**
 > "Sport stores are isolated. Global store holds only cross-sport shared state. Sport-specific data stays in the sport store. Please revise."
+
+**Wrong-direction partner-pool model:**
+> "Pool organizers join partner rosters — super-admin doesn't push partners onto pools. Each partner has one Club Pool (`partners.club_pool_id`) whose organizer manages perk + broadcasts via PoolSettings. Please revise."
 
 ---
 
