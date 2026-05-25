@@ -690,21 +690,39 @@ export function PartnerAdminScreen() {
         return;
       }
 
+      const trimmedName = editName.trim();
+      const nameChanged = trimmedName !== partner.name;
+
+      // Only rewrite slug when the name actually changed. Rewriting on every
+      // save risks UNIQUE-constraint collisions and silently changes the
+      // partner's public URL — both painful for partners.
+      const updatePayload: Record<string, unknown> = {
+        brand_config: updatedConfig as unknown,
+        perk_text: trimmedPerk.length === 0 ? null : trimmedPerk,
+        perk_icon: editPerkIcon.trim().length === 0 ? null : editPerkIcon.trim(),
+        can_run_pools: editCanRunPools,
+        partner_type: editPartnerType,
+      };
+      if (nameChanged) {
+        updatePayload.name = trimmedName;
+        updatePayload.slug = slugify(trimmedName);
+      }
+
+      // Chain .select().single() so an RLS-filtered or otherwise silent
+      // 0-row UPDATE throws PGRST116 instead of returning success with no
+      // change applied (CLAUDE.md Red Flag — silent RLS-filtered writes).
       const {error} = await supabase
         .from('partners')
-        .update({
-          name: editName.trim(),
-          slug: slugify(editName.trim()),
-          brand_config: updatedConfig as unknown,
-          perk_text: trimmedPerk.length === 0 ? null : trimmedPerk,
-          perk_icon: editPerkIcon.trim().length === 0 ? null : editPerkIcon.trim(),
-          can_run_pools: editCanRunPools,
-          partner_type: editPartnerType,
-        })
-        .eq('id', partner.id);
+        .update(updatePayload)
+        .eq('id', partner.id)
+        .select('id')
+        .single();
 
       if (error) {
-        Alert.alert('Error', error.message);
+        const msg = error.code === 'PGRST116'
+          ? "Save blocked — your account isn't allowed to update this partner, or the row was changed by someone else."
+          : error.message;
+        Alert.alert('Could Not Save', msg);
         setSaving(false);
         return;
       }
