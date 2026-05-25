@@ -1,6 +1,12 @@
-// Compact partner card: logo, name, "via Pool" subtitle, perk row.
-// Tap → PartnerRosterScreen. Perk content is partner-authored (we
-// don't verify it).
+// Compact partner card: logo, name, perk row.
+// Tap → PartnerRosterScreen.
+//
+// Rule #23: brand visuals (name, primary_color, logo) render from the
+// aligned pool's brand_config snapshot, NOT live partner data. Keeps
+// PartnerModule and PoolModule in lockstep — a partner re-skin doesn't
+// repaint old aligned pools' cards differently across surfaces.
+// Perk text/icon are NOT snapshotted (partner-managed, should stay
+// fresh) so they still read from the live partner row.
 
 import React, {useMemo} from 'react';
 import {Image, Pressable, StyleSheet, Text, View} from 'react-native';
@@ -22,6 +28,16 @@ export interface PartnerModuleProps {
   alignedPools: DbPool[];
 }
 
+// Tolerates two BrandConfig logo shapes (see REFERENCE.md §15).
+function resolveSnapshotLogoUrl(bc: unknown): string | null {
+  if (!bc || typeof bc !== 'object') return null;
+  const rec = bc as Record<string, unknown>;
+  const nested = (rec.logo ?? {}) as Record<string, unknown>;
+  if (typeof nested.full === 'string' && nested.full.length > 0) return nested.full;
+  if (typeof rec.logo_url === 'string' && rec.logo_url.length > 0) return rec.logo_url;
+  return null;
+}
+
 export function PartnerModule({partnerId, alignedPools}: PartnerModuleProps) {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
@@ -36,9 +52,22 @@ export function PartnerModule({partnerId, alignedPools}: PartnerModuleProps) {
   }, [indicator?.mostRecentAt]);
   const showNewBadge = unread > 0 && isRecent;
 
-  if (!partner) return null;
+  // Read brand snapshot from the first aligned pool (Rule #23). All
+  // aligned pools share the snapshot at alignment time; pick [0] for
+  // a stable choice. Falls back to live partner data only when there's
+  // no pool snapshot available (defensive — shouldn't happen at render).
+  const {brandName, tint, brandLogoUrl} = useMemo(() => {
+    const bc = (alignedPools[0]?.brand_config ?? null) as Record<string, unknown> | null;
+    const snapName    = typeof bc?.partner_name === 'string' ? bc.partner_name : null;
+    const snapPrimary = typeof bc?.primary_color === 'string' ? bc.primary_color : null;
+    return {
+      brandName:    snapName    || partner?.name              || '',
+      tint:         snapPrimary || partner?.primary_color     || colors.primary,
+      brandLogoUrl: resolveSnapshotLogoUrl(bc) || partner?.logo_url || null,
+    };
+  }, [alignedPools, partner?.name, partner?.primary_color, partner?.logo_url, colors.primary]);
 
-  const tint = partner.primary_color ?? colors.primary;
+  if (!partner) return null;
 
   const openRoster = () => {
     navigation.navigate('PartnerRoster', {slug: partner.slug});
@@ -56,23 +85,23 @@ export function PartnerModule({partnerId, alignedPools}: PartnerModuleProps) {
         },
       ]}
       accessibilityRole="button"
-      accessibilityLabel={`Open ${partner.name} roster`}>
+      accessibilityLabel={`Open ${brandName} roster`}>
       <View style={styles.topRow}>
-        {partner.logo_url ? (
+        {brandLogoUrl ? (
           <Image
-            source={{uri: partner.logo_url}}
+            source={{uri: brandLogoUrl}}
             style={[styles.logoImg, {borderColor: tint}]}
             accessible={false}
           />
         ) : (
-          <LogoMark initials={partnerInitials(partner.name)} tint={tint} size={40} />
+          <LogoMark initials={partnerInitials(brandName)} tint={tint} size={40} />
         )}
 
         <View style={styles.titleBlock}>
           <Text
             style={[displayType.display, styles.partnerName, {color: colors.textPrimary}]}
             numberOfLines={1}>
-            {partner.name.toUpperCase()}
+            {brandName.toUpperCase()}
           </Text>
         </View>
 
