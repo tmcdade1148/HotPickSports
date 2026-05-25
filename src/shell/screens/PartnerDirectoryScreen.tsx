@@ -83,22 +83,16 @@ export function PartnerDirectoryScreen() {
 
   const handleAlign = async (partner: PartnerRow) => {
     setAligning(partner.id);
-    const {error} = await supabase
-      .from('pools')
-      .update({
-        brand_config: partner.brand_config as unknown,
-        partner_id: partner.id,
-        invite_slug: partner.slug,
-      })
-      .eq('id', poolId)
-      .select('id')
-      .single();
+    // Server-side RPC: validates partner is active, gates on organizer
+    // role, reads brand_config + invite_slug server-side (caller can't
+    // forge them). See CLAUDE.md Auth & Security Red Flag.
+    const {error} = await supabase.rpc('join_partner_roster', {
+      p_pool_id: poolId,
+      p_partner_id: partner.id,
+    });
     setAligning(null);
     if (error) {
-      const msg = error.code === 'PGRST116'
-        ? "Couldn’t add to roster — you may not be the organizer of this pool."
-        : error.message;
-      Alert.alert('Could not add', msg);
+      Alert.alert('Could not add', error.message);
       return;
     }
     updatePoolBrandConfig(poolId, (partner.brand_config as any) ?? null);
@@ -122,18 +116,12 @@ export function PartnerDirectoryScreen() {
           style: 'destructive',
           onPress: async () => {
             setAligning('__none__');
-            const {error} = await supabase
-              .from('pools')
-              .update({brand_config: null, partner_id: null})
-              .eq('id', poolId)
-              .select('id')
-              .single();
+            const {error} = await supabase.rpc('leave_partner_roster', {
+              p_pool_id: poolId,
+            });
             setAligning(null);
             if (error) {
-              const msg = error.code === 'PGRST116'
-                ? "Couldn’t leave — you may not be the organizer of this pool."
-                : error.message;
-              Alert.alert('Could not leave', msg);
+              Alert.alert('Could not leave', error.message);
               return;
             }
             updatePoolBrandConfig(poolId, null);
