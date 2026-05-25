@@ -23,6 +23,7 @@ import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {useTheme} from '@shell/theme/hooks';
 import {bodyType, displayType, spacing, borderRadius} from '@shared/theme';
+import {readableTextOn} from '@shared/utils/color';
 
 type PartnerRow = {
   id: string;
@@ -203,7 +204,7 @@ export function PartnerDirectoryScreen() {
                   <Image source={{uri: logo}} style={styles.cardLogo} resizeMode="contain" />
                 ) : (
                   <View style={[styles.cardLogo, {backgroundColor: partnerPrimary, alignItems: 'center', justifyContent: 'center'}]}>
-                    <Text style={{color: colors.onPrimary, fontWeight: '700'}}>
+                    <Text style={{color: readableTextOn(partnerPrimary), fontWeight: '700'}}>
                       {partner.name.charAt(0).toUpperCase()}
                     </Text>
                   </View>

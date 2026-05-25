@@ -9,7 +9,7 @@ import {Info, MessageCircle, Megaphone, Settings, X} from 'lucide-react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
-import {hexToRgba} from '@shared/utils/color';
+import {hexToRgba, readableTextOn} from '@shared/utils/color';
 import {ordinalSuffix} from '@shared/utils/format';
 import type {DbPool} from '@shared/types/database';
 import {LogoMark} from './LogoMark';
@@ -410,7 +410,14 @@ export function PoolModule({pool}: PoolModuleProps) {
                 ]}
                 accessibilityRole="button"
                 accessibilityLabel={`Open ${partnerName ?? 'partner'} roster`}>
-                <Text style={[bodyType.bold, styles.modalCtaText, {color: colors.onPrimary}]}>
+                <Text
+                  style={[
+                    bodyType.bold,
+                    styles.modalCtaText,
+                    // Partner primary may be light or dark; pick contrasting
+                    // text instead of assuming theme onPrimary.
+                    {color: readableTextOn(stripeColor) },
+                  ]}>
                   View partner roster
                 </Text>
               </Pressable>
