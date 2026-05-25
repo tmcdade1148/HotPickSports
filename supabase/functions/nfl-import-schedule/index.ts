@@ -61,13 +61,13 @@ Deno.serve(async (req) => {
         game_id: event.id, competition, season_year: seasonYear, week, phase,
         home_team: homeTeam.team.abbreviation, away_team: awayTeam.team.abbreviation,
         kickoff_at: event.date, status,
-        home_score: homeTeam.score ? parseInt(homeTeam.score) : null,
-        away_score: awayTeam.score ? parseInt(awayTeam.score) : null,
+        home_score: homeTeam.score ? parseInt(homeTeam.score, 10) : null,
+        away_score: awayTeam.score ? parseInt(awayTeam.score, 10) : null,
         home_record: cleanRecord(homeTeam.records?.[0]?.summary ?? null),
         away_record: cleanRecord(awayTeam.records?.[0]?.summary ?? null),
         spread: odds?.details ? parseFloat(odds.details) : null,
-        home_moneyline: odds?.homeTeamOdds?.moneyLine ? parseInt(odds.homeTeamOdds.moneyLine) : null,
-        away_moneyline: odds?.awayTeamOdds?.moneyLine ? parseInt(odds.awayTeamOdds.moneyLine) : null,
+        home_moneyline: odds?.homeTeamOdds?.moneyLine ? parseInt(odds.homeTeamOdds.moneyLine, 10) : null,
+        away_moneyline: odds?.awayTeamOdds?.moneyLine ? parseInt(odds.awayTeamOdds.moneyLine, 10) : null,
         rank, frozen_rank: rank, is_finalized: false,
       };
     });

@@ -7,18 +7,22 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		072B3B8B300A472CA4445EEB /* SairaCondensed-Black.ttf in Resources */ = {isa = PBXBuildFile; fileRef = C685C507CDB9477085F71966 /* SairaCondensed-Black.ttf */; };
 		0C80B921A6F3F58F76C31292 /* libPods-HotPickSports.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-HotPickSports.a */; };
 		126A9B3339183E58A13844E1 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		1C0E8FFF2F85619500996DA3 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 1C0E8FFE2F85619500996DA3 /* GoogleService-Info.plist */; };
 		1C6431F32F9003AF004AEB6D /* apple.icon in Resources */ = {isa = PBXBuildFile; fileRef = 1C6431F22F9003AF004AEB6D /* apple.icon */; };
+		248459EFBFCF4837B88D10D4 /* Manrope-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 032A923F3B034BD6A335ACC0 /* Manrope-Bold.ttf */; };
 		5A9A7B6015444ED7ADCAF4F0 /* Colors.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7DAFD1BC79E345998E27CEFF /* Colors.xcassets */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		78BE216C575A4B439790B864 /* BootSplash.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = F14169EF94C44DF0B8CEB803 /* BootSplash.storyboard */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
+		B6C2A10C604343BD8CEBA2B1 /* Manrope-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 5D47B2C89C1A4AC094C274EB /* Manrope-Regular.ttf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		032A923F3B034BD6A335ACC0 /* Manrope-Bold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Manrope-Bold.ttf"; path = "../assets/fonts/Manrope-Bold.ttf"; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* HotPickSports.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HotPickSports.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = HotPickSports/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = HotPickSports/Info.plist; sourceTree = "<group>"; };
@@ -28,10 +32,12 @@
 		1C6431F22F9003AF004AEB6D /* apple.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; name = apple.icon; path = HotPickSports/apple.icon; sourceTree = "<group>"; };
 		3B4392A12AC88292D35C810B /* Pods-HotPickSports.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-HotPickSports.debug.xcconfig"; path = "Target Support Files/Pods-HotPickSports/Pods-HotPickSports.debug.xcconfig"; sourceTree = "<group>"; };
 		5709B34CF0A7D63546082F79 /* Pods-HotPickSports.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-HotPickSports.release.xcconfig"; path = "Target Support Files/Pods-HotPickSports/Pods-HotPickSports.release.xcconfig"; sourceTree = "<group>"; };
+		5D47B2C89C1A4AC094C274EB /* Manrope-Regular.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Manrope-Regular.ttf"; path = "../assets/fonts/Manrope-Regular.ttf"; sourceTree = "<group>"; };
 		5DCACB8F33CDC322A6C60F78 /* libPods-HotPickSports.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-HotPickSports.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = HotPickSports/AppDelegate.swift; sourceTree = "<group>"; };
 		7DAFD1BC79E345998E27CEFF /* Colors.xcassets */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = folder.assetcatalog; name = Colors.xcassets; path = HotPickSports/Colors.xcassets; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = HotPickSports/LaunchScreen.storyboard; sourceTree = "<group>"; };
+		C685C507CDB9477085F71966 /* SairaCondensed-Black.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "SairaCondensed-Black.ttf"; path = "../assets/fonts/SairaCondensed-Black.ttf"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F14169EF94C44DF0B8CEB803 /* BootSplash.storyboard */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = BootSplash.storyboard; path = HotPickSports/BootSplash.storyboard; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -72,6 +78,17 @@
 			name = HotPickSports;
 			sourceTree = "<group>";
 		};
+		13E13C8996764880AA8740C9 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				5D47B2C89C1A4AC094C274EB /* Manrope-Regular.ttf */,
+				C685C507CDB9477085F71966 /* SairaCondensed-Black.ttf */,
+				032A923F3B034BD6A335ACC0 /* Manrope-Bold.ttf */,
+			);
+			name = Resources;
+			path = "";
+			sourceTree = "<group>";
+		};
 		2D16E6871FA4F8E400B85C8A /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
@@ -98,6 +115,7 @@
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				BBD78D7AC51CEA395F1C20DB /* Pods */,
 				04C77803FD0F71FDDC8B8393 /* ExpoModulesProviders */,
+				13E13C8996764880AA8740C9 /* Resources */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -195,6 +213,9 @@
 				5A9A7B6015444ED7ADCAF4F0 /* Colors.xcassets in Resources */,
 				1C0E8FFF2F85619500996DA3 /* GoogleService-Info.plist in Resources */,
 				1C6431F32F9003AF004AEB6D /* apple.icon in Resources */,
+				B6C2A10C604343BD8CEBA2B1 /* Manrope-Regular.ttf in Resources */,
+				072B3B8B300A472CA4445EEB /* SairaCondensed-Black.ttf in Resources */,
+				248459EFBFCF4837B88D10D4 /* Manrope-Bold.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

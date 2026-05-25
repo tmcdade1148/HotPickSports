@@ -50,8 +50,8 @@ Deno.serve(async (req) => {
         if (espnState === "in") status = "IN_PROGRESS";
         else if (espnState === "post") status = "FINAL";
 
-        const homeScore = parseInt(homeTeam.score ?? "0");
-        const awayScore = parseInt(awayTeam.score ?? "0");
+        const homeScore = parseInt(homeTeam.score ?? "0", 10);
+        const awayScore = parseInt(awayTeam.score ?? "0", 10);
         const currentPeriod = event.status?.period ?? null;
         const gameClock = event.status?.displayClock ?? null;
 
@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
         const awayLS = awayTeam.linescores ?? [];
         const getScore = (ls: any[], period: number) => {
           const entry = ls.find((x) => x.period === period);
-          return entry ? parseInt(entry.value) || 0 : null;
+          return entry ? parseInt(entry.value, 10) || 0 : null;
         };
 
         let winnerTeam = null;

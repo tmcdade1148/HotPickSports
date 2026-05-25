@@ -513,7 +513,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
   },
   filterTabTextActive: {
-    color: '#FFFFFF',
+    color: colors.onPrimary,
   },
   // Hardware grid
   hardwareGrid: {
@@ -658,7 +658,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.primary,
   },
   modalCloseText: {
-    color: '#FFFFFF',
+    color: colors.onPrimary,
     fontSize: 14,
     fontWeight: '600',
   },

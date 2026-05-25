@@ -38,9 +38,10 @@ async function ensureModules(): Promise<boolean> {
     Device = require('expo-device');
 
     // Configure notification handler — show alerts even when app is in foreground
-    Notifications.setNotificationHandler({
+    Notifications!.setNotificationHandler({
       handleNotification: async () => ({
-        shouldShowAlert: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
         shouldPlaySound: true,
         shouldSetBadge: false,
       }),

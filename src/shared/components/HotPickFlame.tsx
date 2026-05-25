@@ -1,6 +1,7 @@
 import React from 'react';
 import {View, useColorScheme} from 'react-native';
 import Svg, {Path} from 'react-native-svg';
+import {useTheme} from '@shell/theme/hooks';
 
 interface HotPickFlameProps {
   /** Height in points — width auto-scales to maintain aspect ratio */
@@ -25,13 +26,14 @@ export function HotPickFlame({
   active = false,
   inactiveColor,
 }: HotPickFlameProps) {
+  const {colors} = useTheme();
   const isDark = useColorScheme() === 'dark';
-  const resolvedInactive = inactiveColor ?? (isDark ? '#444444' : '#CCCCCC');
+  const resolvedInactive = inactiveColor ?? (isDark ? colors.textTertiary : colors.border);
   // Maintain aspect ratio: width = height * (388.71 / 518.34)
   const width = size * (388.71 / 518.34);
 
-  const mainFill = active ? '#F66321' : resolvedInactive;
-  const innerFill = active ? '#F66321' : resolvedInactive;
+  const mainFill = active ? colors.primary : resolvedInactive;
+  const innerFill = active ? colors.primary : resolvedInactive;
 
   return (
     <View accessible={false} focusable={false} collapsable={false}>

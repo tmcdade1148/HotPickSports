@@ -1,25 +1,9 @@
-import React, {useEffect, useState} from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Modal,
-  FlatList,
-  StyleSheet,
-} from 'react-native';
+import React, {useEffect} from 'react';
+import {View} from 'react-native';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
-import {
-  CheckCircle,
-  BarChart2,
-  MessageCircle,
-  ChevronDown,
-  ChevronLeft,
-  Settings,
-} from 'lucide-react-native';
+import {CheckCircle, BarChart2, MessageCircle, Settings} from 'lucide-react-native';
 import type {SeriesConfig, TabConfig} from '@shared/types/templates';
 import type {DbPool} from '@shared/types/database';
-import {spacing, borderRadius} from '@shared/theme';
-import {useGlobalStore} from '@shell/stores/globalStore';
 import {useSeriesStore} from '../stores/seriesStore';
 import {SeriesPicksScreen} from '../screens/SeriesPicksScreen';
 import {SeriesBoardScreen} from '../screens/SeriesBoardScreen';
@@ -88,11 +72,6 @@ interface SeriesTabNavigatorProps {
 export function SeriesTabNavigator({
   config,
   poolId,
-  poolName,
-  userPools,
-  onSwitchPool,
-  onOpenSettings,
-  onGoHome,
 }: SeriesTabNavigatorProps) {
   const {colors} = useTheme();
   const initialize = useSeriesStore(s => s.initialize);

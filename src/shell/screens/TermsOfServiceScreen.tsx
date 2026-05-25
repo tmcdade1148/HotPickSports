@@ -7,22 +7,22 @@ import {useTheme} from '@shell/theme';
 
 /* ─── tiny helper components ─── */
 
-const H1 = ({children, s}: {children: string; s: any}) => (
+const H1 = ({children, s}: {children: React.ReactNode; s: any}) => (
   <Text style={s.h1}>{children}</Text>
 );
-const H2 = ({children, s}: {children: string; s: any}) => (
+const H2 = ({children, s}: {children: React.ReactNode; s: any}) => (
   <Text style={s.h2}>{children}</Text>
 );
-const H3 = ({children, s}: {children: string; s: any}) => (
+const H3 = ({children, s}: {children: React.ReactNode; s: any}) => (
   <Text style={s.h3}>{children}</Text>
 );
-const P = ({children, s}: {children: string; s: any}) => (
+const P = ({children, s}: {children: React.ReactNode; s: any}) => (
   <Text style={s.p}>{children}</Text>
 );
-const Bold = ({children, s}: {children: string; s: any}) => (
+const Bold = ({children, s}: {children: React.ReactNode; s: any}) => (
   <Text style={[s.p, {fontWeight: '700'}]}>{children}</Text>
 );
-const Bullet = ({children, s}: {children: string; s: any}) => (
+const Bullet = ({children, s}: {children: React.ReactNode; s: any}) => (
   <View style={s.bulletRow}>
     <Text style={s.bulletDot}>•</Text>
     <Text style={[s.p, {flex: 1}]}>{children}</Text>

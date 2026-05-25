@@ -183,8 +183,8 @@ export function PoolSwitcherBar({mode, onGoBack}: PoolSwitcherBarProps) {
                           {item.name}
                         </Text>
                         {flagged > 0 && (
-                          <View style={styles.flaggedDot}>
-                            <Text style={styles.flaggedDotText}>{flagged}</Text>
+                          <View style={[styles.flaggedDot, {backgroundColor: colors.error}]}>
+                            <Text style={[styles.flaggedDotText, {color: colors.onPrimary}]}>{flagged}</Text>
                           </View>
                         )}
                         {unread > 0 && (
@@ -296,7 +296,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   flaggedDot: {
-    backgroundColor: '#E53935',
     borderRadius: 10,
     paddingHorizontal: 6,
     paddingVertical: 1,
@@ -304,7 +303,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   flaggedDotText: {
-    color: '#FFFFFF',
     fontSize: 10,
     fontWeight: '700',
   },

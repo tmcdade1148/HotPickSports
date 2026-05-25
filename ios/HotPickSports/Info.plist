@@ -74,5 +74,11 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Manrope-Regular.ttf</string>
+		<string>SairaCondensed-Black.ttf</string>
+		<string>Manrope-Bold.ttf</string>
+	</array>
 </dict>
 </plist>

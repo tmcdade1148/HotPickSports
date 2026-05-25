@@ -1,27 +1,10 @@
-import React, {useEffect, useState} from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Modal,
-  FlatList,
-  StyleSheet,
-} from 'react-native';
+import React, {useEffect} from 'react';
+import {View} from 'react-native';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
-import {
-  CheckCircle,
-  Grid3x3,
-  BarChart2,
-  MessageCircle,
-  ChevronDown,
-  ChevronLeft,
-  Settings,
-} from 'lucide-react-native';
+import {CheckCircle, Grid3x3, BarChart2, MessageCircle, Settings} from 'lucide-react-native';
 import type {TournamentConfig, TabConfig} from '@shared/types/templates';
 import type {DbPool} from '@shared/types/database';
-import {spacing, borderRadius} from '@shared/theme';
-import {useGlobalStore} from '@shell/stores/globalStore';
 import {useTournamentStore} from '../stores/tournamentStore';
 import {TournamentPicksHub} from '../screens/TournamentPicksHub';
 import {GroupPicksScreen} from '../screens/GroupPicksScreen';
@@ -30,7 +13,6 @@ import {TournamentBoardScreen} from '../screens/TournamentBoardScreen';
 import {SmackTalkScreen} from '@shared/components/SmackTalkScreen';
 import {SettingsScreen} from '@shell/screens/SettingsScreen';
 import {useTheme} from '@shell/theme';
-import {isPoolVisible} from '@shared/utils/poolVisibility';
 
 // ---------------------------------------------------------------------------
 // Icon mapping — maps config icon strings to Lucide components
@@ -114,11 +96,6 @@ interface TournamentTabNavigatorProps {
 export function TournamentTabNavigator({
   config,
   poolId,
-  poolName,
-  userPools,
-  onSwitchPool,
-  onOpenSettings,
-  onGoHome,
 }: TournamentTabNavigatorProps) {
   const {colors} = useTheme();
   const initialize = useTournamentStore(s => s.initialize);

@@ -90,7 +90,7 @@ export function WelcomeScreen({navigation}: any) {
               onPress={handleApple}
               disabled={loading !== null}>
               {loading === 'apple' ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator color={colors.onPrimary} />
               ) : (
                 <Text style={[styles.authButtonText, styles.appleButtonText]}>
                   Continue with Apple
@@ -192,7 +192,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: '#000000',
   },
   appleButtonText: {
-    color: '#FFFFFF',
+    color: colors.onPrimary,
   },
   googleButton: {
     backgroundColor: colors.background,
@@ -206,7 +206,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.primary,
   },
   emailButtonText: {
-    color: '#FFFFFF',
+    color: colors.onPrimary,
   },
   authButtonText: {
     fontSize: 16,

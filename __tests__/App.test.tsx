@@ -29,6 +29,22 @@ jest.mock('@react-navigation/bottom-tabs', () => ({
   }),
 }));
 
+// react-native-bootsplash — native module unavailable in Jest
+jest.mock('react-native-bootsplash', () => ({
+  hide: jest.fn().mockResolvedValue(undefined),
+  show: jest.fn().mockResolvedValue(undefined),
+  isVisible: jest.fn().mockResolvedValue(false),
+}));
+
+// @react-native-clipboard/clipboard — native module unavailable in Jest
+jest.mock('@react-native-clipboard/clipboard', () => ({
+  __esModule: true,
+  default: {
+    setString: jest.fn(),
+    getString: jest.fn().mockResolvedValue(''),
+  },
+}));
+
 // AsyncStorage — in-memory mock
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn().mockResolvedValue(null),

@@ -235,7 +235,7 @@ export function FlaggedMessagesScreen() {
   };
 
   const renderItem = ({item}: {item: DbSmackMessage}) => {
-    const isPending = item.moderation_status === 'pending' || item.moderation_status === 'escalated';
+    const isPending = item.moderation_status === 'pending';
     const isApproved = item.moderation_status === 'approved';
     const isRemoved = item.moderation_status === 'removed';
     const isExpanded = expandedId === item.id;
@@ -254,7 +254,7 @@ export function FlaggedMessagesScreen() {
     const statusColor = isApproved
       ? colors.success
       : isRemoved
-        ? colors.error ?? '#E53935'
+        ? colors.error
         : colors.warning;
 
     const statusLabel = isApproved
@@ -309,13 +309,13 @@ export function FlaggedMessagesScreen() {
             <TouchableOpacity
               style={[styles.actionButton, styles.approveButton]}
               onPress={() => handleApprove(item.id)}>
-              <Check size={16} color="#FFFFFF" />
+              <Check size={16} color={colors.onPrimary} />
               <Text style={styles.actionText}>Approve</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.actionButton, styles.removeButton]}
               onPress={() => handleRemove(item.id)}>
-              <X size={16} color="#FFFFFF" />
+              <X size={16} color={colors.onPrimary} />
               <Text style={styles.actionText}>Remove</Text>
             </TouchableOpacity>
           </View>
@@ -361,7 +361,7 @@ export function FlaggedMessagesScreen() {
   };
 
   const pendingCount = flaggedMessages.filter(
-    m => m.moderation_status === 'pending' || m.moderation_status === 'escalated',
+    m => m.moderation_status === 'pending',
   ).length;
 
   return (
@@ -507,7 +507,7 @@ const createStyles = (colors: any) =>
       paddingVertical: 2,
     },
     pendingText: {
-      color: '#FFFFFF',
+      color: colors.onPrimary,
       fontSize: 12,
       fontWeight: '700',
     },
@@ -566,7 +566,7 @@ const createStyles = (colors: any) =>
       marginBottom: spacing.sm,
     },
     statusText: {
-      color: '#FFFFFF',
+      color: colors.onPrimary,
       fontSize: 11,
       fontWeight: '700',
       textTransform: 'uppercase',
@@ -605,10 +605,10 @@ const createStyles = (colors: any) =>
       backgroundColor: colors.success,
     },
     removeButton: {
-      backgroundColor: colors.error ?? '#E53935',
+      backgroundColor: colors.error,
     },
     actionText: {
-      color: '#FFFFFF',
+      color: colors.onPrimary,
       fontSize: 14,
       fontWeight: '600',
     },
@@ -686,7 +686,7 @@ const createStyles = (colors: any) =>
       alignItems: 'center',
     },
     noteSendText: {
-      color: '#FFFFFF',
+      color: colors.onPrimary,
       fontSize: 14,
       fontWeight: '600',
     },

@@ -189,7 +189,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: colors.onPrimary,
     fontSize: 16,
     fontWeight: '600',
   },

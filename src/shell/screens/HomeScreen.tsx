@@ -1,197 +1,314 @@
-import React from 'react';
-import {
-  View,
-  Text,
-  Image,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-} from 'react-native';
-// SafeAreaView now handled by HomeTab wrapper in MainTabNavigator
-// Settings icon removed — now in MainTabNavigator bottom tab
+// Home composes the redesigned hero suite (HomeHeader → IdentityBar →
+// StateHero → Insight → Pool/Partner stacks). All Supabase reads live
+// in store loaders fired here so child modules can stay presentational.
+
+import React, {useEffect, useMemo} from 'react';
+import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {KeyRound, Plus} from 'lucide-react-native';
+import {useNavigation} from '@react-navigation/native';
 import {useGlobalStore} from '@shell/stores/globalStore';
-import {getDisplayName} from '@shared/utils/displayName';
-import {SeasonEventCard} from '@shell/components/home/SeasonEventCard';
-import {TournamentEventCard} from '@shell/components/home/TournamentEventCard';
-import {SeriesEventCard} from '@shell/components/home/SeriesEventCard';
-import {StandingsBadge} from '@shell/components/home/StandingsBadge';
-import {SmackTalkNudge} from '@shell/components/home/SmackTalkNudge';
-import {MessageCenter} from '@shell/components/home/MessageCenter';
-import {HardwareModule} from '@shell/components/home/HardwareModule';
-import {JoinPoolModule} from '@shell/components/home/JoinPoolModule';
-import {spacing, typography} from '@shared/theme';
-import {useTheme, useBrand} from '@shell/theme';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
+import {isScheduledStatus} from '@sports/nfl/utils/gameStatus';
+import {useSeasonStore} from '@templates/season/stores/seasonStore';
+import {useTheme} from '@shell/theme/hooks';
+import {spacing, bodyType} from '@shared/theme';
 
-import type {
-  AnyEventConfig,
-  SeasonConfig,
-  TournamentConfig,
-  SeriesConfig,
-} from '@shared/types/templates';
+import {SystemMessageSlot} from '@shell/components/home/SystemMessageSlot';
+import {HomeHeader} from '@shell/components/home/HomeHeader';
+import {IdentityBar} from '@shell/components/home/IdentityBar';
+import {StateHero} from '@shell/components/home/StateHero';
+import {Insight} from '@shell/components/home/Insight';
+import {PoolModule} from '@shell/components/home/PoolModule';
+import {PartnerModule} from '@shell/components/home/PartnerModule';
+import {resolveHomeState} from '@shell/components/home/resolveHomeState';
 
-/**
- * HomeScreen — Smart Home Screen showing priority-ordered event cards.
- *
- * Per CLAUDE.md §21, the Home Screen surfaces live action based on
- * current state of active events. Maximum 2 event cards rendered.
- * Tapping a card navigates to EventDetail which renders the full
- * template tab navigator for that event.
- */
-export function HomeScreen({navigation}: any) {
-  const {colors, isDark} = useTheme();
-  const brand = useBrand();
-  const styles = createStyles(colors);
-  const userProfile = useGlobalStore(s => s.userProfile);
-  const activeEventCards = useGlobalStore(s => s.activeEventCards);
-  const activeSport = useGlobalStore(s => s.activeSport);
-  const setActiveSport = useGlobalStore(s => s.setActiveSport);
-  const userPools = useGlobalStore(s => s.visiblePools);
+export function HomeScreen() {
+  const {colors} = useTheme();
+  const navigation = useNavigation<any>();
 
-  const nflWeekState = useNFLStore(s => s.weekState);
-  const nflCurrentPhase = useNFLStore(s => s.currentPhase);
-  const nflUserPickCount = useNFLStore(s => s.userPickCount);
-  const nflPicksDeadline = useNFLStore(s => s.picksDeadline);
+  const userId       = useGlobalStore(s => s.user?.id);
+  const visiblePools = useGlobalStore(s => s.visiblePools);
+  const defaultPoolId = useGlobalStore(s => s.defaultPoolId);
+  const currentPhase = useNFLStore(s => s.currentPhase);
+  const weekState    = useNFLStore(s => s.weekState);
+  const currentWeek  = useNFLStore(s => s.currentWeek);
+  const competition  = useNFLStore(s => s.competition);
 
-  const greeting = getContextGreeting(nflCurrentPhase, nflWeekState, nflUserPickCount, nflPicksDeadline);
-  const firstName = getDisplayName(userProfile);
+  const loadLastWeekHotPick   = useGlobalStore(s => s.loadLastWeekHotPick);
+  const loadRecentWeeks       = useGlobalStore(s => s.loadRecentWeeks);
+  const loadHotPickHitRate    = useGlobalStore(s => s.loadHotPickHitRate);
+  const loadPoolIndicators    = useGlobalStore(s => s.loadPoolIndicators);
+  const loadUserRankByPool    = useGlobalStore(s => s.loadUserRankByPool);
+  const loadWeekRankByPool    = useGlobalStore(s => s.loadWeekRankByPool);
+  const loadAlignedPartners   = useGlobalStore(s => s.loadAlignedPartners);
+  const loadActivePartners    = useGlobalStore(s => s.loadActivePartners);
+  const activePartnerIds      = useGlobalStore(s => s.activePartnerIds);
+  const loadPartnerIndicators = useGlobalStore(s => s.loadPartnerIndicators);
+  const fetchUserPickStatus    = useNFLStore(s => s.fetchUserPickStatus);
+  const fetchUserHotPick       = useNFLStore(s => s.fetchUserHotPick);
+  const fetchLiveScores        = useNFLStore(s => s.fetchLiveScores);
+  const subscribeToLiveScores  = useNFLStore(s => s.subscribeToLiveScores);
+  const fetchHighestRankedGame = useNFLStore(s => s.fetchHighestRankedGame);
+  const fetchSeasonUserPicks   = useSeasonStore(s => s.fetchUserPicks);
+  const fetchSeasonWeekGames   = useSeasonStore(s => s.fetchWeekGames);
+  const fetchSeasonLeaderboard = useSeasonStore(s => s.fetchLeaderboard);
+  const seasonInitialize       = useSeasonStore(s => s.initialize);
+  const seasonConfig           = useSeasonStore(s => s.config);
+  const activeSport            = useGlobalStore(s => s.activeSport);
+  const activePoolId           = useGlobalStore(s => s.activePoolId);
+  const subscribeToCompetitionConfig = useNFLStore(s => s.subscribeToCompetitionConfig);
 
-  // Join module: show when user has no private pool, hide during SEASON_COMPLETE
-  const hasPrivatePool = userPools.some(
-    p => !p.is_global && p.competition === (activeSport?.competition ?? 'nfl_2026'),
+  const homeState = useMemo(
+    () => resolveHomeState(visiblePools.length, currentPhase, weekState),
+    [visiblePools.length, currentPhase, weekState],
   );
-  const isSeasonOver = nflCurrentPhase === 'SEASON_COMPLETE';
-  const showJoinModule = (!hasPrivatePool || nflCurrentPhase === 'PRE_SEASON') && !isSeasonOver;
 
-  // Event name + phase for header
-  const eventName = activeSport
-    ? activeSport.competition.replace(/_/g, ' ').toUpperCase()
-    : '';
-  const phaseForLabel = nflCurrentPhase || (activeSport as any)?.currentPhase;
-  const phaseLabel = phaseForLabel === 'PRE_SEASON'
-    ? 'The Calm Before...'
-    : phaseForLabel === 'PLAYOFFS'
-      ? 'Playoffs'
-      : phaseForLabel === 'SUPERBOWL'
-        ? 'Super Bowl'
-        : phaseForLabel === 'SUPERBOWL_INTRO'
-          ? 'Super Bowl'
-          : phaseForLabel === 'REGULAR_COMPLETE'
-            ? 'Playoffs Loading...'
-            : phaseForLabel === 'SEASON_COMPLETE'
-              ? 'Season Complete'
-              : 'Regular Season';
+  const isPicksFlow =
+    homeState === 'picks_open'   ||
+    homeState === 'picks_locked' ||
+    homeState === 'games_live';
+  const showInsight      = isPicksFlow;
+  const showPoolStack    = homeState !== 'zero_pools';
+  const showPartnerStack = homeState !== 'zero_pools';
 
-  const handleCardPress = (config: AnyEventConfig) => {
-    // Set as active sport so Picks/Leaderboard/SmackTalk tabs render this sport
-    setActiveSport(config);
-    navigation.navigate('PicksTab');
-  };
-
-  /** Navigate to the Leaderboard tab */
-  const handleNavigateToBoard = () => {
-    const config = activeEventCards[0] ?? activeSport;
-    if (config) {
-      setActiveSport(config);
-      navigation.navigate('LeaderboardTab');
+  // ---------------------------------------------------------------------------
+  // Partition pools for the Pool stack + Partner stack.
+  // ---------------------------------------------------------------------------
+  const {privatePoolIds, alignedPoolsByPartner, partnerIds} = useMemo(() => {
+    const privatePools: string[] = [];
+    const alignedMap: Record<string, typeof visiblePools> = {};
+    const partners: string[] = [];
+    for (const p of visiblePools) {
+      if (p.partner_id) {
+        if (!alignedMap[p.partner_id]) {
+          alignedMap[p.partner_id] = [];
+          partners.push(p.partner_id);
+        }
+        alignedMap[p.partner_id].push(p);
+      } else {
+        privatePools.push(p.id);
+      }
     }
-  };
+    return {
+      privatePoolIds:        privatePools,
+      alignedPoolsByPartner: alignedMap,
+      partnerIds:            partners,
+    };
+  }, [visiblePools]);
 
-  /** Navigate to SmackTalk tab for the active pool */
-  const handleNavigateToSmackTalk = () => {
-    const config = activeEventCards[0] ?? activeSport;
-    if (config) {
-      setActiveSport(config);
-      navigation.navigate('SmackTalkTab');
-    }
-  };
+  // Default pool pins to the top of the Home pool stack; the rest sort
+  // alphabetically. Set via the star icon in Settings → My Pools.
+  const sortedVisiblePools = useMemo(() => {
+    const byName = [...visiblePools].sort((a, b) =>
+      (a.name ?? '').localeCompare(b.name ?? '', undefined, {sensitivity: 'base'}),
+    );
+    if (!defaultPoolId) return byName;
+    const idx = byName.findIndex(p => p.id === defaultPoolId);
+    if (idx <= 0) return byName;
+    const [pinned] = byName.splice(idx, 1);
+    return [pinned, ...byName];
+  }, [visiblePools, defaultPoolId]);
 
-  /** Switch pool globally, then navigate to SmackTalk tab */
-  const handleNavigateToSmackTalkPool = (poolId: string) => {
-    useGlobalStore.getState().setActivePoolId(poolId);
-    const config = activeEventCards[0] ?? activeSport;
-    if (config) {
-      setActiveSport(config);
-      navigation.navigate('SmackTalkTab');
-    }
-  };
+  const allPoolIds = useMemo(() => visiblePools.map(p => p.id), [visiblePools]);
+  const liveScores = useNFLStore(s => s.liveScores);
 
-  // Use activeEventCards if populated, otherwise fall back to activeSport
-  const cardsToShow =
-    activeEventCards.length > 0
-      ? activeEventCards
-      : activeSport
-        ? [activeSport]
-        : [];
+  // Derived flags — kept stable so dependent effects don't re-fire on
+  // every Realtime score push.
+  const someGameStarted = useMemo(
+    () => Object.values(liveScores).some(g => !isScheduledStatus(g.status)),
+    [liveScores],
+  );
+  const pastKickoff =
+    homeState === 'picks_locked' ||
+    homeState === 'games_live'   ||
+    homeState === 'settling'     ||
+    homeState === 'complete';
 
+  // Partner render order: aligned first, then the rest of the active
+  // partner roster.
+  const partnerRenderIds = useMemo(() => {
+    const unaligned = activePartnerIds.filter(id => !partnerIds.includes(id));
+    return [...partnerIds, ...unaligned];
+  }, [partnerIds, activePartnerIds]);
+
+  useEffect(() => {
+    const unsub = subscribeToCompetitionConfig();
+    return unsub;
+  }, [subscribeToCompetitionConfig]);
+
+  useEffect(() => {
+    if (!userId || !competition) return;
+    loadLastWeekHotPick(userId, competition, currentWeek).catch(() => {});
+    loadRecentWeeks(userId, competition).catch(() => {});
+    loadHotPickHitRate(userId, competition).catch(() => {});
+  }, [userId, competition, currentWeek, loadLastWeekHotPick, loadRecentWeeks, loadHotPickHitRate]);
+
+  useEffect(() => {
+    if (!userId) return;
+    loadPoolIndicators(userId, allPoolIds).catch(() => {});
+  }, [userId, allPoolIds, loadPoolIndicators]);
+
+  useEffect(() => {
+    if (!userId) return;
+    loadUserRankByPool(userId, allPoolIds).catch(() => {});
+  }, [userId, allPoolIds, loadUserRankByPool]);
+
+  useEffect(() => {
+    if (!userId || !competition || currentWeek <= 0 || allPoolIds.length === 0) return;
+    if (!someGameStarted && !pastKickoff) return;
+    loadWeekRankByPool(userId, allPoolIds, competition, currentWeek).catch(() => {});
+  }, [userId, competition, currentWeek, allPoolIds, someGameStarted, pastKickoff, loadWeekRankByPool]);
+
+  useEffect(() => {
+    loadAlignedPartners(partnerIds).catch(() => {});
+  }, [partnerIds, loadAlignedPartners]);
+
+  useEffect(() => {
+    loadActivePartners().catch(() => {});
+  }, [loadActivePartners]);
+
+  useEffect(() => {
+    if (!userId) return;
+    loadPartnerIndicators(userId, partnerIds).catch(() => {});
+  }, [userId, partnerIds, loadPartnerIndicators]);
+
+  useEffect(() => {
+    if (!userId || !competition || currentWeek <= 0) return;
+    fetchUserPickStatus(userId).catch(() => {});
+    fetchUserHotPick(userId, currentWeek).catch(() => {});
+  }, [userId, competition, currentWeek, fetchUserPickStatus, fetchUserHotPick]);
+
+  // Live scores re-fetch on currentWeek change — fetchLiveScores REPLACES
+  // (not merges) so last week's final entries are wiped, preventing
+  // "every game final" weekComplete from sticking after rollover.
+  useEffect(() => {
+    if (!competition || currentWeek <= 0) return;
+    fetchLiveScores().catch(() => {});
+    fetchHighestRankedGame().catch(() => {});
+    const unsub = subscribeToLiveScores();
+    return unsub;
+  }, [competition, currentWeek, fetchLiveScores, fetchHighestRankedGame, subscribeToLiveScores]);
+
+  // Bootstrap seasonStore.config from Home too — MainTabNavigator runs
+  // initialize as well, but only after activeSport + activePoolId resolve.
+  // On iOS that can land later than the first Home render.
+  useEffect(() => {
+    if (!activeSport || activeSport.templateType !== 'season') return;
+    if (!activePoolId) return;
+    if (seasonConfig && seasonConfig.competition === activeSport.competition) return;
+    seasonInitialize(activeSport, activePoolId).catch(() => {});
+  }, [activeSport, activePoolId, seasonConfig, seasonInitialize]);
+
+  useEffect(() => {
+    if (!userId || currentWeek <= 0) return;
+    fetchSeasonUserPicks(userId, currentWeek).catch(() => {});
+    fetchSeasonWeekGames(currentWeek).catch(() => {});
+  }, [userId, currentWeek, fetchSeasonUserPicks, fetchSeasonWeekGames, seasonConfig]);
+
+  useEffect(() => {
+    if (!seasonConfig) return;
+    fetchSeasonLeaderboard().catch(() => {});
+  }, [seasonConfig, currentWeek, homeState, fetchSeasonLeaderboard]);
+
+  // While the backend is computing final scores, season_user_totals
+  // updates aren't pushed via Realtime — poll the season aggregates so
+  // SEASON PTS / recent weeks / hit rate roll forward.
+  useEffect(() => {
+    if (homeState !== 'settling') return;
+    if (!userId || !competition) return;
+    const tick = () => {
+      fetchSeasonLeaderboard().catch(() => {});
+      loadRecentWeeks(userId, competition).catch(() => {});
+      loadHotPickHitRate(userId, competition).catch(() => {});
+    };
+    tick();
+    const id = setInterval(tick, 10_000);
+    return () => clearInterval(id);
+  }, [
+    homeState,
+    userId,
+    competition,
+    fetchSeasonLeaderboard,
+    loadRecentWeeks,
+    loadHotPickHitRate,
+  ]);
   return (
-    <View style={styles.container}>
-      {/* Header — logo/pool switcher now in PoolSwitcherBar above */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>{greeting}</Text>
-          <Text style={styles.name}>{firstName}</Text>
-        </View>
-        {eventName ? (
-          <View style={styles.headerRight}>
-            <Text style={styles.phaseLabel}>{phaseLabel}</Text>
-            <Text style={[styles.eventName, {color: colors.highlight}]}>{eventName}</Text>
-            {(nflCurrentPhase === 'REGULAR' || nflCurrentPhase === 'PLAYOFFS' || nflCurrentPhase === 'SUPERBOWL') ? (
-              <Text style={[styles.weekLabel, {color: colors.highlight}]}>
-                WEEK {useNFLStore.getState().currentWeek}
-              </Text>
-            ) : null}
-          </View>
-        ) : null}
-      </View>
-      <View style={styles.headerDivider} />
-
-      {/* Event Cards */}
+    <View style={[styles.wrap, {backgroundColor: colors.background}]}>
       <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}>
-        {/* Message Center — broadcasts, moderator notes, flagged messages */}
-        <MessageCenter
-          onNavigateToMessageCenter={() => navigation.navigate('MessageCenter')}
-          onNavigateToFlagged={(poolId: string) => {
-            navigation.navigate('FlaggedMessages', {poolId});
-          }}
-        />
+        <HomeHeader />
+        <SystemMessageSlot />
+        <IdentityBar />
+        <StateHero state={homeState} />
 
-        {/* Hardware Module hidden — History tab not ready for launch */}
-        {/* <HardwareModule onPress={() => navigation.navigate('HistoryTab')} /> */}
+        {showInsight && <Insight />}
 
-        {cardsToShow.map(config => (
-          <EventCardForConfig
-            key={config.competition}
-            config={config}
-            onNavigateToEvent={() => handleCardPress(config)}
-          />
-        ))}
-
-        {/* Join Pool Module — shown during PRE_SEASON or when user has no private pool */}
-        {showJoinModule && <JoinPoolModule />}
-
-        {/* StandingsBadge — hidden during PRE_SEASON and until user has a private pool */}
-        {cardsToShow.length > 0 && hasPrivatePool && nflCurrentPhase !== 'PRE_SEASON' && (
-          <StandingsBadge onPress={handleNavigateToBoard} />
-        )}
-
-        {/* SmackTalkNudge — hidden until user has a private pool */}
-        {cardsToShow.length > 0 && hasPrivatePool && (
-          <SmackTalkNudge
-            onPress={handleNavigateToSmackTalk}
-            onPressPool={handleNavigateToSmackTalkPool}
-          />
-        )}
-
-        {cardsToShow.length === 0 && (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>No active events</Text>
-            <Text style={styles.emptySubtitle}>
-              Events will appear here when they're live
+        {showPoolStack && visiblePools.length > 0 && (
+          <View style={styles.section}>
+            <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textTertiary}]}>
+              YOUR POOLS
             </Text>
+            {sortedVisiblePools.map(p => (
+              <PoolModule key={p.id} pool={p} />
+            ))}
+            <View style={styles.poolActionsRow}>
+              <Pressable
+                onPress={() => navigation.navigate('JoinPool')}
+                style={({pressed}) => [
+                  styles.poolActionBtn,
+                  {borderColor: colors.border, opacity: pressed ? 0.7 : 1},
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Join a pool with an invite code">
+                <KeyRound size={16} color={colors.textSecondary} strokeWidth={2} />
+                <View style={styles.poolActionLabel}>
+                  <Text
+                    style={[bodyType.bold, styles.poolActionPrimary, {color: colors.textPrimary}]}>
+                    Join a pool
+                  </Text>
+                  <Text
+                    style={[bodyType.regular, styles.poolActionSecondary, {color: colors.textTertiary}]}>
+                    with invite code
+                  </Text>
+                </View>
+              </Pressable>
+              <Pressable
+                onPress={() => navigation.navigate('CreatePool')}
+                style={({pressed}) => [
+                  styles.poolActionBtn,
+                  {borderColor: colors.border, opacity: pressed ? 0.7 : 1},
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Create a new pool and invite friends">
+                <Plus size={16} color={colors.textSecondary} strokeWidth={2} />
+                <View style={styles.poolActionLabel}>
+                  <Text
+                    style={[bodyType.bold, styles.poolActionPrimary, {color: colors.textPrimary}]}>
+                    Create a pool
+                  </Text>
+                  <Text
+                    style={[bodyType.regular, styles.poolActionSecondary, {color: colors.textTertiary}]}>
+                    and invite friends
+                  </Text>
+                </View>
+              </Pressable>
+            </View>
+          </View>
+        )}
+
+        {showPartnerStack && (partnerIds.length > 0 || activePartnerIds.length > 0) && (
+          <View style={styles.section}>
+            <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textTertiary}]}>
+              YOUR PARTNERS
+            </Text>
+            {partnerRenderIds.map(pid => (
+              <PartnerModule
+                key={pid}
+                partnerId={pid}
+                alignedPools={alignedPoolsByPartner[pid] ?? []}
+              />
+            ))}
           </View>
         )}
       </ScrollView>
@@ -199,179 +316,44 @@ export function HomeScreen({navigation}: any) {
   );
 }
 
-/**
- * Dispatches to the correct event card component based on templateType.
- * Shell never imports sport logic — each card reads from its own sport store.
- */
-function EventCardForConfig({
-  config,
-  onNavigateToEvent,
-}: {
-  config: AnyEventConfig;
-  onNavigateToEvent: () => void;
-}) {
-  switch (config.templateType) {
-    case 'season':
-      return (
-        <SeasonEventCard
-          config={config as SeasonConfig}
-          onNavigateToEvent={onNavigateToEvent}
-        />
-      );
-    case 'tournament':
-      return <TournamentEventCard config={config as TournamentConfig} />;
-    case 'series':
-      return <SeriesEventCard config={config as SeriesConfig} />;
-  }
-}
-
-/**
- * Context-aware salutation based on season phase, week state, and pick status.
- * Deterministic per-hour — picks one greeting from the pool using the hour
- * as a seed so it doesn't flicker on re-renders but changes throughout the day.
- */
-function getContextGreeting(
-  phase: string | null,
-  weekState: string,
-  userPickCount: number,
-  picksDeadline: Date | null,
-): string {
-  const hour = new Date().getHours();
-  const pick = (arr: string[]) => arr[hour % arr.length];
-
-  // Dead period / pre-season
-  if (!phase || phase === 'PRE_SEASON') {
-    return pick(["Nothing on yet. Enjoy it", "Offseason. It won't last", "Season's coming"]);
-  }
-
-  // Season complete
-  if (phase === 'SEASON_COMPLETE') {
-    return pick(["What a ride", "That's a wrap", "See you next season"]);
-  }
-
-  // Transition phases
-  if (phase === 'REGULAR_COMPLETE' || phase === 'SUPERBOWL_INTRO') {
-    return pick(["Dust settling", "Big things ahead", "Stay sharp"]);
-  }
-
-  // Active season — use week state
-  switch (weekState) {
-    case 'picks_open': {
-      // Check if user has submitted picks
-      if (userPickCount > 0) {
-        return pick(["On record. No edits", "Said what you said", "Locked in"]);
-      }
-      // Check if deadline is within 24 hours
-      if (picksDeadline) {
-        const hoursLeft = (picksDeadline.getTime() - Date.now()) / (1000 * 60 * 60);
-        if (hoursLeft > 0 && hoursLeft <= 24) {
-          return pick(["Last call", "Closing time", "You sure about this?"]);
-        }
-      }
-      return pick(["Picks are open", "Your move", "Clock's running"]);
-    }
-    case 'locked':
-      return pick(["On record. No edits", "Said what you said", "Locked in"]);
-    case 'live':
-      return pick(["It's happening", "Too late to change anything", "Watching or refreshing?"]);
-    case 'settling':
-    case 'complete':
-      return pick(["The record doesn't lie", "It's official", "Week closed"]);
-    default:
-      return pick(["Nothing today", "Rest day", "Back at it soon"]);
-  }
-}
-
-const createStyles = (colors: any) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+const styles = StyleSheet.create({
+  wrap:    {flex: 1},
+  scroll:  {paddingBottom: spacing.xxl},
+  section: {marginTop: spacing.lg},
+  sectionTitle: {
+    fontSize: 11,
+    letterSpacing: 1.8,
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xs,
-    paddingBottom: spacing.md / 2,
+    marginBottom: 10,
   },
-  headerDivider: {
-    height: 2,
-    backgroundColor: colors.secondary,
-    marginHorizontal: spacing.md,
+  poolActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginHorizontal: spacing.lg,
+    marginTop: 4,
   },
-  greeting: {
-    ...typography.caption,
-    color: colors.textSecondary,
-  },
-  name: {
-    ...typography.h2,
-    color: colors.textPrimary,
-  },
-  headerRight: {
-    alignItems: 'flex-end',
-  },
-  eventName: {
-    fontSize: 24,
-    fontWeight: '800' as const,
-    fontStyle: 'italic' as const,
-    color: colors.primary,
-    textTransform: 'uppercase',
-  },
-  phaseLabel: {
-    fontSize: 14,
-    fontWeight: '400' as const,
-    color: colors.textSecondary,
-  },
-  weekLabel: {
-    fontSize: 18,
-    fontWeight: '800' as const,
-    fontStyle: 'italic' as const,
-  },
-  settingsButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 1},
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  logoContainer: {
-    alignItems: 'center',
-    paddingTop: spacing.sm,
-    paddingBottom: 0,
-  },
-  wordmark: {
-    height: 70,
-    width: 400,
-  },
-  partnerLogo: {
-    height: 56,
-    width: 280,
-  },
-  scrollView: {
+  poolActionBtn: {
     flex: 1,
-  },
-  scrollContent: {
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xxl,
-  },
-  emptyState: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: spacing.xxl * 2,
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: 'dashed',
   },
-  emptyTitle: {
-    ...typography.h3,
-    color: colors.textPrimary,
-    marginBottom: spacing.sm,
+  poolActionLabel: {
+    flexShrink: 1,
+    minWidth: 0,
   },
-  emptySubtitle: {
-    ...typography.body,
-    color: colors.textSecondary,
+  poolActionPrimary: {
+    fontSize: 14,
+    lineHeight: 17,
+  },
+  poolActionSecondary: {
+    fontSize: 11,
+    fontStyle: 'italic',
+    marginTop: 1,
   },
 });

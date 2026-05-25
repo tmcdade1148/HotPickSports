@@ -12,6 +12,12 @@ import {nflSeason} from '@sports/nfl/config';
 const POOL_STORAGE_PREFIX = 'hotpick_active_pool_';
 const DEFAULT_POOL_PREFIX = 'hotpick_default_pool_';
 
+// Race-condition guard for loadWeekRankByPool. Each call stamps this
+// with its (competition, week) tag at start; the resolved response only
+// writes to the store if its tag still matches — preventing a slow
+// response from clobbering newer state when the user advances weeks.
+let weekRankLatestTag = '';
+
 /**
  * DEV-only: AsyncStorage key for the active competition so Metro hot reloads
  * don't reset the developer back to the default event. Production builds must
@@ -178,6 +184,87 @@ interface GlobalState {
   loadUserHardware: () => Promise<void>;
   updateHistoryVisibility: (v: 'private' | 'pools_only' | 'public') => Promise<void>;
   computePlayerArchetype: () => void;
+
+  // Home Redesign §6.6 — Last-week HotPick recap + Week Mini-Strip data.
+  // Computed server-side; clients never aggregate scores (Hard Rule #3).
+  lastWeekHotPick: {
+    team: string;
+    isCorrect: boolean;
+    points: number;
+  } | null;
+  loadLastWeekHotPick: (
+    userId: string,
+    competition: string,
+    currentWeek: number,
+  ) => Promise<void>;
+
+  // Last 4 weeks of pre-computed totals for the user.
+  recentWeeks: Array<{week: number; total: number; correctPicks: number; totalPicks: number}>;
+  loadRecentWeeks: (userId: string, competition: string) => Promise<void>;
+
+  // Season-long HotPick hit rate — aggregated across every settled week
+  // the user has played. `hits` = weeks where is_hotpick_correct is
+  // true; `total` = settled weeks with a HotPick designated.
+  hotPickHitRate: {hits: number; total: number} | null;
+  loadHotPickHitRate: (userId: string, competition: string) => Promise<void>;
+
+  // Pool Module indicators (per-pool unread counts + most-recent activity timestamp).
+  // Aggregated in ONE query in loadPoolIndicators — never per-pool useEffect
+  // (spec §6.4.6 Red Flag). Smack unread already lives in smackUnreadCounts;
+  // this slice adds organizer-notification unread + recency.
+  poolIndicators: Record<string, {orgUnread: number; mostRecentAt: string | null}>;
+  loadPoolIndicators: (userId: string, poolIds: string[]) => Promise<void>;
+  /** Mark organizer notifications as read for this user in this pool. */
+  markOrgNotificationsRead: (userId: string, poolId: string) => Promise<void>;
+
+  // Per-pool user rank for the Pool Module rank chip. Populated by the
+  // get_user_ranks_in_pools RPC. Partner-aligned pools are NOT passed —
+  // they're never ranked per the May 13 2026 locked product decision.
+  userRankByPool: Record<string, {rank: number; memberCount: number; total: number}>;
+  loadUserRankByPool: (userId: string, poolIds: string[]) => Promise<void>;
+
+  // Per-pool weekly rank — pool-scoped ranking of members by THIS week's
+  // points only. Drives the live "Week N · You're Xth (of Y)" line that
+  // shows under each pool's season-rank line once the first game of the
+  // week kicks off. Empty between weeks; repopulates as games settle.
+  weekRankByPool: Record<string, {rank: number; memberCount: number; weekPoints: number}>;
+  loadWeekRankByPool: (
+    userId: string,
+    poolIds: string[],
+    competition: string,
+    week: number,
+  ) => Promise<void>;
+
+  // Partner Module data — spec §6.4.7.
+  // partnersById is the fetched partner record cache (one per distinct
+  // partner_id aligned to a visible pool). Only partners with
+  // is_active = true AND perk_text IS NOT NULL are loaded — partners
+  // without a configured perk should not appear as Modules.
+  partnersById: Record<string, {
+    id: string;
+    name: string;
+    slug: string;
+    perk_text: string;
+    perk_icon: string | null;
+    logo_url: string | null;
+    primary_color: string | null;
+  }>;
+  loadAlignedPartners: (visiblePoolPartnerIds: string[]) => Promise<void>;
+
+  // Active partners across the platform (regardless of pool alignment).
+  // Used by Home's `YOUR PARTNERS` section so the user always sees the
+  // live partner roster, not just the ones they happen to be aligned
+  // with via a pool.
+  loadActivePartners: () => Promise<void>;
+  activePartnerIds: string[];
+
+  // partnerIndicators — parallel to poolIndicators but keyed by partner_id.
+  // Sourced from partner_notifications + partner_notification_read_state.
+  partnerIndicators: Record<string, {unread: number; mostRecentAt: string | null}>;
+  loadPartnerIndicators: (userId: string, partnerIds: string[]) => Promise<void>;
+  /** Mark partner notifications read for this user/partner. Called on entry
+   *  to PartnerRosterScreen. Clears the indicator on Home. */
+  markPartnerNotificationsRead: (userId: string, partnerId: string) => Promise<void>;
 }
 
 export interface UserHardwareItem {
@@ -1178,5 +1265,450 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
 
     // No archetype threshold met — show nothing
     set({playerArchetype: null});
+  },
+
+  // ---------------------------------------------------------------------------
+  // Home Redesign §6.6 — Last-week HotPick recap + Week Mini-Strip
+  // ---------------------------------------------------------------------------
+  // Both queries respect Hard Rule #3 (client never computes scores). They
+  // read pre-computed values: season_picks.is_correct for the last-week
+  // HotPick chip, and season_user_totals.{week_points, playoff_points} for
+  // the week strip. No SUM or AVG happens here.
+  // ---------------------------------------------------------------------------
+  lastWeekHotPick: null,
+  recentWeeks: [],
+  hotPickHitRate: null,
+  loadHotPickHitRate: async (userId, competition) => {
+    // Weeks with is_hotpick_correct = null had no HotPick attempt and
+    // don't count toward numerator or denominator.
+    const {data} = await supabase
+      .from('season_user_totals')
+      .select('is_hotpick_correct')
+      .eq('user_id', userId)
+      .eq('competition', competition);
+    if (!data) {
+      set({hotPickHitRate: null});
+      return;
+    }
+    let hits = 0;
+    let total = 0;
+    for (const row of data as Array<{is_hotpick_correct: boolean | null}>) {
+      if (row.is_hotpick_correct == null) continue;
+      total += 1;
+      if (row.is_hotpick_correct) hits += 1;
+    }
+    set({hotPickHitRate: total > 0 ? {hits, total} : null});
+  },
+
+  loadLastWeekHotPick: async (userId, competition, currentWeek) => {
+    if (currentWeek <= 1) {
+      set({lastWeekHotPick: null});
+      return;
+    }
+    const targetWeek = currentWeek - 1;
+
+    // Read the user's HotPick row for the prior week. is_correct + points
+    // are server-computed by the scoring Edge Function; we only display.
+    const {data: pick} = await supabase
+      .from('season_picks')
+      .select('picked_team, is_correct, points')
+      .eq('user_id', userId)
+      .eq('competition', competition)
+      .eq('week', targetWeek)
+      .eq('is_hotpick', true)
+      .maybeSingle();
+
+    if (!pick || pick.is_correct == null) {
+      set({lastWeekHotPick: null});
+      return;
+    }
+
+    set({
+      lastWeekHotPick: {
+        team:      pick.picked_team,
+        isCorrect: pick.is_correct,
+        points:    pick.points ?? 0,
+      },
+    });
+  },
+
+  loadRecentWeeks: async (userId, competition) => {
+    // Pre-computed per-week totals. Last 4 weeks descending; display ascending.
+    const {data} = await supabase
+      .from('season_user_totals')
+      .select('week, week_points, playoff_points, correct_picks, total_picks')
+      .eq('user_id', userId)
+      .eq('competition', competition)
+      .order('week', {ascending: false})
+      .limit(4);
+
+    const rows = (data ?? []) as Array<{
+      week: number;
+      week_points: number | null;
+      playoff_points: number | null;
+      correct_picks: number | null;
+      total_picks: number | null;
+    }>;
+    const ascending = [...rows].reverse().map(r => ({
+      week:         r.week,
+      total:        (r.week_points ?? 0) + (r.playoff_points ?? 0),
+      correctPicks: r.correct_picks ?? 0,
+      totalPicks:   r.total_picks ?? 0,
+    }));
+    set({recentWeeks: ascending});
+  },
+
+  // ---------------------------------------------------------------------------
+  // Home Redesign §6.4.6 — Pool Module indicators + rank batch
+  // ---------------------------------------------------------------------------
+  poolIndicators: {},
+
+  loadPoolIndicators: async (userId, poolIds) => {
+    if (poolIds.length === 0) {
+      set({poolIndicators: {}});
+      return;
+    }
+
+    // One aggregated query across all pools — never N+1 per Module.
+    // Counts organizer_notifications.sent_at > notification_read_state.last_read_at.
+    const [unreadResult, readStateResult] = await Promise.all([
+      supabase
+        .from('organizer_notifications')
+        .select('pool_id, sent_at')
+        .in('pool_id', poolIds)
+        .order('sent_at', {ascending: false}),
+      supabase
+        .from('notification_read_state')
+        .select('pool_id, last_read_at')
+        .in('pool_id', poolIds)
+        .eq('user_id', userId),
+    ]);
+
+    const lastReadByPool = new Map<string, string>();
+    for (const row of (readStateResult.data ?? []) as Array<{
+      pool_id: string;
+      last_read_at: string;
+    }>) {
+      lastReadByPool.set(row.pool_id, row.last_read_at);
+    }
+
+    const indicators: Record<string, {orgUnread: number; mostRecentAt: string | null}> = {};
+    for (const pid of poolIds) {
+      indicators[pid] = {orgUnread: 0, mostRecentAt: null};
+    }
+
+    for (const row of (unreadResult.data ?? []) as Array<{
+      pool_id: string;
+      sent_at: string;
+    }>) {
+      const cell = indicators[row.pool_id];
+      if (!cell) continue;
+      const lastRead = lastReadByPool.get(row.pool_id);
+      // If we've never visited the pool's notifications, EVERYTHING is unread.
+      if (!lastRead || row.sent_at > lastRead) {
+        cell.orgUnread += 1;
+      }
+      // mostRecentAt = the newest sent_at we've seen for this pool (any read state).
+      if (!cell.mostRecentAt || row.sent_at > cell.mostRecentAt) {
+        cell.mostRecentAt = row.sent_at;
+      }
+    }
+
+    set({poolIndicators: indicators});
+  },
+
+  markOrgNotificationsRead: async (userId, poolId) => {
+    const now = new Date().toISOString();
+    // Upsert by (user_id, pool_id) — primary key composite. RLS allows
+    // user to insert/update their own rows only.
+    await supabase
+      .from('notification_read_state')
+      .upsert(
+        {user_id: userId, pool_id: poolId, last_read_at: now},
+        {onConflict: 'user_id,pool_id'},
+      );
+    set(state => ({
+      poolIndicators: {
+        ...state.poolIndicators,
+        [poolId]: {...(state.poolIndicators[poolId] ?? {mostRecentAt: null}), orgUnread: 0},
+      },
+    }));
+  },
+
+  userRankByPool: {},
+
+  weekRankByPool: {},
+  loadWeekRankByPool: async (userId, poolIds, competition, week) => {
+    if (poolIds.length === 0 || week <= 0) {
+      weekRankLatestTag = '';
+      set({weekRankByPool: {}});
+      return;
+    }
+    weekRankLatestTag = `${competition}::${week}`;
+    const {data: members} = await supabase
+      .from('pool_members')
+      .select('pool_id, user_id')
+      .in('pool_id', poolIds)
+      .eq('status', 'active');
+    if (!members) {
+      set({weekRankByPool: {}});
+      return;
+    }
+    const memberIds = [...new Set(members.map((r: any) => r.user_id))];
+    if (memberIds.length === 0) {
+      set({weekRankByPool: {}});
+      return;
+    }
+    const {data: totals} = await supabase
+      .from('season_user_totals')
+      .select('user_id, week_points')
+      .eq('competition', competition)
+      .eq('week', week)
+      .in('user_id', memberIds);
+    const pointsByUser: Record<string, number> = {};
+    for (const r of totals ?? []) {
+      pointsByUser[(r as any).user_id] =
+        (pointsByUser[(r as any).user_id] ?? 0) + ((r as any).week_points ?? 0);
+    }
+    const membersByPool: Record<string, string[]> = {};
+    for (const row of members) {
+      const pid = (row as any).pool_id as string;
+      const uid = (row as any).user_id as string;
+      if (!membersByPool[pid]) membersByPool[pid] = [];
+      membersByPool[pid].push(uid);
+    }
+    const map: Record<string, {rank: number; memberCount: number; weekPoints: number}> = {};
+    for (const pid of Object.keys(membersByPool)) {
+      const ids = membersByPool[pid];
+      const ranked = ids
+        .map(uid => ({uid, pts: pointsByUser[uid] ?? 0}))
+        .sort((a, b) => b.pts - a.pts);
+      const idx = ranked.findIndex(r => r.uid === userId);
+      if (idx === -1) continue;
+      map[pid] = {
+        rank: idx + 1,
+        memberCount: ids.length,
+        weekPoints: ranked[idx].pts,
+      };
+    }
+    // Race-condition guard — discard if a newer call has already been
+    // issued for a different (week, competition) tuple. Avoids the
+    // late-response-overwrite bug without a cross-store import.
+    const tag = `${competition}::${week}`;
+    if (weekRankLatestTag !== tag) return;
+    set({weekRankByPool: map});
+  },
+
+  loadUserRankByPool: async (userId, poolIds) => {
+    if (poolIds.length === 0) {
+      set({userRankByPool: {}});
+      return;
+    }
+
+    // One RPC round trip for all pools at once.
+    const {data, error} = await supabase.rpc('get_user_ranks_in_pools', {
+      p_user_id:  userId,
+      p_pool_ids: poolIds,
+    });
+
+    if (error || !data) {
+      set({userRankByPool: {}});
+      return;
+    }
+
+    const map: Record<string, {rank: number; memberCount: number; total: number}> = {};
+    for (const row of data as Array<{
+      pool_id: string;
+      user_rank: number;
+      member_count: number;
+      user_total: number;
+    }>) {
+      map[row.pool_id] = {
+        rank:        row.user_rank,
+        memberCount: row.member_count,
+        total:       row.user_total,
+      };
+    }
+    set({userRankByPool: map});
+  },
+
+  // ---------------------------------------------------------------------------
+  // Home Redesign §6.4.7 — Partner Module data + indicators
+  // ---------------------------------------------------------------------------
+  partnersById: {},
+  activePartnerIds: [],
+  loadActivePartners: async () => {
+    // Fetch every active partner with a configured perk — these populate
+    // the "YOUR PARTNERS" section on Home regardless of whether the user
+    // has a pool aligned with them.
+    const {data} = await supabase
+      .from('partners')
+      .select('id, name, slug, perk_text, perk_icon, brand_config')
+      .eq('is_active', true)
+      .not('perk_text', 'is', null);
+    if (!data) {
+      set({activePartnerIds: []});
+      return;
+    }
+    const rows = data as Array<{
+      id: string;
+      name: string;
+      slug: string;
+      perk_text: string | null;
+      perk_icon: string | null;
+      brand_config: Record<string, unknown> | null;
+    }>;
+    const map: Record<string, {
+      id: string;
+      name: string;
+      slug: string;
+      perk_text: string;
+      perk_icon: string | null;
+      logo_url: string | null;
+      primary_color: string | null;
+    }> = {};
+    const ids: string[] = [];
+    for (const row of rows) {
+      if (!row.perk_text) continue;
+      const bc = (row.brand_config ?? {}) as Record<string, unknown>;
+      const logo = (bc.logo ?? {}) as Record<string, unknown>;
+      map[row.id] = {
+        id:            row.id,
+        name:          row.name,
+        slug:          row.slug,
+        perk_text:     row.perk_text,
+        perk_icon:     row.perk_icon,
+        logo_url:      typeof logo.full === 'string' ? logo.full : null,
+        primary_color: typeof bc.primary_color === 'string' ? bc.primary_color : null,
+      };
+      ids.push(row.id);
+    }
+    // Merge into partnersById so existing aligned-partner lookups still
+    // work; broader set just expands what's known.
+    set(state => ({
+      partnersById: {...state.partnersById, ...map},
+      activePartnerIds: ids,
+    }));
+  },
+
+  loadAlignedPartners: async (partnerIds) => {
+    if (partnerIds.length === 0) {
+      set({partnersById: {}});
+      return;
+    }
+
+    // Only load partners that are active AND have a configured perk —
+    // partners without a perk are not rendered as Modules per spec §6.4.7.
+    const {data} = await supabase
+      .from('partners')
+      .select('id, name, slug, perk_text, perk_icon, brand_config')
+      .in('id', partnerIds)
+      .eq('is_active', true)
+      .not('perk_text', 'is', null);
+
+    const map: Record<string, {
+      id: string;
+      name: string;
+      slug: string;
+      perk_text: string;
+      perk_icon: string | null;
+      logo_url: string | null;
+      primary_color: string | null;
+    }> = {};
+
+    for (const row of (data ?? []) as Array<{
+      id: string;
+      name: string;
+      slug: string;
+      perk_text: string | null;
+      perk_icon: string | null;
+      brand_config: Record<string, unknown> | null;
+    }>) {
+      if (!row.perk_text) continue;
+      const bc = (row.brand_config ?? {}) as Record<string, unknown>;
+      const logo = (bc.logo ?? {}) as Record<string, unknown>;
+      map[row.id] = {
+        id:            row.id,
+        name:          row.name,
+        slug:          row.slug,
+        perk_text:     row.perk_text,
+        perk_icon:     row.perk_icon,
+        logo_url:      typeof logo.full === 'string' ? logo.full : null,
+        primary_color: typeof bc.primary_color === 'string' ? bc.primary_color : null,
+      };
+    }
+    set({partnersById: map});
+  },
+
+  partnerIndicators: {},
+
+  loadPartnerIndicators: async (userId, partnerIds) => {
+    if (partnerIds.length === 0) {
+      set({partnerIndicators: {}});
+      return;
+    }
+
+    // Parallel queries (notifications + read-state) — never per-Module.
+    const [notifResult, readStateResult] = await Promise.all([
+      supabase
+        .from('partner_notifications')
+        .select('partner_id, sent_at')
+        .in('partner_id', partnerIds)
+        .order('sent_at', {ascending: false}),
+      supabase
+        .from('partner_notification_read_state')
+        .select('partner_id, last_read_at')
+        .in('partner_id', partnerIds)
+        .eq('user_id', userId),
+    ]);
+
+    const lastReadByPartner = new Map<string, string>();
+    for (const row of (readStateResult.data ?? []) as Array<{
+      partner_id: string;
+      last_read_at: string;
+    }>) {
+      lastReadByPartner.set(row.partner_id, row.last_read_at);
+    }
+
+    const indicators: Record<string, {unread: number; mostRecentAt: string | null}> = {};
+    for (const pid of partnerIds) {
+      indicators[pid] = {unread: 0, mostRecentAt: null};
+    }
+
+    for (const row of (notifResult.data ?? []) as Array<{
+      partner_id: string;
+      sent_at: string;
+    }>) {
+      const cell = indicators[row.partner_id];
+      if (!cell) continue;
+      const lastRead = lastReadByPartner.get(row.partner_id);
+      if (!lastRead || row.sent_at > lastRead) {
+        cell.unread += 1;
+      }
+      if (!cell.mostRecentAt || row.sent_at > cell.mostRecentAt) {
+        cell.mostRecentAt = row.sent_at;
+      }
+    }
+
+    set({partnerIndicators: indicators});
+  },
+
+  markPartnerNotificationsRead: async (userId, partnerId) => {
+    const now = new Date().toISOString();
+    await supabase
+      .from('partner_notification_read_state')
+      .upsert(
+        {user_id: userId, partner_id: partnerId, last_read_at: now},
+        {onConflict: 'user_id,partner_id'},
+      );
+    set(state => ({
+      partnerIndicators: {
+        ...state.partnerIndicators,
+        [partnerId]: {
+          ...(state.partnerIndicators[partnerId] ?? {mostRecentAt: null}),
+          unread: 0,
+        },
+      },
+    }));
   },
 }));

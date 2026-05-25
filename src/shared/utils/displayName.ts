@@ -9,13 +9,3 @@ export function getDisplayName(profile: DbProfile | null): string {
   if (!profile) return 'Poolie';
   return profile.poolie_name || 'Poolie';
 }
-
-/**
- * Format real name for contexts that show identity (e.g. "Tom M.").
- * Last name is truncated to initial for privacy.
- */
-export function getRealName(profile: DbProfile | null): string {
-  if (!profile) return '';
-  if (!profile.last_name) return profile.first_name || '';
-  return `${profile.first_name} ${profile.last_name.charAt(0).toUpperCase()}.`;
-}

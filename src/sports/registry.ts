@@ -5,10 +5,6 @@ import {nhlPlayoffs2027} from './nhl/config';
 
 const ALL_EVENTS: AnyEventConfig[] = [nflSeason, nflSeasonSim, worldCup2026, nhlPlayoffs2027];
 
-export function getEventById(id: string): AnyEventConfig | undefined {
-  return ALL_EVENTS.find(e => e.competition === id);
-}
-
 export function getEventsByPriority(): AnyEventConfig[] {
   return [...ALL_EVENTS].sort((a, b) => {
     const statusOrder = {active: 0, upcoming: 1, completed: 2};

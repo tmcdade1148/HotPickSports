@@ -165,10 +165,10 @@ export function BroadcastComposer({
               onPress={handleSend}
               disabled={!canSend}>
               {sending ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
+                <ActivityIndicator size="small" color={colors.onPrimary} />
               ) : (
                 <>
-                  <Send size={18} color="#FFFFFF" />
+                  <Send size={18} color={colors.onPrimary} />
                   <Text style={styles.sendButtonText}>
                     Send to {memberCount} member
                     {memberCount !== 1 ? 's' : ''}
@@ -256,7 +256,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     opacity: 0.4,
   },
   sendButtonText: {
-    color: '#FFFFFF',
+    color: colors.onPrimary,
     fontSize: 16,
     fontWeight: '600',
   },

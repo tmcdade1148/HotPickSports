@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Modal,
   ScrollView,
-  StyleSheet,
 } from 'react-native';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {
@@ -19,7 +18,6 @@ import {
 } from 'lucide-react-native';
 import type {SeasonConfig, TabConfig} from '@shared/types/templates';
 import type {DbPool} from '@shared/types/database';
-import {spacing, borderRadius} from '@shared/theme';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {useSeasonStore} from '../stores/seasonStore';
 import {SeasonPicksScreen} from '../screens/SeasonPicksScreen';
@@ -56,50 +54,6 @@ const SCREEN_MAP: Record<string, React.ComponentType<any>> = {
   board: SeasonBoardScreen,
   smacktalk: SmackTalkTab,
 };
-
-// ---------------------------------------------------------------------------
-// PoolSwitcherHeader removed — unified in PoolSwitcherBar
-
-const createHeaderStyles = (_colors: any) => StyleSheet.create({
-  // Kept as placeholder — will be cleaned up in follow-up
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modal: {
-    backgroundColor: colors.background,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    width: '80%',
-    maxHeight: '50%',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    marginBottom: spacing.md,
-  },
-  poolOption: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  poolOptionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    flex: 1,
-  },
-  poolOptionText: {
-    fontSize: 16,
-    color: colors.textPrimary,
-  },
-});
 
 // ---------------------------------------------------------------------------
 // Tab Navigator — 100% config-driven

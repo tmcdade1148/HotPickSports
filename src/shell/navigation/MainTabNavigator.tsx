@@ -21,6 +21,9 @@ import {useBrand} from '@shell/theme';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {PoweredByHotPick} from '@shell/components/PoweredByHotPick';
 import {PoolSwitcherBar} from '@shell/components/PoolSwitcherBar';
+import {PoolHeader} from '@shell/components/PoolHeader';
+import {PicksHeader} from '@shell/components/PicksHeader';
+import {SubmitPicksBarSlot} from '@shell/components/SubmitPicksBarSlot';
 import {spacing, typography, borderRadius} from '@shared/theme';
 import {useForegroundRefetch} from '@shared/hooks/useForegroundRefetch';
 
@@ -110,7 +113,7 @@ function PicksTab() {
 
   return (
     <SafeAreaView style={{flex: 1, backgroundColor: colors.background}} edges={['top']}>
-      <PoolSwitcherBar mode="picks" />
+      <PicksHeader />
       {screen}
     </SafeAreaView>
   );
@@ -135,7 +138,7 @@ function LeaderboardTab() {
 
   return (
     <SafeAreaView style={{flex: 1, backgroundColor: colors.background}} edges={['top']}>
-      <PoolSwitcherBar mode="pool" />
+      <PoolHeader />
       {screen}
     </SafeAreaView>
   );
@@ -157,7 +160,7 @@ function SmackTalkTab() {
   }
   return (
     <SafeAreaView style={{flex: 1, backgroundColor: colors.background}} edges={['top']}>
-      <PoolSwitcherBar mode="pool" />
+      <PoolHeader />
       <SmackTalkScreen poolId={smackPoolId} />
     </SafeAreaView>
   );
@@ -224,29 +227,22 @@ function SettingsTabWrapper(props: any) {
 }
 
 /**
- * HomeTab — Home screen with unified pool switcher bar.
+ * HomeTab — Home screen.
+ *
+ * The PNG wordmark image that used to render above HomeScreen has been
+ * removed per the May 13 design call. Home now ships its own text-rendered
+ * wordmark via the HomeHeader component (and the spec's original §6.4.2
+ * stance was "no wordmark on Home" anyway — this returns us to that
+ * position with HomeHeader supplying a lighter-weight inline equivalent).
+ *
+ * Partner branding for partner-aligned pools is now handled inside the
+ * Home content via PoolModule's accent stripe + PartnerModule's logo,
+ * not as a top-of-screen banner.
  */
 function HomeTab(props: any) {
   const {colors} = useTheme();
-  const brand = useBrand();
-  const wordmark = isDarkBg(colors.background) ? wordmarkDark : wordmarkLight;
   return (
     <SafeAreaView style={{flex: 1, backgroundColor: colors.background}} edges={['top']}>
-      <View style={{alignItems: 'center', paddingTop: spacing.sm, paddingBottom: spacing.xs}}>
-        {brand.isBranded && brand.logo.full ? (
-          <Image
-            source={{uri: brand.logo.full}}
-            style={{height: 36, width: 190}}
-            resizeMode="contain"
-          />
-        ) : (
-          <Image
-            source={wordmark}
-            style={{height: 50, width: 280}}
-            resizeMode="contain"
-          />
-        )}
-      </View>
       <HomeScreen {...props} />
     </SafeAreaView>
   );
@@ -314,51 +310,72 @@ function GroupedTabBar({state, descriptors, navigation}: BottomTabBarProps) {
     );
   };
 
-  // Tab indices: 0=Home, 1=Games, 2=Leaders, 3=SmackTalk, 4+=History/Settings
-  const leading = state.routes.slice(0, 2);
-  const grouped = state.routes.slice(2, 4);   // Leaders + SmackTalk — always indices 2 & 3
-  const trailing = state.routes.slice(4);
+  // Settings is reachable via the gear in each tab's header (HomeHeader /
+  // PoolHeader / PicksHeader). Hide it from the bottom bar so the bar can
+  // focus on tab navigation, but keep the route registered.
+  const visibleRoutes = state.routes.filter(r => r.name !== 'SettingsTab');
+  const indexOfVisible = (visible: typeof state.routes[number]) =>
+    state.routes.findIndex(r => r.key === visible.key);
+
+  // Tab indices: 0=Home, 1=Games, 2=Leaders, 3=SmackTalk, 4+=trailing
+  const leading = visibleRoutes.slice(0, 2);
+  const grouped = visibleRoutes.slice(2, 4);
+  const trailing = visibleRoutes.slice(4);
+
+  // Hide Leaders + SmackTalk grouped box on Home AND Picks tabs — both are
+  // "pick-flow" surfaces where the user shouldn't be hopping over to the
+  // social side of the app. Routes stay registered so direct nav still works.
+  const activeRouteName = state.routes[state.index]?.name;
+  const hideGroupedTabs = activeRouteName === 'HomeTab' || activeRouteName === 'PicksTab';
+  const showSubmitSlot  = activeRouteName === 'PicksTab';
 
   return (
     <View style={[s.bar, {backgroundColor: colors.background, borderTopColor: colors.border}]}>
-      {leading.map((route, i) => (
-        <TouchableOpacity
-          key={route.key}
-          onPress={() => onTabPress(route, i)}
-          style={i === 0 ? s.tabHome : s.tab}
-          accessibilityRole="button"
-          accessibilityState={state.index === i ? {selected: true} : {}}>
-          {renderTabContent(route, i)}
-        </TouchableOpacity>
-      ))}
+      {leading.map((route, i) => {
+        const realIndex = indexOfVisible(route);
+        return (
+          <TouchableOpacity
+            key={route.key}
+            onPress={() => onTabPress(route, realIndex)}
+            style={i === 0 ? s.tabHome : s.tab}
+            accessibilityRole="button"
+            accessibilityState={state.index === realIndex ? {selected: true} : {}}>
+            {renderTabContent(route, realIndex)}
+          </TouchableOpacity>
+        );
+      })}
 
-      {/* Underline spanning Leaders + SmackTalk */}
+      {/* Underline spanning Leaders + SmackTalk — suppressed on Home */}
+      {showSubmitSlot && <SubmitPicksBarSlot />}
+
+      {!hideGroupedTabs && (
       <View style={[s.groupBox, {borderBottomColor: colors.border}]}>
-        {grouped.map((route, i) => {
-          const index = i + 2;
+        {grouped.map(route => {
+          const realIndex = indexOfVisible(route);
           return (
             <TouchableOpacity
               key={route.key}
-              onPress={() => onTabPress(route, index)}
+              onPress={() => onTabPress(route, realIndex)}
               style={s.groupTab}
               accessibilityRole="button"
-              accessibilityState={state.index === index ? {selected: true} : {}}>
-              {renderTabContent(route, index)}
+              accessibilityState={state.index === realIndex ? {selected: true} : {}}>
+              {renderTabContent(route, realIndex)}
             </TouchableOpacity>
           );
         })}
       </View>
+      )}
 
-      {trailing.map((route, i) => {
-        const index = i + 4;
+      {trailing.map(route => {
+        const realIndex = indexOfVisible(route);
         return (
           <TouchableOpacity
             key={route.key}
-            onPress={() => onTabPress(route, index)}
+            onPress={() => onTabPress(route, realIndex)}
             style={s.tab}
             accessibilityRole="button"
-            accessibilityState={state.index === index ? {selected: true} : {}}>
-            {renderTabContent(route, index)}
+            accessibilityState={state.index === realIndex ? {selected: true} : {}}>
+            {renderTabContent(route, realIndex)}
           </TouchableOpacity>
         );
       })}
@@ -460,6 +477,8 @@ export function MainTabNavigator() {
   // Initialize sport stores when activeSport or activePoolId changes
   const seasonInitialize = useSeasonStore(s => s.initialize);
   const seasonConfig = useSeasonStore(s => s.config);
+  const nflInitialize = useNFLStore(s => s.initialize);
+  const nflCompetitionInStore = useNFLStore(s => s.competition);
   const didInit = useRef(false);
 
   useEffect(() => {
@@ -480,15 +499,35 @@ export function MainTabNavigator() {
     }
   }, [activeSport?.competition, activePoolId, seasonInitialize, seasonConfig?.competition]);
 
+  // nflStore initialization — was previously triggered by SeasonEventCard
+  // before the Home Redesign deleted that component. Now driven directly
+  // by activeSport.competition. Without this, nflStore sits on its
+  // hardcoded defaults (competition: 'nfl_2026', weekState: 'picks_open',
+  // currentPhase: 'REGULAR', currentWeek: 1) and the redesigned Home shows
+  // stale state regardless of what competition_config holds.
+  useEffect(() => {
+    if (!activeSport) return;
+    if (activeSport.templateType !== 'season') return;
+    if (nflCompetitionInStore === activeSport.competition) return;
+    nflInitialize(activeSport.competition).catch(() => {});
+  }, [activeSport?.competition, activeSport?.templateType, nflInitialize, nflCompetitionInStore]);
+
   return (
     <Tab.Navigator
       initialRouteName="HomeTab"
-      tabBar={(props) => (
-        <SafeAreaView style={{backgroundColor: colors.background}} edges={['bottom']}>
-          <PoweredByHotPick />
-          <GroupedTabBar {...props} />
-        </SafeAreaView>
-      )}
+      tabBar={(props) => {
+        // Brief (redesign-v3): hide the entire bottom-nav region on Home —
+        // PoweredByHotPick included. Home owns the full screen; other tabs
+        // continue to show the bar.
+        const activeRouteName = props.state.routes[props.state.index]?.name;
+        if (activeRouteName === 'HomeTab') return null;
+        return (
+          <SafeAreaView style={{backgroundColor: colors.background}} edges={['bottom']}>
+            <PoweredByHotPick />
+            <GroupedTabBar {...props} />
+          </SafeAreaView>
+        );
+      }}
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.primary,

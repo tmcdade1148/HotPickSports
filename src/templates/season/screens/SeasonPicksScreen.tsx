@@ -5,7 +5,6 @@ import {useSeasonStore} from '../stores/seasonStore';
 import {WeekSelector} from '../components/WeekSelector';
 import {SeasonMatchCard} from '../components/SeasonMatchCard';
 import {PicksProgressHeader} from '../components/PicksProgressHeader';
-import {SubmitPicksButton} from '../components/SubmitPicksButton';
 import {useAuth} from '@shared/hooks/useAuth';
 import {spacing, borderRadius} from '@shared/theme';
 import type {DbSeasonGame} from '@shared/types/database';
@@ -77,8 +76,6 @@ export function SeasonPicksScreen() {
   const isLoading = useSeasonStore(s => s.isLoading);
   const hotPickCount = useSeasonStore(s => s.getHotPickCount());
   const pickCount = useSeasonStore(s => s.getPickCount());
-  const isWeekComplete = useSeasonStore(s => s.isWeekComplete);
-  const setWeekComplete = useSeasonStore(s => s.setWeekComplete);
   const setCurrentWeek = useSeasonStore(s => s.setCurrentWeek);
   const fetchWeekGames = useSeasonStore(s => s.fetchWeekGames);
   const fetchUserPicks = useSeasonStore(s => s.fetchUserPicks);
@@ -142,7 +139,7 @@ export function SeasonPicksScreen() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id, config?.competition, currentWeek]);
+  }, [user?.id, config, currentWeek]);
 
   // Pick split stats per game (from game_pick_stats table)
   const [pickStats, setPickStats] = useState<Record<string, any>>({});
@@ -171,7 +168,7 @@ export function SeasonPicksScreen() {
       }
     };
     fetchStats();
-  }, [config?.competition, activePoolId, currentWeek, games.length]);
+  }, [config, activePoolId, currentWeek, games.length]);
 
   // Compute potential week score from current picks
   const potentialWeekScore = (() => {
@@ -212,7 +209,7 @@ export function SeasonPicksScreen() {
       }
     };
     load();
-  }, [config?.competition, currentWeek, weekState, user?.id, fetchWeekGames, fetchUserPicks]);
+  }, [config, currentWeek, weekState, user?.id, fetchWeekGames, fetchUserPicks]);
 
   // Re-fetch games when Picks tab regains focus so lock_at changes are picked up
   // even if weekState hasn't changed (e.g. new wave kicks off during 'live')
@@ -220,7 +217,7 @@ export function SeasonPicksScreen() {
     useCallback(() => {
       if (!config) return;
       fetchWeekGames(currentWeek);
-    }, [config?.competition, currentWeek, fetchWeekGames]),
+    }, [config, currentWeek, fetchWeekGames]),
   );
 
   // Subscribe to live game updates (scores, status, lock_at) whenever the
@@ -230,7 +227,7 @@ export function SeasonPicksScreen() {
     if (!config) return;
     const unsub = subscribeToGameScores();
     return unsub;
-  }, [config?.competition, subscribeToGameScores]);
+  }, [config, subscribeToGameScores]);
 
   // Block week navigation if user has picks but no HotPick
   const handleSelectWeek = useCallback(
@@ -246,6 +243,22 @@ export function SeasonPicksScreen() {
     },
     [pickCount, hotPickCount, setCurrentWeek],
   );
+
+  // Wave-lock fallback: earliest kickoff of any live/final game this week.
+  // Used by SeasonMatchCard to lock games without lock_at that kicked off at
+  // or before this time. Games with lock_at use lock_at as authoritative.
+  const liveAnchorTime = useMemo(() => {
+    if (weekState !== 'live') return null;
+    const liveOrFinalKickoffs = games
+      .filter(g => {
+        const s = (g.status ?? '').toUpperCase();
+        return s === 'IN_PROGRESS' || s === 'LIVE' || s === 'FINAL' || s === 'STATUS_FINAL' || s === 'COMPLETED';
+      })
+      .map(g => new Date(g.kickoff_at).getTime());
+    return liveOrFinalKickoffs.length > 0 ? Math.min(...liveOrFinalKickoffs) : null;
+  }, [weekState, games]);
+
+  const sections = useMemo(() => groupGamesByWave(games), [games]);
 
   if (!config) {
     return (
@@ -275,22 +288,6 @@ export function SeasonPicksScreen() {
   // Picks remain interactive through 'live' — individual games lock per-card via
   // status, lock_at, or wave inference. 'locked' state and beyond are fully locked.
   const picksAreOpen = (weekState === 'picks_open' || weekState === 'live') && currentWeek === dbCurrentWeek;
-
-  // Wave-lock fallback: earliest kickoff of any live/final game this week.
-  // Used by SeasonMatchCard to lock games without lock_at that kicked off at
-  // or before this time. Games with lock_at use lock_at as authoritative.
-  const liveAnchorTime = useMemo(() => {
-    if (weekState !== 'live') return null;
-    const liveOrFinalKickoffs = games
-      .filter(g => {
-        const s = (g.status ?? '').toUpperCase();
-        return s === 'IN_PROGRESS' || s === 'LIVE' || s === 'FINAL' || s === 'STATUS_FINAL' || s === 'COMPLETED';
-      })
-      .map(g => new Date(g.kickoff_at).getTime());
-    return liveOrFinalKickoffs.length > 0 ? Math.min(...liveOrFinalKickoffs) : null;
-  }, [weekState, games]);
-
-  const sections = useMemo(() => groupGamesByWave(games), [games]);
 
   const renderGame = ({item}: {item: DbSeasonGame}) => (
     <View style={styles.cardWrapper}>
@@ -345,13 +342,13 @@ export function SeasonPicksScreen() {
                 <View style={styles.widgetValueRow}>
                   <Text style={[
                     styles.widgetValue,
-                    {color: weekEarned >= 0 ? '#1b9a06' : colors.error},
+                    {color: weekEarned >= 0 ? colors.success : colors.error},
                   ]}>
                     {weekEarned >= 0 ? '+' : ''}{weekEarned}
                   </Text>
                   <Text style={[
                     styles.widgetPts,
-                    {color: weekEarned >= 0 ? '#1b9a06' : colors.error},
+                    {color: weekEarned >= 0 ? colors.success : colors.error},
                   ]}>pts</Text>
                   <Text style={styles.widgetTarget}>/{potentialWeekScore} ceiling pts</Text>
                 </View>
@@ -376,7 +373,7 @@ export function SeasonPicksScreen() {
                 <View style={styles.widgetValueRow}>
                   <Text style={[
                     styles.widgetValue,
-                    weekEarned != null && weekEarned > 0 && {color: '#1b9a06'},
+                    weekEarned != null && weekEarned > 0 && {color: colors.success},
                     weekEarned != null && weekEarned < 0 && {color: colors.error},
                   ]}>
                     {weekEarned == null
@@ -415,26 +412,6 @@ export function SeasonPicksScreen() {
         />
       )}
 
-      {!isLoading && games.length > 0 && (
-        <SubmitPicksButton
-          pickCount={pickCount}
-          totalGames={games.length}
-          hotPickCount={hotPickCount}
-          hotPicksRequired={config.hotPicksPerWeek}
-          isWeekComplete={isWeekComplete}
-          allGamesFinal={allGamesFinal}
-          currentWeek={currentWeek}
-          allGamesLocked={games.length > 0 && games.every(g => {
-            const status = (g.status ?? '').toUpperCase();
-            if (status === 'FINAL' || status === 'STATUS_FINAL' || status === 'COMPLETED'
-              || status === 'IN_PROGRESS' || status === 'LIVE') return true;
-            if (g.lock_at && new Date(g.lock_at).getTime() <= Date.now()) return true;
-            return false;
-          })}
-          onSubmit={() => setWeekComplete(true)}
-          accentColor={config.color}
-        />
-      )}
     </View>
   );
 }
