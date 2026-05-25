@@ -875,7 +875,7 @@ export function PartnerAdminScreen() {
             />
             <View style={styles.assetMetaCol}>
               <Text style={styles.colorHint} numberOfLines={2}>Selected</Text>
-              <TouchableOpacity onPress={() => onSelect(null)} hitSlop={6}>
+              <TouchableOpacity onPress={() => onSelect(null)} hitSlop={6} accessibilityRole="button" accessibilityLabel="Clear selected logo">
                 <Text style={styles.resetText}>Clear</Text>
               </TouchableOpacity>
             </View>
@@ -905,6 +905,7 @@ export function PartnerAdminScreen() {
                         borderWidth: isSelected ? 2 : 1,
                       },
                     ]}
+                    accessibilityRole="button"
                     accessibilityLabel={`Select ${item.displayName}`}>
                     <Image source={{uri: renderUri}} style={styles.libraryThumb} resizeMode="contain" />
                   </TouchableOpacity>
@@ -912,6 +913,7 @@ export function PartnerAdminScreen() {
                     onPress={() => confirmDeleteLibraryItem(prefix, item, selectedUrl, onSelect)}
                     style={[styles.libraryDeleteBadge, {backgroundColor: colors.error}]}
                     hitSlop={6}
+                    accessibilityRole="button"
                     accessibilityLabel={`Delete ${item.displayName}`}>
                     <X size={11} color={colors.onPrimary} strokeWidth={3} />
                   </TouchableOpacity>
@@ -922,7 +924,10 @@ export function PartnerAdminScreen() {
           <TouchableOpacity
             style={[styles.libraryTile, styles.libraryAddTile, {borderColor: colors.border}]}
             onPress={() => addToLibrary(prefix, url => onSelect(url))}
-            disabled={libraryUploading}>
+            disabled={libraryUploading}
+            accessibilityRole="button"
+            accessibilityLabel="Add logo from photo library"
+            accessibilityState={{disabled: libraryUploading}}>
             {libraryUploading ? (
               <ActivityIndicator size="small" color={colors.primary} />
             ) : (
@@ -935,7 +940,10 @@ export function PartnerAdminScreen() {
           <TouchableOpacity
             style={[styles.libraryTile, styles.libraryAddTile, {borderColor: colors.border}]}
             onPress={() => openUrlPrompt(prefix, url => onSelect(url))}
-            disabled={libraryUploading}>
+            disabled={libraryUploading}
+            accessibilityRole="button"
+            accessibilityLabel="Add logo by URL"
+            accessibilityState={{disabled: libraryUploading}}>
             <LinkIcon size={18} color={colors.textSecondary} />
             <Text style={styles.libraryAddText}>URL</Text>
           </TouchableOpacity>
@@ -960,7 +968,10 @@ export function PartnerAdminScreen() {
               selected
                 ? {backgroundColor: colors.primary, borderColor: colors.primary}
                 : {borderColor: colors.border},
-            ]}>
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={`Partner type: ${PARTNER_TYPE_LABELS[type]}`}
+            accessibilityState={{selected}}>
             <Text
               style={[
                 styles.typePillText,
@@ -998,10 +1009,12 @@ export function PartnerAdminScreen() {
             <View style={styles.assetActionRow}>
               <TouchableOpacity
                 style={styles.logoChangeButton}
-                onPress={() => pickAssetForCreate(kind, onPick)}>
+                onPress={() => pickAssetForCreate(kind, onPick)}
+                accessibilityRole="button"
+                accessibilityLabel={`Change ${kind}`}>
                 <Text style={styles.logoChangeText}>Change</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => onPick(null)} hitSlop={6}>
+              <TouchableOpacity onPress={() => onPick(null)} hitSlop={6} accessibilityRole="button" accessibilityLabel={`Remove ${kind}`}>
                 <Text style={[styles.resetText, {marginLeft: spacing.md}]}>Remove</Text>
               </TouchableOpacity>
             </View>
@@ -1010,7 +1023,9 @@ export function PartnerAdminScreen() {
       ) : (
         <TouchableOpacity
           style={styles.logoUploadButton}
-          onPress={() => pickAssetForCreate(kind, onPick)}>
+          onPress={() => pickAssetForCreate(kind, onPick)}
+          accessibilityRole="button"
+          accessibilityLabel={`Pick ${kind === 'logo' ? 'logo' : 'banner'}`}>
           <Upload size={18} color={colors.textSecondary} />
           <Text style={styles.logoUploadText}>
             Pick {kind === 'logo' ? 'Logo' : 'Banner'}
@@ -1030,7 +1045,9 @@ export function PartnerAdminScreen() {
         <View style={styles.header}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
-            hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+            hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+            accessibilityRole="button"
+            accessibilityLabel="Go back">
             <ChevronLeft size={24} color={colors.textPrimary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Partner Admin</Text>
@@ -1039,7 +1056,9 @@ export function PartnerAdminScreen() {
               if (showForm) resetCreateForm();
               setShowForm(!showForm);
             }}
-            hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+            hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+            accessibilityRole="button"
+            accessibilityLabel={showForm ? 'Close new partner form' : 'Add new partner'}>
             {showForm ? (
               <X size={24} color={colors.textPrimary} />
             ) : (
@@ -1161,7 +1180,10 @@ export function PartnerAdminScreen() {
                 (!formName.trim() || creating) && styles.buttonDisabled,
               ]}
               onPress={handleCreate}
-              disabled={!formName.trim() || creating}>
+              disabled={!formName.trim() || creating}
+              accessibilityRole="button"
+              accessibilityLabel="Create partner"
+              accessibilityState={{disabled: !formName.trim() || creating}}>
               {creating ? (
                 <ActivityIndicator size="small" color={colors.onPrimary} />
               ) : (
@@ -1176,7 +1198,9 @@ export function PartnerAdminScreen() {
           <Text style={styles.sectionTitle}>Partners</Text>
           <TouchableOpacity
             onPress={fetchPartners}
-            hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+            hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+            accessibilityRole="button"
+            accessibilityLabel="Refresh partners">
             <RefreshCw size={18} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
@@ -1205,7 +1229,9 @@ export function PartnerAdminScreen() {
                     style={styles.partnerInfo}
                     onPress={() =>
                       setExpandedPartnerId(isExpanded ? null : partner.id)
-                    }>
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel={`${isExpanded ? 'Collapse' : 'Expand'} ${partner.name}`}>
                     {logoUrl ? (
                       <Image
                         source={{uri: logoUrl}}
@@ -1257,7 +1283,9 @@ export function PartnerAdminScreen() {
                         } else {
                           startEditing(partner);
                         }
-                      }}>
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={isEditing ? `Close edit for ${partner.name}` : `Edit ${partner.name}`}>
                       {isEditing ? (
                         <>
                           <X size={14} color={colors.primary} />
@@ -1273,7 +1301,9 @@ export function PartnerAdminScreen() {
                     <TouchableOpacity
                       onPress={() =>
                         setExpandedPartnerId(isExpanded ? null : partner.id)
-                      }>
+                      }
+                      accessibilityRole="button"
+                      accessibilityLabel={`${isExpanded ? 'Hide' : 'Show'} ${partner.name} signage and QR code`}>
                       <Users
                         size={18}
                         color={
@@ -1371,7 +1401,10 @@ export function PartnerAdminScreen() {
                             {marginBottom: spacing.md},
                           ]}
                           onPress={() => handleCreatePartnerPool(partner)}
-                          disabled={creatingPoolForPartnerId === partner.id}>
+                          disabled={creatingPoolForPartnerId === partner.id}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Create Club Pool for ${partner.name}`}
+                          accessibilityState={{disabled: creatingPoolForPartnerId === partner.id}}>
                           {creatingPoolForPartnerId === partner.id ? (
                             <ActivityIndicator size="small" color={colors.onPrimary} />
                           ) : (
@@ -1423,7 +1456,10 @@ export function PartnerAdminScreen() {
                         (!editName.trim() || saving) && styles.buttonDisabled,
                       ]}
                       onPress={() => handleSaveEdit(partner)}
-                      disabled={!editName.trim() || saving}>
+                      disabled={!editName.trim() || saving}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Save changes to ${partner.name}`}
+                      accessibilityState={{disabled: !editName.trim() || saving}}>
                       {saving ? (
                         <ActivityIndicator size="small" color={colors.onPrimary} />
                       ) : (
@@ -1463,7 +1499,9 @@ export function PartnerAdminScreen() {
                       </Text>
                       <TouchableOpacity
                         style={styles.shareButton}
-                        onPress={() => handleShareQR(partner)}>
+                        onPress={() => handleShareQR(partner)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Share ${partner.name} invite link`}>
                         <Share2 size={16} color={colors.primary} />
                         <Text style={styles.shareButtonText}>Share Link</Text>
                       </TouchableOpacity>

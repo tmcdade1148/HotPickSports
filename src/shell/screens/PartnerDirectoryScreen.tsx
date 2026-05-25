@@ -141,7 +141,7 @@ export function PartnerDirectoryScreen() {
   return (
     <SafeAreaView style={[styles.wrap, {backgroundColor: colors.background}]} edges={['top']}>
       <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={10}>
+        <Pressable onPress={() => navigation.goBack()} hitSlop={10} accessibilityRole="button" accessibilityLabel="Go back">
           <ChevronLeft color={colors.textPrimary} size={24} />
         </Pressable>
         <Text style={[displayType.display, styles.title, {color: colors.textPrimary}]}>
@@ -164,7 +164,10 @@ export function PartnerDirectoryScreen() {
             <Pressable
               onPress={handleRemoveAlignment}
               disabled={aligning === '__none__'}
-              style={({pressed}) => [{opacity: pressed ? 0.6 : 1}]}>
+              style={({pressed}) => [{opacity: pressed ? 0.6 : 1}]}
+              accessibilityRole="button"
+              accessibilityLabel={`Leave ${aligned.name}'s roster`}
+              accessibilityState={{disabled: aligning === '__none__'}}>
               <Text style={[bodyType.bold, {color: colors.error, marginTop: 4}]}>
                 {aligning === '__none__' ? 'Leaving…' : 'Leave this roster'}
               </Text>
@@ -198,7 +201,10 @@ export function PartnerDirectoryScreen() {
                     borderWidth: isAligned ? 2 : 1,
                     opacity: pressed ? 0.9 : 1,
                   },
-                ]}>
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={isAligned ? `${partner.name}, currently on roster` : `Add pool to ${partner.name}'s roster`}
+                accessibilityState={{disabled: isAligning || isAligned, selected: isAligned}}>
                 <View style={[styles.cardStripe, {backgroundColor: partnerPrimary}]} />
                 {logo ? (
                   <Image source={{uri: logo}} style={styles.cardLogo} resizeMode="contain" />

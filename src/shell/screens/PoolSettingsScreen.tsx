@@ -203,7 +203,9 @@ export function PoolSettingsScreen() {
         <View style={styles.header}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
-            hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+            hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+            accessibilityRole="button"
+            accessibilityLabel="Go back">
             <ChevronLeft size={24} color={colors.textPrimary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Pool Settings</Text>
@@ -365,7 +367,9 @@ export function PoolSettingsScreen() {
         <View style={styles.header}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
-            hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+            hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+            accessibilityRole="button"
+            accessibilityLabel="Go back">
             <ChevronLeft size={24} color={colors.textPrimary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Pool Settings</Text>
