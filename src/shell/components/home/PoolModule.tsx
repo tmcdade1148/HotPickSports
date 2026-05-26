@@ -120,17 +120,18 @@ function renderRankValue(args: {
     );
   }
 
+  // Solid medal fill — the pill IS the celebration. Foreground
+  // (icon + number) flips to black or white whichever has more
+  // contrast against the saturated background.
+  const fg = readableTextOn(medal);
   return (
     <View
       style={[
         rankPillStyles.pill,
-        {
-          backgroundColor: hexToRgba(medal, 0.14),
-          borderColor: medal,
-        },
+        {backgroundColor: medal, borderColor: medal},
       ]}>
-      <Trophy size={iconSize} color={medal} strokeWidth={2.25} />
-      <Text style={[displayType.display, sizeStyle, {color: medal}]}>
+      <Trophy size={iconSize} color={fg} strokeWidth={2.5} fill={fg} />
+      <Text style={[displayType.display, sizeStyle, {color: fg}]}>
         {rank}
         <Text style={suffixStyle}>{ordinalSuffix(rank)}</Text>
       </Text>
@@ -152,14 +153,12 @@ const rankPillStyles = StyleSheet.create({
 
 // Medal accent for top-3 finishes. Returns null for any rank
 // outside 1–3 — the caller renders the plain number in that case.
-// Gold / silver / bronze are picked to read on both light- and
-// dark-mode surfaces (validated with hexToRgba 0.14 fill + same
-// hex border + same hex bold text — all three clear WCAG 3:1
-// against surfaceElevated in either mode).
+// Saturated so they read as a celebration on the Home stack; foreground
+// text/icon switches to black or white via readableTextOn at render.
 function medalColor(rank: number): string | null {
-  if (rank === 1) return '#E6A82E'; // gold
-  if (rank === 2) return '#9AA1A6'; // silver
-  if (rank === 3) return '#C77A3E'; // bronze
+  if (rank === 1) return '#F5B400'; // gold
+  if (rank === 2) return '#B8C4D0'; // silver (slight blue cast so it pops on neutral backgrounds)
+  if (rank === 3) return '#D9742B'; // bronze
   return null;
 }
 
