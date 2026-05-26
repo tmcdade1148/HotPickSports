@@ -185,6 +185,11 @@ export function PoolModule({pool}: PoolModuleProps) {
     pool.owning_club_id ? s.partnersById?.[pool.owning_club_id] : undefined,
   );
 
+  // Full partnersById map — used to resolve each affiliate's slug at
+  // render time so the per-Club name Pressable below can navigate
+  // straight to the right partner's roster.
+  const partnersById = useGlobalStore(s => s.partnersById);
+
   // Legacy single-Club path — pool.partner_id + pool.brand_config. Used as
   // the fallback when the multi-Club affiliations slice hasn't loaded yet
   // (initial render, or a pool that pre-dates the affiliations migration).
@@ -488,22 +493,21 @@ export function PoolModule({pool}: PoolModuleProps) {
           </View>
         </View>
 
-        {/* AFFILIATED — affiliation zone. Logo cluster + text scales with N. */}
+        {/* AFFILIATED — affiliation zone. Logo cluster + text scales with N.
+            Each Club name is its own Pressable that navigates to that
+            specific Club's roster. The outer row is a plain View — we
+            don't want nested-Pressable gesture handling. */}
         {isAffiliated && primaryAffiliate && (
           <View style={[styles.partnerZone, {borderTopColor: colors.border}]}>
-            <Pressable
-              onPress={() => goToPartnerRoster(legacyPartner?.slug)}
-              hitSlop={6}
-              style={({pressed}) => [
-                styles.alignRow,
-                {opacity: pressed ? 0.6 : 1},
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel={affiliatedWith(affiliates.map(e => e.name))}>
+            <View
+              style={styles.alignRow}
+              accessible={false}>
               {/* Overlapping logo cluster. Each logo's ring is colored in
                   the Club's primary — the only Club-color accent on an
                   Affiliated card's body, used here because the logo IS
-                  the Club's identity (the ring just reinforces it). */}
+                  the Club's identity (the ring just reinforces it).
+                  Cluster itself is decorative; navigation lives on the
+                  Club name(s) below. */}
               <View style={styles.logoCluster}>
                 {affiliates.slice(0, 3).map((e, i) => (
                   <View
@@ -559,27 +563,37 @@ export function PoolModule({pool}: PoolModuleProps) {
                 />
               )}
               <View style={styles.alignTextCol}>
-                {/* Single-affiliate: keep it on one line. Multi: print
-                    "Affiliated with" once, then each Club on its own
-                    row underneath. Each Club name is a SEPARATE <Text>
-                    node — not nested in a parent Text via Fragments —
-                    because the previous Fragment-based approach was
-                    duplicating Clubs on Android. */}
+                {/* Single-affiliate: keep "Affiliated with" + Club name on
+                    one line, but the Club name itself is the Pressable.
+                    Multi: print "Affiliated with" once, then each Club
+                    on its own row underneath — each its own Pressable
+                    routing to that Club's roster. */}
                 {affiliates.length === 1 ? (
                   <View style={styles.singleAffiliateRow}>
                     <Text
                       style={[bodyType.regular, styles.affiliateLabel, {color: colors.textSecondary}]}>
                       {'Affiliated with '}
                     </Text>
-                    <Text
-                      style={[
-                        bodyType.bold,
-                        styles.affiliateName,
-                        {color: primaryAffiliate.displayColor ?? colors.textPrimary},
-                      ]}
-                      numberOfLines={1}>
-                      {primaryAffiliate.name}
-                    </Text>
+                    <Pressable
+                      onPress={() => goToPartnerRoster(partnersById[primaryAffiliate.partnerId]?.slug)}
+                      hitSlop={6}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Open ${primaryAffiliate.name} ${LEXICON.roster}`}>
+                      {({pressed}) => (
+                        <Text
+                          style={[
+                            bodyType.bold,
+                            styles.affiliateName,
+                            {
+                              color: primaryAffiliate.displayColor ?? colors.textPrimary,
+                              opacity: pressed ? 0.55 : 1,
+                            },
+                          ]}
+                          numberOfLines={1}>
+                          {primaryAffiliate.name}
+                        </Text>
+                      )}
+                    </Pressable>
                   </View>
                 ) : (
                   <>
@@ -588,16 +602,27 @@ export function PoolModule({pool}: PoolModuleProps) {
                       Affiliated with
                     </Text>
                     {affiliates.slice(0, 3).map(e => (
-                      <Text
+                      <Pressable
                         key={e.partnerId}
-                        style={[
-                          bodyType.bold,
-                          styles.affiliateName,
-                          {color: e.displayColor ?? colors.textPrimary},
-                        ]}
-                        numberOfLines={1}>
-                        {e.name}
-                      </Text>
+                        onPress={() => goToPartnerRoster(partnersById[e.partnerId]?.slug)}
+                        hitSlop={6}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Open ${e.name} ${LEXICON.roster}`}>
+                        {({pressed}) => (
+                          <Text
+                            style={[
+                              bodyType.bold,
+                              styles.affiliateName,
+                              {
+                                color: e.displayColor ?? colors.textPrimary,
+                                opacity: pressed ? 0.55 : 1,
+                              },
+                            ]}
+                            numberOfLines={1}>
+                            {e.name}
+                          </Text>
+                        )}
+                      </Pressable>
                     ))}
                     {affiliates.length > 3 && (
                       <Text
@@ -627,7 +652,7 @@ export function PoolModule({pool}: PoolModuleProps) {
                   </Text>
                 </View>
               )}
-            </Pressable>
+            </View>
           </View>
         )}
 
