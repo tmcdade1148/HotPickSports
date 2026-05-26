@@ -846,7 +846,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     // Fire broadcast email Edge Function (non-blocking — don't await)
     const profile = get().userProfile;
     const senderName =
-      profile?.first_name ?? profile?.poolie_name ?? 'Pool Organizer';
+      profile?.first_name ?? profile?.poolie_name ?? 'Contest Gaffer';
 
     supabase.functions
       .invoke('send-broadcast-email', {

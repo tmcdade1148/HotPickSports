@@ -89,6 +89,7 @@ If you find yourself writing any of the following, stop and revise.
 ### UI & Theming
 - Hex color value in a StyleSheet (except `SplashScreen.tsx` container background) → use `useTheme()`
 - Hardcoded logo path or app name string → use `useBrand()`
+- **Hardcoded user-facing nouns** ("Pool", "Poolie", "Organizer", "Partner", "Leaderboard", "Standings", "SmackTalk" in a TSX/TS string literal) → import from `@shared/lexicon`. The user-facing vocabulary (Contest / Player / the Gaffer / the Club / the Ladder / Chirps) is intentionally decoupled from the internal code identifiers (`pool_id`, `organizer_id`, `smack_messages`, etc.) per REFERENCE.md §22. Internal names stay; only user labels move.
 - Card priority logic computed inside a React component → computed in globalStore only
 - Week state transition triggered from the client → admin-initiated via Edge Function
 - ESPN API called directly from the client → server-side polling only; clients use Realtime
