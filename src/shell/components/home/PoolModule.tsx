@@ -491,7 +491,14 @@ export function PoolModule({pool}: PoolModuleProps) {
                       <Text
                         style={[
                           bodyType.bold,
-                          {color: e.primaryColor ?? colors.textPrimary},
+                          {
+                            color: e.primaryColor ?? colors.textPrimary,
+                            // Bumped up from 12.5 → 14 + heavier weight
+                            // so the Club's name reads as the focal
+                            // point of the affiliation row.
+                            fontSize: 14,
+                            fontWeight: '800',
+                          },
                         ]}>
                         {e.name}
                       </Text>
