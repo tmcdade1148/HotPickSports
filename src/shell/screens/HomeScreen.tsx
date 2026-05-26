@@ -40,6 +40,7 @@ export function HomeScreen() {
   const loadHotPickHitRate    = useGlobalStore(s => s.loadHotPickHitRate);
   const loadPoolIndicators    = useGlobalStore(s => s.loadPoolIndicators);
   const loadUserRankByPool    = useGlobalStore(s => s.loadUserRankByPool);
+  const loadPoolAffiliations  = useGlobalStore(s => s.loadPoolAffiliations);
   const loadWeekRankByPool    = useGlobalStore(s => s.loadWeekRankByPool);
   const loadAlignedPartners   = useGlobalStore(s => s.loadAlignedPartners);
   const loadActivePartners    = useGlobalStore(s => s.loadActivePartners);
@@ -148,6 +149,15 @@ export function HomeScreen() {
     if (!userId) return;
     loadPoolIndicators(userId, allPoolIds).catch(() => {});
   }, [userId, allPoolIds, loadPoolIndicators]);
+
+  // Affiliations drive the 3-state Contest card. Cheap one-shot query
+  // gated by RLS to the user's own pools; no Realtime subscription —
+  // Gaffer edits to affiliations are infrequent and a re-mount picks
+  // them up.
+  useEffect(() => {
+    if (allPoolIds.length === 0) return;
+    loadPoolAffiliations(allPoolIds).catch(() => {});
+  }, [allPoolIds, loadPoolAffiliations]);
 
   useEffect(() => {
     if (!userId) return;

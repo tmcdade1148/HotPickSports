@@ -1,12 +1,11 @@
 // Locks the user-facing lexicon to the spec's locked decisions
 // (260520_HotPick_LexiconImplementation_Spec.docx §2). Any accidental drift
 // from "Contest" / "Player" / "Gaffer" / "Club" / "Ladder" / "Chirp" /
-// "Endorsed by X" trips this test before users see it.
+// "Affiliated with X" trips this test before users see it.
 
 import {
   LEXICON,
-  endorsedBy,
-  endorsedByMany,
+  affiliatedWith,
   gafferOf,
   clubsContest,
   clubContestTagline,
@@ -52,13 +51,6 @@ describe('LEXICON constants', () => {
   });
 });
 
-describe('endorsedBy()', () => {
-  it('builds the affiliation line', () => {
-    expect(endorsedBy('Mes Que NFL')).toBe('Endorsed by Mes Que NFL');
-    expect(endorsedBy('Big Tree Inn')).toBe('Endorsed by Big Tree Inn');
-  });
-});
-
 describe('gafferOf()', () => {
   it('keeps the definite article in long copy', () => {
     expect(gafferOf("Stella's Gang")).toBe("the Gaffer of Stella's Gang");
@@ -85,28 +77,30 @@ describe('clubContestTagline()', () => {
   });
 });
 
-describe('endorsedByMany()', () => {
+describe('affiliatedWith()', () => {
   it('returns empty string when no clubs', () => {
-    expect(endorsedByMany([])).toBe('');
-    expect(endorsedByMany(['', ''])).toBe('');
+    expect(affiliatedWith([])).toBe('');
+    expect(affiliatedWith(['', ''])).toBe('');
   });
-  it('one endorser — matches the singular endorsedBy()', () => {
-    expect(endorsedByMany(['Hammer'])).toBe('Endorsed by Hammer');
+  it('one affiliation', () => {
+    expect(affiliatedWith(['Hammer'])).toBe('Affiliated with Hammer');
   });
-  it('two endorsers join with &', () => {
-    expect(endorsedByMany(['Hammer', 'The Crown'])).toBe(
-      'Endorsed by Hammer & The Crown',
+  it('two affiliations join with &', () => {
+    expect(affiliatedWith(['Hammer', 'The Crown'])).toBe(
+      'Affiliated with Hammer & The Crown',
     );
   });
-  it('three endorsers use serial comma + &', () => {
-    expect(endorsedByMany(['Hammer', 'The Crown', "Joe's"])).toBe(
-      "Endorsed by Hammer, The Crown & Joe's",
+  it('three affiliations use serial comma + &', () => {
+    expect(affiliatedWith(['Hammer', 'The Crown', "Joe's"])).toBe(
+      "Affiliated with Hammer, The Crown & Joe's",
     );
   });
   it('four or more collapses the tail to a count', () => {
-    expect(endorsedByMany(['A', 'B', 'C', 'D'])).toBe('Endorsed by A, B & 2 more');
-    expect(endorsedByMany(['A', 'B', 'C', 'D', 'E'])).toBe(
-      'Endorsed by A, B & 3 more',
+    expect(affiliatedWith(['A', 'B', 'C', 'D'])).toBe(
+      'Affiliated with A, B & 2 more',
+    );
+    expect(affiliatedWith(['A', 'B', 'C', 'D', 'E'])).toBe(
+      'Affiliated with A, B & 3 more',
     );
   });
 });

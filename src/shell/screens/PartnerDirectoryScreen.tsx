@@ -1,11 +1,12 @@
-// Organizer-side partner directory. Lists active partners; tapping one
-// aligns the calling pool with that partner by snapshotting the partner's
-// brand_config onto the pool and setting pool.partner_id + invite_slug.
+// Organizer-side Club directory. Lists active Clubs; tapping one affiliates
+// the calling Contest with that Club via `add_pool_affiliation`. A Contest
+// can be affiliated with many Clubs simultaneously — each affiliation
+// surfaces that Club's brand + perk to the Contest's members.
 //
-// "Users join pools, organizers join rosters." This screen is the
-// organizer's join-roster surface.
+// "Users join Contests, the Gaffer affiliates with Clubs." This screen is
+// the Gaffer's join-a-roster surface.
 
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,7 +19,7 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation, useRoute, type RouteProp} from '@react-navigation/native';
-import {ChevronLeft, Check} from 'lucide-react-native';
+import {ChevronLeft, Check, X as XIcon} from 'lucide-react-native';
 import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {useTheme} from '@shell/theme/hooks';
@@ -54,88 +55,102 @@ export function PartnerDirectoryScreen() {
   const poolId = route.params.poolId;
 
   const updatePoolBrandConfig = useGlobalStore(s => s.updatePoolBrandConfig);
+  const loadPoolAffiliations  = useGlobalStore(s => s.loadPoolAffiliations);
 
   const [partners, setPartners] = useState<PartnerRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [aligning, setAligning] = useState<string | null>(null);
-  const [currentPartnerId, setCurrentPartnerId] = useState<string | null>(null);
+  const [working, setWorking] = useState<string | null>(null);
+  // Multi-affiliation state: the set of partner_ids the pool is currently
+  // affiliated with, sourced from pool_partner_affiliations.
+  const [affiliatedIds, setAffiliatedIds] = useState<Set<string>>(new Set());
+
+  const refreshAffiliations = useCallback(async () => {
+    const {data} = await supabase
+      .from('pool_partner_affiliations')
+      .select('partner_id')
+      .eq('pool_id', poolId);
+    setAffiliatedIds(
+      new Set(((data ?? []) as {partner_id: string}[]).map(r => r.partner_id)),
+    );
+  }, [poolId]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const [{data: partnerData}, {data: poolData}] = await Promise.all([
+      const [{data: partnerData}] = await Promise.all([
         supabase
           .from('partners')
           .select('id, name, slug, perk_text, perk_icon, brand_config, is_active, can_run_pools, partner_type')
           .eq('is_active', true)
           .order('name', {ascending: true}),
-        supabase.from('pools').select('partner_id').eq('id', poolId).maybeSingle(),
+        refreshAffiliations(),
       ]);
       if (cancelled) return;
       setPartners((partnerData ?? []) as PartnerRow[]);
-      setCurrentPartnerId(poolData?.partner_id ?? null);
       setLoading(false);
     })();
     return () => {
       cancelled = true;
     };
-  }, [poolId]);
+  }, [poolId, refreshAffiliations]);
 
-  const handleAlign = async (partner: PartnerRow) => {
-    setAligning(partner.id);
-    // Server-side RPC: validates partner is active, gates on organizer
-    // role, reads brand_config + invite_slug server-side (caller can't
-    // forge them). See CLAUDE.md Auth & Security Red Flag.
-    const {error} = await supabase.rpc('join_partner_roster', {
-      p_pool_id: poolId,
+  const handleAffiliate = async (partner: PartnerRow) => {
+    setWorking(partner.id);
+    // SECURITY DEFINER RPC: gates on organizer role, snapshots the Club's
+    // current brand_config server-side (caller can't forge it). First
+    // affiliation on a pool is auto-flagged primary by the RPC.
+    const {error} = await supabase.rpc('add_pool_affiliation', {
+      p_pool_id:    poolId,
       p_partner_id: partner.id,
+      p_is_primary: false,
     });
-    setAligning(null);
+    setWorking(null);
     if (error) {
-      Alert.alert('Could not add', error.message);
+      Alert.alert('Could not affiliate', error.message);
       return;
     }
+    await refreshAffiliations();
+    // Refresh the Home Screen's cached affiliations so Contest cards pick
+    // up the new logo cluster on next render.
+    loadPoolAffiliations([poolId]).catch(() => {});
+    // Keep brand_config snapshot on the pool in sync — the DB trigger
+    // handles primary-affiliation rotation, but the in-memory pool record
+    // needs the new brand for the active session.
     updatePoolBrandConfig(poolId, (partner.brand_config as any) ?? null);
-    setCurrentPartnerId(partner.id);
-    Alert.alert(
-      'Added to roster',
-      `Your Contest is now a member of ${partner.name}'s roster. Their brand and perk will surface to your members.`,
-      [{text: 'OK', onPress: () => navigation.goBack()}],
-    );
   };
 
-  const handleRemoveAlignment = () => {
-    const partnerName = aligned?.name ?? 'this Club';
+  const handleRemove = (partner: PartnerRow) => {
     Alert.alert(
-      `Leave ${partnerName}'s roster?`,
-      'Your Contest will lose this Club’s brand, perk, and broadcasts. You can re-join any time.',
+      `Remove affiliation with ${partner.name}?`,
+      `Your Contest will lose ${partner.name}’s brand, perk, and broadcasts. You can re-affiliate any time.`,
       [
         {text: 'Cancel', style: 'cancel'},
         {
-          text: 'Leave',
+          text: 'Remove',
           style: 'destructive',
           onPress: async () => {
-            setAligning('__none__');
-            const {error} = await supabase.rpc('leave_partner_roster', {
-              p_pool_id: poolId,
+            setWorking(partner.id);
+            const {error} = await supabase.rpc('remove_pool_affiliation', {
+              p_pool_id:    poolId,
+              p_partner_id: partner.id,
             });
-            setAligning(null);
+            setWorking(null);
             if (error) {
-              Alert.alert('Could not leave', error.message);
+              Alert.alert('Could not remove', error.message);
               return;
             }
-            updatePoolBrandConfig(poolId, null);
-            setCurrentPartnerId(null);
+            await refreshAffiliations();
+            loadPoolAffiliations([poolId]).catch(() => {});
           },
         },
       ],
     );
   };
 
-  const aligned = useMemo(
-    () => partners.find(p => p.id === currentPartnerId) ?? null,
-    [partners, currentPartnerId],
+  const affiliatedPartners = useMemo(
+    () => partners.filter(p => affiliatedIds.has(p.id)),
+    [partners, affiliatedIds],
   );
 
   return (
@@ -145,33 +160,47 @@ export function PartnerDirectoryScreen() {
           <ChevronLeft color={colors.textPrimary} size={24} />
         </Pressable>
         <Text style={[displayType.display, styles.title, {color: colors.textPrimary}]}>
-          JOIN A ROSTER
+          AFFILIATE WITH A CLUB
         </Text>
         <View style={{width: 24}} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={[bodyType.regular, styles.intro, {color: colors.textSecondary}]}>
-          Pick a Club to add your Contest to their roster. Your Contest will pick
-          up their brand, surface their perk, and receive their broadcasts.
+          Affiliate your Contest with one or more Clubs. Each Club's brand
+          and perk surfaces to your members; their broadcasts reach them too.
         </Text>
 
-        {aligned && (
+        {affiliatedPartners.length > 0 && (
           <View style={[styles.alignedCard, {backgroundColor: colors.surface, borderColor: colors.border}]}>
-            <Text style={[bodyType.bold, {color: colors.textPrimary}]}>
-              Currently on {aligned.name}'s roster
+            <Text style={[bodyType.bold, styles.alignedTitle, {color: colors.textPrimary}]}>
+              Currently affiliated with
             </Text>
-            <Pressable
-              onPress={handleRemoveAlignment}
-              disabled={aligning === '__none__'}
-              style={({pressed}) => [{opacity: pressed ? 0.6 : 1}]}
-              accessibilityRole="button"
-              accessibilityLabel={`Leave ${aligned.name}'s roster`}
-              accessibilityState={{disabled: aligning === '__none__'}}>
-              <Text style={[bodyType.bold, {color: colors.error, marginTop: 4}]}>
-                {aligning === '__none__' ? 'Leaving…' : 'Leave this roster'}
-              </Text>
-            </Pressable>
+            {affiliatedPartners.map(p => (
+              <View key={p.id} style={styles.alignedRow}>
+                <Text style={[bodyType.regular, {color: colors.textPrimary}]} numberOfLines={1}>
+                  {p.name}
+                </Text>
+                <Pressable
+                  onPress={() => handleRemove(p)}
+                  disabled={working === p.id}
+                  hitSlop={6}
+                  style={({pressed}) => [styles.removeBtn, {opacity: pressed ? 0.6 : 1}]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove affiliation with ${p.name}`}>
+                  {working === p.id ? (
+                    <ActivityIndicator size="small" color={colors.error} />
+                  ) : (
+                    <>
+                      <XIcon size={12} color={colors.error} strokeWidth={2.25} />
+                      <Text style={[bodyType.bold, styles.removeText, {color: colors.error}]}>
+                        Remove
+                      </Text>
+                    </>
+                  )}
+                </Pressable>
+              </View>
+            ))}
           </View>
         )}
 
@@ -184,27 +213,31 @@ export function PartnerDirectoryScreen() {
         ) : (
           partners.map(partner => {
             const logo = resolvePartnerLogo(partner.brand_config);
-            const isAligned = partner.id === currentPartnerId;
-            const isAligning = aligning === partner.id;
+            const isAffiliated = affiliatedIds.has(partner.id);
+            const isWorking = working === partner.id;
             const partnerPrimary =
               (partner.brand_config?.primary_color as string | undefined) ?? colors.primary;
             return (
               <Pressable
                 key={partner.id}
-                onPress={() => handleAlign(partner)}
-                disabled={isAligning || isAligned}
+                onPress={() => (isAffiliated ? handleRemove(partner) : handleAffiliate(partner))}
+                disabled={isWorking}
                 style={({pressed}) => [
                   styles.card,
                   {
                     backgroundColor: colors.surface,
-                    borderColor: isAligned ? partnerPrimary : colors.border,
-                    borderWidth: isAligned ? 2 : 1,
+                    borderColor: isAffiliated ? partnerPrimary : colors.border,
+                    borderWidth: isAffiliated ? 2 : 1,
                     opacity: pressed ? 0.9 : 1,
                   },
                 ]}
                 accessibilityRole="button"
-                accessibilityLabel={isAligned ? `${partner.name}, currently on roster` : `Add Contest to ${partner.name}'s roster`}
-                accessibilityState={{disabled: isAligning || isAligned, selected: isAligned}}>
+                accessibilityLabel={
+                  isAffiliated
+                    ? `${partner.name}, currently affiliated — tap to remove`
+                    : `Affiliate Contest with ${partner.name}`
+                }
+                accessibilityState={{disabled: isWorking, selected: isAffiliated}}>
                 <View style={[styles.cardStripe, {backgroundColor: partnerPrimary}]} />
                 {logo ? (
                   <Image source={{uri: logo}} style={styles.cardLogo} resizeMode="contain" />
@@ -229,9 +262,9 @@ export function PartnerDirectoryScreen() {
                     {partner.can_run_pools ? ' · runs Contests' : ' · sponsor only'}
                   </Text>
                 </View>
-                {isAligning ? (
+                {isWorking ? (
                   <ActivityIndicator size="small" color={partnerPrimary} />
-                ) : isAligned ? (
+                ) : isAffiliated ? (
                   <Check size={20} color={partnerPrimary} strokeWidth={2.5} />
                 ) : null}
               </Pressable>
@@ -260,6 +293,30 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: spacing.md,
     marginBottom: spacing.md,
+    gap: 8,
+  },
+  alignedTitle: {
+    fontSize: 12,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  alignedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  removeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  removeText: {
+    fontSize: 11,
+    letterSpacing: 0.3,
   },
   card: {
     flexDirection: 'row',

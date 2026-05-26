@@ -6,26 +6,26 @@
 //     "AN OFFICIAL [CLUB] CONTEST". The Club's brand defines the silhouette
 //     of the card, not just its accent color.
 //
-//   • Roster (endorsed) Contest — pool has ≥1 endorsement.
-//     Brand stripe on the left edge (single endorser) or a stacked
-//     multi-color stripe (≥2 endorsers). Footer carries an overlapping
-//     logo cluster + the endorsedByMany() phrase. Popover opens with the
-//     full list of endorsing Clubs.
+//   • Affiliated Contest — pool has ≥1 row in pool_partner_affiliations.
+//     Brand stripe on the left edge (single affiliation) or a stacked
+//     multi-color stripe (≥2 affiliations). Footer carries an overlapping
+//     logo cluster + the affiliatedWith() phrase. Popover opens with the
+//     full list of affiliated Clubs.
 //
-//   • Independent Contest — no owning Club, no endorsements.
+//   • Independent Contest — no owning Club, no affiliations.
 //     Neutral surface. Footer chip reads "Independent · run by [Gaffer]"
 //     so the absence of Club branding becomes a positive identifier.
 //
 // Hard Rule #23: every Club logo/color rendered here comes from a brand
-// snapshot stored ON the pool (or the per-endorsement snapshot when
-// multi-Club support is wired) — never from a live join to `partners`.
+// snapshot stored ON the pool (legacy single-affiliation path) or on the
+// per-affiliation row in pool_partner_affiliations — never from a live
+// join to `partners`.
 //
-// Data wiring TODO: globalStore does not yet load `pool_partner_endorsements`
-// rows. Until that loader ships, this component reads from the legacy
-// singular `pool.partner_id` + `pool.brand_config`, producing at most one
-// endorser. The DB trigger keeps that singular column in sync with the
-// primary endorsement row, so this fallback stays correct. When the loader
-// lands, swap `useEndorsers()` to read from the endorsements slice.
+// Data source: reads `globalStore.poolAffiliations[poolId]` when populated.
+// Falls back to the legacy singular `pool.partner_id` + `pool.brand_config`
+// when the slice is empty (initial load, pre-affiliation pools). The DB
+// trigger keeps the singular column in sync with the primary affiliation,
+// so the fallback path stays correct for single-Club pools.
 
 import React, {useMemo, useState} from 'react';
 import {Image, Modal, Pressable, StyleSheet, Text, View} from 'react-native';
@@ -46,8 +46,8 @@ import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
 import {hexToRgba, readableTextOn} from '@shared/utils/color';
 import {
   LEXICON,
+  affiliatedWith,
   clubContestTagline,
-  endorsedByMany,
   independentContestLabel,
 } from '@shared/lexicon';
 import {ordinalSuffix} from '@shared/utils/format';
@@ -87,7 +87,7 @@ function resolvePartnerName(brandConfig: unknown): string | null {
     : null;
 }
 
-interface Endorser {
+interface Affiliate {
   partnerId: string;
   name: string;
   primaryColor: string | null;
@@ -116,8 +116,9 @@ export function PoolModule({pool}: PoolModuleProps) {
     pool.owning_club_id ? s.partnersById?.[pool.owning_club_id] : undefined,
   );
 
-  // Single-endorser path — the legacy partner_id + pool.brand_config.
-  // When the endorsements slice exists, this collapses into the loop below.
+  // Legacy single-Club path — pool.partner_id + pool.brand_config. Used as
+  // the fallback when the multi-Club affiliations slice hasn't loaded yet
+  // (initial render, or a pool that pre-dates the affiliations migration).
   const legacyPartner = useGlobalStore(s =>
     pool.partner_id ? s.partnersById?.[pool.partner_id] : undefined,
   );
@@ -126,13 +127,28 @@ export function PoolModule({pool}: PoolModuleProps) {
   );
   const legacyPartnerUnread = legacyPartnerIndicator?.unread ?? 0;
 
+  // Authoritative multi-Club affiliations from globalStore. Loaded once
+  // per HomeScreen mount in loadPoolAffiliations(allPoolIds).
+  const affiliationsFromStore = useGlobalStore(s => s.poolAffiliations[pool.id]);
+
   const isOfficial = pool.owning_club_id != null;
 
-  // Build the endorsers list. Today: at most one, from pool.partner_id.
-  // The DB trigger keeps pool.partner_id in sync with the primary endorsement
-  // row, so this path stays correct for single-endorser pools.
-  const endorsers = useMemo<Endorser[]>(() => {
+  // Prefer the store's affiliations list; fall back to the legacy single
+  // partner_id mirror when the slice is empty (still loading, or a pool
+  // with no affiliations yet but legacy partner_id set).
+  const affiliates = useMemo<Affiliate[]>(() => {
     if (isOfficial) return [];
+
+    if (affiliationsFromStore && affiliationsFromStore.length > 0) {
+      return affiliationsFromStore.map(a => ({
+        partnerId:    a.partnerId,
+        name:         a.partnerName,
+        primaryColor: a.primaryColor,
+        logoUrl:      a.logoUrl,
+        isPrimary:    a.isPrimary,
+      }));
+    }
+
     if (!pool.partner_id) return [];
     return [
       {
@@ -152,11 +168,18 @@ export function PoolModule({pool}: PoolModuleProps) {
         isPrimary: true,
       },
     ];
-  }, [isOfficial, pool.partner_id, pool.brand_config, legacyPartner]);
+  }, [
+    isOfficial,
+    affiliationsFromStore,
+    pool.partner_id,
+    pool.brand_config,
+    legacyPartner,
+  ]);
 
-  const primaryEndorser = endorsers.find(e => e.isPrimary) ?? endorsers[0] ?? null;
-  const isRoster       = !isOfficial && endorsers.length > 0;
-  const isIndependent  = !isOfficial && endorsers.length === 0;
+  const primaryAffiliate =
+    affiliates.find(a => a.isPrimary) ?? affiliates[0] ?? null;
+  const isAffiliated   = !isOfficial && affiliates.length > 0;
+  const isIndependent  = !isOfficial && affiliates.length === 0;
 
   // Branded header band data for Official Contests. Read snapshot fields off
   // the pool first (Hard Rule #23 — no live join). Fall back to the cached
@@ -257,18 +280,18 @@ export function PoolModule({pool}: PoolModuleProps) {
         </View>
       )}
 
-      {/* ROSTER — left-edge stripe(s). Single endorser → single 3px stripe.
-          Multi-endorser → vertical stack of 2–3 stripes, capped at 3 for
+      {/* AFFILIATED — left-edge stripe(s). Single affiliate → single 3px stripe.
+          Multi-affiliate → vertical stack of 2–3 stripes, capped at 3 for
           legibility (4+ goes to a neutral highlight stripe via the cluster
           alone). */}
-      {isRoster && endorsers.length === 1 && endorsers[0].primaryColor && (
+      {isAffiliated && affiliates.length === 1 && affiliates[0].primaryColor && (
         <View
-          style={[styles.stripe, {backgroundColor: endorsers[0].primaryColor}]}
+          style={[styles.stripe, {backgroundColor: affiliates[0].primaryColor}]}
         />
       )}
-      {isRoster && endorsers.length >= 2 && (
+      {isAffiliated && affiliates.length >= 2 && (
         <View style={styles.stripeStack} pointerEvents="none">
-          {endorsers.slice(0, 3).map((e, i) => (
+          {affiliates.slice(0, 3).map((e, i) => (
             <View
               key={e.partnerId}
               style={[
@@ -276,8 +299,8 @@ export function PoolModule({pool}: PoolModuleProps) {
                 {
                   backgroundColor: e.primaryColor ?? colors.border,
                   // Equal-height segments stacked top to bottom.
-                  top: `${(i * 100) / Math.min(endorsers.length, 3)}%`,
-                  height: `${100 / Math.min(endorsers.length, 3)}%`,
+                  top: `${(i * 100) / Math.min(affiliates.length, 3)}%`,
+                  height: `${100 / Math.min(affiliates.length, 3)}%`,
                 },
               ]}
             />
@@ -292,7 +315,7 @@ export function PoolModule({pool}: PoolModuleProps) {
         hitSlop={10}
         style={({pressed}) => [
           styles.gearBtn,
-          (isRoster || isIndependent) ? styles.gearBtnAboveFooter : null,
+          (isAffiliated || isIndependent) ? styles.gearBtnAboveFooter : null,
           {opacity: pressed ? 0.5 : 1},
         ]}
         accessibilityRole="button"
@@ -404,8 +427,8 @@ export function PoolModule({pool}: PoolModuleProps) {
           </View>
         </View>
 
-        {/* ROSTER — endorsement zone. Logo cluster + text scales with N. */}
-        {isRoster && primaryEndorser && (
+        {/* AFFILIATED — affiliation zone. Logo cluster + text scales with N. */}
+        {isAffiliated && primaryAffiliate && (
           <View style={[styles.partnerZone, {borderTopColor: colors.border}]}>
             <Pressable
               onPress={() => goToPartnerRoster(legacyPartner?.slug)}
@@ -415,18 +438,18 @@ export function PoolModule({pool}: PoolModuleProps) {
                 {opacity: pressed ? 0.6 : 1},
               ]}
               accessibilityRole="button"
-              accessibilityLabel={endorsedByMany(endorsers.map(e => e.name))}>
+              accessibilityLabel={affiliatedWith(affiliates.map(e => e.name))}>
               {/* Overlapping logo cluster. Each logo gets a ring matching the
                   card surface so they stay distinct when overlapped. */}
               <View style={styles.logoCluster}>
-                {endorsers.slice(0, 3).map((e, i) => (
+                {affiliates.slice(0, 3).map((e, i) => (
                   <View
                     key={e.partnerId}
                     style={[
                       styles.logoClusterItem,
                       {
                         marginLeft: i === 0 ? 0 : -8,
-                        zIndex: endorsers.length - i,
+                        zIndex: affiliates.length - i,
                         borderColor: colors.surfaceElevated,
                       },
                     ]}>
@@ -445,7 +468,7 @@ export function PoolModule({pool}: PoolModuleProps) {
                     )}
                   </View>
                 ))}
-                {endorsers.length > 3 && (
+                {affiliates.length > 3 && (
                   <View
                     style={[
                       styles.logoClusterMore,
@@ -460,24 +483,24 @@ export function PoolModule({pool}: PoolModuleProps) {
                         styles.logoClusterMoreText,
                         {color: colors.textSecondary},
                       ]}>
-                      +{endorsers.length - 3}
+                      +{affiliates.length - 3}
                     </Text>
                   </View>
                 )}
               </View>
-              {endorsers.length === 1 && (
+              {affiliates.length === 1 && (
                 <BadgeCheck
                   size={14}
-                  color={primaryEndorser.primaryColor ?? colors.primary}
+                  color={primaryAffiliate.primaryColor ?? colors.primary}
                   strokeWidth={2.25}
                 />
               )}
               <Text
                 style={[bodyType.regular, styles.alignText, {color: colors.textSecondary}]}
                 numberOfLines={1}>
-                {endorsedByMany(endorsers.map(e => e.name))}
+                {affiliatedWith(affiliates.map(e => e.name))}
               </Text>
-              {legacyPartnerUnread > 0 && endorsers.length === 1 && (
+              {legacyPartnerUnread > 0 && affiliates.length === 1 && (
                 <View
                   style={[
                     styles.partnerNewBadge,
@@ -509,24 +532,24 @@ export function PoolModule({pool}: PoolModuleProps) {
               ]}
               accessibilityRole="button"
               accessibilityLabel={
-                endorsers.length === 1
-                  ? `Show ${LEXICON.club.short} endorsement details`
-                  : `Show ${endorsers.length} ${LEXICON.club.short} endorsements`
+                affiliates.length === 1
+                  ? `Show ${LEXICON.club.short} affiliation details`
+                  : `Show ${affiliates.length} ${LEXICON.club.short} affiliations`
               }>
               <Info size={11} color={colors.textTertiary} strokeWidth={2} />
               <Text
                 style={[bodyType.regular, styles.connectionText, {color: colors.textTertiary}]}>
-                {endorsers.length === 1
-                  ? `${LEXICON.club.short} endorsement`
-                  : `${endorsers.length} endorsements`}
+                {affiliates.length === 1
+                  ? `${LEXICON.club.short} affiliation`
+                  : `${affiliates.length} affiliations`}
               </Text>
             </Pressable>
-            {legacyPartner?.perk_text && endorsers.length === 1 && (
+            {legacyPartner?.perk_text && affiliates.length === 1 && (
               <View style={styles.perkRow}>
                 <PerkIcon
                   name={legacyPartner.perk_icon}
                   size={13}
-                  color={primaryEndorser.primaryColor ?? colors.primary}
+                  color={primaryAffiliate.primaryColor ?? colors.primary}
                   containerStyle={styles.perkIconBox}
                 />
                 <Text
@@ -563,7 +586,7 @@ export function PoolModule({pool}: PoolModuleProps) {
         )}
       </View>
 
-      {isRoster && popoverOpen && primaryEndorser && (
+      {isAffiliated && popoverOpen && primaryAffiliate && (
         <Modal
           visible
           transparent
@@ -572,7 +595,7 @@ export function PoolModule({pool}: PoolModuleProps) {
           <Pressable
             style={styles.modalBackdrop}
             onPress={() => setPopoverOpen(false)}
-            accessibilityLabel="Close endorsement details">
+            accessibilityLabel="Close affiliation details">
             <Pressable
               style={[
                 styles.modalCard,
@@ -590,18 +613,18 @@ export function PoolModule({pool}: PoolModuleProps) {
 
               <Text
                 style={[displayType.display, styles.modalTitle, {color: colors.textPrimary}]}>
-                {endorsers.length === 1
+                {affiliates.length === 1
                   ? `${LEXICON.club.short.toUpperCase()} ENDORSEMENT`
-                  : `${endorsers.length} ${LEXICON.club.short.toUpperCase()} ENDORSEMENTS`}
+                  : `${affiliates.length} ${LEXICON.club.short.toUpperCase()} ENDORSEMENTS`}
               </Text>
 
-              {endorsers.map(e => (
+              {affiliates.map(e => (
                 <Pressable
                   key={e.partnerId}
                   onPress={() => {
                     setPopoverOpen(false);
-                    // Slug only available for the legacy primary endorser
-                    // today; multi-endorsement nav lands when the loader does.
+                    // Slug only available for the legacy primary affiliate
+                    // today; multi-affiliation nav lands when the loader does.
                     if (e.partnerId === pool.partner_id) {
                       goToPartnerRoster(legacyPartner?.slug);
                     }
@@ -633,7 +656,7 @@ export function PoolModule({pool}: PoolModuleProps) {
                     numberOfLines={1}>
                     {e.name}
                   </Text>
-                  {e.isPrimary && endorsers.length > 1 && (
+                  {e.isPrimary && affiliates.length > 1 && (
                     <Text
                       style={[
                         bodyType.regular,
@@ -646,7 +669,7 @@ export function PoolModule({pool}: PoolModuleProps) {
                 </Pressable>
               ))}
 
-              {legacyPartner?.perk_text && endorsers.length === 1 && (
+              {legacyPartner?.perk_text && affiliates.length === 1 && (
                 <View
                   style={[
                     styles.modalPerkRow,
@@ -655,7 +678,7 @@ export function PoolModule({pool}: PoolModuleProps) {
                   <PerkIcon
                     name={legacyPartner.perk_icon}
                     size={20}
-                    color={primaryEndorser.primaryColor ?? colors.primary}
+                    color={primaryAffiliate.primaryColor ?? colors.primary}
                     containerStyle={styles.modalPerkIcon}
                   />
                   <Text
@@ -816,7 +839,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
 
-  // Roster / endorsement footer zone.
+  // Roster / affiliation footer zone.
   partnerZone: {
     marginTop: 14,
     paddingTop: 12,
@@ -923,7 +946,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
 
-  // Endorsement detail modal.
+  // Affiliation detail modal.
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',

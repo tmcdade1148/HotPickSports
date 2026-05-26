@@ -265,6 +265,25 @@ interface GlobalState {
   /** Mark partner notifications read for this user/partner. Called on entry
    *  to PartnerRosterScreen. Clears the indicator on Home. */
   markPartnerNotificationsRead: (userId: string, partnerId: string) => Promise<void>;
+
+  // Pool ↔ Club affiliations (many-to-many). Sourced from
+  // `pool_partner_affiliations`. Each pool maps to an ordered list of its
+  // affiliated Clubs (primary first, then by created_at). Each row carries
+  // its own brand snapshot — never live-joined to `partners` for rendering
+  // (Hard Rule #23).
+  //
+  // PoolModule reads from this slice when populated; falls back to the
+  // legacy singular pool.partner_id + pool.brand_config when not.
+  poolAffiliations: Record<string, PoolAffiliation[]>;
+  loadPoolAffiliations: (poolIds: string[]) => Promise<void>;
+}
+
+export interface PoolAffiliation {
+  partnerId:    string;
+  partnerName:  string;
+  primaryColor: string | null;
+  logoUrl:      string | null;
+  isPrimary:    boolean;
 }
 
 export interface UserHardwareItem {
@@ -1710,5 +1729,76 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
         },
       },
     }));
+  },
+
+  poolAffiliations: {},
+
+  loadPoolAffiliations: async (poolIds) => {
+    if (poolIds.length === 0) {
+      set({poolAffiliations: {}});
+      return;
+    }
+
+    // One query for all pools. RLS gates SELECT to active members of each
+    // pool, so this is safe to call with the full visible pool list.
+    const {data, error} = await supabase
+      .from('pool_partner_affiliations')
+      .select('pool_id, partner_id, brand_config_snapshot, is_primary, created_at')
+      .in('pool_id', poolIds);
+
+    if (error) {
+      // Don't blow away existing data on transient failures.
+      return;
+    }
+
+    type Row = {
+      pool_id:               string;
+      partner_id:            string;
+      brand_config_snapshot: Record<string, unknown> | null;
+      is_primary:            boolean;
+      created_at:            string;
+    };
+
+    const byPool: Record<string, PoolAffiliation[]> = {};
+    for (const pid of poolIds) byPool[pid] = [];
+
+    for (const row of (data ?? []) as Row[]) {
+      const bc   = (row.brand_config_snapshot ?? {}) as Record<string, unknown>;
+      const logo = (bc.logo ?? {}) as Record<string, unknown>;
+      const logoUrl =
+        typeof logo.full === 'string' && logo.full.length > 0
+          ? logo.full
+          : typeof bc.logo_url === 'string' && bc.logo_url.length > 0
+          ? bc.logo_url
+          : null;
+      const primaryColor =
+        typeof bc.primary_color === 'string' && bc.primary_color.length > 0
+          ? bc.primary_color
+          : null;
+      const partnerName =
+        typeof bc.partner_name === 'string' && bc.partner_name.length > 0
+          ? bc.partner_name
+          : 'Club';
+
+      byPool[row.pool_id]?.push({
+        partnerId:    row.partner_id,
+        partnerName,
+        primaryColor,
+        logoUrl,
+        isPrimary:    row.is_primary,
+      });
+    }
+
+    // Sort each pool's affiliations: primary first, then by partner name.
+    for (const pid of Object.keys(byPool)) {
+      byPool[pid].sort((a, b) => {
+        if (a.isPrimary !== b.isPrimary) return a.isPrimary ? -1 : 1;
+        return a.partnerName.localeCompare(b.partnerName, undefined, {
+          sensitivity: 'base',
+        });
+      });
+    }
+
+    set({poolAffiliations: byPool});
   },
 }));

@@ -6,11 +6,11 @@
 // Spec: 260520_HotPick_LexiconImplementation_Spec.docx
 //
 // Usage:
-//   import {LEXICON, endorsedBy, endorsedByMany, gafferOf,
+//   import {LEXICON, affiliatedWith, gafferOf,
 //           clubsContest, clubContestTagline,
 //           independentContestLabel} from '@shared/lexicon';
 //   <Text>YOUR {LEXICON.contest.plural.toUpperCase()}</Text>   // "YOUR CONTESTS"
-//   <Text>{endorsedBy(partner.name)}</Text>                    // "Endorsed by Mes Que NFL"
+//   <Text>{affiliatedWith([partner.name])}</Text>              // "Affiliated with Mes Que NFL"
 //   <Text>You are {gafferOf(pool.name)}.</Text>                // "You are the Gaffer of Stella's Gang."
 //
 // Article guidance (spec §2):
@@ -69,18 +69,9 @@ export const LEXICON = {
 
 // ---------------------------------------------------------------------------
 // Helpers — preferred over inline string literals so the lexicon stays
-// consistent across surfaces. If you find yourself writing "Endorsed by ..."
+// consistent across surfaces. If you find yourself writing "Affiliated with ..."
 // or "the Gaffer of ..." by hand, use these instead.
 // ---------------------------------------------------------------------------
-
-/**
- * Affiliation line on a Contest card that's on a Club's roster.
- * Replaces the old "On [X]'s Roster" phrasing.
- *   endorsedBy('Mes Que NFL') → "Endorsed by Mes Que NFL"
- */
-export function endorsedBy(clubName: string): string {
-  return `Endorsed by ${clubName}`;
-}
 
 /**
  * Role-in-context sentence form.
@@ -112,30 +103,34 @@ export function clubContestTagline(clubName: string): string {
 }
 
 /**
- * Affiliation line for a Contest endorsed by one or more Clubs. Scales
- * from 1 endorsement up — the visual footer truncates to a logo cluster
+ * Affiliation line for a Contest affiliated with one or more Clubs. Scales
+ * from 1 affiliation up — the visual footer truncates to a logo cluster
  * for 4+, this helper keeps the text variant readable:
- *   1   → "Endorsed by Hammer's Tavern"
- *   2   → "Endorsed by Hammer's & The Crown"
- *   3   → "Endorsed by Hammer's, The Crown & Joe's"
- *   4+  → "Endorsed by Hammer's, The Crown & 2 more"
+ *   1   → "Affiliated with Hammer's Tavern"
+ *   2   → "Affiliated with Hammer's & The Crown"
+ *   3   → "Affiliated with Hammer's, The Crown & Joe's"
+ *   4+  → "Affiliated with Hammer's, The Crown & 2 more"
  * For empty input, returns an empty string — callers should check
  * length before rendering.
+ *
+ * Note: an earlier draft used "Endorsed by" / `endorsedBy(name)`. The
+ * Gaffer self-submits via PartnerDirectoryScreen, so "Affiliated with" is
+ * the accurate vocabulary — the Club isn't actively vouching.
  */
-export function endorsedByMany(clubNames: readonly string[]): string {
+export function affiliatedWith(clubNames: readonly string[]): string {
   const names = clubNames.filter(n => n && n.length > 0);
   if (names.length === 0) return '';
-  if (names.length === 1) return `Endorsed by ${names[0]}`;
-  if (names.length === 2) return `Endorsed by ${names[0]} & ${names[1]}`;
+  if (names.length === 1) return `Affiliated with ${names[0]}`;
+  if (names.length === 2) return `Affiliated with ${names[0]} & ${names[1]}`;
   if (names.length === 3) {
-    return `Endorsed by ${names[0]}, ${names[1]} & ${names[2]}`;
+    return `Affiliated with ${names[0]}, ${names[1]} & ${names[2]}`;
   }
   const remaining = names.length - 2;
-  return `Endorsed by ${names[0]}, ${names[1]} & ${remaining} more`;
+  return `Affiliated with ${names[0]}, ${names[1]} & ${remaining} more`;
 }
 
 /**
- * Footer label for a Contest with no Club endorsements. The presence of
+ * Footer label for a Contest with no Club affiliations. The presence of
  * the Gaffer's first name + last initial turns "Independent" from an
  * absence-signal into a positive identifier.
  *   independentContestLabel('Tom M.') → "Independent · run by Tom M."

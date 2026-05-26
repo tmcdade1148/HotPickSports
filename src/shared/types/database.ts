@@ -60,8 +60,8 @@ export interface DbPool {
   /**
    * If non-NULL, this pool is an Official Contest of that Club. A Club can
    * have many (e.g., ESPN regional pools). Mutually exclusive with
-   * pool_partner_endorsements rows — enforced by DB trigger.
-   * @see supabase/migrations/260526_pool_endorsements_and_owning_club.sql
+   * pool_partner_affiliations rows — enforced by DB trigger.
+   * @see supabase/migrations/260526_pool_affiliations_and_owning_club.sql
    */
   owning_club_id: string | null;
   invite_slug: string | null;

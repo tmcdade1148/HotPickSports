@@ -853,7 +853,7 @@ Spec: `260520_HotPick_LexiconImplementation_Spec.docx` (May 2026).
 | picks | Picks (unchanged) |
 
 ### Affiliation copy
-`pool.partner_id = X` renders on a Contest card as **"Endorsed by [Club]"** with a `BadgeCheck` icon (lucide, tinted with the Club's primary color). Builds via `endorsedBy(clubName)` helper. Replaces the older "On [X]'s Roster" phrasing.
+A Contest's affiliations render on its card as **"Affiliated with [Club]"** (or `affiliatedWith([names])` for multi-Club: "Affiliated with X & Y", "Affiliated with X, Y & 2 more"). Single-Club affiliation gets a `BadgeCheck` icon tinted with the Club's primary color; multi-Club gets an overlapping logo cluster instead. Replaces the older "On [X]'s Roster" and the "Endorsed by [X]" interim phrasings. Backing schema: `pool_partner_affiliations` (many-to-many), with `pools.owning_club_id` distinguishing the Club's own Official Contest from a roster member (see `260526_pool_affiliations_and_owning_club.sql`).
 
 ### Carve-outs (intentional — do not "fix")
 - **`PartnerAdminScreen`** — super-admin internal tool; keeps "Partner" labels per spec §2.
