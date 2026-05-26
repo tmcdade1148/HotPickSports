@@ -24,6 +24,15 @@ import {PartnerModule} from '@shell/components/home/PartnerModule';
 import {resolveHomeState} from '@shell/components/home/resolveHomeState';
 import {LEXICON} from '@shared/lexicon';
 
+// HotPick brand accents for the two Home CTAs. Hard-coded here (not
+// read from theme) because the two buttons are explicitly painted in
+// secondary HotPick brand colors that aren't on the active palette —
+// teal #45615E (the legacy secondary) and amber #E39032 (the current
+// secondary). Both colors clear WCAG 3:1 against light + dark
+// surfaceElevated, so a single value works in both modes.
+const JOIN_ACCENT   = '#45615E';
+const CREATE_ACCENT = '#E39032';
+
 export function HomeScreen() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
@@ -289,22 +298,27 @@ export function HomeScreen() {
               <PoolModule key={p.id} pool={p} />
             ))}
             <View style={styles.poolActionsRow}>
+              {/* Join uses HotPick teal #45615E; Create uses HotPick
+                  amber #E39032. Two distinct brand colors so the CTAs
+                  read as a pair without either disappearing into
+                  HotPick's primary orange already used elsewhere on
+                  the home stack. */}
               <Pressable
                 onPress={() => navigation.navigate('JoinPool')}
                 style={({pressed}) => [
                   styles.poolActionBtn,
                   {
-                    backgroundColor: hexToRgba(colors.primary, 0.10),
-                    borderColor: colors.primary,
+                    backgroundColor: hexToRgba(JOIN_ACCENT, 0.12),
+                    borderColor: JOIN_ACCENT,
                     opacity: pressed ? 0.7 : 1,
                   },
                 ]}
                 accessibilityRole="button"
                 accessibilityLabel="Join a Contest with an invite code">
-                <KeyRound size={18} color={colors.primary} strokeWidth={2.25} />
+                <KeyRound size={18} color={JOIN_ACCENT} strokeWidth={2.25} />
                 <View style={styles.poolActionLabel}>
                   <Text
-                    style={[bodyType.bold, styles.poolActionPrimary, {color: colors.primary}]}>
+                    style={[bodyType.bold, styles.poolActionPrimary, {color: JOIN_ACCENT}]}>
                     Join a Contest
                   </Text>
                   <Text
@@ -318,17 +332,17 @@ export function HomeScreen() {
                 style={({pressed}) => [
                   styles.poolActionBtn,
                   {
-                    backgroundColor: hexToRgba(colors.primary, 0.10),
-                    borderColor: colors.primary,
+                    backgroundColor: hexToRgba(CREATE_ACCENT, 0.12),
+                    borderColor: CREATE_ACCENT,
                     opacity: pressed ? 0.7 : 1,
                   },
                 ]}
                 accessibilityRole="button"
                 accessibilityLabel="Create a new Contest and invite friends">
-                <Plus size={18} color={colors.primary} strokeWidth={2.25} />
+                <Plus size={18} color={CREATE_ACCENT} strokeWidth={2.25} />
                 <View style={styles.poolActionLabel}>
                   <Text
-                    style={[bodyType.bold, styles.poolActionPrimary, {color: colors.primary}]}>
+                    style={[bodyType.bold, styles.poolActionPrimary, {color: CREATE_ACCENT}]}>
                     Create a Contest
                   </Text>
                   <Text
@@ -385,6 +399,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 12,
     borderWidth: 1.5,
+    // Android RN occasionally keeps a previously-set borderStyle when
+    // the prop is omitted entirely. Set it explicitly so the button
+    // can't fall back to dashed.
+    borderStyle: 'solid',
   },
   poolActionLabel: {
     flexShrink: 1,
