@@ -1,5 +1,4 @@
 import {useColorScheme} from 'react-native';
-import {useGlobalStore} from '@shell/stores/globalStore';
 import {
   HOTPICK_DEFAULTS,
   SEMANTIC_COLORS,
@@ -11,31 +10,35 @@ import {
 import type {ThemeColors, BrandIdentity} from './types';
 
 /**
- * useTheme() — returns resolved theme colors for the active pool.
+ * useTheme() — returns resolved theme colors for the app shell.
  *
- * Reads activeBrandConfig from the global Zustand store.
- * If null: returns HotPick default colors.
- * If populated: returns partner colors + HotPick semantic colors.
+ * **HotPick always.** Club brand colors NEVER drive the global shell
+ * (Header, CTAs, bottom nav, Settings, any screen using this hook).
+ * Club colors appear only on Official Club Contest cards — those read
+ * their snapshot directly from `pool.brand_config`, not via this hook.
  *
- * Automatically derives dark mode: brand primary/secondary stay the
- * same (brand recognition), backgrounds and text flip to dark surfaces.
- * Partners don't manage dark mode — we handle it.
+ * Per product call 2026-05-26: prior behavior tied the global theme to
+ * the active pool's brand, which made Club colors flicker in and out as
+ * the user navigated. That model is retired. The global shell is HotPick
+ * end-to-end; per-Club color appears only inside the Official Contest
+ * card's branded header band.
+ *
+ * `activeBrandConfig` is still maintained on the store (writes from
+ * setActivePoolId continue to update it) but is no longer read here —
+ * intentionally kept so legacy callsites (PoweredByHotPick, branded join
+ * flow) can opt in to brand details without going through theming.
  */
 export function useTheme(): {colors: ThemeColors; isDark: boolean} {
-  const brandConfig = useGlobalStore(s => s.activeBrandConfig);
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
-  const lightConfig = brandConfig ?? HOTPICK_DEFAULTS;
+  const lightConfig = HOTPICK_DEFAULTS;
   const config = isDark ? deriveDarkColors(lightConfig) : lightConfig;
   const semantic = isDark ? SEMANTIC_COLORS_DARK : SEMANTIC_COLORS;
   const extended = isDark ? HOTPICK_EXTENDED_TOKENS_DARK : HOTPICK_EXTENDED_TOKENS;
 
   // HotPick uses blue (#34A4D1) in light mode and gold (#E39032) in dark mode.
-  // Partners keep their own highlight in both modes.
-  const highlight = isDark && !brandConfig
-    ? '#E39032'
-    : (config.highlight_color ?? '#FFFFFF');
+  const highlight = isDark ? '#E39032' : (config.highlight_color ?? '#FFFFFF');
 
   return {
     isDark,
@@ -63,17 +66,22 @@ export function useTheme(): {colors: ThemeColors; isDark: boolean} {
 }
 
 /**
- * useBrand() — returns brand identity for the active pool.
+ * useBrand() — returns HotPick identity for the global shell.
  *
- * Reads activeBrandConfig from the global Zustand store.
- * If null: returns HotPick default identity.
- * If populated: returns partner identity.
+ * Like `useTheme()`, this hook used to swap to the active pool's Club
+ * brand. It no longer does — the global shell (Header logos, app name,
+ * tab nav) stays HotPick end-to-end (product call 2026-05-26). Screens
+ * that need to render a specific Club's identity (e.g., PartnerRoster,
+ * the Official Contest card's branded band) read the brand snapshot
+ * directly from the pool or partner record instead.
  *
- * Components use this for logos, app names, and branded copy.
+ * `isBranded` therefore always returns false here. The PoweredByHotPick
+ * component, which gates on this flag, simply won't render via the
+ * global hook — branded contexts that genuinely need the watermark pass
+ * the brand in explicitly.
  */
 export function useBrand(): BrandIdentity {
-  const brandConfig = useGlobalStore(s => s.activeBrandConfig);
-  const config = brandConfig ?? HOTPICK_DEFAULTS;
+  const config = HOTPICK_DEFAULTS;
 
   return {
     partnerName: config.partner_name,
@@ -81,7 +89,7 @@ export function useBrand(): BrandIdentity {
     appName: config.app_name,
     logo: config.logo,
     inviteSlug: config.invite_slug,
-    isBranded: config.is_branded,
+    isBranded: false,
     poweredByHotpick: true,
   };
 }

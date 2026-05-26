@@ -280,33 +280,11 @@ export function PoolModule({pool}: PoolModuleProps) {
         </View>
       )}
 
-      {/* AFFILIATED — left-edge stripe(s). Single affiliate → single 3px stripe.
-          Multi-affiliate → vertical stack of 2–3 stripes, capped at 3 for
-          legibility (4+ goes to a neutral highlight stripe via the cluster
-          alone). */}
-      {isAffiliated && affiliates.length === 1 && affiliates[0].primaryColor && (
-        <View
-          style={[styles.stripe, {backgroundColor: affiliates[0].primaryColor}]}
-        />
-      )}
-      {isAffiliated && affiliates.length >= 2 && (
-        <View style={styles.stripeStack} pointerEvents="none">
-          {affiliates.slice(0, 3).map((e, i) => (
-            <View
-              key={e.partnerId}
-              style={[
-                styles.stripeStackSegment,
-                {
-                  backgroundColor: e.primaryColor ?? colors.border,
-                  // Equal-height segments stacked top to bottom.
-                  top: `${(i * 100) / Math.min(affiliates.length, 3)}%`,
-                  height: `${100 / Math.min(affiliates.length, 3)}%`,
-                },
-              ]}
-            />
-          ))}
-        </View>
-      )}
+      {/* AFFILIATED cards do NOT paint Club colors anywhere on the card
+          itself. Per product call 2026-05-26, Club colors are reserved
+          for Official Club Contests only. Affiliated Contests identify
+          their Clubs via the logo cluster + "Affiliated with …" text in
+          the footer below; the card body stays HotPick-neutral. */}
 
       {/* Pool settings gear — sits in the lower-right. Bumped above the
           footer divider when a partner zone or independent chip is below. */}
@@ -462,7 +440,7 @@ export function PoolModule({pool}: PoolModuleProps) {
                     ) : (
                       <LogoMark
                         initials={partnerInitials(e.name)}
-                        tint={e.primaryColor ?? colors.primary}
+                        tint={colors.textTertiary}
                         size={22}
                       />
                     )}
@@ -491,7 +469,7 @@ export function PoolModule({pool}: PoolModuleProps) {
               {affiliates.length === 1 && (
                 <BadgeCheck
                   size={14}
-                  color={primaryAffiliate.primaryColor ?? colors.primary}
+                  color={colors.textTertiary}
                   strokeWidth={2.25}
                 />
               )}
@@ -549,7 +527,7 @@ export function PoolModule({pool}: PoolModuleProps) {
                 <PerkIcon
                   name={legacyPartner.perk_icon}
                   size={13}
-                  color={primaryAffiliate.primaryColor ?? colors.primary}
+                  color={colors.textSecondary}
                   containerStyle={styles.perkIconBox}
                 />
                 <Text
@@ -640,14 +618,14 @@ export function PoolModule({pool}: PoolModuleProps) {
                       source={{uri: e.logoUrl}}
                       style={[
                         styles.modalRowLogo,
-                        {borderColor: e.primaryColor ?? colors.border},
+                        {borderColor: colors.border},
                       ]}
                       resizeMode="contain"
                     />
                   ) : (
                     <LogoMark
                       initials={partnerInitials(e.name)}
-                      tint={e.primaryColor ?? colors.primary}
+                      tint={colors.textTertiary}
                       size={32}
                     />
                   )}
@@ -661,7 +639,7 @@ export function PoolModule({pool}: PoolModuleProps) {
                       style={[
                         bodyType.regular,
                         styles.modalRowPrimary,
-                        {color: e.primaryColor ?? colors.primary},
+                        {color: colors.textSecondary},
                       ]}>
                       Lead
                     </Text>
@@ -678,7 +656,7 @@ export function PoolModule({pool}: PoolModuleProps) {
                   <PerkIcon
                     name={legacyPartner.perk_icon}
                     size={20}
-                    color={primaryAffiliate.primaryColor ?? colors.primary}
+                    color={colors.textSecondary}
                     containerStyle={styles.modalPerkIcon}
                   />
                   <Text

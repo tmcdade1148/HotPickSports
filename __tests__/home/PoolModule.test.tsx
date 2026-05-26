@@ -54,6 +54,11 @@ const mockStoreState = {
   poolIndicators:   {} as Record<string, {orgUnread: number; mostRecentAt: string | null}>,
   userRankByPool:   {} as Record<string, {rank: number; memberCount: number; total: number}>,
   weekRankByPool:   {} as Record<string, {rank: number; memberCount: number; weekPoints: number}>,
+  // Affiliations slice — keyed by poolId. Empty by default; the legacy
+  // single-Club fallback path kicks in via pool.partner_id + brand_config.
+  poolAffiliations: {} as Record<string, unknown[]>,
+  partnersById:     {} as Record<string, unknown>,
+  partnerIndicators: {} as Record<string, {unread: number; mostRecentAt: string | null}>,
 };
 
 jest.mock('@shell/stores/globalStore', () => ({
@@ -149,9 +154,11 @@ describe('PoolModule tap routing (spec §6.4.6)', () => {
     //   [1] settings gear (lower-right)
     //   [2] SmackTalk badge
     expect(pressables.length).toBeGreaterThanOrEqual(3);
-    const smackPress = pressables.find(p =>
-      String(p.props.accessibilityLabel ?? '').toLowerCase().includes('smacktalk'),
-    )?.props.onPress;
+    const smackPress = pressables.find(p => {
+      const label = String(p.props.accessibilityLabel ?? '').toLowerCase();
+      // Label vocabulary moved from "SmackTalk" to "Chirps" per lexicon spec.
+      return label.includes('chirp') || label.includes('smacktalk');
+    })?.props.onPress;
     expect(typeof smackPress).toBe('function');
 
     ReactTestRenderer.act(() => {
@@ -183,16 +190,17 @@ describe('PoolModule tap routing (spec §6.4.6)', () => {
     expect(mockNavigate).toHaveBeenCalledWith('LeaderboardTab');
   });
 
-  test('partner-aligned pool: no rank chip rendered (renders card + gear + SmackTalk + partner roster link)', () => {
+  test('partner-aligned pool: no rank chip rendered (renders card + gear + Chirps + affiliation row + info pill)', () => {
     let tree: ReactTestRenderer.ReactTestRenderer;
     ReactTestRenderer.act(() => {
       tree = ReactTestRenderer.create(<PoolModule pool={partnerPool} />);
     });
-    // Redesign-v3: SmackTalk badge is always visible (even with zero
-    // unread — muted state), a settings gear sits in the lower-right,
-    // and the "Aligned with…" row is a Pressable that opens the partner
-    // roster. So a partner-aligned pool renders four Pressables: card
-    // body, settings gear, SmackTalk badge, partner roster link.
-    expect(findPressables(tree!.root)).toHaveLength(4);
+    // Redesign-v3 (affiliations): Chirps badge is always visible (muted
+    // when zero unread), settings gear sits in the lower-right, the
+    // "Affiliated with…" row is a Pressable that opens the partner
+    // roster, and a small ⓘ "Club affiliation" pill is a Pressable that
+    // opens the affiliation-details modal (accessibility path for
+    // colorblind users — see PoolModule.tsx). Five Pressables total.
+    expect(findPressables(tree!.root)).toHaveLength(5);
   });
 });
