@@ -437,11 +437,9 @@ export function SettingsScreen({route}: any) {
                       </Text>
                     </View>
                   )}
-                  {isActive && (
-                    <Text style={[styles.activeLabel, {color: isBranded ? pillTextColor : hotpick.primary}]}>
-                      Active
-                    </Text>
-                  )}
+                  {/* "Active" label removed — the pill's visual state
+                      (brand color bg for Official, primary border for
+                      everything else) already signals active. */}
                   {(poolRoles[pool.id] === 'organizer' || poolRoles[pool.id] === 'admin') && (
                     <TouchableOpacity
                       onPress={() =>
