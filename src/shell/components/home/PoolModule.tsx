@@ -32,7 +32,6 @@ import {Image, Pressable, StyleSheet, Text, View} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {
   BadgeCheck,
-  Flag,
   MessageCircle,
   Megaphone,
   ShieldCheck,
@@ -46,13 +45,11 @@ import {
   LEXICON,
   affiliatedWith,
   clubContestTagline,
-  independentContestLabel,
 } from '@shared/lexicon';
 import {ordinalSuffix} from '@shared/utils/format';
 import type {DbPool} from '@shared/types/database';
 import {LogoMark} from './LogoMark';
 import {partnerInitials} from './teamColors';
-import {PerkIcon} from './PerkIcon';
 
 export interface PoolModuleProps {
   pool: DbPool;
@@ -273,22 +270,6 @@ export function PoolModule({pool}: PoolModuleProps) {
     affiliates.find(a => a.isPrimary) ?? affiliates[0] ?? null;
   const isAffiliated   = !isOfficial && affiliates.length > 0;
   const isIndependent  = !isOfficial && affiliates.length === 0;
-
-  // Perk for the lead affiliate Club, displayed in the Affiliated card
-  // footer. Perks are NOT snapshotted onto the pool (partner-managed,
-  // should stay fresh — see PartnerModule comments), so we always read
-  // them from the live partner record. Falls back to the legacy
-  // pool.partner_id record when partnersById hasn't loaded the lead
-  // affiliate yet.
-  const partnersById = useGlobalStore(s => s.partnersById);
-  const primaryAffiliatePerk = useMemo(() => {
-    if (!isAffiliated || !primaryAffiliate) return null;
-    const live = partnersById[primaryAffiliate.partnerId];
-    const text = live?.perk_text ?? legacyPartner?.perk_text ?? null;
-    const icon = live?.perk_icon ?? legacyPartner?.perk_icon ?? null;
-    if (!text) return null;
-    return {text, icon};
-  }, [isAffiliated, primaryAffiliate, partnersById, legacyPartner]);
 
   // Branded header band data for Official Contests. Read snapshot fields off
   // the pool first (Hard Rule #23 — no live join). Fall back to the cached
@@ -577,38 +558,56 @@ export function PoolModule({pool}: PoolModuleProps) {
                   strokeWidth={2.25}
                 />
               )}
-              <Text
-                style={[bodyType.regular, styles.alignText, {color: colors.textSecondary}]}
-                numberOfLines={1}>
-                {'Affiliated with '}
-                {affiliates.slice(0, 3).map((e, i) => {
-                  // Separator before this name: nothing before first,
-                  // " & " before the last when total <= 3, otherwise ", ".
-                  const total = Math.min(affiliates.length, 3);
-                  const isLast = i === total - 1;
-                  const sep = i === 0 ? '' : isLast && affiliates.length <= 3 ? ' & ' : ', ';
-                  return (
-                    <React.Fragment key={e.partnerId}>
-                      {sep}
+              <View style={styles.alignTextCol}>
+                {/* Single-affiliate: keep it on one line. Multi: print
+                    "Affiliated with" once, then each Club on its own
+                    row underneath. Each Club name is a SEPARATE <Text>
+                    node — not nested in a parent Text via Fragments —
+                    because the previous Fragment-based approach was
+                    duplicating Clubs on Android. */}
+                {affiliates.length === 1 ? (
+                  <View style={styles.singleAffiliateRow}>
+                    <Text
+                      style={[bodyType.regular, styles.affiliateLabel, {color: colors.textSecondary}]}>
+                      {'Affiliated with '}
+                    </Text>
+                    <Text
+                      style={[
+                        bodyType.bold,
+                        styles.affiliateName,
+                        {color: primaryAffiliate.displayColor ?? colors.textPrimary},
+                      ]}
+                      numberOfLines={1}>
+                      {primaryAffiliate.name}
+                    </Text>
+                  </View>
+                ) : (
+                  <>
+                    <Text
+                      style={[bodyType.regular, styles.affiliateLabel, {color: colors.textSecondary}]}>
+                      Affiliated with
+                    </Text>
+                    {affiliates.slice(0, 3).map(e => (
                       <Text
+                        key={e.partnerId}
                         style={[
                           bodyType.bold,
-                          {
-                            color: e.displayColor ?? colors.textPrimary,
-                            // Bumped up from 12.5 → 14 + heavier weight
-                            // so the Club's name reads as the focal
-                            // point of the affiliation row.
-                            fontSize: 14,
-                            fontWeight: '800',
-                          },
-                        ]}>
+                          styles.affiliateName,
+                          {color: e.displayColor ?? colors.textPrimary},
+                        ]}
+                        numberOfLines={1}>
                         {e.name}
                       </Text>
-                    </React.Fragment>
-                  );
-                })}
-                {affiliates.length > 3 && ` & ${affiliates.length - 3} more`}
-              </Text>
+                    ))}
+                    {affiliates.length > 3 && (
+                      <Text
+                        style={[bodyType.regular, styles.affiliateLabel, {color: colors.textTertiary}]}>
+                        +{affiliates.length - 3} more
+                      </Text>
+                    )}
+                  </>
+                )}
+              </View>
               {legacyPartnerUnread > 0 && affiliates.length === 1 && (
                 <View
                   style={[
@@ -629,55 +628,11 @@ export function PoolModule({pool}: PoolModuleProps) {
                 </View>
               )}
             </Pressable>
-            {/* Perk row for the lead affiliate. Replaces the prior
-                "Club Affiliation" info pill — the perk is the value
-                users care about, the affiliation itself is already
-                signaled by the logo cluster + Club name above. For
-                multi-affiliate Contests we show the lead Club's perk
-                only (each Club's full perk is on its YOUR CLUBS tile). */}
-            {primaryAffiliatePerk?.text && (
-              <View style={styles.perkRow}>
-                <PerkIcon
-                  name={primaryAffiliatePerk.icon}
-                  size={13}
-                  color={colors.textSecondary}
-                  containerStyle={styles.perkIconBox}
-                />
-                <Text
-                  style={[bodyType.regular, styles.perkText, {color: colors.textSecondary}]}
-                  numberOfLines={2}>
-                  {primaryAffiliatePerk.text}
-                </Text>
-                <Text style={[bodyType.bold, styles.perkEyebrow, {color: colors.textTertiary}]}>
-                  {LEXICON.club.short.toUpperCase()} {LEXICON.perks.toUpperCase()}
-                </Text>
-              </View>
-            )}
           </View>
         )}
 
-        {/* INDEPENDENT — small footer chip turns absence into a positive
-            identifier. Gaffer name will populate once a loader feeds it
-            (today: organizer_id → profile poolie_name; not yet in store). */}
-        {isIndependent && (
-          <View style={[styles.partnerZone, {borderTopColor: colors.border}]}>
-            <View
-              style={[styles.independentChip, {borderColor: colors.border}]}
-              accessible
-              accessibilityLabel={independentContestLabel(null)}>
-              <Flag size={11} color={colors.textTertiary} strokeWidth={2} />
-              <Text
-                style={[
-                  bodyType.regular,
-                  styles.independentText,
-                  {color: colors.textTertiary},
-                ]}
-                numberOfLines={1}>
-                {independentContestLabel(null)}
-              </Text>
-            </View>
-          </View>
-        )}
+        {/* INDEPENDENT Contests: no footer. Independence is the default
+            state — the absence of a Club row IS the signal. */}
       </View>
 
     </Pressable>
@@ -873,130 +828,27 @@ const styles = StyleSheet.create({
   partnerNewText: {
     fontSize: 10,
   },
-  perkRow: {
+  // Right-hand column inside the affiliation row. Holds the
+  // "Affiliated with" label and either a single Club name (inline)
+  // or a stack of one-per-line Club names (multi affiliate).
+  alignTextCol: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'column',
+    gap: 2,
+  },
+  singleAffiliateRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 8,
-    paddingLeft: 34,
+    alignItems: 'baseline',
+    flexWrap: 'wrap',
   },
-  perkIconBox: {
-    width: 16,
-  },
-  perkText: {
-    flex: 1,
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  perkEyebrow: {
-    fontSize: 10,
-    letterSpacing: 1.2,
-    marginLeft: 8,
-  },
-  alignText: {
-    flex: 1,
+  affiliateLabel: {
     fontSize: 12.5,
     fontWeight: '500',
   },
-  connectionPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-end',
-    gap: 4,
-    paddingVertical: 3,
-    paddingHorizontal: 7,
-    marginTop: 6,
-    borderRadius: borderRadius.full,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  connectionText: {
-    fontSize: 10,
-    letterSpacing: 0.3,
-  },
-
-  // Independent Contest footer chip.
-  independentChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 5,
-    paddingVertical: 4,
-    paddingHorizontal: 9,
-    borderRadius: borderRadius.full,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  independentText: {
-    fontSize: 11,
-    letterSpacing: 0.2,
-  },
-
-  // Affiliation detail modal.
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-  },
-  modalCard: {
-    width: '100%',
-    maxWidth: 340,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.lg,
-  },
-  modalClose: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    padding: 4,
-    zIndex: 1,
-  },
-  modalTitle: {
-    fontSize: 13,
-    letterSpacing: 0.8,
-    marginBottom: spacing.md,
-    paddingTop: 4,
-  },
-  modalRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  modalRowLogo: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    backgroundColor: 'rgba(255,255,255,0.92)',
-  },
-  modalRowName: {
-    flex: 1,
+  affiliateName: {
     fontSize: 14,
-  },
-  modalRowPrimary: {
-    fontSize: 10,
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-  },
-  modalPerkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.md,
-    marginTop: spacing.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  modalPerkIcon: {
-    width: 24,
-  },
-  modalPerkText: {
-    flex: 1,
-    fontSize: 13,
-    lineHeight: 18,
+    fontWeight: '800',
+    lineHeight: 17,
   },
 });
