@@ -303,20 +303,26 @@ export function SettingsScreen({route}: any) {
             Tap a Contest to make it active. Tap the ★ to pin a Contest to the
             top of your Home Screen — the rest sort alphabetically.
           </Text>
-          {/* Pool list — partner pools first, then HotPick pools (global pool hidden) */}
+          {/* Pool list — Official Club Contests first, then everything else
+              (Affiliated + Private mix alphabetically). Only Official rows
+              wear Club brand colors; Affiliated/Private render as neutral
+              pills per product call. */}
           {[
-            ...userPools.filter(p => !!(p.brand_config as any)?.is_branded),
+            ...userPools.filter(p => !!p.owning_club_id),
             'DIVIDER' as const,
-            ...userPools.filter(p => !(p.brand_config as any)?.is_branded),
+            ...userPools.filter(p => !p.owning_club_id),
           ].map((poolOrDivider) => {
             if (poolOrDivider === 'DIVIDER') {
-              const hasPartner = userPools.some(p => !!(p.brand_config as any)?.is_branded);
-              if (!hasPartner) return null;
+              const hasOfficial = userPools.some(p => !!p.owning_club_id);
+              if (!hasOfficial) return null;
               return <View key="partner-divider" style={{height: 16}} />;
             }
             const pool = poolOrDivider as typeof userPools[0];
             const poolBrand = getPoolColors(pool);
-            const isBranded = !!(pool.brand_config as any)?.is_branded;
+            // `isBranded` here means "this row wears Club brand colors" —
+            // only true for Official Club Contests now. Affiliated pools
+            // render neutral, same as Private.
+            const isBranded = !!pool.owning_club_id;
             const isActive = pool.id === activePoolId;
             const hotpick = {primary: colors.primary, secondary: colors.secondary, surface: colors.surface};
 
