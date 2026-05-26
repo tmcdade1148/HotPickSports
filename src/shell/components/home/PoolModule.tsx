@@ -417,8 +417,10 @@ export function PoolModule({pool}: PoolModuleProps) {
               ]}
               accessibilityRole="button"
               accessibilityLabel={affiliatedWith(affiliates.map(e => e.name))}>
-              {/* Overlapping logo cluster. Each logo gets a ring matching the
-                  card surface so they stay distinct when overlapped. */}
+              {/* Overlapping logo cluster. Each logo's ring is colored in
+                  the Club's primary — the only Club-color accent on an
+                  Affiliated card's body, used here because the logo IS
+                  the Club's identity (the ring just reinforces it). */}
               <View style={styles.logoCluster}>
                 {affiliates.slice(0, 3).map((e, i) => (
                   <View
@@ -428,7 +430,7 @@ export function PoolModule({pool}: PoolModuleProps) {
                       {
                         marginLeft: i === 0 ? 0 : -8,
                         zIndex: affiliates.length - i,
-                        borderColor: colors.surfaceElevated,
+                        borderColor: e.primaryColor ?? colors.surfaceElevated,
                       },
                     ]}>
                     {e.logoUrl ? (
@@ -440,7 +442,7 @@ export function PoolModule({pool}: PoolModuleProps) {
                     ) : (
                       <LogoMark
                         initials={partnerInitials(e.name)}
-                        tint={colors.textTertiary}
+                        tint={e.primaryColor ?? colors.textTertiary}
                         size={22}
                       />
                     )}
@@ -469,14 +471,34 @@ export function PoolModule({pool}: PoolModuleProps) {
               {affiliates.length === 1 && (
                 <BadgeCheck
                   size={14}
-                  color={colors.textTertiary}
+                  color={primaryAffiliate.primaryColor ?? colors.textTertiary}
                   strokeWidth={2.25}
                 />
               )}
               <Text
                 style={[bodyType.regular, styles.alignText, {color: colors.textSecondary}]}
                 numberOfLines={1}>
-                {affiliatedWith(affiliates.map(e => e.name))}
+                {'Affiliated with '}
+                {affiliates.slice(0, 3).map((e, i) => {
+                  // Separator before this name: nothing before first,
+                  // " & " before the last when total <= 3, otherwise ", ".
+                  const total = Math.min(affiliates.length, 3);
+                  const isLast = i === total - 1;
+                  const sep = i === 0 ? '' : isLast && affiliates.length <= 3 ? ' & ' : ', ';
+                  return (
+                    <React.Fragment key={e.partnerId}>
+                      {sep}
+                      <Text
+                        style={[
+                          bodyType.bold,
+                          {color: e.primaryColor ?? colors.textPrimary},
+                        ]}>
+                        {e.name}
+                      </Text>
+                    </React.Fragment>
+                  );
+                })}
+                {affiliates.length > 3 && ` & ${affiliates.length - 3} more`}
               </Text>
               {legacyPartnerUnread > 0 && affiliates.length === 1 && (
                 <View
@@ -618,19 +640,19 @@ export function PoolModule({pool}: PoolModuleProps) {
                       source={{uri: e.logoUrl}}
                       style={[
                         styles.modalRowLogo,
-                        {borderColor: colors.border},
+                        {borderColor: e.primaryColor ?? colors.border},
                       ]}
                       resizeMode="contain"
                     />
                   ) : (
                     <LogoMark
                       initials={partnerInitials(e.name)}
-                      tint={colors.textTertiary}
+                      tint={e.primaryColor ?? colors.textTertiary}
                       size={32}
                     />
                   )}
                   <Text
-                    style={[bodyType.bold, styles.modalRowName, {color: colors.textPrimary}]}
+                    style={[bodyType.bold, styles.modalRowName, {color: e.primaryColor ?? colors.textPrimary}]}
                     numberOfLines={1}>
                     {e.name}
                   </Text>
@@ -639,7 +661,7 @@ export function PoolModule({pool}: PoolModuleProps) {
                       style={[
                         bodyType.regular,
                         styles.modalRowPrimary,
-                        {color: colors.textSecondary},
+                        {color: e.primaryColor ?? colors.textSecondary},
                       ]}>
                       Lead
                     </Text>
