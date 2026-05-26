@@ -36,6 +36,7 @@ import {
   MessageCircle,
   Megaphone,
   ShieldCheck,
+  Trophy,
 } from 'lucide-react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useGlobalStore} from '@shell/stores/globalStore';
@@ -94,6 +95,72 @@ interface Affiliate {
   displayColor: string | null;
   logoUrl: string | null;
   isPrimary: boolean;
+}
+
+// Render the rank number — wrapped in a medal pill when top-3,
+// plain text otherwise. Inlined helper (not a Component) so it can
+// sit unwrapped next to a sibling Text element in the row's
+// flexbox without introducing an extra View boundary.
+function renderRankValue(args: {
+  rank: number;
+  sizeStyle: object;
+  suffixStyle: object;
+  iconSize: number;
+  textColor: string;
+}) {
+  const {rank, sizeStyle, suffixStyle, iconSize, textColor} = args;
+  const medal = medalColor(rank);
+
+  if (!medal) {
+    return (
+      <Text style={[displayType.display, sizeStyle, {color: textColor}]}>
+        {rank}
+        <Text style={suffixStyle}>{ordinalSuffix(rank)}</Text>
+      </Text>
+    );
+  }
+
+  return (
+    <View
+      style={[
+        rankPillStyles.pill,
+        {
+          backgroundColor: hexToRgba(medal, 0.14),
+          borderColor: medal,
+        },
+      ]}>
+      <Trophy size={iconSize} color={medal} strokeWidth={2.25} />
+      <Text style={[displayType.display, sizeStyle, {color: medal}]}>
+        {rank}
+        <Text style={suffixStyle}>{ordinalSuffix(rank)}</Text>
+      </Text>
+    </View>
+  );
+}
+
+const rankPillStyles = StyleSheet.create({
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 1,
+    paddingHorizontal: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+});
+
+// Medal accent for top-3 finishes. Returns null for any rank
+// outside 1–3 — the caller renders the plain number in that case.
+// Gold / silver / bronze are picked to read on both light- and
+// dark-mode surfaces (validated with hexToRgba 0.14 fill + same
+// hex border + same hex bold text — all three clear WCAG 3:1
+// against surfaceElevated in either mode).
+function medalColor(rank: number): string | null {
+  if (rank === 1) return '#E6A82E'; // gold
+  if (rank === 2) return '#9AA1A6'; // silver
+  if (rank === 3) return '#C77A3E'; // bronze
+  return null;
 }
 
 // Pull a hex string off a brand_config snapshot if present.
@@ -345,10 +412,13 @@ export function PoolModule({pool}: PoolModuleProps) {
                   <Text style={[bodyType.regular, styles.rankLabel, {color: colors.textSecondary}]}>
                     Season:{' '}
                   </Text>
-                  <Text style={[displayType.display, styles.rankNumber, {color: colors.textPrimary}]}>
-                    {rankData.rank}
-                    <Text style={styles.rankSuffix}>{ordinalSuffix(rankData.rank)}</Text>
-                  </Text>
+                  {renderRankValue({
+                    rank: rankData.rank,
+                    sizeStyle: styles.rankNumber,
+                    suffixStyle: styles.rankSuffix,
+                    iconSize: 12,
+                    textColor: colors.textPrimary,
+                  })}
                   <Text style={[bodyType.regular, styles.rankLabel, {color: colors.textTertiary}]}>
                     {' '}(of {rankData.memberCount})
                   </Text>
@@ -358,10 +428,13 @@ export function PoolModule({pool}: PoolModuleProps) {
                     <Text style={[bodyType.regular, styles.rankLabel, {color: colors.textSecondary}]}>
                       Week:{' '}
                     </Text>
-                    <Text style={[displayType.display, styles.weekRankNumber, {color: colors.textPrimary}]}>
-                      {weekRank.rank}
-                      <Text style={styles.rankSuffix}>{ordinalSuffix(weekRank.rank)}</Text>
-                    </Text>
+                    {renderRankValue({
+                      rank: weekRank.rank,
+                      sizeStyle: styles.weekRankNumber,
+                      suffixStyle: styles.rankSuffix,
+                      iconSize: 11,
+                      textColor: colors.textPrimary,
+                    })}
                   </View>
                 )}
               </>
