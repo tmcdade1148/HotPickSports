@@ -46,6 +46,7 @@ export function HomeScreen() {
   const loadAlignedPartners   = useGlobalStore(s => s.loadAlignedPartners);
   const loadActivePartners    = useGlobalStore(s => s.loadActivePartners);
   const activePartnerIds      = useGlobalStore(s => s.activePartnerIds);
+  const poolAffiliations      = useGlobalStore(s => s.poolAffiliations);
   const loadPartnerIndicators = useGlobalStore(s => s.loadPartnerIndicators);
   const fetchUserPickStatus    = useNFLStore(s => s.fetchUserPickStatus);
   const fetchUserHotPick       = useNFLStore(s => s.fetchUserHotPick);
@@ -81,23 +82,46 @@ export function HomeScreen() {
     const privatePools: string[] = [];
     const alignedMap: Record<string, typeof visiblePools> = {};
     const partners: string[] = [];
-    for (const p of visiblePools) {
-      if (p.partner_id) {
-        if (!alignedMap[p.partner_id]) {
-          alignedMap[p.partner_id] = [];
-          partners.push(p.partner_id);
-        }
-        alignedMap[p.partner_id].push(p);
-      } else {
-        privatePools.push(p.id);
+
+    // A pool is connected to a Club when ANY of these are true:
+    //   1. pool.owning_club_id is set (Official Club Contest)
+    //   2. pool has rows in pool_partner_affiliations (multi-affiliate)
+    //   3. pool.partner_id is set (legacy single-Club fallback)
+    // All three feed YOUR CLUBS — every Club touching the user's pools
+    // gets a tile, with the connected pools listed under it.
+    const attach = (partnerId: string, pool: (typeof visiblePools)[number]) => {
+      if (!alignedMap[partnerId]) {
+        alignedMap[partnerId] = [];
+        partners.push(partnerId);
       }
+      // Avoid double-listing a pool under the same partner.
+      if (!alignedMap[partnerId].some(x => x.id === pool.id)) {
+        alignedMap[partnerId].push(pool);
+      }
+    };
+
+    for (const p of visiblePools) {
+      const affiliates = poolAffiliations[p.id] ?? [];
+      const hasClubConnection =
+        !!p.owning_club_id || affiliates.length > 0 || !!p.partner_id;
+
+      if (!hasClubConnection) {
+        privatePools.push(p.id);
+        continue;
+      }
+
+      if (p.owning_club_id) attach(p.owning_club_id, p);
+      for (const a of affiliates) attach(a.partnerId, p);
+      // Legacy single-Club fallback — only use it when the affiliations
+      // slice hasn't populated yet (matches PoolModule's behavior).
+      if (affiliates.length === 0 && p.partner_id) attach(p.partner_id, p);
     }
     return {
       privatePoolIds:        privatePools,
       alignedPoolsByPartner: alignedMap,
       partnerIds:            partners,
     };
-  }, [visiblePools]);
+  }, [visiblePools, poolAffiliations]);
 
   // Default pool pins to the top of the Home pool stack; the rest sort
   // alphabetically. Set via the star icon in Settings → My Pools.
