@@ -1,16 +1,55 @@
-// Full-width pool card: name, Season/Week rank, org + SmackTalk
-// indicators, settings gear, partner-alignment footer when applicable.
-// Reads from globalStore — HomeScreen owns the loaders.
+// Full-width Contest card. Renders one of three visual states so the user
+// can identify the Contest's affiliation at a glance:
+//
+//   • Official Club Contest — pool.owning_club_id IS NOT NULL.
+//     A full-bleed branded header band with the Club logo + the tagline
+//     "AN OFFICIAL [CLUB] CONTEST". The Club's brand defines the silhouette
+//     of the card, not just its accent color.
+//
+//   • Roster (endorsed) Contest — pool has ≥1 endorsement.
+//     Brand stripe on the left edge (single endorser) or a stacked
+//     multi-color stripe (≥2 endorsers). Footer carries an overlapping
+//     logo cluster + the endorsedByMany() phrase. Popover opens with the
+//     full list of endorsing Clubs.
+//
+//   • Independent Contest — no owning Club, no endorsements.
+//     Neutral surface. Footer chip reads "Independent · run by [Gaffer]"
+//     so the absence of Club branding becomes a positive identifier.
+//
+// Hard Rule #23: every Club logo/color rendered here comes from a brand
+// snapshot stored ON the pool (or the per-endorsement snapshot when
+// multi-Club support is wired) — never from a live join to `partners`.
+//
+// Data wiring TODO: globalStore does not yet load `pool_partner_endorsements`
+// rows. Until that loader ships, this component reads from the legacy
+// singular `pool.partner_id` + `pool.brand_config`, producing at most one
+// endorser. The DB trigger keeps that singular column in sync with the
+// primary endorsement row, so this fallback stays correct. When the loader
+// lands, swap `useEndorsers()` to read from the endorsements slice.
 
 import React, {useMemo, useState} from 'react';
 import {Image, Modal, Pressable, StyleSheet, Text, View} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
-import {BadgeCheck, Info, MessageCircle, Megaphone, Settings, X} from 'lucide-react-native';
+import {
+  BadgeCheck,
+  Flag,
+  Info,
+  MessageCircle,
+  Megaphone,
+  Settings,
+  ShieldCheck,
+  X,
+} from 'lucide-react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
 import {hexToRgba, readableTextOn} from '@shared/utils/color';
-import {LEXICON, endorsedBy} from '@shared/lexicon';
+import {
+  LEXICON,
+  clubContestTagline,
+  endorsedByMany,
+  independentContestLabel,
+} from '@shared/lexicon';
 import {ordinalSuffix} from '@shared/utils/format';
 import type {DbPool} from '@shared/types/database';
 import {LogoMark} from './LogoMark';
@@ -32,6 +71,30 @@ function resolveSnapshotLogoUrl(brandConfig: unknown): string | null {
   return null;
 }
 
+function resolvePrimaryColor(brandConfig: unknown): string | null {
+  if (!brandConfig || typeof brandConfig !== 'object') return null;
+  const bc = brandConfig as Record<string, unknown>;
+  return typeof bc.primary_color === 'string' && bc.primary_color.length > 0
+    ? bc.primary_color
+    : null;
+}
+
+function resolvePartnerName(brandConfig: unknown): string | null {
+  if (!brandConfig || typeof brandConfig !== 'object') return null;
+  const bc = brandConfig as Record<string, unknown>;
+  return typeof bc.partner_name === 'string' && bc.partner_name.length > 0
+    ? bc.partner_name
+    : null;
+}
+
+interface Endorser {
+  partnerId: string;
+  name: string;
+  primaryColor: string | null;
+  logoUrl: string | null;
+  isPrimary: boolean;
+}
+
 export function PoolModule({pool}: PoolModuleProps) {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
@@ -44,36 +107,72 @@ export function PoolModule({pool}: PoolModuleProps) {
   const poolInd     = useGlobalStore(s => s.poolIndicators[pool.id]);
   const orgUnread   = poolInd?.orgUnread ?? 0;
 
-  const isPartnerAligned = pool.partner_id != null;
   const rankData = useGlobalStore(s => s.userRankByPool[pool.id]);
   const weekRank = useGlobalStore(s => s.weekRankByPool[pool.id]);
-  const partner = useGlobalStore(s =>
+
+  // The owning Club, if any. Loaded into partnersById alongside aligned
+  // partners. Falls back to null (no header band) if not yet cached.
+  const owningClub = useGlobalStore(s =>
+    pool.owning_club_id ? s.partnersById?.[pool.owning_club_id] : undefined,
+  );
+
+  // Single-endorser path — the legacy partner_id + pool.brand_config.
+  // When the endorsements slice exists, this collapses into the loop below.
+  const legacyPartner = useGlobalStore(s =>
     pool.partner_id ? s.partnersById?.[pool.partner_id] : undefined,
   );
-  const partnerIndicator = useGlobalStore(s =>
+  const legacyPartnerIndicator = useGlobalStore(s =>
     pool.partner_id ? s.partnerIndicators?.[pool.partner_id] : undefined,
   );
-  const partnerUnread = partnerIndicator?.unread ?? 0;
+  const legacyPartnerUnread = legacyPartnerIndicator?.unread ?? 0;
 
-  // Hard Rule #23: read partner brand from the pool's brand_config snapshot,
-  // never from a live join to partners. If the snapshot is missing the
-  // primary_color, render no stripe — we don't fabricate one.
-  const {stripeColor, partnerName} = useMemo(() => {
-    if (
-      isPartnerAligned &&
-      pool.brand_config &&
-      typeof pool.brand_config === 'object'
-    ) {
-      const bc = pool.brand_config as Record<string, unknown>;
-      const primary = typeof bc.primary_color === 'string' ? bc.primary_color : null;
-      const name = typeof bc.partner_name === 'string' ? bc.partner_name : null;
-      return {
-        stripeColor: primary && primary.length > 0 ? primary : null,
-        partnerName: name && name.length > 0 ? name : null,
-      };
-    }
-    return {stripeColor: null as string | null, partnerName: null as string | null};
-  }, [isPartnerAligned, pool.brand_config]);
+  const isOfficial = pool.owning_club_id != null;
+
+  // Build the endorsers list. Today: at most one, from pool.partner_id.
+  // The DB trigger keeps pool.partner_id in sync with the primary endorsement
+  // row, so this path stays correct for single-endorser pools.
+  const endorsers = useMemo<Endorser[]>(() => {
+    if (isOfficial) return [];
+    if (!pool.partner_id) return [];
+    return [
+      {
+        partnerId: pool.partner_id,
+        name:
+          resolvePartnerName(pool.brand_config) ??
+          legacyPartner?.name ??
+          'Club',
+        primaryColor:
+          resolvePrimaryColor(pool.brand_config) ??
+          legacyPartner?.primary_color ??
+          null,
+        logoUrl:
+          resolveSnapshotLogoUrl(pool.brand_config) ??
+          legacyPartner?.logo_url ??
+          null,
+        isPrimary: true,
+      },
+    ];
+  }, [isOfficial, pool.partner_id, pool.brand_config, legacyPartner]);
+
+  const primaryEndorser = endorsers.find(e => e.isPrimary) ?? endorsers[0] ?? null;
+  const isRoster       = !isOfficial && endorsers.length > 0;
+  const isIndependent  = !isOfficial && endorsers.length === 0;
+
+  // Branded header band data for Official Contests. Read snapshot fields off
+  // the pool first (Hard Rule #23 — no live join). Fall back to the cached
+  // partner record if the pool's brand_config snapshot is missing.
+  const officialBrand = useMemo(() => {
+    if (!isOfficial) return null;
+    const name =
+      resolvePartnerName(pool.brand_config) ?? owningClub?.name ?? null;
+    const primaryColor =
+      resolvePrimaryColor(pool.brand_config) ??
+      owningClub?.primary_color ??
+      colors.primary;
+    const logoUrl =
+      resolveSnapshotLogoUrl(pool.brand_config) ?? owningClub?.logo_url ?? null;
+    return {name, primaryColor, logoUrl};
+  }, [isOfficial, pool.brand_config, owningClub, colors.primary]);
 
   const goToLeaderboard = () => {
     setActivePoolId(pool.id);
@@ -90,16 +189,9 @@ export function PoolModule({pool}: PoolModuleProps) {
     navigation.navigate('PoolSettings', {poolId: pool.id});
   };
 
-  const goToPartnerRoster = () => {
-    if (!partner) return;
-    navigation.navigate('PartnerRoster', {slug: partner.slug});
-  };
-
-  const goToPartnerRosterFromPopover = () => {
-    setPopoverOpen(false);
-    if (partner) {
-      navigation.navigate('PartnerRoster', {slug: partner.slug});
-    }
+  const goToPartnerRoster = (slug?: string | null) => {
+    if (!slug) return;
+    navigation.navigate('PartnerRoster', {slug});
   };
 
   return (
@@ -109,25 +201,98 @@ export function PoolModule({pool}: PoolModuleProps) {
         styles.card,
         {
           backgroundColor: colors.surfaceElevated,
-          borderColor: colors.border,
+          borderColor: isOfficial
+            ? (officialBrand?.primaryColor ?? colors.border)
+            : colors.border,
+          borderWidth: isOfficial ? 1.5 : 1,
           opacity: pressed ? 0.9 : 1,
         },
       ]}
       accessibilityRole="button"
-      accessibilityLabel={`Open ${pool.name} leaderboard`}>
-      {stripeColor && (
-        <View style={[styles.stripe, {backgroundColor: stripeColor}]} />
+      accessibilityLabel={`Open ${pool.name} ${LEXICON.ladder.short}`}>
+      {/* OFFICIAL CLUB CONTEST — full-bleed branded header band. */}
+      {isOfficial && officialBrand && (
+        <View
+          style={[
+            styles.officialBand,
+            {backgroundColor: officialBrand.primaryColor},
+          ]}
+          accessible
+          accessibilityLabel={
+            officialBrand.name
+              ? clubContestTagline(officialBrand.name)
+              : `An Official ${LEXICON.club.short} ${LEXICON.contest.singular}`
+          }>
+          {officialBrand.logoUrl ? (
+            <Image
+              source={{uri: officialBrand.logoUrl}}
+              style={styles.officialBandLogo}
+              resizeMode="contain"
+            />
+          ) : (
+            <LogoMark
+              initials={partnerInitials(officialBrand.name ?? 'C')}
+              tint={officialBrand.primaryColor}
+              size={28}
+            />
+          )}
+          <View style={styles.officialBandTextBlock}>
+            <ShieldCheck
+              size={13}
+              color={readableTextOn(officialBrand.primaryColor)}
+              strokeWidth={2.5}
+            />
+            <Text
+              style={[
+                bodyType.bold,
+                styles.officialBandText,
+                {color: readableTextOn(officialBrand.primaryColor)},
+              ]}
+              numberOfLines={1}>
+              {officialBrand.name
+                ? clubContestTagline(officialBrand.name).toUpperCase()
+                : `AN OFFICIAL ${LEXICON.club.short.toUpperCase()} ${LEXICON.contest.singular.toUpperCase()}`}
+            </Text>
+          </View>
+        </View>
       )}
 
-      {/* Pool settings gear — absolutely positioned in the lower-right
-          corner of the card. When the card has an aligned-partner footer,
-          the gear is bumped up so it always sits ABOVE the divider line. */}
+      {/* ROSTER — left-edge stripe(s). Single endorser → single 3px stripe.
+          Multi-endorser → vertical stack of 2–3 stripes, capped at 3 for
+          legibility (4+ goes to a neutral highlight stripe via the cluster
+          alone). */}
+      {isRoster && endorsers.length === 1 && endorsers[0].primaryColor && (
+        <View
+          style={[styles.stripe, {backgroundColor: endorsers[0].primaryColor}]}
+        />
+      )}
+      {isRoster && endorsers.length >= 2 && (
+        <View style={styles.stripeStack} pointerEvents="none">
+          {endorsers.slice(0, 3).map((e, i) => (
+            <View
+              key={e.partnerId}
+              style={[
+                styles.stripeStackSegment,
+                {
+                  backgroundColor: e.primaryColor ?? colors.border,
+                  // Equal-height segments stacked top to bottom.
+                  top: `${(i * 100) / Math.min(endorsers.length, 3)}%`,
+                  height: `${100 / Math.min(endorsers.length, 3)}%`,
+                },
+              ]}
+            />
+          ))}
+        </View>
+      )}
+
+      {/* Pool settings gear — sits in the lower-right. Bumped above the
+          footer divider when a partner zone or independent chip is below. */}
       <Pressable
         onPress={goToPoolSettings}
         hitSlop={10}
         style={({pressed}) => [
           styles.gearBtn,
-          isPartnerAligned && partnerName ? styles.gearBtnAboveFooter : null,
+          (isRoster || isIndependent) ? styles.gearBtnAboveFooter : null,
           {opacity: pressed ? 0.5 : 1},
         ]}
         accessibilityRole="button"
@@ -145,7 +310,6 @@ export function PoolModule({pool}: PoolModuleProps) {
             </Text>
             {rankData && (
               <>
-                {/* Season-rank summary — "Season: 11th (of 11)". */}
                 <View style={styles.rankRow}>
                   <Text style={[bodyType.regular, styles.rankLabel, {color: colors.textSecondary}]}>
                     Season:{' '}
@@ -158,8 +322,6 @@ export function PoolModule({pool}: PoolModuleProps) {
                     {' '}(of {rankData.memberCount})
                   </Text>
                 </View>
-                {/* Week-rank summary — appears once the first game has
-                    kicked off. "Week: 11th". */}
                 {weekRank && (
                   <View style={styles.weekRankRow}>
                     <Text style={[bodyType.regular, styles.rankLabel, {color: colors.textSecondary}]}>
@@ -175,11 +337,6 @@ export function PoolModule({pool}: PoolModuleProps) {
             )}
           </View>
 
-          {/* Both badges are always visible so the user can see the two
-              comms channels and how each one stands. When there's nothing
-              unread, the badge renders in a muted "empty" state (faded
-              icon, no count); a real unread count flips it to the live
-              tinted state. */}
           <View style={styles.badgeColumn}>
             <View
               style={[
@@ -197,8 +354,8 @@ export function PoolModule({pool}: PoolModuleProps) {
               accessible
               accessibilityLabel={
                 orgUnread > 0
-                  ? `${orgUnread} new Gaffer ${orgUnread === 1 ? 'message' : 'messages'}`
-                  : 'No new Gaffer messages'
+                  ? `${orgUnread} new ${LEXICON.gaffer.short} ${orgUnread === 1 ? 'message' : 'messages'}`
+                  : `No new ${LEXICON.gaffer.short} messages`
               }>
               <Megaphone
                 size={12}
@@ -230,8 +387,8 @@ export function PoolModule({pool}: PoolModuleProps) {
               accessibilityRole="button"
               accessibilityLabel={
                 smackUnread > 0
-                  ? `${smackUnread} unread ${smackUnread === 1 ? 'Chirp' : 'Chirps'}, open chat`
-                  : 'Open Chirps'
+                  ? `${smackUnread} unread ${smackUnread === 1 ? LEXICON.chirps.singular : LEXICON.chirps.plural}, open chat`
+                  : `Open ${LEXICON.chirps.plural}`
               }>
               <MessageCircle
                 size={12}
@@ -247,37 +404,80 @@ export function PoolModule({pool}: PoolModuleProps) {
           </View>
         </View>
 
-        {isPartnerAligned && partnerName && (
+        {/* ROSTER — endorsement zone. Logo cluster + text scales with N. */}
+        {isRoster && primaryEndorser && (
           <View style={[styles.partnerZone, {borderTopColor: colors.border}]}>
             <Pressable
-              onPress={goToPartnerRoster}
-              disabled={!partner}
+              onPress={() => goToPartnerRoster(legacyPartner?.slug)}
               hitSlop={6}
               style={({pressed}) => [
                 styles.alignRow,
                 {opacity: pressed ? 0.6 : 1},
               ]}
               accessibilityRole="button"
-              accessibilityLabel={`Open ${partnerName} ${LEXICON.roster}`}>
-              <LogoMark
-                initials={partnerInitials(partnerName)}
-                tint={stripeColor ?? colors.primary}
-                size={24}
-              />
-              <BadgeCheck
-                size={14}
-                color={stripeColor ?? colors.primary}
-                strokeWidth={2.25}
-              />
+              accessibilityLabel={endorsedByMany(endorsers.map(e => e.name))}>
+              {/* Overlapping logo cluster. Each logo gets a ring matching the
+                  card surface so they stay distinct when overlapped. */}
+              <View style={styles.logoCluster}>
+                {endorsers.slice(0, 3).map((e, i) => (
+                  <View
+                    key={e.partnerId}
+                    style={[
+                      styles.logoClusterItem,
+                      {
+                        marginLeft: i === 0 ? 0 : -8,
+                        zIndex: endorsers.length - i,
+                        borderColor: colors.surfaceElevated,
+                      },
+                    ]}>
+                    {e.logoUrl ? (
+                      <Image
+                        source={{uri: e.logoUrl}}
+                        style={styles.logoClusterImg}
+                        resizeMode="contain"
+                      />
+                    ) : (
+                      <LogoMark
+                        initials={partnerInitials(e.name)}
+                        tint={e.primaryColor ?? colors.primary}
+                        size={22}
+                      />
+                    )}
+                  </View>
+                ))}
+                {endorsers.length > 3 && (
+                  <View
+                    style={[
+                      styles.logoClusterMore,
+                      {
+                        backgroundColor: colors.surface,
+                        borderColor: colors.surfaceElevated,
+                      },
+                    ]}>
+                    <Text
+                      style={[
+                        bodyType.bold,
+                        styles.logoClusterMoreText,
+                        {color: colors.textSecondary},
+                      ]}>
+                      +{endorsers.length - 3}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              {endorsers.length === 1 && (
+                <BadgeCheck
+                  size={14}
+                  color={primaryEndorser.primaryColor ?? colors.primary}
+                  strokeWidth={2.25}
+                />
+              )}
               <Text
                 style={[bodyType.regular, styles.alignText, {color: colors.textSecondary}]}
                 numberOfLines={1}>
-                Endorsed by{' '}
-                <Text style={[bodyType.bold, {color: colors.textPrimary}]}>
-                  {partnerName}
-                </Text>
+                {endorsedByMany(endorsers.map(e => e.name))}
               </Text>
-              {partnerUnread > 0 && (
+              {legacyPartnerUnread > 0 && endorsers.length === 1 && (
                 <View
                   style={[
                     styles.partnerNewBadge,
@@ -287,19 +487,19 @@ export function PoolModule({pool}: PoolModuleProps) {
                     },
                   ]}
                   accessible
-                  accessibilityLabel={`${partnerUnread} new Club ${
-                    partnerUnread === 1 ? 'message' : 'messages'
+                  accessibilityLabel={`${legacyPartnerUnread} new ${LEXICON.club.short} ${
+                    legacyPartnerUnread === 1 ? 'message' : 'messages'
                   }`}>
                   <Megaphone size={11} color={colors.primary} strokeWidth={2} />
                   <Text style={[bodyType.bold, styles.partnerNewText, {color: colors.primary}]}>
-                    {partnerUnread > 9 ? '9+' : partnerUnread}
+                    {legacyPartnerUnread > 9 ? '9+' : legacyPartnerUnread}
                   </Text>
                 </View>
               )}
             </Pressable>
-            {/* Accessibility affordance — non-color path to partner info.
-                Color-only signaling (the brand stripe) fails for ~8% of male
-                users; this provides a tap target that reveals the same info. */}
+            {/* Non-color path to the same info — required for the ~8% of
+                male users with color-vision deficiency who can't rely on
+                the stripe alone. */}
             <Pressable
               onPress={() => setPopoverOpen(true)}
               hitSlop={8}
@@ -308,33 +508,62 @@ export function PoolModule({pool}: PoolModuleProps) {
                 {borderColor: colors.border, opacity: pressed ? 0.6 : 1},
               ]}
               accessibilityRole="button"
-              accessibilityLabel={`Show ${LEXICON.club.short} endorsement details`}>
+              accessibilityLabel={
+                endorsers.length === 1
+                  ? `Show ${LEXICON.club.short} endorsement details`
+                  : `Show ${endorsers.length} ${LEXICON.club.short} endorsements`
+              }>
               <Info size={11} color={colors.textTertiary} strokeWidth={2} />
               <Text
                 style={[bodyType.regular, styles.connectionText, {color: colors.textTertiary}]}>
-                {LEXICON.club.short} endorsement
+                {endorsers.length === 1
+                  ? `${LEXICON.club.short} endorsement`
+                  : `${endorsers.length} endorsements`}
               </Text>
             </Pressable>
-            {partner?.perk_text && (
+            {legacyPartner?.perk_text && endorsers.length === 1 && (
               <View style={styles.perkRow}>
                 <PerkIcon
-                  name={partner.perk_icon}
+                  name={legacyPartner.perk_icon}
                   size={13}
-                  color={stripeColor ?? colors.primary}
+                  color={primaryEndorser.primaryColor ?? colors.primary}
                   containerStyle={styles.perkIconBox}
                 />
                 <Text
                   style={[bodyType.regular, styles.perkText, {color: colors.textSecondary}]}
                   numberOfLines={2}>
-                  {partner.perk_text}
+                  {legacyPartner.perk_text}
                 </Text>
               </View>
             )}
           </View>
         )}
+
+        {/* INDEPENDENT — small footer chip turns absence into a positive
+            identifier. Gaffer name will populate once a loader feeds it
+            (today: organizer_id → profile poolie_name; not yet in store). */}
+        {isIndependent && (
+          <View style={[styles.partnerZone, {borderTopColor: colors.border}]}>
+            <View
+              style={[styles.independentChip, {borderColor: colors.border}]}
+              accessible
+              accessibilityLabel={independentContestLabel(null)}>
+              <Flag size={11} color={colors.textTertiary} strokeWidth={2} />
+              <Text
+                style={[
+                  bodyType.regular,
+                  styles.independentText,
+                  {color: colors.textTertiary},
+                ]}
+                numberOfLines={1}>
+                {independentContestLabel(null)}
+              </Text>
+            </View>
+          </View>
+        )}
       </View>
 
-      {isPartnerAligned && popoverOpen && (
+      {isRoster && popoverOpen && primaryEndorser && (
         <Modal
           visible
           transparent
@@ -343,15 +572,13 @@ export function PoolModule({pool}: PoolModuleProps) {
           <Pressable
             style={styles.modalBackdrop}
             onPress={() => setPopoverOpen(false)}
-            accessibilityLabel="Close partner connection details">
+            accessibilityLabel="Close endorsement details">
             <Pressable
               style={[
                 styles.modalCard,
                 {backgroundColor: colors.surfaceElevated, borderColor: colors.border},
               ]}
-              onPress={() => {
-                /* swallow tap so backdrop press doesn't close when tapping inside */
-              }}>
+              onPress={() => { /* swallow tap so backdrop doesn't close */ }}>
               <Pressable
                 onPress={() => setPopoverOpen(false)}
                 hitSlop={10}
@@ -361,71 +588,82 @@ export function PoolModule({pool}: PoolModuleProps) {
                 <X size={18} color={colors.textTertiary} strokeWidth={2} />
               </Pressable>
 
-              <View style={styles.modalHeader}>
-                {(() => {
-                  const logoUrl = resolveSnapshotLogoUrl(pool.brand_config);
-                  return logoUrl ? (
+              <Text
+                style={[displayType.display, styles.modalTitle, {color: colors.textPrimary}]}>
+                {endorsers.length === 1
+                  ? `${LEXICON.club.short.toUpperCase()} ENDORSEMENT`
+                  : `${endorsers.length} ${LEXICON.club.short.toUpperCase()} ENDORSEMENTS`}
+              </Text>
+
+              {endorsers.map(e => (
+                <Pressable
+                  key={e.partnerId}
+                  onPress={() => {
+                    setPopoverOpen(false);
+                    // Slug only available for the legacy primary endorser
+                    // today; multi-endorsement nav lands when the loader does.
+                    if (e.partnerId === pool.partner_id) {
+                      goToPartnerRoster(legacyPartner?.slug);
+                    }
+                  }}
+                  style={({pressed}) => [
+                    styles.modalRow,
+                    {borderTopColor: colors.border, opacity: pressed ? 0.6 : 1},
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open ${e.name} ${LEXICON.roster}`}>
+                  {e.logoUrl ? (
                     <Image
-                      source={{uri: logoUrl}}
+                      source={{uri: e.logoUrl}}
                       style={[
-                        styles.modalLogo,
-                        {borderColor: stripeColor ?? colors.border},
+                        styles.modalRowLogo,
+                        {borderColor: e.primaryColor ?? colors.border},
                       ]}
+                      resizeMode="contain"
                     />
                   ) : (
                     <LogoMark
-                      initials={partnerInitials(partnerName ?? 'P')}
-                      tint={stripeColor ?? colors.primary}
-                      size={48}
+                      initials={partnerInitials(e.name)}
+                      tint={e.primaryColor ?? colors.primary}
+                      size={32}
                     />
-                  );
-                })()}
-                <Text
-                  style={[displayType.display, styles.modalName, {color: colors.textPrimary}]}
-                  numberOfLines={2}>
-                  {(partnerName ?? partner?.name ?? '').toUpperCase()}
-                </Text>
-              </View>
+                  )}
+                  <Text
+                    style={[bodyType.bold, styles.modalRowName, {color: colors.textPrimary}]}
+                    numberOfLines={1}>
+                    {e.name}
+                  </Text>
+                  {e.isPrimary && endorsers.length > 1 && (
+                    <Text
+                      style={[
+                        bodyType.regular,
+                        styles.modalRowPrimary,
+                        {color: e.primaryColor ?? colors.primary},
+                      ]}>
+                      Lead
+                    </Text>
+                  )}
+                </Pressable>
+              ))}
 
-              {partner?.perk_text && (
+              {legacyPartner?.perk_text && endorsers.length === 1 && (
                 <View
                   style={[
                     styles.modalPerkRow,
                     {borderTopColor: colors.border, borderBottomColor: colors.border},
                   ]}>
                   <PerkIcon
-                    name={partner.perk_icon}
+                    name={legacyPartner.perk_icon}
                     size={20}
-                    color={stripeColor ?? colors.primary}
+                    color={primaryEndorser.primaryColor ?? colors.primary}
                     containerStyle={styles.modalPerkIcon}
                   />
                   <Text
                     style={[bodyType.regular, styles.modalPerkText, {color: colors.textSecondary}]}>
-                    {partner.perk_text}
+                    {legacyPartner.perk_text}
                   </Text>
                 </View>
               )}
-
-              <Pressable
-                onPress={goToPartnerRosterFromPopover}
-                disabled={!partner}
-                style={({pressed}) => [
-                  styles.modalCta,
-                  {backgroundColor: stripeColor ?? colors.primary, opacity: pressed ? 0.85 : 1},
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel={`Open ${partnerName ?? 'partner'} roster`}>
-                <Text
-                  style={[
-                    bodyType.bold,
-                    styles.modalCtaText,
-                    // Partner primary may be light or dark; pick contrasting
-                    // text instead of assuming theme onPrimary.
-                    {color: readableTextOn(stripeColor) },
-                  ]}>
-                  View {partnerName ?? LEXICON.club.long}'s {LEXICON.roster}
-                </Text>
-              </Pressable>
             </Pressable>
           </Pressable>
         </Modal>
@@ -443,6 +681,34 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     overflow: 'hidden',
   },
+
+  // Official Club Contest — full-bleed branded header band.
+  officialBand: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  officialBandLogo: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+  },
+  officialBandTextBlock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 1,
+  },
+  officialBandText: {
+    fontSize: 11,
+    letterSpacing: 0.8,
+    flexShrink: 1,
+  },
+
+  // Roster stripes — single (3px solid) or stacked (multi-color).
   stripe: {
     position: 'absolute',
     left: 0,
@@ -450,6 +716,19 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: 3,
   },
+  stripeStack: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 3,
+  },
+  stripeStackSegment: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+  },
+
   gearBtn: {
     position: 'absolute',
     bottom: 10,
@@ -457,9 +736,6 @@ const styles = StyleSheet.create({
     padding: 4,
     zIndex: 2,
   },
-  // When the card has a partner zone (alignment row + perk row), the zone
-  // occupies more space at the bottom. Bump the gear above the divider
-  // line so it stays in the rank-row strip.
   gearBtnAboveFooter: {
     bottom: 88,
   },
@@ -494,17 +770,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 16,
   },
-  // Smaller superscript-ish suffix so "4th" reads cleanly next to the
-  // emphasized rank numeral without dominating it.
   rankSuffix: {
     fontSize: 11,
-  },
-  rankSpacer: {
-    width: 6,
-  },
-  movementText: {
-    fontSize: 12,
-    fontWeight: '700',
   },
   weekRankRow: {
     flexDirection: 'row',
@@ -515,26 +782,6 @@ const styles = StyleSheet.create({
   weekRankNumber: {
     fontSize: 14,
     lineHeight: 14,
-  },
-  weekRankPts: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  weekRankPtsUnit: {
-    fontSize: 10,
-    fontWeight: '500',
-  },
-  lastWeekLine: {
-    fontSize: 12,
-    fontWeight: '500',
-    marginTop: 4,
-  },
-  rankDot: {
-    fontSize: 13,
-  },
-  deltaText: {
-    fontSize: 13,
-    fontWeight: '600',
   },
   badgeColumn: {
     flexShrink: 0,
@@ -568,6 +815,8 @@ const styles = StyleSheet.create({
     fontSize: 11,
     letterSpacing: 0.2,
   },
+
+  // Roster / endorsement footer zone.
   partnerZone: {
     marginTop: 14,
     paddingTop: 12,
@@ -577,6 +826,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+  },
+  logoCluster: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  logoClusterItem: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoClusterImg: {
+    width: 20,
+    height: 20,
+  },
+  logoClusterMore: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    marginLeft: -8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoClusterMoreText: {
+    fontSize: 10,
   },
   partnerNewBadge: {
     flexDirection: 'row',
@@ -607,6 +887,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   alignText: {
+    flex: 1,
     fontSize: 12.5,
     fontWeight: '500',
   },
@@ -625,6 +906,24 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 0.3,
   },
+
+  // Independent Contest footer chip.
+  independentChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 5,
+    paddingVertical: 4,
+    paddingHorizontal: 9,
+    borderRadius: borderRadius.full,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  independentText: {
+    fontSize: 11,
+    letterSpacing: 0.2,
+  },
+
+  // Endorsement detail modal.
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -647,31 +946,43 @@ const styles = StyleSheet.create({
     padding: 4,
     zIndex: 1,
   },
-  modalHeader: {
+  modalTitle: {
+    fontSize: 13,
+    letterSpacing: 0.8,
+    marginBottom: spacing.md,
+    paddingTop: 4,
+  },
+  modalRow: {
+    flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    marginBottom: spacing.md,
-    paddingTop: 8,
+    paddingVertical: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  modalLogo: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  modalRowLogo: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     borderWidth: 1.5,
+    backgroundColor: 'rgba(255,255,255,0.92)',
   },
-  modalName: {
-    fontSize: 17,
-    lineHeight: 19,
-    textAlign: 'center',
+  modalRowName: {
+    flex: 1,
+    fontSize: 14,
+  },
+  modalRowPrimary: {
+    fontSize: 10,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
   modalPerkRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     paddingVertical: spacing.md,
+    marginTop: spacing.md,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    marginBottom: spacing.md,
   },
   modalPerkIcon: {
     width: 24,
@@ -680,16 +991,5 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     lineHeight: 18,
-  },
-  modalCta: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: borderRadius.md,
-    alignItems: 'center',
-  },
-  modalCtaText: {
-    fontSize: 13,
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
   },
 });

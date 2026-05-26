@@ -6,7 +6,9 @@
 // Spec: 260520_HotPick_LexiconImplementation_Spec.docx
 //
 // Usage:
-//   import {LEXICON, endorsedBy, gafferOf, clubsContest} from '@shared/lexicon';
+//   import {LEXICON, endorsedBy, endorsedByMany, gafferOf,
+//           clubsContest, clubContestTagline,
+//           independentContestLabel} from '@shared/lexicon';
 //   <Text>YOUR {LEXICON.contest.plural.toUpperCase()}</Text>   // "YOUR CONTESTS"
 //   <Text>{endorsedBy(partner.name)}</Text>                    // "Endorsed by Mes Que NFL"
 //   <Text>You are {gafferOf(pool.name)}.</Text>                // "You are the Gaffer of Stella's Gang."
@@ -97,6 +99,53 @@ export function gafferOf(contestName: string): string {
 export function clubsContest(clubName?: string | null): string {
   if (clubName && clubName.length > 0) return `${clubName}'s ${LEXICON.contest.singular}`;
   return `${LEXICON.club.long}'s ${LEXICON.contest.singular}`;
+}
+
+/**
+ * Tagline for an Official Club Contest. A Club can run more than one
+ * (e.g. ESPN Northeast, ESPN West), so the article is "An", not "The".
+ *   clubContestTagline('ESPN') → "An Official ESPN Contest"
+ * Rendered inside the branded header band — small caps, body text.
+ */
+export function clubContestTagline(clubName: string): string {
+  return `An Official ${clubName} ${LEXICON.contest.singular}`;
+}
+
+/**
+ * Affiliation line for a Contest endorsed by one or more Clubs. Scales
+ * from 1 endorsement up — the visual footer truncates to a logo cluster
+ * for 4+, this helper keeps the text variant readable:
+ *   1   → "Endorsed by Hammer's Tavern"
+ *   2   → "Endorsed by Hammer's & The Crown"
+ *   3   → "Endorsed by Hammer's, The Crown & Joe's"
+ *   4+  → "Endorsed by Hammer's, The Crown & 2 more"
+ * For empty input, returns an empty string — callers should check
+ * length before rendering.
+ */
+export function endorsedByMany(clubNames: readonly string[]): string {
+  const names = clubNames.filter(n => n && n.length > 0);
+  if (names.length === 0) return '';
+  if (names.length === 1) return `Endorsed by ${names[0]}`;
+  if (names.length === 2) return `Endorsed by ${names[0]} & ${names[1]}`;
+  if (names.length === 3) {
+    return `Endorsed by ${names[0]}, ${names[1]} & ${names[2]}`;
+  }
+  const remaining = names.length - 2;
+  return `Endorsed by ${names[0]}, ${names[1]} & ${remaining} more`;
+}
+
+/**
+ * Footer label for a Contest with no Club endorsements. The presence of
+ * the Gaffer's first name + last initial turns "Independent" from an
+ * absence-signal into a positive identifier.
+ *   independentContestLabel('Tom M.') → "Independent · run by Tom M."
+ *   independentContestLabel()         → "Independent Contest"
+ */
+export function independentContestLabel(gafferDisplayName?: string | null): string {
+  if (gafferDisplayName && gafferDisplayName.length > 0) {
+    return `Independent · run by ${gafferDisplayName}`;
+  }
+  return `Independent ${LEXICON.contest.singular}`;
 }
 
 /**

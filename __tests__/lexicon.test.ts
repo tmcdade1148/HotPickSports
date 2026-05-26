@@ -6,8 +6,11 @@
 import {
   LEXICON,
   endorsedBy,
+  endorsedByMany,
   gafferOf,
   clubsContest,
+  clubContestTagline,
+  independentContestLabel,
   countLabel,
 } from '../src/shared/lexicon';
 
@@ -70,6 +73,52 @@ describe('clubsContest()', () => {
     expect(clubsContest()).toBe("the Club's Contest");
     expect(clubsContest(null)).toBe("the Club's Contest");
     expect(clubsContest('')).toBe("the Club's Contest");
+  });
+});
+
+describe('clubContestTagline()', () => {
+  it('uses "An Official" so multiple official Contests per Club read naturally', () => {
+    expect(clubContestTagline('ESPN')).toBe('An Official ESPN Contest');
+    expect(clubContestTagline("Hammer's Tavern")).toBe(
+      "An Official Hammer's Tavern Contest",
+    );
+  });
+});
+
+describe('endorsedByMany()', () => {
+  it('returns empty string when no clubs', () => {
+    expect(endorsedByMany([])).toBe('');
+    expect(endorsedByMany(['', ''])).toBe('');
+  });
+  it('one endorser — matches the singular endorsedBy()', () => {
+    expect(endorsedByMany(['Hammer'])).toBe('Endorsed by Hammer');
+  });
+  it('two endorsers join with &', () => {
+    expect(endorsedByMany(['Hammer', 'The Crown'])).toBe(
+      'Endorsed by Hammer & The Crown',
+    );
+  });
+  it('three endorsers use serial comma + &', () => {
+    expect(endorsedByMany(['Hammer', 'The Crown', "Joe's"])).toBe(
+      "Endorsed by Hammer, The Crown & Joe's",
+    );
+  });
+  it('four or more collapses the tail to a count', () => {
+    expect(endorsedByMany(['A', 'B', 'C', 'D'])).toBe('Endorsed by A, B & 2 more');
+    expect(endorsedByMany(['A', 'B', 'C', 'D', 'E'])).toBe(
+      'Endorsed by A, B & 3 more',
+    );
+  });
+});
+
+describe('independentContestLabel()', () => {
+  it('with a Gaffer name shows the run-by phrase', () => {
+    expect(independentContestLabel('Tom M.')).toBe('Independent · run by Tom M.');
+  });
+  it('without a Gaffer name falls back to the generic noun', () => {
+    expect(independentContestLabel()).toBe('Independent Contest');
+    expect(independentContestLabel(null)).toBe('Independent Contest');
+    expect(independentContestLabel('')).toBe('Independent Contest');
   });
 });
 
