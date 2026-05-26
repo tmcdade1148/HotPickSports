@@ -43,7 +43,7 @@ import {
 import {useTheme} from '@shell/theme/hooks';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
-import {hexToRgba, readableTextOn} from '@shared/utils/color';
+import {hexToRgba, pickReadableBrandColor, readableTextOn} from '@shared/utils/color';
 import {
   LEXICON,
   affiliatedWith,
@@ -90,9 +90,20 @@ function resolvePartnerName(brandConfig: unknown): string | null {
 interface Affiliate {
   partnerId: string;
   name: string;
+  // `primaryColor` kept as a convenience pointer; `displayColor` is the
+  // contrast-adjusted color resolved against the current surface and
+  // is what every render site should actually paint with.
   primaryColor: string | null;
+  displayColor: string | null;
   logoUrl: string | null;
   isPrimary: boolean;
+}
+
+// Pull a hex string off a brand_config snapshot if present.
+function resolveColorField(bc: unknown, key: string): string | null {
+  if (!bc || typeof bc !== 'object') return null;
+  const v = (bc as Record<string, unknown>)[key];
+  return typeof v === 'string' && v.length > 0 ? v : null;
 }
 
 export function PoolModule({pool}: PoolModuleProps) {
@@ -139,30 +150,50 @@ export function PoolModule({pool}: PoolModuleProps) {
   const affiliates = useMemo<Affiliate[]>(() => {
     if (isOfficial) return [];
 
+    // Card body sits on `surfaceElevated`; pick whichever Club color
+    // (primary → highlight → secondary → background) clears WCAG 3:1
+    // against it. Surface flips with light/dark mode automatically.
+    const surfaceBg = colors.surfaceElevated;
+
     if (affiliationsFromStore && affiliationsFromStore.length > 0) {
       return affiliationsFromStore.map(a => ({
         partnerId:    a.partnerId,
         name:         a.partnerName,
         primaryColor: a.primaryColor,
+        displayColor: pickReadableBrandColor(
+          [
+            a.brandColors.primary,
+            a.brandColors.highlight,
+            a.brandColors.secondary,
+            a.brandColors.background,
+          ],
+          surfaceBg,
+        ),
         logoUrl:      a.logoUrl,
         isPrimary:    a.isPrimary,
       }));
     }
 
     if (!pool.partner_id) return [];
+    const bc = pool.brand_config;
+    const legacyPrimary    = resolveColorField(bc, 'primary_color')    ?? legacyPartner?.primary_color    ?? null;
+    const legacySecondary  = resolveColorField(bc, 'secondary_color')  ?? null;
+    const legacyBackground = resolveColorField(bc, 'background_color') ?? null;
+    const legacyHighlight  = resolveColorField(bc, 'highlight_color')  ?? null;
     return [
       {
         partnerId: pool.partner_id,
         name:
-          resolvePartnerName(pool.brand_config) ??
+          resolvePartnerName(bc) ??
           legacyPartner?.name ??
           'Club',
-        primaryColor:
-          resolvePrimaryColor(pool.brand_config) ??
-          legacyPartner?.primary_color ??
-          null,
+        primaryColor: legacyPrimary,
+        displayColor: pickReadableBrandColor(
+          [legacyPrimary, legacyHighlight, legacySecondary, legacyBackground],
+          surfaceBg,
+        ),
         logoUrl:
-          resolveSnapshotLogoUrl(pool.brand_config) ??
+          resolveSnapshotLogoUrl(bc) ??
           legacyPartner?.logo_url ??
           null,
         isPrimary: true,
@@ -174,6 +205,7 @@ export function PoolModule({pool}: PoolModuleProps) {
     pool.partner_id,
     pool.brand_config,
     legacyPartner,
+    colors.surfaceElevated,
   ]);
 
   const primaryAffiliate =
@@ -430,7 +462,7 @@ export function PoolModule({pool}: PoolModuleProps) {
                       {
                         marginLeft: i === 0 ? 0 : -8,
                         zIndex: affiliates.length - i,
-                        borderColor: e.primaryColor ?? colors.surfaceElevated,
+                        borderColor: e.displayColor ?? colors.surfaceElevated,
                       },
                     ]}>
                     {e.logoUrl ? (
@@ -442,7 +474,7 @@ export function PoolModule({pool}: PoolModuleProps) {
                     ) : (
                       <LogoMark
                         initials={partnerInitials(e.name)}
-                        tint={e.primaryColor ?? colors.textTertiary}
+                        tint={e.displayColor ?? colors.textTertiary}
                         size={22}
                       />
                     )}
@@ -471,7 +503,7 @@ export function PoolModule({pool}: PoolModuleProps) {
               {affiliates.length === 1 && (
                 <BadgeCheck
                   size={14}
-                  color={primaryAffiliate.primaryColor ?? colors.textTertiary}
+                  color={primaryAffiliate.displayColor ?? colors.textTertiary}
                   strokeWidth={2.25}
                 />
               )}
@@ -492,7 +524,7 @@ export function PoolModule({pool}: PoolModuleProps) {
                         style={[
                           bodyType.bold,
                           {
-                            color: e.primaryColor ?? colors.textPrimary,
+                            color: e.displayColor ?? colors.textPrimary,
                             // Bumped up from 12.5 → 14 + heavier weight
                             // so the Club's name reads as the focal
                             // point of the affiliation row.
@@ -647,19 +679,19 @@ export function PoolModule({pool}: PoolModuleProps) {
                       source={{uri: e.logoUrl}}
                       style={[
                         styles.modalRowLogo,
-                        {borderColor: e.primaryColor ?? colors.border},
+                        {borderColor: e.displayColor ?? colors.border},
                       ]}
                       resizeMode="contain"
                     />
                   ) : (
                     <LogoMark
                       initials={partnerInitials(e.name)}
-                      tint={e.primaryColor ?? colors.textTertiary}
+                      tint={e.displayColor ?? colors.textTertiary}
                       size={32}
                     />
                   )}
                   <Text
-                    style={[bodyType.bold, styles.modalRowName, {color: e.primaryColor ?? colors.textPrimary}]}
+                    style={[bodyType.bold, styles.modalRowName, {color: e.displayColor ?? colors.textPrimary}]}
                     numberOfLines={1}>
                     {e.name}
                   </Text>
@@ -668,7 +700,7 @@ export function PoolModule({pool}: PoolModuleProps) {
                       style={[
                         bodyType.regular,
                         styles.modalRowPrimary,
-                        {color: e.primaryColor ?? colors.textSecondary},
+                        {color: e.displayColor ?? colors.textSecondary},
                       ]}>
                       Lead
                     </Text>

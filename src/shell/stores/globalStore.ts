@@ -281,7 +281,18 @@ interface GlobalState {
 export interface PoolAffiliation {
   partnerId:    string;
   partnerName:  string;
+  // Kept for backward compat — equals brandColors.primary.
   primaryColor: string | null;
+  // Full 4-slot Club palette captured at affiliation time. Render
+  // code uses `pickReadableBrandColor` to walk this stack and pick
+  // the one with enough contrast against the current surface
+  // (handles light/dark mode automatically).
+  brandColors: {
+    primary:    string | null;
+    secondary:  string | null;
+    background: string | null;
+    highlight:  string | null;
+  };
   logoUrl:      string | null;
   isPrimary:    boolean;
 }
@@ -1771,10 +1782,16 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
           : typeof bc.logo_url === 'string' && bc.logo_url.length > 0
           ? bc.logo_url
           : null;
-      const primaryColor =
-        typeof bc.primary_color === 'string' && bc.primary_color.length > 0
-          ? bc.primary_color
+      const colorOrNull = (key: string): string | null =>
+        typeof bc[key] === 'string' && (bc[key] as string).length > 0
+          ? (bc[key] as string)
           : null;
+      const brandColors = {
+        primary:    colorOrNull('primary_color'),
+        secondary:  colorOrNull('secondary_color'),
+        background: colorOrNull('background_color'),
+        highlight:  colorOrNull('highlight_color'),
+      };
       const partnerName =
         typeof bc.partner_name === 'string' && bc.partner_name.length > 0
           ? bc.partner_name
@@ -1783,7 +1800,8 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       byPool[row.pool_id]?.push({
         partnerId:    row.partner_id,
         partnerName,
-        primaryColor,
+        primaryColor: brandColors.primary,
+        brandColors,
         logoUrl,
         isPrimary:    row.is_primary,
       });
