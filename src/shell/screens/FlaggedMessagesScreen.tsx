@@ -396,7 +396,7 @@ export function FlaggedMessagesScreen() {
             No flagged messages
           </Text>
           <Text style={[styles.emptySubtitle, {color: colors.textSecondary}]}>
-            Flagged messages from your pool will appear here for review.
+            Flagged messages from your Contest will appear here for review.
           </Text>
         </View>
       ) : (

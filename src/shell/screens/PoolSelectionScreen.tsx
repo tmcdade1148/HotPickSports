@@ -56,7 +56,7 @@ export function PoolSelectionScreen({navigation}: any) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Your Pools</Text>
+        <Text style={styles.title}>Your Contests</Text>
         <Text style={styles.subtitle}>
           {activeSport?.shortName ?? activeSport?.name ?? 'Event'}
         </Text>
@@ -64,10 +64,10 @@ export function PoolSelectionScreen({navigation}: any) {
 
       {userPools.length === 0 ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyTitle}>No Pools Yet</Text>
+          <Text style={styles.emptyTitle}>No Contests Yet</Text>
           <Text style={styles.emptyText}>
-            Create a pool and invite friends, or join an existing pool with an
-            invite code.
+            Create a Contest and invite friends, or join an existing Contest with
+            an invite code.
           </Text>
         </View>
       ) : (
@@ -93,7 +93,7 @@ export function PoolSelectionScreen({navigation}: any) {
         <TouchableOpacity
           style={styles.primaryButton}
           onPress={() => navigation.navigate('CreatePool')}>
-          <Text style={styles.primaryButtonText}>Create New Pool</Text>
+          <Text style={styles.primaryButtonText}>Create New Contest</Text>
         </TouchableOpacity>
 
         <TouchableOpacity

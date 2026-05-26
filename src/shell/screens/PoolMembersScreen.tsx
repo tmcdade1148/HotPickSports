@@ -18,6 +18,7 @@ import {AvatarBadge} from '@shared/components/AvatarBadge';
 import {spacing, borderRadius} from '@shared/theme';
 import type {DbPoolMember, DbProfile} from '@shared/types/database';
 import {useTheme} from '@shell/theme';
+import {LEXICON} from '@shared/lexicon';
 
 type MemberWithProfile = DbPoolMember & {profile?: DbProfile};
 
@@ -86,12 +87,12 @@ export function PoolMembersScreen() {
 
       // Remove (organizer can remove anyone except organizer; admin can remove members only)
       buttons.push({
-        text: 'Remove from Pool',
+        text: 'Remove from Contest',
         style: 'destructive',
         onPress: () => {
           Alert.alert(
             'Remove Member',
-            `Remove ${memberName} from this pool? They will no longer see pool content.`,
+            `Remove ${memberName} from this Contest? They will no longer see Contest content.`,
             [
               {text: 'Cancel', style: 'cancel'},
               {
@@ -171,7 +172,9 @@ export function PoolMembersScreen() {
               item.role === 'organizer' && styles.roleTextOrganizer,
               item.role === 'admin' && styles.roleTextAdmin,
             ]}>
-            {item.role.charAt(0).toUpperCase() + item.role.slice(1)}
+            {item.role === 'organizer'
+              ? LEXICON.gaffer.short
+              : item.role.charAt(0).toUpperCase() + item.role.slice(1)}
           </Text>
         </View>
       </TouchableOpacity>

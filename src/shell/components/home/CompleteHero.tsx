@@ -30,7 +30,7 @@ export function CompleteHero() {
   const activePool      = visiblePools.find(p => p.id === activePoolId);
 
   const newRank  = weekResult?.newRank;
-  const poolName = activePool?.name ?? 'your pool';
+  const poolName = activePool?.name ?? 'your Contest';
 
   // Recap input — cascade through what's available so the recap is
   // ALWAYS visible in complete state, even when weekResult or recentWeeks

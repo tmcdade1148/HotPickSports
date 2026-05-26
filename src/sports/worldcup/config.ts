@@ -23,7 +23,7 @@ export const worldCup2026: TournamentConfig = {
     {key: 'picks', label: 'Picks', icon: 'check-circle'},
     {key: 'groups', label: 'Groups', icon: 'grid-3x3'},
     {key: 'board', label: 'Board', icon: 'bar-chart-2'},
-    {key: 'smacktalk', label: 'SmackTalk', icon: 'message-circle'},
+    {key: 'smacktalk', label: 'Chirps', icon: 'message-circle'},
   ],
 
   // Group stage

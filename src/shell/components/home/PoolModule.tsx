@@ -197,8 +197,8 @@ export function PoolModule({pool}: PoolModuleProps) {
               accessible
               accessibilityLabel={
                 orgUnread > 0
-                  ? `${orgUnread} new organizer ${orgUnread === 1 ? 'message' : 'messages'}`
-                  : 'No new organizer messages'
+                  ? `${orgUnread} new Gaffer ${orgUnread === 1 ? 'message' : 'messages'}`
+                  : 'No new Gaffer messages'
               }>
               <Megaphone
                 size={12}
@@ -230,8 +230,8 @@ export function PoolModule({pool}: PoolModuleProps) {
               accessibilityRole="button"
               accessibilityLabel={
                 smackUnread > 0
-                  ? `${smackUnread} unread SmackTalk ${smackUnread === 1 ? 'message' : 'messages'}, open chat`
-                  : 'Open SmackTalk'
+                  ? `${smackUnread} unread ${smackUnread === 1 ? 'Chirp' : 'Chirps'}, open chat`
+                  : 'Open Chirps'
               }>
               <MessageCircle
                 size={12}
@@ -287,7 +287,7 @@ export function PoolModule({pool}: PoolModuleProps) {
                     },
                   ]}
                   accessible
-                  accessibilityLabel={`${partnerUnread} new partner ${
+                  accessibilityLabel={`${partnerUnread} new Club ${
                     partnerUnread === 1 ? 'message' : 'messages'
                   }`}>
                   <Megaphone size={11} color={colors.primary} strokeWidth={2} />

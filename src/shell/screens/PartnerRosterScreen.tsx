@@ -137,7 +137,7 @@ export function PartnerRosterScreen() {
   if (!partner) {
     return (
       <DenialState
-        title="Partner not found"
+        title="Club not found"
         body="This roster doesn't exist or has been removed."
         onHome={() => navigation.navigate('Home')}
       />
@@ -148,8 +148,8 @@ export function PartnerRosterScreen() {
   if (alignedPools.length === 0) {
     return (
       <DenialState
-        title="You're not on this partner's roster"
-        body="Join a pool on their roster to see it again."
+        title="You're not on this Club's roster"
+        body="Join a Contest on their roster to see it again."
         onHome={() => navigation.navigate('Home')}
       />
     );
@@ -208,10 +208,10 @@ export function PartnerRosterScreen() {
         {showTombstone && (
           <View style={[styles.notice, {backgroundColor: colors.surface, borderColor: colors.border}]}>
             <Text style={[bodyType.bold, {color: colors.textPrimary}]}>
-              This partner is no longer active.
+              This Club is no longer active.
             </Text>
             <Text style={[bodyType.regular, styles.noticeBody, {color: colors.textSecondary}]}>
-              Your pool remains. Broadcasts and perks are paused.
+              Your Contest remains. Broadcasts and perks are paused.
             </Text>
           </View>
         )}
@@ -219,7 +219,7 @@ export function PartnerRosterScreen() {
         {showSetupNotice && (
           <View style={[styles.notice, {backgroundColor: colors.surface, borderColor: colors.border}]}>
             <Text style={[bodyType.bold, {color: colors.textPrimary}]}>
-              This partner is being set up.
+              This Club is being set up.
             </Text>
             <Text style={[bodyType.regular, styles.noticeBody, {color: colors.textSecondary}]}>
               Check back soon.
@@ -240,7 +240,7 @@ export function PartnerRosterScreen() {
               },
             ]}>
             <Text style={[bodyType.bold, styles.perkEyebrow, {color: partnerPrimary}]}>
-              PARTNER PERK
+              CLUB PERK
             </Text>
             <PerkIcon
               name={partner.perk_icon}
@@ -299,7 +299,7 @@ export function PartnerRosterScreen() {
             in partner color ties pool rows to the partner brand. */}
         <View style={styles.section}>
           <Text style={[bodyType.bold, styles.sectionLabel, {color: partnerPrimary}]}>
-            YOUR POOLS ON THIS ROSTER
+            YOUR CONTESTS ON THIS ROSTER
           </Text>
           {alignedPools.map(pool => (
             <Pressable
@@ -317,7 +317,7 @@ export function PartnerRosterScreen() {
                 },
               ]}
               accessibilityRole="button"
-              accessibilityLabel={`View ${pool.name} pool`}>
+              accessibilityLabel={`View ${pool.name} Contest`}>
               <View style={[styles.broadcastStripe, {backgroundColor: partnerPrimary}]} />
               <Text
                 style={[bodyType.bold, styles.poolName, {color: colors.textPrimary}]}
@@ -325,13 +325,13 @@ export function PartnerRosterScreen() {
                 {pool.name}
               </Text>
               <Text style={[bodyType.regular, styles.poolCta, {color: partnerPrimary}]}>
-                View pool ›
+                View Contest ›
               </Text>
             </Pressable>
           ))}
           <Text
             style={[bodyType.regular, styles.smackPlaceholder, {color: colors.textTertiary}]}>
-            💬 Cross-pool chat coming to your roster — stay tuned.
+            💬 Cross-Contest chat coming to your roster — stay tuned.
           </Text>
         </View>
 

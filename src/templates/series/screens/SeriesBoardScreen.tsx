@@ -79,7 +79,7 @@ export function SeriesBoardScreen() {
       <SeriesProgress config={config} userId={user?.id ?? ''} />
 
       <View style={styles.leaderboard}>
-        <Text style={styles.sectionTitle}>Standings</Text>
+        <Text style={styles.sectionTitle}>Ladder</Text>
         {leaderboard.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>

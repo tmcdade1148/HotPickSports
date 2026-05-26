@@ -428,7 +428,7 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
 
     Alert.alert(
       'Report Message',
-      'Flag this message as inappropriate? The pool organizer and admins will be notified and the message will be hidden pending review.',
+      'Flag this message as inappropriate? The Gaffer and admins will be notified and the message will be hidden pending review.',
       [
         {text: 'Cancel', style: 'cancel'},
         {
@@ -490,7 +490,7 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
               await supabase.from('notification_queue').insert({
                 user_id: organizer.user_id,
                 notification_type: 'organizer_broadcast',
-                title: 'Message flagged in SmackTalk',
+                title: 'Message flagged in Chirps',
                 body: `${flaggedMsg?.author_name ?? 'A member'}'s message was flagged as inappropriate`,
                 data: {pool_id: poolId, message_id: messageId, escalate_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()},
                 pool_id: poolId,
@@ -511,7 +511,7 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
     const authorName = msg.author_name || 'this user';
     Alert.alert(
       'Block User',
-      `Block ${authorName}? Their messages will be hidden in all your pools. You can unblock from Settings.`,
+      `Block ${authorName}? Their messages will be hidden in all your Contests. You can unblock from Settings.`,
       [
         {text: 'Cancel', style: 'cancel'},
         {
@@ -701,7 +701,7 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
         // Tap-to-dismiss: when the chat is empty there's no FlatList to
         // drag, so the empty state itself dismisses the keyboard on tap.
         <Pressable style={styles.emptyState} onPress={Keyboard.dismiss}>
-          <Text style={styles.emptyTitle}>SmackTalk</Text>
+          <Text style={styles.emptyTitle}>Chirps</Text>
           <Text style={styles.emptyText}>
             No messages yet. Be the first to talk trash!
           </Text>

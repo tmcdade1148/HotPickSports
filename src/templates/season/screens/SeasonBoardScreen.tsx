@@ -207,9 +207,9 @@ export function SeasonBoardScreen() {
   if (currentPhase === 'PRE_SEASON') {
     return (
       <View style={styles.loading}>
-        <Text style={{fontSize: 18, fontWeight: '600', color: colors.textPrimary, marginBottom: 8}}>Leaderboard</Text>
+        <Text style={{fontSize: 18, fontWeight: '600', color: colors.textPrimary, marginBottom: 8}}>The Ladder</Text>
         <Text style={{fontSize: 14, color: colors.textSecondary, textAlign: 'center', paddingHorizontal: 32}}>
-          The leaderboard will come alive once the season kicks off. Check back when picks open.
+          The Ladder will come alive once the season kicks off. Check back when picks open.
         </Text>
       </View>
     );

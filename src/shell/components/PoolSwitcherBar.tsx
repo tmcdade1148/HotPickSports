@@ -68,11 +68,11 @@ export function PoolSwitcherBar({mode, onGoBack}: PoolSwitcherBarProps) {
 
   const goToSettings = () => {
     Alert.alert(
-      'Join or Create a Pool?',
-      'Head to Settings to join a pool with an invite code or create your own.',
+      'Join or Create a Contest?',
+      'Head to Settings to join a Contest with an invite code or create your own.',
       [
         {text: 'Cancel', style: 'cancel'},
-        {text: 'Go to My Pools', onPress: () => navigation.navigate('SettingsTab', {expandPools: true})},
+        {text: 'Go to My Contests', onPress: () => navigation.navigate('SettingsTab', {expandPools: true})},
       ],
     );
   };
@@ -115,7 +115,7 @@ export function PoolSwitcherBar({mode, onGoBack}: PoolSwitcherBarProps) {
             style={styles.selector}
             onPress={() => setModalVisible(true)}>
             <Text style={[styles.switchLabel, {color: colors.textSecondary}]}>
-              Current Pool:
+              Current Contest:
             </Text>
             <Text
               style={[styles.poolName, {color: colors.highlight, fontWeight: '900'}]}
@@ -129,7 +129,7 @@ export function PoolSwitcherBar({mode, onGoBack}: PoolSwitcherBarProps) {
             <Text
               style={[styles.poolName, {color: colors.primary, fontWeight: '700'}]}
               numberOfLines={1}>
-              Join or Create a Pool
+              Join or Create a Contest
             </Text>
           </TouchableOpacity>
         )}
@@ -150,7 +150,7 @@ export function PoolSwitcherBar({mode, onGoBack}: PoolSwitcherBarProps) {
             />
             <View style={[styles.modal, {backgroundColor: colors.surface}]}>
               <Text style={[styles.modalTitle, {color: colors.textPrimary}]}>
-                Switch Pool
+                Switch Contest
               </Text>
               <ScrollView bounces={false}>
                 {[

@@ -241,15 +241,15 @@ export function ProfileScreen({navigation}: any) {
             </Text>
           </View>
 
-          {/* Poolie name (required) */}
+          {/* Player name (required) */}
           <View style={styles.section}>
             <Text style={styles.label}>
-              Poolie name <Text style={styles.required}>*</Text>
+              Player name <Text style={styles.required}>*</Text>
             </Text>
             <TextInput
               style={[styles.input, poolieError ? styles.inputError : null]}
               placeholder={
-                poolieName ? 'Your poolie name' : 'Add your poolie name'
+                poolieName ? 'Your Player name' : 'Add your Player name'
               }
               placeholderTextColor={colors.textSecondary}
               value={poolieName}
@@ -265,7 +265,7 @@ export function ProfileScreen({navigation}: any) {
               <Text style={styles.errorText}>{poolieError}</Text>
             ) : (
               <Text style={styles.hint}>
-                Shown on leaderboards and SmackTalk. Change anytime.
+                Shown on the Ladder and in Chirps. Change anytime.
               </Text>
             )}
           </View>

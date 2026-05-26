@@ -43,6 +43,7 @@ import {useColorScheme} from 'react-native';
 import type {BrandConfig} from '@shell/theme/types';
 import {HOTPICK_DEFAULTS, SEMANTIC_COLORS, SEMANTIC_COLORS_DARK, deriveDarkColors, isLightColor} from '@shell/theme/defaults';
 import {nflSeason, nflSeasonSim} from '@sports/nfl/config';
+import {LEXICON} from '@shared/lexicon';
 
 
 export function SettingsScreen({route}: any) {
@@ -139,9 +140,9 @@ export function SettingsScreen({route}: any) {
       setActivePoolId(result.pool.id);
       Alert.alert('Joined!', `You've joined ${result.pool.name}`);
     } else if (result.poolFull) {
-      setJoinError('This pool is full and cannot accept new members.');
+      setJoinError('This Contest is full and cannot accept new members.');
     } else {
-      setJoinError(result.error ?? 'Invalid invite code or pool is full.');
+      setJoinError(result.error ?? 'Invalid invite code or Contest is full.');
     }
     setJoining(false);
   };
@@ -169,7 +170,7 @@ export function SettingsScreen({route}: any) {
   const handleDeleteAccount = () => {
     Alert.alert(
       'Delete Account',
-      'This will permanently remove your name, email, and avatar. Your picks and scores will be retained anonymously for leaderboard integrity.\n\nYou will be signed out immediately. This cannot be undone.',
+      'This will permanently remove your name, email, and avatar. Your picks and scores will be retained anonymously for Ladder integrity.\n\nYou will be signed out immediately. This cannot be undone.',
       [
         {text: 'Cancel', style: 'cancel'},
         {
@@ -179,7 +180,7 @@ export function SettingsScreen({route}: any) {
             // Second confirmation
             Alert.alert(
               'Are you absolutely sure?',
-              'Your profile, pool memberships, and notification preferences will be permanently removed.',
+              'Your profile, Contest memberships, and notification preferences will be permanently removed.',
               [
                 {text: 'Go Back', style: 'cancel'},
                 {
@@ -277,7 +278,7 @@ export function SettingsScreen({route}: any) {
         activeOpacity={0.7}>
         <View style={styles.poolsHeaderLeft}>
           <Users size={18} color={colors.primary} />
-          <Text style={[styles.sectionTitle, {color: colors.textPrimary}]}>My Pools</Text>
+          <Text style={[styles.sectionTitle, {color: colors.textPrimary}]}>My {LEXICON.contest.plural}</Text>
           <Text style={[styles.poolCount, {color: colors.textSecondary}]}>
             ({userPools.length})
           </Text>
@@ -299,8 +300,8 @@ export function SettingsScreen({route}: any) {
       {poolsExpanded && (
         <View style={styles.poolsContent}>
           <Text style={[styles.poolsHint, {color: colors.textSecondary}]}>
-            Tap a pool to make it active. Tap the ★ to pin a pool to the top
-            of your Home Screen — the rest sort alphabetically.
+            Tap a Contest to make it active. Tap the ★ to pin a Contest to the
+            top of your Home Screen — the rest sort alphabetically.
           </Text>
           {/* Pool list — partner pools first, then HotPick pools (global pool hidden) */}
           {[
@@ -372,11 +373,13 @@ export function SettingsScreen({route}: any) {
                       </Text>
                     <View style={styles.poolMetaRow}>
                       {pool.is_global ? (
-                        <Text style={[styles.globalBadge, {color: colors.textSecondary}, isBranded && {color: pillTextColor + 'AA'}]}>Global pool</Text>
+                        <Text style={[styles.globalBadge, {color: colors.textSecondary}, isBranded && {color: pillTextColor + 'AA'}]}>Global Contest</Text>
                       ) : poolRoles[pool.id] ? (
                         <Text style={[styles.roleBadge, {color: colors.textSecondary}, isBranded && {color: pillTextColor + 'AA'}]}>
-                          {poolRoles[pool.id].charAt(0).toUpperCase() +
-                            poolRoles[pool.id].slice(1)}
+                          {poolRoles[pool.id] === 'organizer'
+                            ? LEXICON.gaffer.short
+                            : poolRoles[pool.id].charAt(0).toUpperCase() +
+                              poolRoles[pool.id].slice(1)}
                         </Text>
                       ) : null}
                       {!pool.is_global &&
@@ -442,7 +445,7 @@ export function SettingsScreen({route}: any) {
             );
           })}
 
-          {/* Join pool */}
+          {/* Join Contest */}
           <View style={styles.joinSection}>
             <Text style={[styles.joinLabel, {color: colors.textPrimary}]}>Have an invite code?</Text>
             <View style={styles.codeRow}>
@@ -481,13 +484,13 @@ export function SettingsScreen({route}: any) {
             ) : null}
           </View>
 
-          {/* Create pool */}
+          {/* Create Contest */}
           <TouchableOpacity
             style={[styles.createPoolButton, {backgroundColor: colors.surface, borderColor: colors.primary}]}
             onPress={handleCreatePool}>
             <Plus size={18} color={colors.primary} />
             <View>
-              <Text style={[styles.createPoolText, {color: colors.primary}]}>Create a Pool</Text>
+              <Text style={[styles.createPoolText, {color: colors.primary}]}>Create a Contest</Text>
               <Text style={[styles.createPoolSub, {color: colors.primary}]}>and invite friends</Text>
             </View>
           </TouchableOpacity>

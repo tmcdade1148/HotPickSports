@@ -48,7 +48,7 @@ export function PreSeasonHero() {
   const handleShare = async () => {
     if (!firstInviteCode) return;
     const message = firstPoolName
-      ? `Join my HotPick pool "${firstPoolName}" — invite code ${firstInviteCode}`
+      ? `Join my HotPick Contest "${firstPoolName}" — invite code ${firstInviteCode}`
       : `Join me on HotPick — invite code ${firstInviteCode}`;
     try {
       await Share.share({message});
@@ -75,8 +75,8 @@ export function PreSeasonHero() {
         {returning
           ? careerPts > 0
             ? `${careerPts.toLocaleString()} career pts. Let's run it back.`
-            : "Get your pool together before kickoff."
-          : "Pools are how the game's played. Join one or start your own."}
+            : "Get your Contest together before kickoff."
+          : "Contests are how the game's played. Join one or start your own."}
       </Text>
 
       {/* Countdown — calm pre-kickoff anchor. */}
@@ -100,7 +100,7 @@ export function PreSeasonHero() {
             {backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1},
           ]}
           accessibilityRole="button"
-          accessibilityLabel="Enter an invite code to join a pool">
+          accessibilityLabel="Enter an invite code to join a Contest">
           <Text style={[bodyType.bold, styles.ctaPrimaryText, {color: colors.onPrimary}]}>Enter invite code</Text>
         </Pressable>
         <Pressable
@@ -110,9 +110,9 @@ export function PreSeasonHero() {
             {borderColor: colors.border, opacity: pressed ? 0.7 : 1},
           ]}
           accessibilityRole="button"
-          accessibilityLabel="Create a new pool you'll organize">
+          accessibilityLabel="Create a new Contest you'll organize">
           <Text style={[bodyType.bold, styles.ctaSecondaryText, {color: colors.textPrimary}]}>
-            Create a pool
+            Create a Contest
           </Text>
         </Pressable>
       </View>
@@ -126,7 +126,7 @@ export function PreSeasonHero() {
             {borderColor: colors.border, opacity: pressed ? 0.7 : 1},
           ]}
           accessibilityRole="button"
-          accessibilityLabel={`Invite a friend to ${firstPoolName ?? 'your pool'}`}>
+          accessibilityLabel={`Invite a friend to ${firstPoolName ?? 'your Contest'}`}>
           <Text style={[bodyType.bold, styles.shareText, {color: colors.textPrimary}]}>
             Invite friends
             {firstPoolName ? (

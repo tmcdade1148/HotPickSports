@@ -261,12 +261,12 @@ export function HomeScreen() {
                   {borderColor: colors.border, opacity: pressed ? 0.7 : 1},
                 ]}
                 accessibilityRole="button"
-                accessibilityLabel="Join a pool with an invite code">
+                accessibilityLabel="Join a Contest with an invite code">
                 <KeyRound size={16} color={colors.textSecondary} strokeWidth={2} />
                 <View style={styles.poolActionLabel}>
                   <Text
                     style={[bodyType.bold, styles.poolActionPrimary, {color: colors.textPrimary}]}>
-                    Join a pool
+                    Join a Contest
                   </Text>
                   <Text
                     style={[bodyType.regular, styles.poolActionSecondary, {color: colors.textTertiary}]}>
@@ -281,12 +281,12 @@ export function HomeScreen() {
                   {borderColor: colors.border, opacity: pressed ? 0.7 : 1},
                 ]}
                 accessibilityRole="button"
-                accessibilityLabel="Create a new pool and invite friends">
+                accessibilityLabel="Create a new Contest and invite friends">
                 <Plus size={16} color={colors.textSecondary} strokeWidth={2} />
                 <View style={styles.poolActionLabel}>
                   <Text
                     style={[bodyType.bold, styles.poolActionPrimary, {color: colors.textPrimary}]}>
-                    Create a pool
+                    Create a Contest
                   </Text>
                   <Text
                     style={[bodyType.regular, styles.poolActionSecondary, {color: colors.textTertiary}]}>
@@ -301,7 +301,7 @@ export function HomeScreen() {
         {showPartnerStack && (partnerIds.length > 0 || activePartnerIds.length > 0) && (
           <View style={styles.section}>
             <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textTertiary}]}>
-              YOUR PARTNERS
+              YOUR CLUBS
             </Text>
             {partnerRenderIds.map(pid => (
               <PartnerModule

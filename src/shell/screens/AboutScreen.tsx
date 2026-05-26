@@ -42,9 +42,9 @@ export function AboutScreen() {
         <View style={[styles.card, {backgroundColor: colors.surface}]}>
           <Text style={[styles.cardTitle, {color: colors.textPrimary}]}>What makes HotPick different</Text>
           <Text style={[styles.body, {color: colors.textSecondary}]}>
-            Traditional pick'em apps make you submit picks separately for every pool.
+            Traditional pick'em apps make you submit picks separately for every Contest.
             HotPick flips that — you make your picks once, and your scores count
-            everywhere. Join five pools, make picks once.
+            everywhere. Join five Contests, make picks once.
           </Text>
         </View>
 
@@ -62,8 +62,8 @@ export function AboutScreen() {
           <Text style={[styles.cardTitle, {color: colors.textPrimary}]}>Built for communities</Text>
           <Text style={[styles.body, {color: colors.textSecondary}]}>
             HotPick is designed for real communities — friend groups, offices,
-            fantasy leagues, sports bars, and local organizations. Create a pool,
-            share your invite code, and let the SmackTalk begin.
+            fantasy leagues, sports bars, and local organizations. Create a Contest,
+            share your invite code, and let the Chirps begin.
           </Text>
         </View>
 

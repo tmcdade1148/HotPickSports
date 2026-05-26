@@ -463,14 +463,14 @@ export const useNFLStore = create<NFLState>((set, get) => ({
 
     const nameMap: Record<string, string> = {};
     for (const p of profiles ?? []) {
-      nameMap[p.id] = p.display_name ?? 'Poolie';
+      nameMap[p.id] = p.display_name ?? 'Player';
     }
 
     // 5. Build standings sorted by total points descending
     const standings: Standing[] = memberUserIds
       .map(uid => ({
         userId: uid,
-        displayName: nameMap[uid] ?? 'Poolie',
+        displayName: nameMap[uid] ?? 'Player',
         totalPoints: pointsByUser[uid] ?? 0,
         rank: 0, // assigned below
       }))

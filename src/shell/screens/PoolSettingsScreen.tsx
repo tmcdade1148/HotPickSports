@@ -208,11 +208,11 @@ export function PoolSettingsScreen() {
             accessibilityLabel="Go back">
             <ChevronLeft size={24} color={colors.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Pool Settings</Text>
+          <Text style={styles.headerTitle}>Contest Settings</Text>
           <View style={{width: 24}} />
         </View>
         <View style={styles.empty}>
-          <Text style={styles.emptyText}>Pool not found</Text>
+          <Text style={styles.emptyText}>Contest not found</Text>
         </View>
       </SafeAreaView>
     );
@@ -233,9 +233,9 @@ export function PoolSettingsScreen() {
     });
     setSaving(false);
     if (result.success) {
-      Alert.alert('Saved', 'Pool name updated.');
+      Alert.alert('Saved', 'Contest name updated.');
     } else {
-      Alert.alert('Error', result.error ?? 'Failed to update pool name');
+      Alert.alert('Error', result.error ?? 'Failed to update Contest name');
     }
   };
 
@@ -264,7 +264,7 @@ export function PoolSettingsScreen() {
         : data?.error === 'INVALID_CODE'
           ? 'Code must be 6–12 letters and numbers.'
           : data?.error === 'NOT_ORGANIZER'
-            ? 'Only the organizer can add codes.'
+            ? 'Only the Gaffer can add codes.'
             : (error?.message ?? 'Could not add code.');
       setCodeError(msg);
       return;
@@ -325,7 +325,7 @@ export function PoolSettingsScreen() {
   const handleShareAnyCode = async (code: string) => {
     try {
       await Share.share({
-        message: `Join my pool "${pool!.name}" on HotPick Sports! Use invite code: ${code}`,
+        message: `Join my Contest "${pool!.name}" on HotPick Sports! Use invite code: ${code}`,
       });
     } catch {
       // user cancelled
@@ -334,8 +334,8 @@ export function PoolSettingsScreen() {
 
   const handleArchive = () => {
     Alert.alert(
-      'Archive Pool',
-      `Archive "${pool.name}"? Members will no longer see this pool in their active list. This can be reversed.`,
+      'Archive Contest',
+      `Archive "${pool.name}"? Members will no longer see this Contest in their active list. This can be reversed.`,
       [
         {text: 'Cancel', style: 'cancel'},
         {
@@ -348,7 +348,7 @@ export function PoolSettingsScreen() {
             } else {
               Alert.alert(
                 'Error',
-                result.error ?? 'Failed to archive pool',
+                result.error ?? 'Failed to archive Contest',
               );
             }
           },
@@ -372,19 +372,19 @@ export function PoolSettingsScreen() {
             accessibilityLabel="Go back">
             <ChevronLeft size={24} color={colors.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Pool Settings</Text>
+          <Text style={styles.headerTitle}>Contest Settings</Text>
           <View style={{width: 24}} />
         </View>
 
         {/* Pool Name */}
-        <Text style={styles.sectionTitle}>Pool Name</Text>
+        <Text style={styles.sectionTitle}>Contest Name</Text>
         <View style={styles.nameRow}>
           <TextInput
             style={styles.nameInput}
             value={poolName}
             onChangeText={setPoolName}
             maxLength={30}
-            placeholder="Pool name"
+            placeholder="Contest name"
             placeholderTextColor={colors.textSecondary}
             returnKeyType="done"
             onSubmitEditing={handleSaveName}
@@ -512,7 +512,7 @@ export function PoolSettingsScreen() {
         )}
 
         {/* Pool Info */}
-        <Text style={styles.sectionTitle}>Pool Info</Text>
+        <Text style={styles.sectionTitle}>Contest Info</Text>
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Members</Text>
@@ -531,7 +531,7 @@ export function PoolSettingsScreen() {
           {pool.is_founding_pool && (
             <View style={styles.foundingBadge}>
               <Award size={14} color={colors.primary} />
-              <Text style={styles.foundingText}>Founding Pool</Text>
+              <Text style={styles.foundingText}>Founding Contest</Text>
             </View>
           )}
         </View>
@@ -540,7 +540,7 @@ export function PoolSettingsScreen() {
         <View style={styles.toggleRow}>
           <Globe size={18} color={colors.textSecondary} />
           <View style={styles.toggleInfo}>
-            <Text style={styles.toggleLabel}>Private Pool</Text>
+            <Text style={styles.toggleLabel}>Private Contest</Text>
             <Text style={styles.toggleDesc}>
               Only people with the invite code can join
             </Text>
@@ -556,14 +556,14 @@ export function PoolSettingsScreen() {
           <Text style={[styles.broadcastText, {color: accentColor}]}>Send Broadcast</Text>
         </TouchableOpacity>
 
-        <Text style={styles.sectionTitle}>Partner</Text>
+        <Text style={styles.sectionTitle}>Club</Text>
 
         {pool.partner_id && partnerRow && (
           <View style={[styles.partnerCard, {marginBottom: 0}]}>
             <Text style={[styles.partnerCardHint, {fontStyle: 'italic'}]}>
               {partnerRow.club_pool_id === pool.id
-                ? `This pool is ${partnerRow.name}'s Club Pool.`
-                : `This pool is on ${partnerRow.name}'s roster.`}
+                ? `This Contest is ${partnerRow.name}'s Contest.`
+                : `This Contest is on ${partnerRow.name}'s roster.`}
             </Text>
           </View>
         )}
@@ -574,7 +574,7 @@ export function PoolSettingsScreen() {
               {partnerRow.name} perk
             </Text>
             <Text style={styles.partnerCardHint}>
-              Shows on every pool on {partnerRow.name}'s roster. Max 120 chars.
+              Shows on every Contest on {partnerRow.name}'s roster. Max 120 chars.
             </Text>
             <View style={styles.perkInputRow}>
               <TextInput
@@ -634,7 +634,7 @@ export function PoolSettingsScreen() {
             onPress={() => navigation.navigate('PartnerDirectory', {poolId})}>
             <Users size={18} color={colors.primary} />
             <Text style={[styles.broadcastText, {color: colors.primary}]}>
-              {pool.partner_id ? 'Change roster' : "Join a partner's roster"}
+              {pool.partner_id ? 'Change roster' : "Join a Club's roster"}
             </Text>
           </TouchableOpacity>
         )}
@@ -653,7 +653,7 @@ export function PoolSettingsScreen() {
         </Text>
         <TouchableOpacity style={styles.archiveButton} onPress={handleArchive}>
           <Archive size={18} color={colors.error} />
-          <Text style={styles.archiveText}>Archive Pool</Text>
+          <Text style={styles.archiveText}>Archive Contest</Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -681,10 +681,10 @@ export function PoolSettingsScreen() {
               /* swallow taps inside the card so backdrop dismiss doesn't fire */
             }}>
             <Text style={styles.modalTitle}>
-              Broadcast from {partnerRow?.name ?? 'Partner'}
+              Broadcast from {partnerRow?.name ?? 'Club'}
             </Text>
             <Text style={styles.modalHint}>
-              Sends to every member of every pool on this partner's roster.
+              Sends to every member of every Contest on this Club's roster.
               Max 280 chars. Rate limit: 3 per 24h.
             </Text>
             <TextInput

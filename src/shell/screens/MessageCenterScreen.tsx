@@ -104,7 +104,7 @@ export function MessageCenterScreen() {
         .in('id', senderIdArr);
 
       for (const p of profiles ?? []) {
-        nameMap[p.id] = p.poolie_name || 'Organizer';
+        nameMap[p.id] = p.poolie_name || 'Gaffer';
       }
     }
 
@@ -113,9 +113,9 @@ export function MessageCenterScreen() {
         id: `bc-${b.id}`,
         type: 'broadcast',
         poolId: b.pool_id,
-        poolName: poolNameMap[b.pool_id] ?? 'Pool',
+        poolName: poolNameMap[b.pool_id] ?? 'Contest',
         message: b.message,
-        senderName: nameMap[b.organizer_id] ?? 'Organizer',
+        senderName: nameMap[b.organizer_id] ?? 'Gaffer',
         sentAt: b.sent_at,
       });
     }
@@ -125,7 +125,7 @@ export function MessageCenterScreen() {
         id: `mod-${n.id}`,
         type: 'moderator_note',
         poolId: n.pool_id,
-        poolName: poolNameMap[n.pool_id] ?? 'Pool',
+        poolName: poolNameMap[n.pool_id] ?? 'Contest',
         message: n.message,
         senderName: nameMap[n.organizer_id] ?? 'Moderator',
         sentAt: n.sent_at,
@@ -228,7 +228,7 @@ export function MessageCenterScreen() {
           </Text>
           <Text
             style={[styles.emptySubtitle, {color: colors.textSecondary}]}>
-            Broadcasts and moderator notes from your pools will appear
+            Broadcasts and moderator notes from your Contests will appear
             here.
           </Text>
         </View>
