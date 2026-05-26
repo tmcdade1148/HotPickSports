@@ -12,6 +12,7 @@ import {isScheduledStatus} from '@sports/nfl/utils/gameStatus';
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {useTheme} from '@shell/theme/hooks';
 import {spacing, bodyType} from '@shared/theme';
+import {hexToRgba} from '@shared/utils/color';
 
 import {SystemMessageSlot} from '@shell/components/home/SystemMessageSlot';
 import {HomeHeader} from '@shell/components/home/HomeHeader';
@@ -268,18 +269,22 @@ export function HomeScreen() {
                 onPress={() => navigation.navigate('JoinPool')}
                 style={({pressed}) => [
                   styles.poolActionBtn,
-                  {borderColor: colors.border, opacity: pressed ? 0.7 : 1},
+                  {
+                    backgroundColor: hexToRgba(colors.primary, 0.10),
+                    borderColor: colors.primary,
+                    opacity: pressed ? 0.7 : 1,
+                  },
                 ]}
                 accessibilityRole="button"
                 accessibilityLabel="Join a Contest with an invite code">
-                <KeyRound size={16} color={colors.textSecondary} strokeWidth={2} />
+                <KeyRound size={18} color={colors.primary} strokeWidth={2.25} />
                 <View style={styles.poolActionLabel}>
                   <Text
-                    style={[bodyType.bold, styles.poolActionPrimary, {color: colors.textPrimary}]}>
+                    style={[bodyType.bold, styles.poolActionPrimary, {color: colors.primary}]}>
                     Join a Contest
                   </Text>
                   <Text
-                    style={[bodyType.regular, styles.poolActionSecondary, {color: colors.textTertiary}]}>
+                    style={[bodyType.regular, styles.poolActionSecondary, {color: colors.textSecondary}]}>
                     with invite code
                   </Text>
                 </View>
@@ -288,18 +293,22 @@ export function HomeScreen() {
                 onPress={() => navigation.navigate('CreatePool')}
                 style={({pressed}) => [
                   styles.poolActionBtn,
-                  {borderColor: colors.border, opacity: pressed ? 0.7 : 1},
+                  {
+                    backgroundColor: hexToRgba(colors.primary, 0.10),
+                    borderColor: colors.primary,
+                    opacity: pressed ? 0.7 : 1,
+                  },
                 ]}
                 accessibilityRole="button"
                 accessibilityLabel="Create a new Contest and invite friends">
-                <Plus size={16} color={colors.textSecondary} strokeWidth={2} />
+                <Plus size={18} color={colors.primary} strokeWidth={2.25} />
                 <View style={styles.poolActionLabel}>
                   <Text
-                    style={[bodyType.bold, styles.poolActionPrimary, {color: colors.textPrimary}]}>
+                    style={[bodyType.bold, styles.poolActionPrimary, {color: colors.primary}]}>
                     Create a Contest
                   </Text>
                   <Text
-                    style={[bodyType.regular, styles.poolActionSecondary, {color: colors.textTertiary}]}>
+                    style={[bodyType.regular, styles.poolActionSecondary, {color: colors.textSecondary}]}>
                     and invite friends
                   </Text>
                 </View>
@@ -351,8 +360,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderRadius: 12,
-    borderWidth: 1,
-    borderStyle: 'dashed',
+    borderWidth: 1.5,
   },
   poolActionLabel: {
     flexShrink: 1,
