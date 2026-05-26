@@ -378,6 +378,18 @@ export function SettingsScreen({route}: any) {
                         {pool.name}
                       </Text>
                     <View style={styles.poolMetaRow}>
+                      {/* Official Club Contests surface the owning Club's
+                          name in the meta row so the pill identifies WHICH
+                          Club it belongs to (the brand-color background
+                          alone doesn't say "Mes Que" out loud). Read off
+                          the brand_config snapshot — kept fresh by the
+                          partners_propagate_brand trigger. */}
+                      {isBranded && (
+                        <Text style={[styles.roleBadge, {color: pillTextColor + 'CC', fontWeight: '700'}]}>
+                          {((pool.brand_config as any)?.partner_name as string | undefined) ?? LEXICON.club.short}
+                          {(pool.is_global || poolRoles[pool.id]) ? ' · ' : ''}
+                        </Text>
+                      )}
                       {pool.is_global ? (
                         <Text style={[styles.globalBadge, {color: colors.textSecondary}, isBranded && {color: pillTextColor + 'AA'}]}>Global Contest</Text>
                       ) : poolRoles[pool.id] ? (
