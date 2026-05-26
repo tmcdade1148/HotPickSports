@@ -53,10 +53,14 @@ export function PartnerModule({partnerId, alignedPools}: PartnerModuleProps) {
   }, [indicator?.mostRecentAt]);
   const showNewBadge = unread > 0 && isRecent;
 
-  // Read brand snapshot from the first aligned pool (Rule #23). All
-  // aligned pools share the snapshot at alignment time; pick [0] for
-  // a stable choice. Falls back to live partner data only when there's
-  // no pool snapshot available (defensive — shouldn't happen at render).
+  // Read brand snapshot from the first aligned pool (Rule #23). Per the
+  // 2026-05-26 product call, Club brand *colors* never paint shell
+  // surfaces — only Official Club Contest cards may use Club colors.
+  // PartnerModule is a broadcast/perk tile, not an Official Contest, so
+  // we surface the Club's identity via name + logo only and leave color
+  // accents on HotPick-neutral tokens. `tint` is kept for the LogoMark
+  // initials fallback because the LogoMark itself IS the Club's
+  // identity (akin to the logo image carrying its own colors).
   const {brandName, tint, brandLogoUrl} = useMemo(() => {
     const bc = (alignedPools[0]?.brand_config ?? null) as Record<string, unknown> | null;
     const snapName    = typeof bc?.partner_name === 'string' ? bc.partner_name : null;
@@ -91,11 +95,11 @@ export function PartnerModule({partnerId, alignedPools}: PartnerModuleProps) {
         {brandLogoUrl ? (
           <Image
             source={{uri: brandLogoUrl}}
-            style={[styles.logoImg, {borderColor: tint}]}
+            style={[styles.logoImg, {borderColor: colors.border}]}
             accessible={false}
           />
         ) : (
-          <LogoMark initials={partnerInitials(brandName)} tint={tint} size={40} />
+          <LogoMark initials={partnerInitials(brandName)} tint={colors.textTertiary} size={40} />
         )}
 
         <View style={styles.titleBlock}>
@@ -127,7 +131,7 @@ export function PartnerModule({partnerId, alignedPools}: PartnerModuleProps) {
         <PerkIcon
           name={partner.perk_icon}
           size={14}
-          color={tint}
+          color={colors.textSecondary}
           containerStyle={styles.perkIconBox}
         />
         <Text

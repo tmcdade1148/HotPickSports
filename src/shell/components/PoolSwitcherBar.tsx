@@ -159,10 +159,10 @@ export function PoolSwitcherBar({mode, onGoBack}: PoolSwitcherBarProps) {
                 ].map(item => {
                   const unread = smackUnreadCounts[item.id] ?? 0;
                   const flagged = flaggedCounts[item.id] ?? 0;
-                  const itemBranded = !!(item.brand_config as any)?.is_branded;
-                  const itemHighlight = itemBranded
-                    ? (item.brand_config as any)?.highlight_color
-                    : null;
+                  // Club brand colors no longer paint shell surfaces
+                  // (2026-05-26 product call). Branded pools still sort
+                  // to the top of the switcher list, but the row label
+                  // uses the active-pool HotPick accent only.
                   return (
                     <TouchableOpacity
                       key={item.id}
@@ -173,12 +173,7 @@ export function PoolSwitcherBar({mode, onGoBack}: PoolSwitcherBarProps) {
                           style={[
                             styles.poolOptionText,
                             {color: colors.textPrimary},
-                            itemBranded && {
-                              fontWeight: '700',
-                              color: itemHighlight || colors.textPrimary,
-                            },
-                            item.id === activePoolId &&
-                              !itemBranded && {color: colors.primary},
+                            item.id === activePoolId && {color: colors.primary},
                           ]}>
                           {item.name}
                         </Text>
