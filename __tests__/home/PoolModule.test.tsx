@@ -195,12 +195,10 @@ describe('PoolModule tap routing (spec §6.4.6)', () => {
     ReactTestRenderer.act(() => {
       tree = ReactTestRenderer.create(<PoolModule pool={partnerPool} />);
     });
-    // Redesign-v3 (affiliations): Chirps badge is always visible (muted
-    // when zero unread), settings gear sits in the lower-right, the
-    // "Affiliated with…" row is a Pressable that opens the partner
-    // roster, and a small ⓘ "Club affiliation" pill is a Pressable that
-    // opens the affiliation-details modal (accessibility path for
-    // colorblind users — see PoolModule.tsx). Five Pressables total.
-    expect(findPressables(tree!.root)).toHaveLength(5);
+    // Redesign-v4: the ⓘ "Club affiliation" info pill was removed
+    // (replaced by the Club perk row, which isn't pressable). Four
+    // Pressables remain: card body, settings gear, Chirps badge,
+    // affiliation row → partner roster.
+    expect(findPressables(tree!.root)).toHaveLength(4);
   });
 });

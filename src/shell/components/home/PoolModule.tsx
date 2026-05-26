@@ -27,18 +27,16 @@
 // trigger keeps the singular column in sync with the primary affiliation,
 // so the fallback path stays correct for single-Club pools.
 
-import React, {useMemo, useState} from 'react';
-import {Image, Modal, Pressable, StyleSheet, Text, View} from 'react-native';
+import React, {useMemo} from 'react';
+import {Image, Pressable, StyleSheet, Text, View} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {
   BadgeCheck,
   Flag,
-  Info,
   MessageCircle,
   Megaphone,
   Settings,
   ShieldCheck,
-  X,
 } from 'lucide-react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useGlobalStore} from '@shell/stores/globalStore';
@@ -109,8 +107,6 @@ function resolveColorField(bc: unknown, key: string): string | null {
 export function PoolModule({pool}: PoolModuleProps) {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
-  const [popoverOpen, setPopoverOpen] = useState(false);
-
   const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
   // Two independent unread streams — kept separate so each badge has a
   // clear meaning and a single tap target.
@@ -212,6 +208,22 @@ export function PoolModule({pool}: PoolModuleProps) {
     affiliates.find(a => a.isPrimary) ?? affiliates[0] ?? null;
   const isAffiliated   = !isOfficial && affiliates.length > 0;
   const isIndependent  = !isOfficial && affiliates.length === 0;
+
+  // Perk for the lead affiliate Club, displayed in the Affiliated card
+  // footer. Perks are NOT snapshotted onto the pool (partner-managed,
+  // should stay fresh — see PartnerModule comments), so we always read
+  // them from the live partner record. Falls back to the legacy
+  // pool.partner_id record when partnersById hasn't loaded the lead
+  // affiliate yet.
+  const partnersById = useGlobalStore(s => s.partnersById);
+  const primaryAffiliatePerk = useMemo(() => {
+    if (!isAffiliated || !primaryAffiliate) return null;
+    const live = partnersById[primaryAffiliate.partnerId];
+    const text = live?.perk_text ?? legacyPartner?.perk_text ?? null;
+    const icon = live?.perk_icon ?? legacyPartner?.perk_icon ?? null;
+    if (!text) return null;
+    return {text, icon};
+  }, [isAffiliated, primaryAffiliate, partnersById, legacyPartner]);
 
   // Branded header band data for Official Contests. Read snapshot fields off
   // the pool first (Hard Rule #23 — no live join). Fall back to the cached
@@ -559,34 +571,16 @@ export function PoolModule({pool}: PoolModuleProps) {
                 </View>
               )}
             </Pressable>
-            {/* Non-color path to the same info — required for the ~8% of
-                male users with color-vision deficiency who can't rely on
-                the stripe alone. */}
-            <Pressable
-              onPress={() => setPopoverOpen(true)}
-              hitSlop={8}
-              style={({pressed}) => [
-                styles.connectionPill,
-                {borderColor: colors.border, opacity: pressed ? 0.6 : 1},
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel={
-                affiliates.length === 1
-                  ? `Show ${LEXICON.club.short} affiliation details`
-                  : `Show ${affiliates.length} ${LEXICON.club.short} affiliations`
-              }>
-              <Info size={11} color={colors.textTertiary} strokeWidth={2} />
-              <Text
-                style={[bodyType.regular, styles.connectionText, {color: colors.textTertiary}]}>
-                {affiliates.length === 1
-                  ? `${LEXICON.club.short} affiliation`
-                  : `${affiliates.length} affiliations`}
-              </Text>
-            </Pressable>
-            {legacyPartner?.perk_text && affiliates.length === 1 && (
+            {/* Perk row for the lead affiliate. Replaces the prior
+                "Club Affiliation" info pill — the perk is the value
+                users care about, the affiliation itself is already
+                signaled by the logo cluster + Club name above. For
+                multi-affiliate Contests we show the lead Club's perk
+                only (each Club's full perk is on its YOUR CLUBS tile). */}
+            {primaryAffiliatePerk?.text && (
               <View style={styles.perkRow}>
                 <PerkIcon
-                  name={legacyPartner.perk_icon}
+                  name={primaryAffiliatePerk.icon}
                   size={13}
                   color={colors.textSecondary}
                   containerStyle={styles.perkIconBox}
@@ -594,7 +588,10 @@ export function PoolModule({pool}: PoolModuleProps) {
                 <Text
                   style={[bodyType.regular, styles.perkText, {color: colors.textSecondary}]}
                   numberOfLines={2}>
-                  {legacyPartner.perk_text}
+                  {primaryAffiliatePerk.text}
+                </Text>
+                <Text style={[bodyType.bold, styles.perkEyebrow, {color: colors.textTertiary}]}>
+                  {LEXICON.club.short.toUpperCase()} {LEXICON.perks.toUpperCase()}
                 </Text>
               </View>
             )}
@@ -625,111 +622,6 @@ export function PoolModule({pool}: PoolModuleProps) {
         )}
       </View>
 
-      {isAffiliated && popoverOpen && primaryAffiliate && (
-        <Modal
-          visible
-          transparent
-          animationType="fade"
-          onRequestClose={() => setPopoverOpen(false)}>
-          <Pressable
-            style={styles.modalBackdrop}
-            onPress={() => setPopoverOpen(false)}
-            accessibilityLabel="Close affiliation details">
-            <Pressable
-              style={[
-                styles.modalCard,
-                {backgroundColor: colors.surfaceElevated, borderColor: colors.border},
-              ]}
-              onPress={() => { /* swallow tap so backdrop doesn't close */ }}>
-              <Pressable
-                onPress={() => setPopoverOpen(false)}
-                hitSlop={10}
-                style={styles.modalClose}
-                accessibilityRole="button"
-                accessibilityLabel="Close">
-                <X size={18} color={colors.textTertiary} strokeWidth={2} />
-              </Pressable>
-
-              <Text
-                style={[displayType.display, styles.modalTitle, {color: colors.textPrimary}]}>
-                {affiliates.length === 1
-                  ? `${LEXICON.club.short.toUpperCase()} ENDORSEMENT`
-                  : `${affiliates.length} ${LEXICON.club.short.toUpperCase()} ENDORSEMENTS`}
-              </Text>
-
-              {affiliates.map(e => (
-                <Pressable
-                  key={e.partnerId}
-                  onPress={() => {
-                    setPopoverOpen(false);
-                    // Slug only available for the legacy primary affiliate
-                    // today; multi-affiliation nav lands when the loader does.
-                    if (e.partnerId === pool.partner_id) {
-                      goToPartnerRoster(legacyPartner?.slug);
-                    }
-                  }}
-                  style={({pressed}) => [
-                    styles.modalRow,
-                    {borderTopColor: colors.border, opacity: pressed ? 0.6 : 1},
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Open ${e.name} ${LEXICON.roster}`}>
-                  {e.logoUrl ? (
-                    <Image
-                      source={{uri: e.logoUrl}}
-                      style={[
-                        styles.modalRowLogo,
-                        {borderColor: e.displayColor ?? colors.border},
-                      ]}
-                      resizeMode="contain"
-                    />
-                  ) : (
-                    <LogoMark
-                      initials={partnerInitials(e.name)}
-                      tint={e.displayColor ?? colors.textTertiary}
-                      size={32}
-                    />
-                  )}
-                  <Text
-                    style={[bodyType.bold, styles.modalRowName, {color: e.displayColor ?? colors.textPrimary}]}
-                    numberOfLines={1}>
-                    {e.name}
-                  </Text>
-                  {e.isPrimary && affiliates.length > 1 && (
-                    <Text
-                      style={[
-                        bodyType.regular,
-                        styles.modalRowPrimary,
-                        {color: e.displayColor ?? colors.textSecondary},
-                      ]}>
-                      Lead
-                    </Text>
-                  )}
-                </Pressable>
-              ))}
-
-              {legacyPartner?.perk_text && affiliates.length === 1 && (
-                <View
-                  style={[
-                    styles.modalPerkRow,
-                    {borderTopColor: colors.border, borderBottomColor: colors.border},
-                  ]}>
-                  <PerkIcon
-                    name={legacyPartner.perk_icon}
-                    size={20}
-                    color={colors.textSecondary}
-                    containerStyle={styles.modalPerkIcon}
-                  />
-                  <Text
-                    style={[bodyType.regular, styles.modalPerkText, {color: colors.textSecondary}]}>
-                    {legacyPartner.perk_text}
-                  </Text>
-                </View>
-              )}
-            </Pressable>
-          </Pressable>
-        </Modal>
-      )}
     </Pressable>
   );
 }
@@ -947,6 +839,11 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     fontWeight: '500',
+  },
+  perkEyebrow: {
+    fontSize: 10,
+    letterSpacing: 1.2,
+    marginLeft: 8,
   },
   alignText: {
     flex: 1,
