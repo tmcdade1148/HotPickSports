@@ -35,7 +35,6 @@ import {
   Flag,
   MessageCircle,
   Megaphone,
-  Settings,
   ShieldCheck,
 } from 'lucide-react-native';
 import {useTheme} from '@shell/theme/hooks';
@@ -251,11 +250,6 @@ export function PoolModule({pool}: PoolModuleProps) {
     navigation.navigate('SmackTalkTab');
   };
 
-  const goToPoolSettings = () => {
-    setActivePoolId(pool.id);
-    navigation.navigate('PoolSettings', {poolId: pool.id});
-  };
-
   const goToPartnerRoster = (slug?: string | null) => {
     if (!slug) return;
     navigation.navigate('PartnerRoster', {slug});
@@ -330,20 +324,12 @@ export function PoolModule({pool}: PoolModuleProps) {
           their Clubs via the logo cluster + "Affiliated with …" text in
           the footer below; the card body stays HotPick-neutral. */}
 
-      {/* Pool settings gear — sits in the lower-right. Bumped above the
-          footer divider when a partner zone or independent chip is below. */}
-      <Pressable
-        onPress={goToPoolSettings}
-        hitSlop={10}
-        style={({pressed}) => [
-          styles.gearBtn,
-          (isAffiliated || isIndependent) ? styles.gearBtnAboveFooter : null,
-          {opacity: pressed ? 0.5 : 1},
-        ]}
-        accessibilityRole="button"
-        accessibilityLabel={`Open ${pool.name} settings`}>
-        <Settings size={16} color={colors.textTertiary} strokeWidth={2} />
-      </Pressable>
+      {/* Per-Contest settings gear was removed from the Home card.
+          Pool settings (invite / leave / archive / rename) are
+          rarely-used actions; surfacing them on every Contest tile
+          created visual noise + a misclickable target next to the
+          rank chip. Settings now reaches PoolSettings via the
+          Settings tab → My Contests row. */}
 
       <View style={styles.body}>
         <View style={styles.topRow}>
@@ -683,16 +669,6 @@ const styles = StyleSheet.create({
     right: 0,
   },
 
-  gearBtn: {
-    position: 'absolute',
-    bottom: 10,
-    right: 10,
-    padding: 4,
-    zIndex: 2,
-  },
-  gearBtnAboveFooter: {
-    bottom: 88,
-  },
   body: {
     padding: 16,
   },

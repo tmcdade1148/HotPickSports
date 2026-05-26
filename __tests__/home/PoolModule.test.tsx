@@ -149,11 +149,10 @@ describe('PoolModule tap routing (spec §6.4.6)', () => {
     });
 
     const pressables = findPressables(tree!.root);
-    // Pressable order (redesign-v3, settings gear added):
+    // Pressable order (redesign-v5, per-Contest settings gear dropped):
     //   [0] card body
-    //   [1] settings gear (lower-right)
-    //   [2] SmackTalk badge
-    expect(pressables.length).toBeGreaterThanOrEqual(3);
+    //   [1] Chirps badge (was "SmackTalk")
+    expect(pressables.length).toBeGreaterThanOrEqual(2);
     const smackPress = pressables.find(p => {
       const label = String(p.props.accessibilityLabel ?? '').toLowerCase();
       // Label vocabulary moved from "SmackTalk" to "Chirps" per lexicon spec.
@@ -195,10 +194,10 @@ describe('PoolModule tap routing (spec §6.4.6)', () => {
     ReactTestRenderer.act(() => {
       tree = ReactTestRenderer.create(<PoolModule pool={partnerPool} />);
     });
-    // Redesign-v4: the ⓘ "Club affiliation" info pill was removed
-    // (replaced by the Club perk row, which isn't pressable). Four
-    // Pressables remain: card body, settings gear, Chirps badge,
-    // affiliation row → partner roster.
-    expect(findPressables(tree!.root)).toHaveLength(4);
+    // Redesign-v5: per-Contest settings gear removed from the Home
+    // card (pool settings rarely-used; reached via Settings tab now).
+    // Three Pressables remain: card body, Chirps badge, affiliation
+    // row → partner roster.
+    expect(findPressables(tree!.root)).toHaveLength(3);
   });
 });
