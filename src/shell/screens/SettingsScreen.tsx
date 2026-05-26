@@ -58,6 +58,10 @@ export function SettingsScreen({route}: any) {
   const userPools = visiblePools.length > 0 ? visiblePools : allPools;
   const poolRoles = useGlobalStore(s => s.poolRoles);
   const activePoolId = useGlobalStore(s => s.activePoolId);
+  // Member counts come from the Home screen's rank loader (kept in
+  // userRankByPool). If the user lands on Settings first the map is
+  // empty — count just doesn't render until Home loads.
+  const userRankByPool = useGlobalStore(s => s.userRankByPool);
   const activeSport = useGlobalStore(s => s.activeSport);
   const setActiveSport = useGlobalStore(s => s.setActiveSport);
   const rawDefaultPoolId = useGlobalStore(s => s.defaultPoolId);
@@ -376,6 +380,11 @@ export function SettingsScreen({route}: any) {
                         ]}
                         numberOfLines={1}>
                         {pool.name}
+                        {userRankByPool[pool.id]?.memberCount != null && (
+                          <Text style={[styles.poolMemberCount, {color: pillTextColor + 'AA'}]}>
+                            {`  (${userRankByPool[pool.id].memberCount})`}
+                          </Text>
+                        )}
                       </Text>
                     <View style={styles.poolMetaRow}>
                       {/* Official Club Contests surface the owning Club's
@@ -759,6 +768,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
     flexShrink: 1,
+  },
+  poolMemberCount: {
+    fontSize: 13,
+    fontWeight: '500',
   },
   inviteCode: {
     fontSize: 12,
