@@ -127,6 +127,10 @@ export function PartnerModule({partnerId, alignedPools}: PartnerModuleProps) {
         )}
       </View>
 
+      {/* Perk row only renders when the Club actually has a perk
+          configured. Clubs without perks still appear in YOUR CLUBS
+          via the top row above — perk-less just means no perk row. */}
+      {partner.perk_text && (
       <View style={[styles.perkRow, {borderTopColor: colors.border}]}>
         <PerkIcon
           name={partner.perk_icon}
@@ -143,6 +147,7 @@ export function PartnerModule({partnerId, alignedPools}: PartnerModuleProps) {
           {LEXICON.club.short.toUpperCase()} {LEXICON.perks.toUpperCase()}
         </Text>
       </View>
+      )}
     </Pressable>
   );
 }

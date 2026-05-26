@@ -244,7 +244,9 @@ interface GlobalState {
     id: string;
     name: string;
     slug: string;
-    perk_text: string;
+    // Nullable — Clubs without a perk still appear in YOUR CLUBS;
+    // PartnerModule hides its perk row when null.
+    perk_text: string | null;
     perk_icon: string | null;
     logo_url: string | null;
     primary_color: string | null;
@@ -1592,14 +1594,13 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       id: string;
       name: string;
       slug: string;
-      perk_text: string;
+      perk_text: string | null;
       perk_icon: string | null;
       logo_url: string | null;
       primary_color: string | null;
     }> = {};
     const ids: string[] = [];
     for (const row of rows) {
-      if (!row.perk_text) continue;
       const bc = (row.brand_config ?? {}) as Record<string, unknown>;
       const logo = (bc.logo ?? {}) as Record<string, unknown>;
       map[row.id] = {
@@ -1627,20 +1628,22 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       return;
     }
 
-    // Only load partners that are active AND have a configured perk —
-    // partners without a perk are not rendered as Modules per spec §6.4.7.
+    // Load every active Club the user is connected to via their Contests
+    // — Official Clubs, affiliated Clubs, legacy partner_id Clubs.
+    // (Earlier this filtered to perks-only per spec §6.4.7, but the home
+    // YOUR CLUBS list is now the authoritative "Clubs you're connected
+    // to" surface; Clubs without perks still belong there.)
     const {data} = await supabase
       .from('partners')
       .select('id, name, slug, perk_text, perk_icon, brand_config')
       .in('id', partnerIds)
-      .eq('is_active', true)
-      .not('perk_text', 'is', null);
+      .eq('is_active', true);
 
     const map: Record<string, {
       id: string;
       name: string;
       slug: string;
-      perk_text: string;
+      perk_text: string | null;
       perk_icon: string | null;
       logo_url: string | null;
       primary_color: string | null;
@@ -1654,7 +1657,6 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       perk_icon: string | null;
       brand_config: Record<string, unknown> | null;
     }>) {
-      if (!row.perk_text) continue;
       const bc = (row.brand_config ?? {}) as Record<string, unknown>;
       const logo = (bc.logo ?? {}) as Record<string, unknown>;
       map[row.id] = {

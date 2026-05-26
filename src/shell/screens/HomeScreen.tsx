@@ -24,14 +24,12 @@ import {PartnerModule} from '@shell/components/home/PartnerModule';
 import {resolveHomeState} from '@shell/components/home/resolveHomeState';
 import {LEXICON} from '@shared/lexicon';
 
-// HotPick brand accents for the two Home CTAs. Hard-coded here (not
-// read from theme) because the two buttons are explicitly painted in
-// secondary HotPick brand colors that aren't on the active palette —
-// teal #45615E (the legacy secondary) and amber #E39032 (the current
-// secondary). Both colors clear WCAG 3:1 against light + dark
-// surfaceElevated, so a single value works in both modes.
-const JOIN_ACCENT   = '#45615E';
-const CREATE_ACCENT = '#E39032';
+// HotPick brand accents for the two Home CTAs. Outline (border + icon)
+// in teal #45615E; label text in amber #E39032. Hard-coded here (not
+// read from useTheme) — these are HotPick brand secondaries kept
+// stable regardless of which slot the active theme uses.
+const CTA_OUTLINE = '#45615E';
+const CTA_TEXT    = '#E39032';
 
 export function HomeScreen() {
   const {colors} = useTheme();
@@ -298,27 +296,22 @@ export function HomeScreen() {
               <PoolModule key={p.id} pool={p} />
             ))}
             <View style={styles.poolActionsRow}>
-              {/* Join uses HotPick teal #45615E; Create uses HotPick
-                  amber #E39032. Two distinct brand colors so the CTAs
-                  read as a pair without either disappearing into
-                  HotPick's primary orange already used elsewhere on
-                  the home stack. */}
               <Pressable
                 onPress={() => navigation.navigate('JoinPool')}
                 style={({pressed}) => [
                   styles.poolActionBtn,
                   {
-                    backgroundColor: hexToRgba(JOIN_ACCENT, 0.12),
-                    borderColor: JOIN_ACCENT,
+                    backgroundColor: hexToRgba(CTA_OUTLINE, 0.08),
+                    borderColor: CTA_OUTLINE,
                     opacity: pressed ? 0.7 : 1,
                   },
                 ]}
                 accessibilityRole="button"
                 accessibilityLabel="Join a Contest with an invite code">
-                <KeyRound size={18} color={JOIN_ACCENT} strokeWidth={2.25} />
+                <KeyRound size={18} color={CTA_OUTLINE} strokeWidth={2.25} />
                 <View style={styles.poolActionLabel}>
                   <Text
-                    style={[bodyType.bold, styles.poolActionPrimary, {color: JOIN_ACCENT}]}>
+                    style={[bodyType.bold, styles.poolActionPrimary, {color: CTA_TEXT}]}>
                     Join a Contest
                   </Text>
                   <Text
@@ -332,17 +325,17 @@ export function HomeScreen() {
                 style={({pressed}) => [
                   styles.poolActionBtn,
                   {
-                    backgroundColor: hexToRgba(CREATE_ACCENT, 0.12),
-                    borderColor: CREATE_ACCENT,
+                    backgroundColor: hexToRgba(CTA_OUTLINE, 0.08),
+                    borderColor: CTA_OUTLINE,
                     opacity: pressed ? 0.7 : 1,
                   },
                 ]}
                 accessibilityRole="button"
                 accessibilityLabel="Create a new Contest and invite friends">
-                <Plus size={18} color={CREATE_ACCENT} strokeWidth={2.25} />
+                <Plus size={18} color={CTA_OUTLINE} strokeWidth={2.25} />
                 <View style={styles.poolActionLabel}>
                   <Text
-                    style={[bodyType.bold, styles.poolActionPrimary, {color: CREATE_ACCENT}]}>
+                    style={[bodyType.bold, styles.poolActionPrimary, {color: CTA_TEXT}]}>
                     Create a Contest
                   </Text>
                   <Text
