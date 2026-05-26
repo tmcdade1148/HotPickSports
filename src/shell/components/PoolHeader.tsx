@@ -36,7 +36,7 @@ export function PoolHeader() {
   const activePool   = visiblePools.find(p => p.id === activePoolId);
 
   const period = shortPeriod(currentPhase, currentWeek, playoffStartWeek, seasonYear);
-  const display = (activePool?.name ?? 'JOIN A POOL').toUpperCase();
+  const display = (activePool?.name ?? 'JOIN A CONTEST').toUpperCase();
 
   // Same auto-fit as IdentityBar: measure rendered width at NAME_MAX_FONT
   // unconstrained, then scale font to fit the actual column width (cap at

@@ -168,7 +168,7 @@ function buildEmailHtml({
               <tr>
                 <td style="background-color:#F66321;padding:20px 24px;">
                   <h1 style="margin:0;color:#FFFFFF;font-size:20px;font-weight:700;">
-                    📢 Pool Broadcast
+                    📢 Contest Broadcast
                   </h1>
                 </td>
               </tr>
@@ -188,7 +188,7 @@ function buildEmailHtml({
                     </p>
                   </div>
                   <p style="color:#A0A0A0;font-size:13px;margin:0;">
-                    Open HotPick Sports to check it out and respond in SmackTalk.
+                    Open HotPick Sports to check it out and respond in Chirps.
                   </p>
                 </td>
               </tr>
@@ -196,7 +196,7 @@ function buildEmailHtml({
               <tr>
                 <td style="padding:16px 24px;border-top:1px solid #333;">
                   <p style="color:#666;font-size:11px;margin:0;text-align:center;">
-                    HotPick Sports — Pick once. Play every pool.
+                    HotPick Sports — Pick once. Play every Contest.
                   </p>
                 </td>
               </tr>

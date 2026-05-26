@@ -846,7 +846,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     // Fire broadcast email Edge Function (non-blocking — don't await)
     const profile = get().userProfile;
     const senderName =
-      profile?.first_name ?? profile?.poolie_name ?? 'Pool Organizer';
+      profile?.first_name ?? profile?.poolie_name ?? 'Contest Gaffer';
 
     supabase.functions
       .invoke('send-broadcast-email', {
@@ -1224,7 +1224,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       set({
         playerArchetype: {
           label: 'The Closer',
-          description: `You know how to finish. ${poolChampionCount} Pool Championships across ${poolChampionPools} different pools.`,
+          description: `You know how to finish. ${poolChampionCount} Contest Championships across ${poolChampionPools} different Contests.`,
         },
       });
       return;
@@ -1246,7 +1246,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       set({
         playerArchetype: {
           label: 'The Gunslinger',
-          description: `You go big. ${gunslingerCount} Gunslinger awards. It's cost you. It's also won you ${poolChampionCount} pool${poolChampionCount !== 1 ? 's' : ''}.`,
+          description: `You go big. ${gunslingerCount} Gunslinger awards. It's cost you. It's also won you ${poolChampionCount} Contest${poolChampionCount !== 1 ? 's' : ''}.`,
         },
       });
       return;
@@ -1257,7 +1257,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       set({
         playerArchetype: {
           label: 'The Grinder',
-          description: `Never missed a week. ${ironPoolieCount} Iron Poolie awards. ${careerCorrect} correct picks. Quietly dangerous.`,
+          description: `Never missed a week. ${ironPoolieCount} Iron Player awards. ${careerCorrect} correct picks. Quietly dangerous.`,
         },
       });
       return;

@@ -830,3 +830,40 @@ When building Series (NHL Playoffs) and Tournament (World Cup):
 - `enforce_pick_lock` trigger pattern needed per template table
 - `enforce_single_hotpick` trigger pattern needed per template table
 - Server-side triggers are authoritative
+
+---
+
+## 22. User-Facing Lexicon
+
+Internal code identifiers (`pool_id`, `organizer_id`, `smack_messages`, `smackUnreadCounts`, `partner_id`, etc.) stay as they are. The strings the **user** reads live in `src/shared/lexicon/index.ts`.
+
+Spec: `260520_HotPick_LexiconImplementation_Spec.docx` (May 2026).
+
+### Mapping
+| Code identifier (stays) | User-facing label |
+|---|---|
+| pool / pools | **Contest** / **Contests** |
+| poolie | **Player** |
+| organizer | **the Gaffer** (long) / **Gaffer** (short) |
+| partner | **the Club** (long) / **Club** (short) |
+| leaderboard / standings | **the Ladder** (long) / **Ladder** (short) |
+| smacktalk | **Chirp** / **Chirps** |
+| roster | Roster (unchanged) |
+| perks | Perks (unchanged) |
+| picks | Picks (unchanged) |
+
+### Affiliation copy
+`pool.partner_id = X` renders on a Contest card as **"Endorsed by [Club]"** with a `BadgeCheck` icon (lucide, tinted with the Club's primary color). Builds via `endorsedBy(clubName)` helper. Replaces the older "On [X]'s Roster" phrasing.
+
+### Carve-outs (intentional — do not "fix")
+- **`PartnerAdminScreen`** — super-admin internal tool; keeps "Partner" labels per spec §2.
+- **`PrivacyPolicyScreen.tsx` + `TermsOfServiceScreen.tsx`** — legal copy, requires lawyer review before any change.
+- **Database identifiers** (`pool_id`, `pool_events`, `organizer_id`, `smack_messages`, `partners.club_pool_id`, `iron_poolie` hardware slug, `leaderboard_change` notification_type, etc.) — internal code, never changes.
+- **Route names** (`PoolSettings`, `LeaderboardTab`, `SmackTalkTab`, `PartnerRoster`) — internal navigation contract.
+- **`createPool` / `joinPool` / `archivePool` store actions** — internal API surface.
+
+### Article guidance
+Full sentence copy uses the definite article: "the Gaffer of Hammer's Contest", "view the Ladder". Chip/pill labels can drop it: "Gaffer", "Ladder". When in doubt, include the article. Use `LEXICON.gaffer.long` (`"the Gaffer"`) for sentences, `LEXICON.gaffer.short` (`"Gaffer"`) for compact labels.
+
+### Test enforcement
+`__tests__/lexicon.test.ts` locks every value in `LEXICON` plus the helper outputs. Any accidental drift from the locked vocab trips a test before users see it.

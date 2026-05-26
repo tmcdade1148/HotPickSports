@@ -22,7 +22,7 @@ export const nhlPlayoffs2027: SeriesConfig = {
   tabs: [
     {key: 'picks', label: 'Picks', icon: 'check-circle'},
     {key: 'board', label: 'Board', icon: 'bar-chart-2'},
-    {key: 'smacktalk', label: 'SmackTalk', icon: 'message-circle'},
+    {key: 'smacktalk', label: 'Chirps', icon: 'message-circle'},
   ],
 
   // Playoff structure — 4 rounds, all best-of-7

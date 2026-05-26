@@ -142,7 +142,7 @@ export function BroadcastComposer({
               style={styles.input}
               value={message}
               onChangeText={text => setMessage(text.slice(0, MAX_CHARS))}
-              placeholder="Write a message to your pool..."
+              placeholder="Write a message to your Contest..."
               placeholderTextColor={colors.textSecondary}
               multiline
               maxLength={MAX_CHARS}

@@ -29,10 +29,10 @@ export function ZeroPoolsHero() {
           displayType.display,
           {fontSize: displayType.size.h1, color: colors.textPrimary},
         ]}>
-        GET IN A POOL.
+        GET IN A CONTEST.
       </Text>
       <Text style={[bodyType.regular, styles.sub, {color: colors.textSecondary}]}>
-        Pools are how HotPick is played. Join one a friend made, or run your own.
+        Contests are how HotPick is played. Join one a friend made, or run your own.
       </Text>
 
       <View style={styles.ctaRow}>
@@ -43,7 +43,7 @@ export function ZeroPoolsHero() {
             {backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1},
           ]}
           accessibilityRole="button"
-          accessibilityLabel="Enter an invite code to join a pool">
+          accessibilityLabel="Enter an invite code to join a Contest">
           <Text style={[bodyType.bold, styles.ctaPrimaryText, {color: colors.onPrimary}]}>Enter invite code</Text>
         </Pressable>
         <Pressable
@@ -53,9 +53,9 @@ export function ZeroPoolsHero() {
             {borderColor: colors.border, opacity: pressed ? 0.7 : 1},
           ]}
           accessibilityRole="button"
-          accessibilityLabel="Create a new pool you'll organize">
+          accessibilityLabel="Create a new Contest you'll organize">
           <Text style={[bodyType.bold, styles.ctaSecondaryText, {color: colors.textPrimary}]}>
-            Create a pool
+            Create a Contest
           </Text>
         </Pressable>
       </View>

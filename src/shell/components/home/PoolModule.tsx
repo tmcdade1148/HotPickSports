@@ -5,11 +5,12 @@
 import React, {useMemo, useState} from 'react';
 import {Image, Modal, Pressable, StyleSheet, Text, View} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
-import {Info, MessageCircle, Megaphone, Settings, X} from 'lucide-react-native';
+import {BadgeCheck, Info, MessageCircle, Megaphone, Settings, X} from 'lucide-react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
 import {hexToRgba, readableTextOn} from '@shared/utils/color';
+import {LEXICON, endorsedBy} from '@shared/lexicon';
 import {ordinalSuffix} from '@shared/utils/format';
 import type {DbPool} from '@shared/types/database';
 import {LogoMark} from './LogoMark';
@@ -196,8 +197,8 @@ export function PoolModule({pool}: PoolModuleProps) {
               accessible
               accessibilityLabel={
                 orgUnread > 0
-                  ? `${orgUnread} new organizer ${orgUnread === 1 ? 'message' : 'messages'}`
-                  : 'No new organizer messages'
+                  ? `${orgUnread} new Gaffer ${orgUnread === 1 ? 'message' : 'messages'}`
+                  : 'No new Gaffer messages'
               }>
               <Megaphone
                 size={12}
@@ -229,8 +230,8 @@ export function PoolModule({pool}: PoolModuleProps) {
               accessibilityRole="button"
               accessibilityLabel={
                 smackUnread > 0
-                  ? `${smackUnread} unread SmackTalk ${smackUnread === 1 ? 'message' : 'messages'}, open chat`
-                  : 'Open SmackTalk'
+                  ? `${smackUnread} unread ${smackUnread === 1 ? 'Chirp' : 'Chirps'}, open chat`
+                  : 'Open Chirps'
               }>
               <MessageCircle
                 size={12}
@@ -257,20 +258,24 @@ export function PoolModule({pool}: PoolModuleProps) {
                 {opacity: pressed ? 0.6 : 1},
               ]}
               accessibilityRole="button"
-              accessibilityLabel={`Open ${partnerName} roster`}>
+              accessibilityLabel={`Open ${partnerName} ${LEXICON.roster}`}>
               <LogoMark
                 initials={partnerInitials(partnerName)}
                 tint={stripeColor ?? colors.primary}
                 size={24}
               />
+              <BadgeCheck
+                size={14}
+                color={stripeColor ?? colors.primary}
+                strokeWidth={2.25}
+              />
               <Text
                 style={[bodyType.regular, styles.alignText, {color: colors.textSecondary}]}
                 numberOfLines={1}>
-                On{' '}
+                Endorsed by{' '}
                 <Text style={[bodyType.bold, {color: colors.textPrimary}]}>
                   {partnerName}
                 </Text>
-                {"'s roster"}
               </Text>
               {partnerUnread > 0 && (
                 <View
@@ -282,7 +287,7 @@ export function PoolModule({pool}: PoolModuleProps) {
                     },
                   ]}
                   accessible
-                  accessibilityLabel={`${partnerUnread} new partner ${
+                  accessibilityLabel={`${partnerUnread} new Club ${
                     partnerUnread === 1 ? 'message' : 'messages'
                   }`}>
                   <Megaphone size={11} color={colors.primary} strokeWidth={2} />
@@ -303,11 +308,11 @@ export function PoolModule({pool}: PoolModuleProps) {
                 {borderColor: colors.border, opacity: pressed ? 0.6 : 1},
               ]}
               accessibilityRole="button"
-              accessibilityLabel="Show partner connection details">
+              accessibilityLabel={`Show ${LEXICON.club.short} endorsement details`}>
               <Info size={11} color={colors.textTertiary} strokeWidth={2} />
               <Text
                 style={[bodyType.regular, styles.connectionText, {color: colors.textTertiary}]}>
-                Partner connection
+                {LEXICON.club.short} endorsement
               </Text>
             </Pressable>
             {partner?.perk_text && (
@@ -418,7 +423,7 @@ export function PoolModule({pool}: PoolModuleProps) {
                     // text instead of assuming theme onPrimary.
                     {color: readableTextOn(stripeColor) },
                   ]}>
-                  View partner roster
+                  View {partnerName ?? LEXICON.club.long}'s {LEXICON.roster}
                 </Text>
               </Pressable>
             </Pressable>

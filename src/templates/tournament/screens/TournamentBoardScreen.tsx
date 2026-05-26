@@ -81,7 +81,7 @@ export function TournamentBoardScreen() {
       <KnockoutBracket config={config} />
 
       <View style={styles.leaderboard}>
-        <Text style={styles.sectionTitle}>Leaderboard</Text>
+        <Text style={styles.sectionTitle}>Ladder</Text>
         {leaderboard.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>

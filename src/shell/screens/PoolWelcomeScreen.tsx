@@ -66,10 +66,10 @@ export function PoolWelcomeScreen({navigation}: any) {
     if (result.pool) {
       setJoinedPool({name: result.pool.name});
     } else if (result.poolFull) {
-      setJoinError('This pool is full and cannot accept new members.');
+      setJoinError('This Contest is full and cannot accept new members.');
     } else {
       setJoinError(
-        result.error ?? 'Could not join the pool. The invite code may be invalid or the pool is full.',
+        result.error ?? 'Could not join the Contest. The invite code may be invalid or the Contest is full.',
       );
     }
     setJoining(false);
@@ -108,7 +108,7 @@ export function PoolWelcomeScreen({navigation}: any) {
           {joining ? (
             <>
               <ActivityIndicator size="large" color={colors.primary} />
-              <Text style={styles.joiningText}>Joining your pool...</Text>
+              <Text style={styles.joiningText}>Joining your Contest...</Text>
             </>
           ) : joinError ? (
             <>
@@ -126,7 +126,7 @@ export function PoolWelcomeScreen({navigation}: any) {
               <Text style={styles.title}>You're in!</Text>
               <Text style={styles.poolName}>{joinedPool.name}</Text>
               <Text style={styles.subtitle}>
-                You're also in the HotPick NFL 2026 pool — compete with
+                You're also in the HotPick NFL 2026 Contest — compete with
                 everyone on the platform.
               </Text>
 
@@ -134,8 +134,8 @@ export function PoolWelcomeScreen({navigation}: any) {
                 <Text style={styles.mechanicTitle}>How HotPick works</Text>
                 <Text style={styles.mechanicText}>
                   Pick winners each week. Designate one as your HotPick for
-                  bonus points. Compete with your pool and climb the
-                  leaderboard.
+                  bonus points. Compete with your Contest and climb the
+                  Ladder.
                 </Text>
               </View>
 
@@ -161,7 +161,7 @@ export function PoolWelcomeScreen({navigation}: any) {
           <Text style={styles.welcomeEmoji}>{'\u{1F44B}'}</Text>
           <Text style={styles.title}>Welcome, {displayName}!</Text>
           <Text style={styles.subtitle}>
-            You're in the HotPick NFL 2026 pool — compete with everyone on
+            You're in the HotPick NFL 2026 Contest — compete with everyone on
             the platform.
           </Text>
 
@@ -169,12 +169,12 @@ export function PoolWelcomeScreen({navigation}: any) {
             <Text style={styles.mechanicTitle}>How HotPick works</Text>
             <Text style={styles.mechanicText}>
               Pick winners each week. Designate one as your HotPick for bonus
-              points. Compete with your pool and climb the leaderboard.
+              points. Compete with your Contest and climb the Ladder.
             </Text>
           </View>
 
           <View style={styles.inviteSection}>
-            <Text style={styles.inviteLabel}>Have a pool invite code?</Text>
+            <Text style={styles.inviteLabel}>Have a Contest invite code?</Text>
             <View style={styles.codeRow}>
               <TextInput
                 style={styles.codeInput}

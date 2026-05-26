@@ -38,8 +38,8 @@ const HARDWARE_CATALOG: Record<string, {
 }> = {
   sharpshooter_week: {
     icon: Target,
-    description: 'Highest regular pick win rate in the pool that week.',
-    lockedHint: 'Finish a week with the best regular pick accuracy in your pool (min 10 picks).',
+    description: 'Highest regular pick win rate in the Contest that week.',
+    lockedHint: 'Finish a week with the best regular pick accuracy in your Contest (min 10 picks).',
   },
   gunslinger_week: {
     icon: Zap,
@@ -48,8 +48,8 @@ const HARDWARE_CATALOG: Record<string, {
   },
   contrarian_week: {
     icon: Shield,
-    description: 'Went against the pool majority and still finished top 3.',
-    lockedHint: 'Go against your pool on 8+ games, finish top 3, and win your HotPick.',
+    description: 'Went against the Contest majority and still finished top 3.',
+    lockedHint: 'Go against your Contest on 8+ games, finish top 3, and win your HotPick.',
   },
   perfect_week: {
     icon: Award,
@@ -74,7 +74,7 @@ const HARDWARE_CATALOG: Record<string, {
   biggest_comeback: {
     icon: Zap,
     description: 'Largest rank swing from worst week to final standing.',
-    lockedHint: 'Make the biggest comeback in your pool from your worst week to the final standings.',
+    lockedHint: 'Make the biggest comeback in your Contest from your worst week to the final Ladder.',
   },
   iron_poolie: {
     icon: Shield,
@@ -94,7 +94,7 @@ const HARDWARE_CATALOG: Record<string, {
   season_contrarian: {
     icon: Shield,
     description: 'Went against pool majority most often and finished above median.',
-    lockedHint: 'Go against your pool the most often across the season and still finish above the median.',
+    lockedHint: 'Go against your Contest the most often across the season and still finish above the median.',
   },
   season_tactician: {
     icon: Target,
@@ -383,7 +383,7 @@ function formatNarrative(hw: UserHardwareItem): string {
     case 'gunslinger_week':
       return `Week ${ctx.week}: Won a Rank ${ctx.hotpick_rank} HotPick on ${ctx.hotpick_team}. +${ctx.points_earned} pts.`;
     case 'contrarian_week':
-      return `Week ${ctx.week}: Went against the pool on ${ctx.against_majority_count} games, won ${ctx.against_majority_wins}. Finished #${ctx.week_rank}.`;
+      return `Week ${ctx.week}: Went against the Contest on ${ctx.against_majority_count} games, won ${ctx.against_majority_wins}. Finished #${ctx.week_rank}.`;
     case 'perfect_week':
       return `Week ${ctx.week}: 15/15 picks correct + Rank ${ctx.hotpick_rank} HotPick on ${ctx.hotpick_team}. ${ctx.total_points} total points.`;
     case 'biggest_comeback':

@@ -100,16 +100,16 @@ export function PartnerDirectoryScreen() {
     setCurrentPartnerId(partner.id);
     Alert.alert(
       'Added to roster',
-      `Your pool is now a member of ${partner.name}'s roster. Their brand and perk will surface to your members.`,
+      `Your Contest is now a member of ${partner.name}'s roster. Their brand and perk will surface to your members.`,
       [{text: 'OK', onPress: () => navigation.goBack()}],
     );
   };
 
   const handleRemoveAlignment = () => {
-    const partnerName = aligned?.name ?? 'this partner';
+    const partnerName = aligned?.name ?? 'this Club';
     Alert.alert(
       `Leave ${partnerName}'s roster?`,
-      'Your pool will lose this partner’s brand, perk, and broadcasts. You can re-join any time.',
+      'Your Contest will lose this Club’s brand, perk, and broadcasts. You can re-join any time.',
       [
         {text: 'Cancel', style: 'cancel'},
         {
@@ -152,8 +152,8 @@ export function PartnerDirectoryScreen() {
 
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={[bodyType.regular, styles.intro, {color: colors.textSecondary}]}>
-          Pick a partner to add your pool to their roster. Your pool will pick up
-          their brand, surface their perk, and receive their broadcasts.
+          Pick a Club to add your Contest to their roster. Your Contest will pick
+          up their brand, surface their perk, and receive their broadcasts.
         </Text>
 
         {aligned && (
@@ -179,7 +179,7 @@ export function PartnerDirectoryScreen() {
           <ActivityIndicator color={colors.primary} style={{marginTop: spacing.xl}} />
         ) : partners.length === 0 ? (
           <Text style={[bodyType.regular, {color: colors.textTertiary, padding: spacing.lg}]}>
-            No partners are currently active.
+            No Clubs are currently active.
           </Text>
         ) : (
           partners.map(partner => {
@@ -203,7 +203,7 @@ export function PartnerDirectoryScreen() {
                   },
                 ]}
                 accessibilityRole="button"
-                accessibilityLabel={isAligned ? `${partner.name}, currently on roster` : `Add pool to ${partner.name}'s roster`}
+                accessibilityLabel={isAligned ? `${partner.name}, currently on roster` : `Add Contest to ${partner.name}'s roster`}
                 accessibilityState={{disabled: isAligning || isAligned, selected: isAligned}}>
                 <View style={[styles.cardStripe, {backgroundColor: partnerPrimary}]} />
                 {logo ? (
@@ -225,8 +225,8 @@ export function PartnerDirectoryScreen() {
                     </Text>
                   )}
                   <Text style={[bodyType.regular, styles.cardMeta, {color: colors.textTertiary}]}>
-                    {partner.partner_type ? partner.partner_type.toUpperCase() : 'PARTNER'}
-                    {partner.can_run_pools ? ' · runs pools' : ' · sponsor only'}
+                    {partner.partner_type ? partner.partner_type.toUpperCase() : 'CLUB'}
+                    {partner.can_run_pools ? ' · runs Contests' : ' · sponsor only'}
                   </Text>
                 </View>
                 {isAligning ? (

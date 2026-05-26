@@ -60,7 +60,7 @@ export function JoinPoolScreen({navigation}: any) {
     if (result.pool) {
       navigation.goBack();
     } else if (result.poolFull) {
-      setError('This pool is full and cannot accept new members.');
+      setError('This Contest is full and cannot accept new members.');
     } else {
       setError(result.error ?? 'Invalid invite code. Please check and try again.');
     }
@@ -75,7 +75,7 @@ export function JoinPoolScreen({navigation}: any) {
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Text style={styles.backButton}>{'< Back'}</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>Join Pool</Text>
+          <Text style={styles.title}>Join Contest</Text>
         </View>
 
         <View style={styles.form}>
@@ -93,7 +93,7 @@ export function JoinPoolScreen({navigation}: any) {
           />
 
           <Text style={styles.hint}>
-            Ask a friend for their pool invite code ({INVITE_CODE_MIN}–{INVITE_CODE_MAX} letters and numbers).
+            Ask a friend for their Contest invite code ({INVITE_CODE_MIN}–{INVITE_CODE_MAX} letters and numbers).
           </Text>
 
           {error && <Text style={styles.error}>{error}</Text>}
@@ -105,7 +105,7 @@ export function JoinPoolScreen({navigation}: any) {
             {joining ? (
               <ActivityIndicator color={colors.onPrimary} />
             ) : (
-              <Text style={styles.joinButtonText}>Join Pool</Text>
+              <Text style={styles.joinButtonText}>Join Contest</Text>
             )}
           </TouchableOpacity>
         </View>

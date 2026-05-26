@@ -91,13 +91,13 @@ export function InstructionsScreen() {
 
         {/* Quick overview */}
         <Text style={[styles.intro, {color: colors.textSecondary}]}>
-          Everything you need to know about playing, managing pools, and pricing.
+          Everything you need to know about playing, managing Contests, and pricing.
         </Text>
 
         <AccordionSection title="Making Picks & Game Locks" colors={colors}>
           <Text style={[styles.body, {color: colors.textSecondary}]}>
             Each week, pick the winner of every NFL game. Your picks are made once and
-            count across all your pools simultaneously.
+            count across all your Contests simultaneously.
           </Text>
           <Text style={[styles.body, {color: colors.textSecondary, marginTop: spacing.sm}]}>
             Picks open a few days before the first game of the week.
@@ -133,63 +133,63 @@ export function InstructionsScreen() {
           </Text>
         </AccordionSection>
 
-        <AccordionSection title="Pools" colors={colors}>
+        <AccordionSection title="Contests" colors={colors}>
           <Text style={[styles.body, {color: colors.textSecondary}]}>
-            Pools are groups of people competing against each other. You can be in
-            multiple pools at once — your picks are shared, but each pool has its
-            own leaderboard.
+            Contests are groups of people competing against each other. You can be in
+            multiple Contests at once — your picks are shared, but each Contest has its
+            own Ladder.
           </Text>
           <Text style={[styles.body, {color: colors.textSecondary, marginTop: spacing.sm}]}>
-            Pools can start at any point in the season. A pool created in Week 6
+            Contests can start at any point in the season. A Contest created in Week 6
             only counts scores from Week 6 forward — everyone starts at zero.
           </Text>
         </AccordionSection>
 
-        <AccordionSection title="Creating a Pool" colors={colors}>
+        <AccordionSection title="Creating a Contest" colors={colors}>
           <Text style={[styles.body, {color: colors.textSecondary}]}>
-            Anyone can create a pool. Tap "Create a pool" in Settings, give it a
+            Anyone can create a Contest. Tap "Create a Contest" in Settings, give it a
             name, and share the invite code with your group.
           </Text>
           <Text style={[styles.body, {color: colors.textSecondary, marginTop: spacing.sm}]}>
-            As the organizer, you can:
+            As the Gaffer, you can:
           </Text>
           <Text style={[styles.bulletItem, {color: colors.textSecondary}]}>
             {'\u2022'} Manage members (promote, demote, remove)
           </Text>
           <Text style={[styles.bulletItem, {color: colors.textSecondary}]}>
-            {'\u2022'} Send broadcasts to your pool (up to 3/day)
+            {'\u2022'} Send broadcasts to your Contest (up to 3/day)
           </Text>
           <Text style={[styles.bulletItem, {color: colors.textSecondary}]}>
-            {'\u2022'} Edit pool name and settings
+            {'\u2022'} Edit Contest name and settings
           </Text>
           <Text style={[styles.bulletItem, {color: colors.textSecondary}]}>
-            {'\u2022'} Archive the pool when the season ends
+            {'\u2022'} Archive the Contest when the season ends
           </Text>
         </AccordionSection>
 
-        <AccordionSection title="Joining a Pool" colors={colors}>
+        <AccordionSection title="Joining a Contest" colors={colors}>
           <Text style={[styles.body, {color: colors.textSecondary}]}>
-            To join a pool, you need an invite code from the organizer. Enter it in
+            To join a Contest, you need an invite code from the Gaffer. Enter it in
             Settings under "Have an invite code?" or tap a shared invite link.
           </Text>
           <Text style={[styles.body, {color: colors.textSecondary, marginTop: spacing.sm}]}>
-            Once you join, you immediately start competing from the pool's start
+            Once you join, you immediately start competing from the Contest's start
             date. No waiting, no approval needed.
           </Text>
         </AccordionSection>
 
-        <AccordionSection title="SmackTalk" colors={colors}>
+        <AccordionSection title="Chirps" colors={colors}>
           <Text style={[styles.body, {color: colors.textSecondary}]}>
-            Every pool has a SmackTalk feed — a chat for trash talk, reactions, and
+            Every Contest has a Chirps feed — a chat for trash talk, reactions, and
             bragging rights. Messages from the last 14 days are visible.
           </Text>
           <Text style={[styles.body, {color: colors.textSecondary, marginTop: spacing.sm}]}>
-            SmackTalk is what makes HotPick social. Use it. Your future self will
+            Chirps are what makes HotPick social. Use them. Your future self will
             thank you when you called that upset in Week 4.
           </Text>
         </AccordionSection>
 
-        <AccordionSection title="Scoring & Leaderboards" colors={colors}>
+        <AccordionSection title="Scoring & the Ladder" colors={colors}>
           <Text style={[styles.body, {color: colors.textSecondary}]}>
             Your score is calculated server-side after games finish. You'll see:
           </Text>
@@ -200,17 +200,17 @@ export function InstructionsScreen() {
             {'\u2022'} Season total: cumulative points across the season
           </Text>
           <Text style={[styles.bulletItem, {color: colors.textSecondary}]}>
-            {'\u2022'} Pool leaderboard: your rank within each pool
+            {'\u2022'} Contest Ladder: your rank within each Contest
           </Text>
           <Text style={[styles.body, {color: colors.textSecondary, marginTop: spacing.sm}]}>
-            Each pool's leaderboard has two views — a weekly breakdown and a
+            Each Contest's Ladder has two views — a weekly breakdown and a
             season-long race. Both are always available.
           </Text>
         </AccordionSection>
 
         <AccordionSection title="Pricing" colors={colors}>
           <Text style={[styles.body, {color: colors.textSecondary}]}>
-            HotPick is free to play. Organizers pay based on pool size:
+            HotPick is free to play. Gaffers pay based on Contest size:
           </Text>
           <View style={[styles.priceRow, {borderBottomColor: colors.background}]}>
             <Text style={[styles.priceLabel, {color: colors.textPrimary}]}>Free</Text>
@@ -229,11 +229,11 @@ export function InstructionsScreen() {
             <Text style={[styles.priceDetail, {color: colors.textSecondary}]}>51+ members (unlimited)</Text>
           </View>
           <Text style={[styles.body, {color: colors.textSecondary, marginTop: spacing.sm}]}>
-            Only the pool organizer pays. Everyone else plays for free. Pricing is
-            per pool, per season.
+            Only the Gaffer pays. Everyone else plays for free. Pricing is
+            per Contest, per season.
           </Text>
           <Text style={[styles.body, {color: colors.primary, marginTop: spacing.sm, fontWeight: '600'}]}>
-            Founding 100 pools are free forever, regardless of size.
+            Founding 100 Contests are free forever, regardless of size.
           </Text>
         </AccordionSection>
 
@@ -242,7 +242,7 @@ export function InstructionsScreen() {
             The NFL season moves through phases:
           </Text>
           <Text style={[styles.bulletItem, {color: colors.textSecondary}]}>
-            {'\u2022'} Pre-Season: set up your profile and pools
+            {'\u2022'} Pre-Season: set up your profile and Contests
           </Text>
           <Text style={[styles.bulletItem, {color: colors.textSecondary}]}>
             {'\u2022'} Regular Season (Weeks 1-18): weekly pick cycle

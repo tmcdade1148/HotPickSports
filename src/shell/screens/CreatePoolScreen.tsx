@@ -60,31 +60,31 @@ export function CreatePoolScreen({navigation}: any) {
       setTimeout(() => navigation.goBack(), 100);
     } else if (result.upgradeRequired) {
       setError(
-        'You have reached the maximum number of pools for your plan. Upgrade to create more pools.',
+        'You have reached the maximum number of Contests for your plan. Upgrade to create more Contests.',
       );
     } else {
-      setError(result.error ?? 'Failed to create pool. Please try again.');
+      setError(result.error ?? 'Failed to create Contest. Please try again.');
     }
   };
 
   const handleCreate = () => {
     const trimmed = poolName.trim();
     if (trimmed.length < 3) {
-      setError('Pool name must be at least 3 characters.');
+      setError('Contest name must be at least 3 characters.');
       return;
     }
     if (trimmed.length > 30) {
-      setError('Pool name must be 30 characters or less.');
+      setError('Contest name must be 30 characters or less.');
       return;
     }
     if (!user?.id || !activeSport?.competition) return;
 
     Alert.alert(
-      'Before You Create Your Pool',
-      'HotPick Pools are for friendly competition only.\n\nCollecting money from participants — entry fees, prize pots, or any financial arrangement — is prohibited by our Terms of Service and may result in account termination.',
+      'Before You Create Your Contest',
+      'HotPick Contests are for friendly competition only.\n\nCollecting money from participants — entry fees, prize pots, or any financial arrangement — is prohibited by our Terms of Service and may result in account termination.',
       [
         {text: 'Cancel', style: 'cancel'},
-        {text: 'I Understand. Create My Pool', onPress: doCreate},
+        {text: 'I Understand. Create My Contest', onPress: doCreate},
       ],
     );
   };
@@ -98,11 +98,11 @@ export function CreatePoolScreen({navigation}: any) {
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Text style={styles.backButton}>{'< Back'}</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>Create Pool</Text>
+          <Text style={styles.title}>Create Contest</Text>
         </View>
 
         <View style={styles.form}>
-          <Text style={styles.label}>Pool Name</Text>
+          <Text style={styles.label}>Contest Name</Text>
           <TextInput
             style={styles.input}
             placeholder="e.g. Friends & Family"
@@ -115,9 +115,9 @@ export function CreatePoolScreen({navigation}: any) {
 
           <View style={styles.switchRow}>
             <View style={styles.switchInfo}>
-              <Text style={styles.switchLabel}>Public Pool</Text>
+              <Text style={styles.switchLabel}>Public Contest</Text>
               <Text style={styles.switchHint}>
-                Anyone can find and join this pool
+                Anyone can find and join this Contest
               </Text>
             </View>
             <Switch
@@ -137,7 +137,7 @@ export function CreatePoolScreen({navigation}: any) {
             {creating ? (
               <ActivityIndicator color={colors.onPrimary} />
             ) : (
-              <Text style={styles.createButtonText}>Create Pool</Text>
+              <Text style={styles.createButtonText}>Create Contest</Text>
             )}
           </TouchableOpacity>
         </View>

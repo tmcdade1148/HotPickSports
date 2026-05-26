@@ -112,7 +112,7 @@ export function ProfileSetupScreen({navigation}: any) {
             {needsFirstNameFallback ? 'Welcome.' : `Welcome, ${profileFirstName}.`}
           </Text>
           <Text style={styles.subtext}>
-            Choose your Poolie Name and pick an avatar to get started.
+            Choose your Player Name and pick an avatar to get started.
           </Text>
 
           {/* First-name fallback — only shown when Apple returned nil fullName */}
@@ -137,7 +137,7 @@ export function ProfileSetupScreen({navigation}: any) {
           {/* Poolie name (required) */}
           <View style={styles.section}>
             <Text style={styles.label}>
-              Choose your Poolie Name <Text style={styles.required}>*</Text>
+              Choose your Player Name <Text style={styles.required}>*</Text>
             </Text>
             <TextInput
               style={[styles.input, poolieError ? styles.inputError : null]}
@@ -158,7 +158,7 @@ export function ProfileSetupScreen({navigation}: any) {
               <Text style={styles.error}>{poolieError}</Text>
             ) : (
               <Text style={styles.hint}>
-                Shown on leaderboards and SmackTalk. You can change it later.
+                Shown on the Ladder and in Chirps. You can change it later.
               </Text>
             )}
           </View>

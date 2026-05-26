@@ -31,20 +31,20 @@ const PREF_LABELS: Record<string, {label: string; description: string}> = {
     description: 'When your weekly scores are posted',
   },
   leaderboard_change: {
-    label: 'Leaderboard Movement',
+    label: 'Ladder Movement',
     description: 'When your ranking changes',
   },
   smacktalk_mention: {
-    label: 'SmackTalk Mentions',
+    label: 'Chirp Mentions',
     description: 'When someone @mentions you',
   },
   smacktalk_reply: {
-    label: 'SmackTalk Replies',
+    label: 'Chirp Replies',
     description: 'When someone replies to your message',
   },
   organizer_broadcast: {
-    label: 'Pool Broadcasts',
-    description: 'Messages from your pool organizer',
+    label: 'Contest Broadcasts',
+    description: 'Messages from your Gaffer',
   },
   streak_milestone: {
     label: 'Streak & Milestones',
@@ -52,7 +52,7 @@ const PREF_LABELS: Record<string, {label: string; description: string}> = {
   },
   new_member_joined: {
     label: 'New Members',
-    description: 'When someone joins your pool',
+    description: 'When someone joins your Contest',
   },
 };
 

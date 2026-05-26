@@ -9,7 +9,7 @@ import {useTheme} from '@shell/theme';
 const GUIDELINES = [
   {
     title: 'Keep it fun',
-    body: 'SmackTalk is for friendly trash talk, bold predictions, and celebrating great picks. Keep the energy competitive — not hostile.',
+    body: 'Chirps are for friendly trash talk, bold predictions, and celebrating great picks. Keep the energy competitive — not hostile.',
   },
   {
     title: 'Respect everyone',
@@ -17,19 +17,19 @@ const GUIDELINES = [
   },
   {
     title: 'No real-money talk',
-    body: 'HotPick is for bragging rights only. Do not use SmackTalk or any pool feature to organize, promote, or facilitate financial arrangements between users.',
+    body: 'HotPick is for bragging rights only. Do not use Chirps or any Contest feature to organize, promote, or facilitate financial arrangements between users.',
   },
   {
     title: 'No spam or self-promotion',
-    body: 'No advertisements, links to external sites, or repeated messages. Keep conversations relevant to your pool.',
+    body: 'No advertisements, links to external sites, or repeated messages. Keep conversations relevant to your Contest.',
   },
   {
     title: 'Protect privacy',
-    body: 'Do not share other people\'s personal information. What happens in the pool stays in the pool.',
+    body: 'Do not share other people\'s personal information. What happens in the Contest stays in the Contest.',
   },
   {
     title: 'Report, don\'t retaliate',
-    body: 'If you see something that violates these guidelines, use the Report option (long-press any message). Pool organizers and admins review all reports. You can also block users to hide their messages.',
+    body: 'If you see something that violates these guidelines, use the Report option (long-press any message). Gaffers and admins review all reports. You can also block users to hide their messages.',
   },
 ];
 
@@ -53,7 +53,7 @@ export function CommunityGuidelinesScreen() {
         style={styles.flex}
         contentContainerStyle={styles.content}>
         <Text style={[styles.intro, {color: colors.textSecondary}]}>
-          HotPick pools are communities built on friendly competition. These guidelines keep SmackTalk fun for everyone.
+          HotPick Contests are communities built on friendly competition. These guidelines keep Chirps fun for everyone.
         </Text>
 
         {GUIDELINES.map((g, i) => (
@@ -64,7 +64,7 @@ export function CommunityGuidelinesScreen() {
         ))}
 
         <Text style={[styles.footer, {color: colors.textSecondary}]}>
-          Violations may result in message removal, temporary muting, or removal from a pool at the organizer's discretion. Repeated violations may result in account suspension.
+          Violations may result in message removal, temporary muting, or removal from a Contest at the Gaffer's discretion. Repeated violations may result in account suspension.
         </Text>
       </ScrollView>
     </SafeAreaView>

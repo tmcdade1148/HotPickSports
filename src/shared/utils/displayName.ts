@@ -6,6 +6,6 @@ import type {DbProfile} from '@shared/types/database';
  * First/last name is for account identity only, never shown in UI.
  */
 export function getDisplayName(profile: DbProfile | null): string {
-  if (!profile) return 'Poolie';
-  return profile.poolie_name || 'Poolie';
+  if (!profile) return 'Player';
+  return profile.poolie_name || 'Player';
 }
