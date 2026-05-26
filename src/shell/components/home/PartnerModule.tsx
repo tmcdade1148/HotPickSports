@@ -20,6 +20,7 @@ import {hexToRgba} from '@shared/utils/color';
 import {LogoMark} from './LogoMark';
 import {partnerInitials} from './teamColors';
 import {PerkIcon} from './PerkIcon';
+import {LEXICON} from '@shared/lexicon';
 
 const RECENT_WINDOW_MS = 60 * 60 * 1000;
 
@@ -135,7 +136,7 @@ export function PartnerModule({partnerId, alignedPools}: PartnerModuleProps) {
           {partner.perk_text}
         </Text>
         <Text style={[bodyType.bold, styles.perkEyebrow, {color: colors.textTertiary}]}>
-          PARTNER PERK
+          {LEXICON.club.short.toUpperCase()} {LEXICON.perks.toUpperCase()}
         </Text>
       </View>
     </Pressable>

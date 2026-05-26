@@ -25,6 +25,7 @@ import {PoolHeader} from '@shell/components/PoolHeader';
 import {PicksHeader} from '@shell/components/PicksHeader';
 import {SubmitPicksBarSlot} from '@shell/components/SubmitPicksBarSlot';
 import {spacing, typography, borderRadius} from '@shared/theme';
+import {LEXICON} from '@shared/lexicon';
 import {useForegroundRefetch} from '@shared/hooks/useForegroundRefetch';
 
 // Sport store imports for initialization
@@ -156,7 +157,7 @@ function SmackTalkTab() {
   const globalPool = userPools.find(p => p.is_global);
   const smackPoolId = activePoolId || globalPool?.id || null;
   if (!activeSport || !smackPoolId) {
-    return <EmptyTabScreen label="SmackTalk" />;
+    return <EmptyTabScreen label={LEXICON.chirps.plural} />;
   }
   return (
     <SafeAreaView style={{flex: 1, backgroundColor: colors.background}} edges={['top']}>
@@ -566,7 +567,7 @@ export function MainTabNavigator() {
         name="LeaderboardTab"
         component={LeaderboardTab}
         options={{
-          tabBarLabel: 'Leaders',
+          tabBarLabel: LEXICON.ladder.short,
           tabBarIcon: ({color, size}) => (
             <BarChart2 size={size} color={color} />
           ),
@@ -576,7 +577,7 @@ export function MainTabNavigator() {
         name="SmackTalkTab"
         component={SmackTalkTab}
         options={{
-          tabBarLabel: 'SmackTalk',
+          tabBarLabel: LEXICON.chirps.plural,
           tabBarIcon: ({color, size}) => (
             <MessageCircle size={size} color={color} />
           ),

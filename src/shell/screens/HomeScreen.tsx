@@ -21,6 +21,7 @@ import {Insight} from '@shell/components/home/Insight';
 import {PoolModule} from '@shell/components/home/PoolModule';
 import {PartnerModule} from '@shell/components/home/PartnerModule';
 import {resolveHomeState} from '@shell/components/home/resolveHomeState';
+import {LEXICON} from '@shared/lexicon';
 
 export function HomeScreen() {
   const {colors} = useTheme();
@@ -247,7 +248,7 @@ export function HomeScreen() {
         {showPoolStack && visiblePools.length > 0 && (
           <View style={styles.section}>
             <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textTertiary}]}>
-              YOUR POOLS
+              YOUR {LEXICON.contest.plural.toUpperCase()}
             </Text>
             {sortedVisiblePools.map(p => (
               <PoolModule key={p.id} pool={p} />
