@@ -706,74 +706,11 @@ export function PoolSettingsScreen() {
           <Text style={[styles.broadcastText, {color: accentColor}]}>Send Broadcast</Text>
         </TouchableOpacity>
 
-        {/* Club Pool admin: perk editor + broadcast button live here.
-            The roster *list* (above, under Contest Name) handles
-            "which Clubs is this Contest affiliated with" — these
-            controls are exclusively for the Club admin running their
-            own Club Pool. */}
-
-        {pool.partner_id && partnerRow && partnerRow.club_pool_id === pool.id && (
-          <View style={styles.partnerCard}>
-            <Text style={styles.partnerCardTitle}>
-              {partnerRow.name} perk
-            </Text>
-            <Text style={styles.partnerCardHint}>
-              Shows on every Contest on {partnerRow.name}'s roster. Max 120 chars.
-            </Text>
-            <View style={styles.perkInputRow}>
-              <TextInput
-                style={styles.perkIconInput}
-                value={perkIcon}
-                onChangeText={setPerkIcon}
-                placeholder="🎁"
-                placeholderTextColor={colors.textSecondary}
-                maxLength={16}
-              />
-              <TextInput
-                style={styles.perkTextInput}
-                value={perkText}
-                onChangeText={text => {
-                  if (text.length <= 120) setPerkText(text);
-                }}
-                placeholder="$1 off any draft, Sundays."
-                placeholderTextColor={colors.textSecondary}
-                multiline
-                maxLength={120}
-              />
-            </View>
-            <Text style={styles.perkCharCount}>{perkText.length}/120</Text>
-            <TouchableOpacity
-              style={[
-                styles.perkSaveButton,
-                (!perkDirty || perkSaving) && styles.perkSaveButtonDisabled,
-              ]}
-              onPress={handleSavePerk}
-              disabled={!perkDirty || perkSaving}>
-              {perkSaving ? (
-                <ActivityIndicator size="small" color={colors.onPrimary} />
-              ) : (
-                <Text style={styles.perkSaveText}>Save Perk</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {pool.partner_id && partnerRow && partnerRow.club_pool_id === pool.id && (
-          <TouchableOpacity
-            style={[styles.broadcastButton, {borderColor: accentColor}]}
-            onPress={() => {
-              setPartnerBroadcastMessage('');
-              setPartnerBroadcastVisible(true);
-            }}>
-            <Megaphone size={18} color={accentColor} />
-            <Text style={[styles.broadcastText, {color: accentColor}]}>
-              Send {partnerRow.name} Broadcast
-            </Text>
-          </TouchableOpacity>
-        )}
-
-        {/* "Add/Edit Clubs" button now lives in the Club Rosters section
-            at the top of the screen — removed from here. */}
+        {/* Club Pool admin tools (perk editor + partner broadcast)
+            moved to ClubAdminScreen (Settings → Club Admin). Reachable
+            from there for any user organizing a Club Pool. The
+            "Add/Edit Clubs" button now lives in the Club Rosters
+            section at the top of this screen. */}
 
         <Text style={styles.sectionTitle}>Moderation</Text>
         <TouchableOpacity

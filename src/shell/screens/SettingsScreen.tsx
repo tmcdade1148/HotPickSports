@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -59,6 +59,42 @@ export function SettingsScreen({route}: any) {
   // Show global pool in settings when user has no visible private pools
   const userPools = visiblePools.length > 0 ? visiblePools : allPools;
   const poolRoles = useGlobalStore(s => s.poolRoles);
+
+  // Club Admin gating — null = not a Club Manager; string = the Club's name.
+  // Resolved server-side: are you the organizer of any pool flagged
+  // as a Club Pool (partners.club_pool_id)?
+  const [managedClubName, setManagedClubName] = useState<string | null>(null);
+  useEffect(() => {
+    if (!user?.id) {
+      setManagedClubName(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      // Pools where user is organizer
+      const {data: memberRows} = await supabase
+        .from('pool_members')
+        .select('pool_id')
+        .eq('user_id', user.id)
+        .eq('role', 'organizer')
+        .eq('status', 'active');
+      const orgPoolIds = (memberRows ?? []).map((r: {pool_id: string}) => r.pool_id);
+      if (orgPoolIds.length === 0) {
+        if (!cancelled) setManagedClubName(null);
+        return;
+      }
+      const {data: clubRows} = await supabase
+        .from('partners')
+        .select('name')
+        .in('club_pool_id', orgPoolIds)
+        .eq('is_active', true)
+        .limit(1);
+      if (cancelled) return;
+      const name = (clubRows ?? [])[0]?.name as string | undefined;
+      setManagedClubName(name ?? null);
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id]);
   const activePoolId = useGlobalStore(s => s.activePoolId);
   // Member counts come from the Home screen's rank loader (kept in
   // userRankByPool). If the user lands on Settings first the map is
@@ -252,6 +288,29 @@ export function SettingsScreen({route}: any) {
         </View>
         <ChevronRight size={20} color={colors.textSecondary} />
       </TouchableOpacity>
+
+      {/* Club Admin — visible only when the user organizes a Club Pool
+          (the de facto Partner Admin). Resolves the Club name on mount
+          via SettingsScreen's existing managed-club effect (see top of
+          component). */}
+      {managedClubName !== null && (
+        <View style={[styles.groupCard, {backgroundColor: colors.surface, marginBottom: spacing.md}]}>
+          <TouchableOpacity
+            style={styles.groupRow}
+            onPress={() => navigation.navigate('ClubAdmin')}>
+            <View style={styles.linkLeft}>
+              <Settings size={20} color={colors.primary} />
+              <View>
+                <Text style={[styles.linkText, {color: colors.textPrimary}]}>Club Admin</Text>
+                <Text style={{fontSize: 12, color: colors.textSecondary, marginTop: 2}}>
+                  Managing: {managedClubName}
+                </Text>
+              </View>
+            </View>
+            <ChevronRight size={18} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Inbox section */}
       <Text style={[styles.groupLabel, {color: colors.textSecondary}]}>Inbox</Text>
