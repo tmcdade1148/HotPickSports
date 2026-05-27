@@ -194,10 +194,11 @@ describe('PoolModule tap routing (spec §6.4.6)', () => {
     ReactTestRenderer.act(() => {
       tree = ReactTestRenderer.create(<PoolModule pool={partnerPool} />);
     });
-    // Redesign-v5: per-Contest settings gear removed from the Home
-    // card (pool settings rarely-used; reached via Settings tab now).
-    // Three Pressables remain: card body, Chirps badge, affiliation
-    // row → partner roster.
-    expect(findPressables(tree!.root)).toHaveLength(3);
+    // Redesign-v6: the broadcast indicator (Megaphone) became a
+    // Pressable that routes to Message Center (was a plain View that
+    // fell through to the card-level Leaderboard nav).
+    // Four Pressables: card body, broadcast indicator, Chirps badge,
+    // affiliated-Club name.
+    expect(findPressables(tree!.root)).toHaveLength(4);
   });
 });

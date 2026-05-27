@@ -435,8 +435,13 @@ export function PoolModule({pool}: PoolModuleProps) {
           </View>
 
           <View style={styles.badgeColumn}>
-            <View
-              style={[
+            {/* Broadcast indicator — tap goes to Message Center, not
+                the Leaderboard. Always tappable so the inbox is
+                reachable from the card whether or not there's unread. */}
+            <Pressable
+              onPress={() => navigation.navigate('MessageCenter')}
+              hitSlop={6}
+              style={({pressed}) => [
                 styles.newBadge,
                 orgUnread > 0
                   ? {
@@ -447,12 +452,13 @@ export function PoolModule({pool}: PoolModuleProps) {
                       backgroundColor: 'transparent',
                       borderColor: colors.border,
                     },
+                {opacity: pressed ? 0.6 : 1},
               ]}
-              accessible
+              accessibilityRole="button"
               accessibilityLabel={
                 orgUnread > 0
-                  ? `${orgUnread} new ${LEXICON.gaffer.short} ${orgUnread === 1 ? 'message' : 'messages'}`
-                  : `No new ${LEXICON.gaffer.short} messages`
+                  ? `${orgUnread} new ${LEXICON.gaffer.short} ${orgUnread === 1 ? 'message' : 'messages'}, open Message Center`
+                  : `Open Message Center`
               }>
               <Megaphone
                 size={12}
@@ -464,7 +470,7 @@ export function PoolModule({pool}: PoolModuleProps) {
                   {orgUnread > 9 ? '9+' : orgUnread}
                 </Text>
               )}
-            </View>
+            </Pressable>
             <Pressable
               onPress={goToSmackTalk}
               hitSlop={8}
