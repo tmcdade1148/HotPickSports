@@ -144,6 +144,20 @@ export function MessageCenterScreen() {
 
     setMessages(items);
     setLoading(false);
+
+    // Mark every pool the user is in as read up to now. Upsert one row
+    // per (user_id, pool_id); the HomeInbox banner subscribes to UPDATE
+    // events on this table so the unread count clears in real-time as
+    // soon as the upsert lands.
+    if (userId && poolIds.length > 0) {
+      const nowIso = new Date().toISOString();
+      await supabase
+        .from('notification_read_state')
+        .upsert(
+          poolIds.map(pid => ({user_id: userId, pool_id: pid, last_read_at: nowIso})),
+          {onConflict: 'user_id,pool_id'},
+        );
+    }
   }, [userPools, userId]);
 
   useEffect(() => {
