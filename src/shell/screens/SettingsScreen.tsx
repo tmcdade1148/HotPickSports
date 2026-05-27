@@ -331,23 +331,24 @@ export function SettingsScreen({route}: any) {
             const hotpick = {primary: colors.primary, secondary: colors.secondary, surface: colors.surface};
 
             // Three visual states:
-            //   • Official + active:   solid Club primary bg, contrast text
-            //   • Official + inactive: neutral bg + 1.5px Club border + Club-color text
-            //                          (same shape as an inactive private pill, but
-            //                           Club-colored accents — per 2026-05-27 product call)
-            //   • Non-Official:        neutral bg, primary HotPick border only when active
+            //   • Official + active:   solid Club primary bg + contrast text
+            //   • Official + inactive: neutral surface + 1.5px NEUTRAL
+            //                          outline + standard text. Reads as a
+            //                          quiet, unselected row (per 2026-05-27
+            //                          product call). The "Mes Que · Gaffer"
+            //                          subtitle still calls out the Club
+            //                          relationship — the pill itself doesn't
+            //                          need to be Club-colored when not active.
+            //   • Non-Official:        neutral bg; HotPick primary border
+            //                          only when active.
             const pillBg = isBranded && isActive ? poolBrand.primary : undefined;
-            const pillTextColor = isBranded
-              ? isActive
-                ? (isLightColor(pillBg!) ? '#181818' : '#FFFFFF')
-                : poolBrand.primary
+            const pillTextColor = isBranded && isActive
+              ? (isLightColor(pillBg!) ? '#181818' : '#FFFFFF')
               : isActive
                 ? hotpick.primary
                 : colors.textPrimary;
-            const pillIconColor = isBranded
-              ? isActive
-                ? (isLightColor(pillBg!) ? '#181818' : '#FFFFFF')
-                : poolBrand.primary
+            const pillIconColor = isBranded && isActive
+              ? (isLightColor(pillBg!) ? '#181818' : '#FFFFFF')
               : isActive
                 ? hotpick.primary
                 : colors.textSecondary;
@@ -365,11 +366,10 @@ export function SettingsScreen({route}: any) {
                   // sits on neutral surface.
                   isBranded && isActive && {backgroundColor: pillBg},
                   (!isBranded || !isActive) && {backgroundColor: hotpick.surface},
-                  // Borders signal active state:
-                  //   Official+inactive: Club border (always — pill still
-                  //     reads as Club-themed even when not selected)
-                  //   Non-Official+active: HotPick border
-                  isBranded && !isActive && {borderWidth: 1.5, borderColor: poolBrand.primary},
+                  // Borders: inactive Official gets a quiet neutral outline
+                  // so it doesn't disappear into the rest of the list.
+                  // Active private gets the HotPick accent border.
+                  isBranded && !isActive && {borderWidth: 1.5, borderColor: colors.border},
                   !isBranded && isActive && {borderWidth: 1.5, borderColor: hotpick.primary},
                 ]}
                 onPress={() => setActivePoolId(pool.id)}>
