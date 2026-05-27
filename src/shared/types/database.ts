@@ -37,6 +37,12 @@ export interface DbProfile {
   career_hotpick_correct: number;
   career_hotpick_total: number;
   is_super_admin: boolean;
+  // Platform-wide suspension (super_admin action). Suspended users see
+  // a root-level modal they can't bypass; their writes are RLS-blocked.
+  is_platform_suspended: boolean;
+  platform_suspended_at: string | null;
+  platform_suspended_by: string | null;
+  platform_suspension_reason: string | null;
   created_at: string;
   updated_at: string;
 }

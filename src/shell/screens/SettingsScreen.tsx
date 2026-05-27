@@ -289,6 +289,24 @@ export function SettingsScreen({route}: any) {
         <ChevronRight size={20} color={colors.textSecondary} />
       </TouchableOpacity>
 
+      {/* HotPick Admin — visible only to platform super_admins.
+          Entry point to the AdminHome hub (Moderation Queue, Pool
+          Management, Broadcast, etc.). Per April 2026 Super Admin
+          spec §5.1. */}
+      {userProfile?.is_super_admin && (
+        <View style={[styles.groupCard, {backgroundColor: colors.surface, marginBottom: spacing.md}]}>
+          <TouchableOpacity
+            style={styles.groupRow}
+            onPress={() => navigation.navigate('AdminHome')}>
+            <View style={styles.linkLeft}>
+              <Shield size={20} color={colors.primary} />
+              <Text style={[styles.linkText, {color: colors.textPrimary}]}>HotPick Admin</Text>
+            </View>
+            <ChevronRight size={18} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Club Admin — visible only when the user organizes a Club Pool
           (the de facto Partner Admin). Resolves the Club name on mount
           via SettingsScreen's existing managed-club effect (see top of
