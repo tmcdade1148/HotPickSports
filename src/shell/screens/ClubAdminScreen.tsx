@@ -260,7 +260,7 @@ export function ClubAdminScreen() {
       Alert.alert('Could not send', error.message);
       return;
     }
-    const result = data as {ok?: boolean; recipients?: number; error?: string};
+    const result = data as {broadcast_id?: string; recipient_count?: number; error?: string};
     if (result?.error) {
       Alert.alert('Could not send', result.error);
       return;
@@ -269,8 +269,8 @@ export function ClubAdminScreen() {
     setBroadcastVisible(false);
     Alert.alert(
       'Sent',
-      `Broadcast reached ${result.recipients ?? 0} ${
-        (result.recipients ?? 0) === 1 ? 'Player' : 'Players'
+      `Broadcast reached ${result.recipient_count ?? 0} ${
+        (result.recipient_count ?? 0) === 1 ? 'Player' : 'Players'
       } on ${partner.name}'s roster.`,
     );
   };
