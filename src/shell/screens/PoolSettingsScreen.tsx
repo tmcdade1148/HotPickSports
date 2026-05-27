@@ -13,6 +13,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {
@@ -20,7 +21,6 @@ import {
   Copy,
   Share2,
   Archive,
-  Globe,
   Award,
   Megaphone,
   AlertTriangle,
@@ -61,6 +61,25 @@ export function PoolSettingsScreen() {
   // no archive) per the April 2026 spec.
   const myRole = useGlobalStore(s => s.poolRoles[poolId]);
   const isOrganizer = myRole === 'organizer';
+  const isAdmin = myRole === 'admin';
+
+  // One-time intro for a new Admin. Persisted per-Contest in AsyncStorage
+  // so we don't pester returning Admins. Default true (shown) until we
+  // know better — hides instantly once we load the dismissed flag.
+  const adminIntroKey = `dismissed_admin_intro_${poolId}`;
+  const [showAdminIntro, setShowAdminIntro] = useState(false);
+  useEffect(() => {
+    if (!isAdmin) return;
+    AsyncStorage.getItem(adminIntroKey)
+      .then(val => {
+        if (val !== 'true') setShowAdminIntro(true);
+      })
+      .catch(() => {});
+  }, [isAdmin, adminIntroKey]);
+  const dismissAdminIntro = () => {
+    setShowAdminIntro(false);
+    AsyncStorage.setItem(adminIntroKey, 'true').catch(() => {});
+  };
   // Club Rosters section reads + writes through the affiliations slice
   // so the home screen + Contest cards see updates without an extra
   // round-trip.
@@ -429,6 +448,32 @@ export function PoolSettingsScreen() {
           <View style={{width: 24}} />
         </View>
 
+        {/* Admin intro — shown once per Contest to a freshly-promoted
+            Pool Admin so they know what they can and can't do. The
+            Gaffer never sees this; once dismissed, persisted in
+            AsyncStorage and never shown again on this device. */}
+        {showAdminIntro && (
+          <View style={styles.adminIntroCard}>
+            <Text style={styles.adminIntroTitle}>
+              You're an Admin of this Contest.
+            </Text>
+            <Text style={styles.adminIntroBody}>
+              That means you can send broadcasts, action flagged
+              messages, warn or remove members, and edit Contest
+              settings — the same day-to-day stuff the Gaffer can do.
+              {'\n\n'}
+              Two things stay with the Gaffer only:
+              {'\n'}   • Naming other Admins
+              {'\n'}   • Archiving the Contest
+              {'\n\n'}
+              If you have questions, message the Gaffer.
+            </Text>
+            <TouchableOpacity onPress={dismissAdminIntro} style={styles.adminIntroDismiss}>
+              <Text style={styles.adminIntroDismissText}>Got it</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Pool Name */}
         <Text style={styles.sectionTitle}>Contest Name</Text>
         <View style={styles.nameRow}>
@@ -647,16 +692,10 @@ export function PoolSettingsScreen() {
           )}
         </View>
 
-        {/* Privacy label — switch hidden; pools are always private at launch */}
-        <View style={styles.toggleRow}>
-          <Globe size={18} color={colors.textSecondary} />
-          <View style={styles.toggleInfo}>
-            <Text style={styles.toggleLabel}>Private Contest</Text>
-            <Text style={styles.toggleDesc}>
-              Only people with the invite code can join
-            </Text>
-          </View>
-        </View>
+        {/* Privacy placeholder block removed (2026-05-27) — all
+            Contests are now private by definition, so the always-on
+            label was vestigial. Privacy posture is communicated at
+            Create-time + on the empty-state hero instead. */}
 
         {/* Communication & Moderation */}
         <Text style={styles.sectionTitle}>Communication</Text>
@@ -878,6 +917,41 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginBottom: spacing.sm,
     paddingHorizontal: spacing.lg,
   },
+
+  // Admin intro tooltip — one-time per Contest.
+  adminIntroCard: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.lg,
+    padding: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  adminIntroTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+  },
+  adminIntroBody: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.textSecondary,
+  },
+  adminIntroDismiss: {
+    marginTop: spacing.md,
+    alignSelf: 'flex-end',
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.primary,
+  },
+  adminIntroDismissText: {
+    color: colors.onPrimary,
+    fontWeight: '700',
+    fontSize: 13,
+  },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1059,29 +1133,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: colors.primary,
-  },
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.lg,
-    gap: spacing.sm,
-  },
-  toggleInfo: {
-    flex: 1,
-  },
-  toggleLabel: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: colors.textPrimary,
-  },
-  toggleDesc: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 2,
   },
   toggleIndicator: {
     width: 44,

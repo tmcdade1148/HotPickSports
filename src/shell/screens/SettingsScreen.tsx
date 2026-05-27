@@ -5,6 +5,7 @@ import {
   TextInput,
   TouchableOpacity,
   Alert,
+  Linking,
   ScrollView,
   ActivityIndicator,
   StyleSheet,
@@ -33,6 +34,7 @@ import {
   Trash2,
   MessageSquare,
   Bell,
+  HelpCircle,
 } from 'lucide-react-native';
 import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
@@ -648,6 +650,33 @@ export function SettingsScreen({route}: any) {
           </View>
         </>
       )}
+
+      {/* Get Help — fires a mailto: to the support inbox. v1 fallback per
+          the 2026-05-27 product call (deferred a fuller in-app ticket
+          form). Pre-populates a context line so support knows who's
+          writing and from which app build. */}
+      <TouchableOpacity
+        style={[styles.signOutButton, {borderColor: colors.border, marginTop: 0}]}
+        onPress={() => {
+          const subject = encodeURIComponent('HotPick — Help request');
+          const body = encodeURIComponent(
+            `\n\n\n---\nFrom: ${userProfile?.poolie_name ?? user?.email ?? 'a HotPick user'}\n` +
+            `Email: ${user?.email ?? ''}\n` +
+            `User ID: ${user?.id ?? ''}\n` +
+            `Please describe what you need help with above this line.`,
+          );
+          Linking.openURL(
+            `mailto:support@hotpicksports.com?subject=${subject}&body=${body}`,
+          ).catch(() => {
+            Alert.alert(
+              'Email not available',
+              'Reach us at support@hotpicksports.com',
+            );
+          });
+        }}>
+        <HelpCircle size={18} color={colors.textPrimary} />
+        <Text style={[styles.signOutText, {color: colors.textPrimary}]}>Get Help</Text>
+      </TouchableOpacity>
 
       {/* Sign out */}
       <TouchableOpacity style={[styles.signOutButton, {borderColor: colors.error}]} onPress={handleSignOut}>
