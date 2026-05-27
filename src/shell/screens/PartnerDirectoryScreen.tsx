@@ -62,6 +62,7 @@ export function PartnerDirectoryScreen() {
   const [partners, setPartners] = useState<PartnerRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   // Multi-affiliation state: the set of partner_ids the pool is currently
   // affiliated with, sourced from pool_partner_affiliations.
   const [affiliatedIds, setAffiliatedIds] = useState<Set<string>>(new Set());
@@ -345,6 +346,27 @@ export function PartnerDirectoryScreen() {
           </View>
         )}
 
+        {/* Search — name only at launch. Location-aware sort + filter
+            ships with the partners.public_info migration (Phase 1 item 6).
+            Empty query = show all (alphabetical, the default order from
+            the fetch). */}
+        <View style={[styles.searchRow, {backgroundColor: colors.surface, borderColor: colors.border}]}>
+          <Text style={{fontSize: 16}}>🔍</Text>
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search by name"
+            placeholderTextColor={colors.textTertiary}
+            style={[styles.searchInput, {color: colors.textPrimary}]}
+            autoCorrect={false}
+          />
+          {searchQuery.length > 0 && (
+            <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
+              <XIcon size={16} color={colors.textTertiary} />
+            </Pressable>
+          )}
+        </View>
+
         {loading ? (
           <ActivityIndicator color={colors.primary} style={{marginTop: spacing.xl}} />
         ) : partners.length === 0 ? (
@@ -352,7 +374,13 @@ export function PartnerDirectoryScreen() {
             No Clubs are currently active.
           </Text>
         ) : (
-          partners.map(partner => {
+          partners
+            .filter(p => {
+              const q = searchQuery.trim().toLowerCase();
+              if (q.length === 0) return true;
+              return p.name.toLowerCase().includes(q);
+            })
+            .map(partner => {
             const logo = resolvePartnerLogo(partner.brand_config);
             const isAffiliated = affiliatedIds.has(partner.id);
             const isWorking = working === partner.id;
@@ -429,6 +457,23 @@ const styles = StyleSheet.create({
   title: {fontSize: 16, letterSpacing: 1.5},
   scroll: {paddingBottom: spacing.xxl, paddingHorizontal: spacing.lg, gap: spacing.sm},
   intro: {fontSize: 13, marginBottom: spacing.md, lineHeight: 18},
+
+  // Search bar above the Club list.
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderWidth: 1,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.md,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    paddingVertical: 0,
+  },
 
   // Roster Pass redemption card
   passCard: {
