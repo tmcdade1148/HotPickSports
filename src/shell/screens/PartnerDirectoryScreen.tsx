@@ -15,16 +15,18 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation, useRoute, type RouteProp} from '@react-navigation/native';
-import {ChevronLeft, Check, X as XIcon} from 'lucide-react-native';
+import {ChevronLeft, Check, Ticket, X as XIcon} from 'lucide-react-native';
 import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {useTheme} from '@shell/theme/hooks';
 import {bodyType, displayType, spacing, borderRadius} from '@shared/theme';
 import {readableTextOn} from '@shared/utils/color';
+import {formatRosterPass, normalizeRosterPass} from '@shared/utils/format';
 
 type PartnerRow = {
   id: string;
@@ -120,6 +122,67 @@ export function PartnerDirectoryScreen() {
     updatePoolBrandConfig(poolId, (partner.brand_config as any) ?? null);
   };
 
+  // Roster Pass redemption path: Gaffer enters the 8-char pass a Club
+  // admin shared with them. Resolve to partner_id server-side, then run
+  // the same affiliation flow as picking from the directory.
+  const [passInput, setPassInput] = useState('');
+  const [passWorking, setPassWorking] = useState(false);
+  const normalizedPass = useMemo(() => normalizeRosterPass(passInput), [passInput]);
+  const passComplete = normalizedPass.length === 8;
+
+  const handleAffiliateByPass = async () => {
+    if (!passComplete) return;
+    setPassWorking(true);
+    const {data, error} = await supabase.rpc('resolve_roster_pass', {
+      p_pass: normalizedPass,
+    });
+    if (error) {
+      setPassWorking(false);
+      Alert.alert('Could not redeem', error.message);
+      return;
+    }
+    const result = data as
+      | {partner_id: string; partner_name: string; brand_config: Record<string, unknown>}
+      | {error: string};
+    if ('error' in result) {
+      setPassWorking(false);
+      Alert.alert(
+        result.error === 'INVALID_PASS' || result.error === 'INVALID_LENGTH'
+          ? 'Roster Pass not recognized'
+          : 'Could not redeem',
+        result.error === 'INVALID_PASS' || result.error === 'INVALID_LENGTH'
+          ? 'Double-check the pass with the Club admin and try again.'
+          : result.error,
+      );
+      return;
+    }
+    if (affiliatedIds.has(result.partner_id)) {
+      setPassWorking(false);
+      Alert.alert(
+        'Already affiliated',
+        `Your Contest is already on ${result.partner_name}'s roster.`,
+      );
+      return;
+    }
+    // Reuse the existing affiliation RPC — it gates on organizer role
+    // and snapshots brand_config server-side.
+    const {error: affErr} = await supabase.rpc('add_pool_affiliation', {
+      p_pool_id:    poolId,
+      p_partner_id: result.partner_id,
+      p_is_primary: false,
+    });
+    setPassWorking(false);
+    if (affErr) {
+      Alert.alert('Could not affiliate', affErr.message);
+      return;
+    }
+    setPassInput('');
+    await refreshAffiliations();
+    loadPoolAffiliations([poolId]).catch(() => {});
+    updatePoolBrandConfig(poolId, (result.brand_config as any) ?? null);
+    Alert.alert('Affiliated', `Your Contest is now on ${result.partner_name}'s roster.`);
+  };
+
   const handleRemove = (partner: PartnerRow) => {
     Alert.alert(
       `Remove affiliation with ${partner.name}?`,
@@ -170,6 +233,61 @@ export function PartnerDirectoryScreen() {
           Affiliate your Contest with one or more Clubs. Each Club's brand
           and perk surfaces to your members; their broadcasts reach them too.
         </Text>
+
+        {/* Roster Pass redemption — a Gaffer who's been sent a Roster Pass
+            by a Club admin can enter it here to affiliate immediately,
+            without browsing the directory. Distinct UI from the directory
+            below so the two paths don't blur together. */}
+        <View style={[styles.passCard, {backgroundColor: colors.surface, borderColor: colors.border}]}>
+          <View style={styles.passHeaderRow}>
+            <Ticket size={16} color={colors.primary} strokeWidth={2.25} />
+            <Text style={[bodyType.bold, styles.passTitle, {color: colors.textPrimary}]}>
+              Have a Roster Pass?
+            </Text>
+          </View>
+          <Text style={[bodyType.regular, styles.passHint, {color: colors.textSecondary}]}>
+            Enter the 8-character pass a Club admin shared with you.
+          </Text>
+          <View style={styles.passInputRow}>
+            <TextInput
+              value={formatRosterPass(passInput) || passInput}
+              onChangeText={text => {
+                // Cap at 9 chars (8 alphanumeric + 1 dash) so paste of
+                // longer text gets visibly trimmed.
+                const next = text.slice(0, 9);
+                setPassInput(next);
+              }}
+              placeholder="XXXX-XXXX"
+              placeholderTextColor={colors.textTertiary}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              maxLength={9}
+              style={[
+                styles.passInput,
+                {borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.background},
+              ]}
+              accessibilityLabel="Roster Pass"
+            />
+            <Pressable
+              onPress={handleAffiliateByPass}
+              disabled={!passComplete || passWorking}
+              style={({pressed}) => [
+                styles.passSubmit,
+                {
+                  backgroundColor: passComplete && !passWorking ? colors.primary : colors.border,
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Redeem Roster Pass">
+              {passWorking ? (
+                <ActivityIndicator size="small" color={colors.onPrimary} />
+              ) : (
+                <Text style={[bodyType.bold, {color: colors.onPrimary}]}>Add</Text>
+              )}
+            </Pressable>
+          </View>
+        </View>
 
         {affiliatedPartners.length > 0 && (
           <View style={[styles.alignedCard, {backgroundColor: colors.surface, borderColor: colors.border}]}>
@@ -288,6 +406,52 @@ const styles = StyleSheet.create({
   title: {fontSize: 16, letterSpacing: 1.5},
   scroll: {paddingBottom: spacing.xxl, paddingHorizontal: spacing.lg, gap: spacing.sm},
   intro: {fontSize: 13, marginBottom: spacing.md, lineHeight: 18},
+
+  // Roster Pass redemption card
+  passCard: {
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    gap: 8,
+  },
+  passHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  passTitle: {
+    fontSize: 14,
+  },
+  passHint: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  passInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: 4,
+  },
+  passInput: {
+    flex: 1,
+    height: 44,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+  },
+  passSubmit: {
+    height: 44,
+    minWidth: 64,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+  },
+
   alignedCard: {
     borderRadius: borderRadius.md,
     borderWidth: 1,

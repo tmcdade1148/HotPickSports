@@ -27,6 +27,7 @@ import {
   Plus,
   Star,
   Users,
+  X,
   XCircle,
 } from 'lucide-react-native';
 import {supabase} from '@shared/config/supabase';
@@ -57,6 +58,16 @@ export function PoolSettingsScreen() {
   const poolMembers = useGlobalStore(s => s.poolMembers);
   const updatePoolSettings = useGlobalStore(s => s.updatePoolSettings);
   const archivePool = useGlobalStore(s => s.archivePool);
+  // Club Rosters section reads + writes through the affiliations slice
+  // so the home screen + Contest cards see updates without an extra
+  // round-trip.
+  const poolAffiliationsMap = useGlobalStore(s => s.poolAffiliations);
+  const loadPoolAffiliationsFn = useGlobalStore(s => s.loadPoolAffiliations);
+  const partnersById = useGlobalStore(s => s.partnersById);
+  const owningClub = useGlobalStore(s => {
+    const p = s.userPools.find(x => x.id === poolId);
+    return p?.owning_club_id ? s.partnersById?.[p.owning_club_id] : null;
+  });
 
   const pool = useMemo(
     () => userPools.find(p => p.id === poolId),
@@ -117,6 +128,13 @@ export function PoolSettingsScreen() {
   useEffect(() => {
     fetchCodes();
   }, [fetchCodes]);
+
+  // Pull this pool's affiliations into the store on mount so the
+  // Club Rosters section renders the live list. The store loader
+  // dedupes per pool so calling it here is cheap on re-mount.
+  useEffect(() => {
+    if (poolId) loadPoolAffiliationsFn([poolId]).catch(() => {});
+  }, [poolId, loadPoolAffiliationsFn]);
 
   useEffect(() => {
     if (!pool?.partner_id) {
@@ -237,6 +255,36 @@ export function PoolSettingsScreen() {
     } else {
       Alert.alert('Error', result.error ?? 'Failed to update Contest name');
     }
+  };
+
+  // Remove a Club from this Contest's roster. Confirms first; the
+  // store's loader is then re-run so the list re-paints in place.
+  const [removingPartnerId, setRemovingPartnerId] = useState<string | null>(null);
+  const handleRemoveAffiliation = (partnerId: string, partnerName: string) => {
+    Alert.alert(
+      `Remove ${partnerName}?`,
+      `Your Contest will leave ${partnerName}'s roster. You can re-affiliate any time.`,
+      [
+        {text: 'Cancel', style: 'cancel'},
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            setRemovingPartnerId(partnerId);
+            const {error} = await supabase.rpc('remove_pool_affiliation', {
+              p_pool_id:    poolId,
+              p_partner_id: partnerId,
+            });
+            setRemovingPartnerId(null);
+            if (error) {
+              Alert.alert('Could not remove', error.message);
+              return;
+            }
+            loadPoolAffiliationsFn([poolId]).catch(() => {});
+          },
+        },
+      ],
+    );
   };
 
   const handleAddCode = async () => {
@@ -401,6 +449,64 @@ export function PoolSettingsScreen() {
           )}
         </View>
 
+        {/* CLUB ROSTERS — moved here from below Communication so it
+            sits with the other Contest identity controls (name lives
+            in the row above; "which Clubs does this Contest belong to"
+            is conceptually the next thing). */}
+        <Text style={styles.sectionTitle}>Club Rosters</Text>
+        {/* Official Club Contest: the owning Club is non-removable;
+            shown as a pinned pill at the top of the list. Additional
+            affiliations are blocked at the RPC level (POOL_IS_OFFICIAL),
+            so we hide the Add button below for these pools. */}
+        {pool.owning_club_id && owningClub && (
+          <View style={[styles.clubPillRow, {borderColor: colors.border, backgroundColor: colors.surface}]}>
+            <Text style={[styles.clubPillName, {color: colors.textPrimary}]} numberOfLines={1}>
+              {owningClub.name}
+            </Text>
+            <Text style={[styles.clubPillBadge, {color: colors.textTertiary}]}>OWNING CLUB</Text>
+          </View>
+        )}
+        {!pool.owning_club_id && (poolAffiliationsMap[poolId] ?? []).map(aff => {
+          const live = partnersById[aff.partnerId];
+          const displayName = live?.name ?? aff.partnerName;
+          const isRemoving = removingPartnerId === aff.partnerId;
+          return (
+            <View
+              key={aff.partnerId}
+              style={[styles.clubPillRow, {borderColor: colors.border, backgroundColor: colors.surface}]}>
+              <Text style={[styles.clubPillName, {color: colors.textPrimary}]} numberOfLines={1}>
+                {displayName}
+              </Text>
+              {aff.isPrimary && (
+                <Text style={[styles.clubPillBadge, {color: colors.textTertiary}]}>LEAD</Text>
+              )}
+              <TouchableOpacity
+                onPress={() => handleRemoveAffiliation(aff.partnerId, displayName)}
+                disabled={isRemoving}
+                hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+                style={styles.clubPillRemove}
+                accessibilityRole="button"
+                accessibilityLabel={`Remove ${displayName} affiliation`}>
+                {isRemoving ? (
+                  <ActivityIndicator size="small" color={colors.error} />
+                ) : (
+                  <X size={16} color={colors.error} strokeWidth={2.25} />
+                )}
+              </TouchableOpacity>
+            </View>
+          );
+        })}
+        {!pool.owning_club_id && (
+          <TouchableOpacity
+            style={[styles.broadcastButton, {borderColor: colors.primary}]}
+            onPress={() => navigation.navigate('PartnerDirectory', {poolId})}>
+            <Users size={18} color={colors.primary} />
+            <Text style={[styles.broadcastText, {color: colors.primary}]}>
+              Add/Edit Clubs
+            </Text>
+          </TouchableOpacity>
+        )}
+
         {/* Invite Codes — list view, multiple codes per pool. */}
         {!pool.is_global && (
           <>
@@ -556,17 +662,11 @@ export function PoolSettingsScreen() {
           <Text style={[styles.broadcastText, {color: accentColor}]}>Send Broadcast</Text>
         </TouchableOpacity>
 
-        <Text style={styles.sectionTitle}>Club</Text>
-
-        {pool.partner_id && partnerRow && (
-          <View style={[styles.partnerCard, {marginBottom: 0}]}>
-            <Text style={[styles.partnerCardHint, {fontStyle: 'italic'}]}>
-              {partnerRow.club_pool_id === pool.id
-                ? `This Contest is ${partnerRow.name}'s Contest.`
-                : `This Contest is on ${partnerRow.name}'s roster.`}
-            </Text>
-          </View>
-        )}
+        {/* Club Pool admin: perk editor + broadcast button live here.
+            The roster *list* (above, under Contest Name) handles
+            "which Clubs is this Contest affiliated with" — these
+            controls are exclusively for the Club admin running their
+            own Club Pool. */}
 
         {pool.partner_id && partnerRow && partnerRow.club_pool_id === pool.id && (
           <View style={styles.partnerCard}>
@@ -628,16 +728,8 @@ export function PoolSettingsScreen() {
           </TouchableOpacity>
         )}
 
-        {!(partnerRow && partnerRow.club_pool_id === pool.id) && (
-          <TouchableOpacity
-            style={[styles.broadcastButton, {borderColor: colors.primary}]}
-            onPress={() => navigation.navigate('PartnerDirectory', {poolId})}>
-            <Users size={18} color={colors.primary} />
-            <Text style={[styles.broadcastText, {color: colors.primary}]}>
-              {pool.partner_id ? 'Change roster' : "Join a Club's roster"}
-            </Text>
-          </TouchableOpacity>
-        )}
+        {/* "Add/Edit Clubs" button now lives in the Club Rosters section
+            at the top of the screen — removed from here. */}
 
         <Text style={styles.sectionTitle}>Moderation</Text>
         <TouchableOpacity
@@ -999,6 +1091,31 @@ const createStyles = (colors: any) => StyleSheet.create({
   toggleDotOn: {
     alignSelf: 'flex-end',
   },
+  // Club Rosters pills — one row per affiliated Club with inline Remove.
+  clubPillRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  clubPillName: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  clubPillBadge: {
+    fontSize: 10,
+    letterSpacing: 1,
+    fontWeight: '700',
+  },
+  clubPillRemove: {
+    padding: 4,
+  },
+
   broadcastButton: {
     flexDirection: 'row',
     alignItems: 'center',
