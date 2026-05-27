@@ -24,18 +24,33 @@ export function HomeInbox() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
   const user = useGlobalStore(s => s.user);
-  const userPools = useGlobalStore(s => s.userPools);
 
   const [unread, setUnread] = useState(0);
   const [latestPreview, setLatestPreview] = useState<string | null>(null);
 
   const recompute = useCallback(async () => {
-    if (!user?.id || userPools.length === 0) {
+    if (!user?.id) {
       setUnread(0);
       setLatestPreview(null);
       return;
     }
-    const poolIds = userPools.map(p => p.id);
+    // Resolve the user's full active pool membership across ALL
+    // competitions (including the hidden Platform Pool). Can't use
+    // useGlobalStore(s => s.userPools) here — that slice is scoped to
+    // the active competition and would silently drop messages from
+    // pools in other competitions, including platform-wide admin
+    // broadcasts that live on the cross-competition Platform Pool.
+    const {data: membershipRows} = await supabase
+      .from('pool_members')
+      .select('pool_id')
+      .eq('user_id', user.id)
+      .eq('status', 'active');
+    const poolIds = ((membershipRows ?? []) as {pool_id: string}[]).map(r => r.pool_id);
+    if (poolIds.length === 0) {
+      setUnread(0);
+      setLatestPreview(null);
+      return;
+    }
 
     // One query for unread broadcasts/notes across every pool the user
     // is in. The exact same surface MessageCenter consults — just
@@ -82,7 +97,7 @@ export function HomeInbox() {
     }
     setUnread(unreadCount);
     setLatestPreview(mostRecentUnread?.message ?? null);
-  }, [user?.id, userPools]);
+  }, [user?.id]);
 
   useEffect(() => {
     recompute();

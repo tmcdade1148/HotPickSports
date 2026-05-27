@@ -34,34 +34,54 @@ interface MessageItem {
  */
 export function MessageCenterScreen() {
   const navigation = useNavigation<any>();
-  // Read userPools (not visiblePools) so platform-wide admin broadcasts
-  // — attached to the hidden Platform Pool — appear in the inbox.
-  const userPools = useGlobalStore(s => s.userPools);
   const userId = useGlobalStore(s => s.user?.id);
 
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [poolNameMap, setPoolNameMap] = useState<Record<string, string>>({});
 
-  // Settings page always uses HotPick colors
   const {colors} = useTheme();
 
-  // Per-pool name map. Hidden pools (the Platform Pool) get rebranded
-  // to "HotPick" so platform-wide broadcasts read as system messages
-  // rather than messages from a phantom "Platform Pool" Contest.
-  const poolNameMap: Record<string, string> = {};
-  for (const p of userPools) {
-    poolNameMap[p.id] = p.is_hidden_from_users ? 'HotPick' : p.name;
-  }
-
   const fetchMessages = useCallback(async () => {
-    if (userPools.length === 0 || !userId) {
+    if (!userId) {
       setMessages([]);
       setLoading(false);
       return;
     }
 
-    const poolIds = userPools.map(p => p.id);
+    // Pull the user's full active pool membership directly — across
+    // every competition + including hidden pools like the Platform
+    // Pool. The global store's userPools slice is scoped to the
+    // active competition and would drop platform-wide broadcasts.
+    const {data: memberRows} = await supabase
+      .from('pool_members')
+      .select('pool_id, pools!inner(id, name, is_hidden_from_users)')
+      .eq('user_id', userId)
+      .eq('status', 'active');
+
+    type RawRow = {
+      pool_id: string;
+      pools: {id: string; name: string | null; is_hidden_from_users: boolean}
+           | {id: string; name: string | null; is_hidden_from_users: boolean}[]
+           | null;
+    };
+
+    const poolIds: string[] = [];
+    const nameMap: Record<string, string> = {};
+    for (const r of ((memberRows ?? []) as unknown) as RawRow[]) {
+      const p = Array.isArray(r.pools) ? r.pools[0] : r.pools;
+      if (!p) continue;
+      poolIds.push(p.id);
+      nameMap[p.id] = p.is_hidden_from_users ? 'HotPick' : (p.name ?? 'Contest');
+    }
+    setPoolNameMap(nameMap);
+
+    if (poolIds.length === 0) {
+      setMessages([]);
+      setLoading(false);
+      return;
+    }
     const items: MessageItem[] = [];
 
     // 1. Fetch all broadcasts for user's pools (last 30 days)
@@ -101,7 +121,7 @@ export function MessageCenterScreen() {
 
     // Resolve sender names
     const senderIdArr = [...senderIds];
-    let nameMap: Record<string, string> = {};
+    let senderNameMap: Record<string, string> = {};
     if (senderIdArr.length > 0) {
       const {data: profiles} = await supabase
         .from('profiles')
@@ -109,7 +129,7 @@ export function MessageCenterScreen() {
         .in('id', senderIdArr);
 
       for (const p of profiles ?? []) {
-        nameMap[p.id] = p.poolie_name || 'Gaffer';
+        senderNameMap[p.id] = p.poolie_name || 'Gaffer';
       }
     }
 
@@ -120,7 +140,7 @@ export function MessageCenterScreen() {
         poolId: b.pool_id,
         poolName: poolNameMap[b.pool_id] ?? 'Contest',
         message: b.message,
-        senderName: nameMap[b.organizer_id] ?? 'Gaffer',
+        senderName: senderNameMap[b.organizer_id] ?? 'Gaffer',
         sentAt: b.sent_at,
       });
     }
@@ -132,7 +152,7 @@ export function MessageCenterScreen() {
         poolId: n.pool_id,
         poolName: poolNameMap[n.pool_id] ?? 'Contest',
         message: n.message,
-        senderName: nameMap[n.organizer_id] ?? 'Moderator',
+        senderName: senderNameMap[n.organizer_id] ?? 'Moderator',
         sentAt: n.sent_at,
       });
     }
@@ -158,7 +178,7 @@ export function MessageCenterScreen() {
           {onConflict: 'user_id,pool_id'},
         );
     }
-  }, [userPools, userId]);
+  }, [userId]);
 
   useEffect(() => {
     fetchMessages();
