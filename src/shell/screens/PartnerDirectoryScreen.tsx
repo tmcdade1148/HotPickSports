@@ -129,6 +129,11 @@ export function PartnerDirectoryScreen() {
   const [passWorking, setPassWorking] = useState(false);
   const normalizedPass = useMemo(() => normalizeRosterPass(passInput), [passInput]);
   const passComplete = normalizedPass.length === 8;
+  // Reverse rescue: if a user pastes a 6-char Contest invite code here
+  // (by mistake), tell them where it actually goes. Roster Passes are
+  // 8 chars; Contest invite codes are 6–12. The 6-char window covers
+  // the common-case Contest code; if they paste 8+ we trust it's a Pass.
+  const looksLikeInviteCode = normalizedPass.length >= 5 && normalizedPass.length <= 6;
 
   const handleAffiliateByPass = async () => {
     if (!passComplete) return;
@@ -287,6 +292,24 @@ export function PartnerDirectoryScreen() {
               )}
             </Pressable>
           </View>
+          {looksLikeInviteCode && (
+            <View
+              style={[
+                styles.rescueBox,
+                {backgroundColor: colors.background, borderColor: colors.warning ?? colors.border},
+              ]}>
+              <Text style={[bodyType.regular, styles.rescueText, {color: colors.textPrimary}]}>
+                That looks like a{' '}
+                <Text style={{fontWeight: '700'}}>Contest invite code</Text>,
+                not a Roster Pass. Invite codes get you into someone else's
+                Contest as a Player — go to{' '}
+                <Text style={{fontWeight: '700'}}>
+                  Settings → Have an invite code?
+                </Text>{' '}
+                and paste it there.
+              </Text>
+            </View>
+          )}
         </View>
 
         {affiliatedPartners.length > 0 && (
@@ -450,6 +473,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.md,
+  },
+  rescueBox: {
+    borderWidth: 1,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginTop: spacing.sm,
+  },
+  rescueText: {
+    fontSize: 13,
+    lineHeight: 18,
   },
 
   alignedCard: {

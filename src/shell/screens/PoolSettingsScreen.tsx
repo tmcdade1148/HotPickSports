@@ -56,6 +56,11 @@ export function PoolSettingsScreen() {
   const poolMembers = useGlobalStore(s => s.poolMembers);
   const updatePoolSettings = useGlobalStore(s => s.updatePoolSettings);
   const archivePool = useGlobalStore(s => s.archivePool);
+  // Current user's role in THIS Contest. Drives whether Gaffer-only
+  // controls render. Admin = Organizer minus two (no promote/demote,
+  // no archive) per the April 2026 spec.
+  const myRole = useGlobalStore(s => s.poolRoles[poolId]);
+  const isOrganizer = myRole === 'organizer';
   // Club Rosters section reads + writes through the affiliations slice
   // so the home screen + Contest cards see updates without an extra
   // round-trip.
@@ -740,13 +745,20 @@ export function PoolSettingsScreen() {
         </TouchableOpacity>
 
         {/* Danger Zone */}
-        <Text style={[styles.sectionTitle, styles.dangerTitle]}>
-          Danger Zone
-        </Text>
-        <TouchableOpacity style={styles.archiveButton} onPress={handleArchive}>
-          <Archive size={18} color={colors.error} />
-          <Text style={styles.archiveText}>Archive Contest</Text>
-        </TouchableOpacity>
+        {/* Danger Zone — Organizer-only (Admin can't archive per
+            April 2026 spec capability matrix). Section hides
+            entirely for Admin so the screen ends cleanly. */}
+        {isOrganizer && (
+          <>
+            <Text style={[styles.sectionTitle, styles.dangerTitle]}>
+              Danger Zone
+            </Text>
+            <TouchableOpacity style={styles.archiveButton} onPress={handleArchive}>
+              <Archive size={18} color={colors.error} />
+              <Text style={styles.archiveText}>Archive Contest</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </ScrollView>
 
       <BroadcastComposer

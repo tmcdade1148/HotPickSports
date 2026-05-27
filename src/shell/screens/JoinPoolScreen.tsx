@@ -36,6 +36,13 @@ export function JoinPoolScreen({navigation}: any) {
   const normalizeCode = (raw: string) =>
     raw.toUpperCase().replace(/[\s-]/g, '');
 
+  // Detect when the user has pasted a Roster Pass (8 alphanumeric chars,
+  // often formatted XXXX-XXXX) into the invite-code field. Roster Passes
+  // are for Gaffers affiliating their Contests with Clubs — not for
+  // joining a Contest. Rescue UX directs them to the right surface
+  // instead of throwing a generic "invalid code" error.
+  const looksLikeRosterPass = normalizeCode(inviteCode).length === 8;
+
   const handleJoin = async () => {
     const code = normalizeCode(inviteCode);
     if (code.length < INVITE_CODE_MIN || code.length > INVITE_CODE_MAX) {
@@ -95,6 +102,18 @@ export function JoinPoolScreen({navigation}: any) {
           <Text style={styles.hint}>
             Ask a friend for their Contest invite code ({INVITE_CODE_MIN}–{INVITE_CODE_MAX} letters and numbers).
           </Text>
+
+          {looksLikeRosterPass && !error && (
+            <View style={styles.rescueBox}>
+              <Text style={styles.rescueText}>
+                That looks like a <Text style={styles.rescueBold}>Roster Pass</Text>,
+                not an invite code. Roster Passes connect a Contest you organize
+                to a Club's roster. If you organize a Contest, open it in{' '}
+                <Text style={styles.rescueBold}>Settings → Add/Edit Clubs</Text>{' '}
+                and paste the pass there.
+              </Text>
+            </View>
+          )}
 
           {error && <Text style={styles.error}>{error}</Text>}
 
@@ -165,6 +184,22 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: spacing.lg,
+  },
+  rescueBox: {
+    backgroundColor: colors.surface,
+    borderColor: colors.warning ?? colors.border,
+    borderWidth: 1,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  rescueText: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.textPrimary,
+  },
+  rescueBold: {
+    fontWeight: '700',
   },
   error: {
     color: colors.error,
