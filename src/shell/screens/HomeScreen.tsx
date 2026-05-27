@@ -19,6 +19,7 @@ import {HomeHeader} from '@shell/components/home/HomeHeader';
 import {IdentityBar} from '@shell/components/home/IdentityBar';
 import {StateHero} from '@shell/components/home/StateHero';
 import {Insight} from '@shell/components/home/Insight';
+import {HomeInbox} from '@shell/components/home/HomeInbox';
 import {PoolModule} from '@shell/components/home/PoolModule';
 import {PartnerModule} from '@shell/components/home/PartnerModule';
 import {resolveHomeState} from '@shell/components/home/resolveHomeState';
@@ -286,6 +287,12 @@ export function HomeScreen() {
         <StateHero state={homeState} />
 
         {showInsight && <Insight />}
+
+        {/* Unread-message banner — pulls broadcasts + moderator notes
+            across every pool (including the hidden Platform Pool that
+            carries platform-wide admin broadcasts). Self-hides when
+            there's nothing unread. */}
+        <HomeInbox />
 
         {showPoolStack && visiblePools.length > 0 && (
           <View style={styles.section}>

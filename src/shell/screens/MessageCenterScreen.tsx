@@ -34,7 +34,9 @@ interface MessageItem {
  */
 export function MessageCenterScreen() {
   const navigation = useNavigation<any>();
-  const userPools = useGlobalStore(s => s.visiblePools);
+  // Read userPools (not visiblePools) so platform-wide admin broadcasts
+  // — attached to the hidden Platform Pool — appear in the inbox.
+  const userPools = useGlobalStore(s => s.userPools);
   const userId = useGlobalStore(s => s.user?.id);
 
   const [messages, setMessages] = useState<MessageItem[]>([]);
@@ -44,9 +46,12 @@ export function MessageCenterScreen() {
   // Settings page always uses HotPick colors
   const {colors} = useTheme();
 
+  // Per-pool name map. Hidden pools (the Platform Pool) get rebranded
+  // to "HotPick" so platform-wide broadcasts read as system messages
+  // rather than messages from a phantom "Platform Pool" Contest.
   const poolNameMap: Record<string, string> = {};
   for (const p of userPools) {
-    poolNameMap[p.id] = p.name;
+    poolNameMap[p.id] = p.is_hidden_from_users ? 'HotPick' : p.name;
   }
 
   const fetchMessages = useCallback(async () => {
