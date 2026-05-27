@@ -13,7 +13,7 @@
 
 import React from 'react';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
-import {Settings, Mail} from 'lucide-react-native';
+import {Settings} from 'lucide-react-native';
 import {useNavigation} from '@react-navigation/native';
 import {useTheme} from '@shell/theme/hooks';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
@@ -44,21 +44,6 @@ export function HomeHeader() {
             {period}
           </Text>
         </View>
-        {/* Always-visible Message Center entry. Unread count + preview
-            still ride on the HomeInbox banner below; this is the
-            persistent way to reach the inbox after marking everything
-            as read. */}
-        <Pressable
-          onPress={() => navigation.navigate('MessageCenter')}
-          hitSlop={10}
-          style={({pressed}) => [
-            styles.gearBtn,
-            {opacity: pressed ? 0.6 : 1},
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="Open Message Center">
-          <Mail size={22} color={colors.textSecondary} strokeWidth={2} />
-        </Pressable>
         <Pressable
           onPress={() => navigation.navigate('SettingsTab')}
           hitSlop={10}
