@@ -40,8 +40,9 @@ These are non-negotiable. If a task requires violating one, stop and ask.
 20. **Pool selection is global app state** — switching pools updates Home Screen, Board tab, and SmackTalk simultaneously; never scoped to one component
 21. **Next week's picks never open until current week reaches `complete`** — states are sequential: `picks_open → locked → live → settling → complete → picks_open`
 22. **Season phases are sequential and admin-initiated** — `PRE_SEASON → REGULAR → REGULAR_COMPLETE → PLAYOFFS → SUPERBOWL_INTRO → SUPERBOWL → SEASON_COMPLETE`. Weekly cycle only runs inside REGULAR, PLAYOFFS, and SUPERBOWL.
-23. **Partner brand config is copied to pool at creation** — rendering never depends on a live join to `partners`. Pools are self-contained.
+23. **Partner brand config is copied to pool at creation** — rendering never depends on a live join to `partners`. Pools are self-contained. Snapshot stays fresh via the `partners_propagate_brand` AFTER UPDATE trigger — partner edits cascade to `pools.brand_config` + `pool_partner_affiliations.brand_config_snapshot` server-side. Don't refresh client-side; the read path stays self-contained.
 24. **Partners attract pools to their roster, not the other way around** — `pools.partner_id` is set by the pool's organizer via `PartnerDirectoryScreen`, never by super-admin push. Each partner has at most one Club Pool (`partners.club_pool_id`); that pool's organizer is the de facto Partner Admin. Perk edits and partner broadcasts route through the Club Pool's `PoolSettings` — not `PartnerAdminScreen`.
+25. **Club brand colors render only on Official Club Contest cards on the Home stack.** Settings, admin, shell surfaces, partner tiles in YOUR CLUBS, Affiliated Contest cards, Independent Contest cards — all stay HotPick-themed. Partner tiles in YOUR CLUBS surface Club identity via name + logo, not Club colors. `useTheme()` and `useBrand()` always return HotPick defaults; only PoolModule's Official-Contest branded band reads `pool.brand_config` directly.
 
 ---
 
@@ -65,6 +66,7 @@ If you find yourself writing any of the following, stop and revise.
 - Playoff leaderboard mixing regular season scores → scope to `week_number >= playoff_start_week`
 - `DELETE FROM user_hardware` → use `is_visible = false`; hardware rows are permanent
 - `INSERT INTO user_hardware` without `ON CONFLICT DO NOTHING` → duplicates are permanent
+- **Reading partner identity (name/logo/colors) from `pool.brand_config` in a partner-centric component** → wrong partner in multi-affiliate cases. `pool.brand_config` is the *lead/primary* partner's snapshot. Partner-centric surfaces (PartnerModule, partner tiles, partner detail screens) read live from `partnersById[partnerId]`. Pool-centric surfaces (Contest card) read the snapshot per Hard Rule #23.
 
 ### SmackTalk & Messaging
 - `DELETE FROM smack_messages` without prior INSERT to archive → data is never deleted, only archived
