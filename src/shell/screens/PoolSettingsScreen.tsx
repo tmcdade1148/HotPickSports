@@ -35,8 +35,6 @@ import {useGlobalStore} from '@shell/stores/globalStore';
 import {BroadcastComposer} from '@shell/components/BroadcastComposer';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
-import type {BrandConfig} from '@shell/theme/types';
-import {HOTPICK_DEFAULTS} from '@shell/theme/defaults';
 
 interface InviteCodeRow {
   id: string;
@@ -74,11 +72,13 @@ export function PoolSettingsScreen() {
     [userPools, poolId],
   );
 
-  const poolBrand = useMemo(() => {
-    const bc = pool?.brand_config as unknown as BrandConfig | null | undefined;
-    return bc?.is_branded ? bc : null;
-  }, [pool]);
-  const accentColor = poolBrand?.secondary_color ?? HOTPICK_DEFAULTS.primary_color;
+  // Contest Settings stays HotPick-themed regardless of which Club(s)
+  // the Contest is affiliated with. Per the 2026-05-26 product call,
+  // Club brand colors live only on Official Club Contest *cards* on
+  // Home — not on any settings/admin surfaces. Affiliation pills here
+  // wear neutral chrome; their identity comes from the Club name
+  // alone.
+  const accentColor = colors.primary;
 
   const [poolName, setPoolName] = useState(pool?.name ?? '');
   const [saving, setSaving] = useState(false);
