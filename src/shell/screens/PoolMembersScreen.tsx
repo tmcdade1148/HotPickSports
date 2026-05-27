@@ -230,26 +230,68 @@ export function PoolMembersScreen() {
         onPress: () => openNoteEditor(member),
       });
 
-      // Organizer can promote/demote
+      // Organizer can promote/demote. Both transitions get a
+      // confirmation dialog that spells out what changes for the
+      // affected member — per Gaffer Pass §4.4.
       if (isOrganizer) {
         if (member.role === 'member') {
           buttons.push({
             text: 'Promote to Admin',
-            onPress: async () => {
-              const result = await updateMemberRole(poolId, member.user_id, 'admin');
-              if (!result.success) {
-                Alert.alert('Error', result.error ?? 'Failed to update role');
-              }
+            onPress: () => {
+              Alert.alert(
+                `Promote ${memberName} to Admin?`,
+                "Admins of this Contest can:\n" +
+                "   • Send broadcasts to all members\n" +
+                "   • Review and action flagged messages\n" +
+                "   • Warn or remove members\n" +
+                "   • Edit Contest settings and invite codes\n" +
+                "   • Affiliate the Contest with Clubs\n\n" +
+                "They CAN'T:\n" +
+                "   • Name other Admins\n" +
+                "   • Archive this Contest\n\n" +
+                "You can demote them back to Player any time.",
+                [
+                  {text: 'Cancel', style: 'cancel'},
+                  {
+                    text: 'Promote',
+                    onPress: async () => {
+                      const result = await updateMemberRole(poolId, member.user_id, 'admin');
+                      if (!result.success) {
+                        Alert.alert('Error', result.error ?? 'Failed to update role');
+                      }
+                    },
+                  },
+                ],
+              );
             },
           });
         } else if (member.role === 'admin') {
           buttons.push({
             text: 'Demote to Member',
-            onPress: async () => {
-              const result = await updateMemberRole(poolId, member.user_id, 'member');
-              if (!result.success) {
-                Alert.alert('Error', result.error ?? 'Failed to update role');
-              }
+            onPress: () => {
+              Alert.alert(
+                `Demote ${memberName} to Player?`,
+                "They'll lose access to:\n" +
+                "   • Broadcasts\n" +
+                "   • Flagged-message review\n" +
+                "   • Member moderation tools\n" +
+                "   • Contest settings\n\n" +
+                "They'll keep their picks and standings. You can " +
+                "re-promote them later if needed.",
+                [
+                  {text: 'Cancel', style: 'cancel'},
+                  {
+                    text: 'Demote',
+                    style: 'destructive',
+                    onPress: async () => {
+                      const result = await updateMemberRole(poolId, member.user_id, 'member');
+                      if (!result.success) {
+                        Alert.alert('Error', result.error ?? 'Failed to update role');
+                      }
+                    },
+                  },
+                ],
+              );
             },
           });
         }
