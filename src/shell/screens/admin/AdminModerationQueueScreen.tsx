@@ -116,11 +116,20 @@ export function AdminModerationQueueScreen() {
           onPress: async () => {
             setActionId(msg.id);
             await writeAudit('dismiss', msg);
-            await supabase
+            // .select('id').single() chain: an RLS-filtered write
+            // throws PGRST116 instead of silently returning 0 rows
+            // (CLAUDE.md "Silent RLS-filtered writes" red flag).
+            const {error} = await supabase
               .from('smack_messages')
               .update({moderation_status: 'approved'})
-              .eq('id', msg.id);
+              .eq('id', msg.id)
+              .select('id')
+              .single();
             setActionId(null);
+            if (error) {
+              Alert.alert('Could not dismiss', error.message);
+              return;
+            }
             setItems(prev => prev.filter(x => x.id !== msg.id));
           },
         },
@@ -140,11 +149,19 @@ export function AdminModerationQueueScreen() {
           onPress: async () => {
             setActionId(msg.id);
             await writeAudit('remove', msg);
-            await supabase
+            // See handleDismiss — .select('id').single() guards against
+            // silent RLS-filtered writes.
+            const {error} = await supabase
               .from('smack_messages')
               .update({moderation_status: 'removed', is_removed: true})
-              .eq('id', msg.id);
+              .eq('id', msg.id)
+              .select('id')
+              .single();
             setActionId(null);
+            if (error) {
+              Alert.alert('Could not remove', error.message);
+              return;
+            }
             setItems(prev => prev.filter(x => x.id !== msg.id));
           },
         },
@@ -176,12 +193,15 @@ export function AdminModerationQueueScreen() {
               Alert.alert('Failed', result.error);
               return;
             }
-            // Also remove the offending message + audit it
+            // Also remove the offending message + audit it. .select chain
+            // guards against silent RLS-filtered writes (red flag).
             await writeAudit('suspend_user', msg);
             await supabase
               .from('smack_messages')
               .update({moderation_status: 'removed', is_removed: true})
-              .eq('id', msg.id);
+              .eq('id', msg.id)
+              .select('id')
+              .single();
             setItems(prev => prev.filter(x => x.id !== msg.id));
             Alert.alert('Suspended', `${msg.author_name} is now suspended platform-wide.`);
           },

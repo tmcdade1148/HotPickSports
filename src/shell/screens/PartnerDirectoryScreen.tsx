@@ -130,11 +130,13 @@ export function PartnerDirectoryScreen() {
   const [passWorking, setPassWorking] = useState(false);
   const normalizedPass = useMemo(() => normalizeRosterPass(passInput), [passInput]);
   const passComplete = normalizedPass.length === 8;
-  // Reverse rescue: if a user pastes a 6-char Contest invite code here
-  // (by mistake), tell them where it actually goes. Roster Passes are
-  // 8 chars; Contest invite codes are 6–12. The 6-char window covers
-  // the common-case Contest code; if they paste 8+ we trust it's a Pass.
-  const looksLikeInviteCode = normalizedPass.length >= 5 && normalizedPass.length <= 6;
+  // Reverse rescue: only fire when the user has clearly entered an
+  // invite code (6 normalized chars + no dash). Mid-typing of a Pass
+  // passes through 4/5/6 normalized chars but the input always carries
+  // the auto-inserted dash by char 5, so the dash check filters that
+  // false positive out.
+  const looksLikeInviteCode =
+    normalizedPass.length === 6 && !passInput.includes('-');
 
   const handleAffiliateByPass = async () => {
     if (!passComplete) return;
@@ -211,6 +213,12 @@ export function PartnerDirectoryScreen() {
             }
             await refreshAffiliations();
             loadPoolAffiliations([poolId]).catch(() => {});
+            // Clear the in-memory brand_config snapshot so the Home
+            // Contest card stops painting the removed Club's brand
+            // until the next userPools refetch. (The partner-brand
+            // propagate trigger fires on partner UPDATE, not on
+            // affiliation DELETE, so we have to nudge the client.)
+            updatePoolBrandConfig(poolId, null);
           },
         },
       ],

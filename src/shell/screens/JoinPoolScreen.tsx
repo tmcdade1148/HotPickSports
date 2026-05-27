@@ -36,12 +36,13 @@ export function JoinPoolScreen({navigation}: any) {
   const normalizeCode = (raw: string) =>
     raw.toUpperCase().replace(/[\s-]/g, '');
 
-  // Detect when the user has pasted a Roster Pass (8 alphanumeric chars,
-  // often formatted XXXX-XXXX) into the invite-code field. Roster Passes
-  // are for Gaffers affiliating their Contests with Clubs — not for
-  // joining a Contest. Rescue UX directs them to the right surface
-  // instead of throwing a generic "invalid code" error.
-  const looksLikeRosterPass = normalizeCode(inviteCode).length === 8;
+  // Detect when the user has pasted a Roster Pass into the invite-code
+  // field. Roster Passes are 8 chars formatted XXXX-XXXX. Require the
+  // dash *and* the 8-char normalized length — a bare 8-char string is
+  // a valid Contest invite code (codes are 6–12 chars), so rescuing on
+  // length alone misidentifies legitimate codes.
+  const looksLikeRosterPass =
+    inviteCode.includes('-') && normalizeCode(inviteCode).length === 8;
 
   const handleJoin = async () => {
     const code = normalizeCode(inviteCode);

@@ -714,27 +714,6 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
 
-  // Roster stripes — single (3px solid) or stacked (multi-color).
-  stripe: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 3,
-  },
-  stripeStack: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 3,
-  },
-  stripeStackSegment: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-  },
-
   suspendedBanner: {
     paddingVertical: 8,
     paddingHorizontal: 14,

@@ -115,9 +115,11 @@ export function PartnerModule({partnerId}: PartnerModuleProps) {
       </View>
 
       {/* Perk row only renders when the Club actually has a perk
-          configured. Clubs without perks still appear in YOUR CLUBS
-          via the top row above — perk-less just means no perk row. */}
-      {partner.perk_text && (
+          configured. Use a strict truthy-string check (not just
+          `&&`) so an empty-string perk_text doesn't leak the empty
+          string into JSX — RN throws "Text strings must be rendered
+          within a <Text>" for stray strings outside a <Text>. */}
+      {!!partner.perk_text && (
       <View style={[styles.perkRow, {borderTopColor: colors.border}]}>
         <PerkIcon
           name={partner.perk_icon}

@@ -1822,6 +1822,9 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       });
     }
 
-    set({poolAffiliations: byPool});
+    // Merge — never replace — so a single-pool refresh from
+    // PoolSettings / PartnerDirectory doesn't clobber the rest of the
+    // map loaded by HomeScreen's all-pool fetch.
+    set(state => ({poolAffiliations: {...state.poolAffiliations, ...byPool}}));
   },
 }));

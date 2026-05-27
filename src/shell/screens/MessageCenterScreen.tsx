@@ -39,7 +39,11 @@ export function MessageCenterScreen() {
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [poolNameMap, setPoolNameMap] = useState<Record<string, string>>({});
+  // poolNameMap was stored in React state previously, but the for-loops
+  // below run *inside* fetchMessages — the freshly-built local `nameMap`
+  // is the only correct source there (state is async / stale-closured).
+  // Carry it on the messages themselves via `poolName` and drop the
+  // state entirely.
 
   const {colors} = useTheme();
 
@@ -75,7 +79,6 @@ export function MessageCenterScreen() {
       poolIds.push(p.id);
       nameMap[p.id] = p.is_hidden_from_users ? 'HotPick' : (p.name ?? 'Contest');
     }
-    setPoolNameMap(nameMap);
 
     if (poolIds.length === 0) {
       setMessages([]);
@@ -138,7 +141,7 @@ export function MessageCenterScreen() {
         id: `bc-${b.id}`,
         type: 'broadcast',
         poolId: b.pool_id,
-        poolName: poolNameMap[b.pool_id] ?? 'Contest',
+        poolName: nameMap[b.pool_id] ?? 'Contest',
         message: b.message,
         senderName: senderNameMap[b.organizer_id] ?? 'Gaffer',
         sentAt: b.sent_at,
@@ -150,7 +153,7 @@ export function MessageCenterScreen() {
         id: `mod-${n.id}`,
         type: 'moderator_note',
         poolId: n.pool_id,
-        poolName: poolNameMap[n.pool_id] ?? 'Contest',
+        poolName: nameMap[n.pool_id] ?? 'Contest',
         message: n.message,
         senderName: senderNameMap[n.organizer_id] ?? 'Moderator',
         sentAt: n.sent_at,
