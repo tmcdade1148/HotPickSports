@@ -323,25 +323,34 @@ export function SettingsScreen({route}: any) {
             }
             const pool = poolOrDivider as typeof userPools[0];
             const poolBrand = getPoolColors(pool);
-            // `isBranded` here means "this row wears Club brand colors" —
-            // only true for Official Club Contests now. Affiliated pools
-            // render neutral, same as Private.
+            // `isBranded` here means "this row IS an Official Club
+            // Contest" — only Official rows wear Club brand colors.
+            // Affiliated pools render neutral, same as Private.
             const isBranded = !!pool.owning_club_id;
             const isActive = pool.id === activePoolId;
             const hotpick = {primary: colors.primary, secondary: colors.secondary, surface: colors.surface};
 
-            // Partner pills: secondary bg when inactive, primary bg when active
-            // HotPick pills: no bg when inactive, primary border when active
-            const pillBg = isBranded
-              ? (isActive ? poolBrand.primary : poolBrand.secondary)
-              : undefined;
-            // Contrast text for partner pill backgrounds
+            // Three visual states:
+            //   • Official + active:   solid Club primary bg, contrast text
+            //   • Official + inactive: neutral bg + 1.5px Club border + Club-color text
+            //                          (same shape as an inactive private pill, but
+            //                           Club-colored accents — per 2026-05-27 product call)
+            //   • Non-Official:        neutral bg, primary HotPick border only when active
+            const pillBg = isBranded && isActive ? poolBrand.primary : undefined;
             const pillTextColor = isBranded
-              ? (isLightColor(pillBg!) ? '#181818' : '#FFFFFF')
-              : (isActive ? hotpick.primary : colors.textPrimary);
+              ? isActive
+                ? (isLightColor(pillBg!) ? '#181818' : '#FFFFFF')
+                : poolBrand.primary
+              : isActive
+                ? hotpick.primary
+                : colors.textPrimary;
             const pillIconColor = isBranded
-              ? (isLightColor(pillBg!) ? '#181818' : '#FFFFFF')
-              : (isActive ? hotpick.primary : colors.textSecondary);
+              ? isActive
+                ? (isLightColor(pillBg!) ? '#181818' : '#FFFFFF')
+                : poolBrand.primary
+              : isActive
+                ? hotpick.primary
+                : colors.textSecondary;
 
             const poolGlowColor = isBranded
               ? (pool.brand_config as any)?.secondary_color || '#0E6666'
@@ -352,8 +361,15 @@ export function SettingsScreen({route}: any) {
                 key={pool.id}
                 style={[
                   styles.poolRow,
-                  isBranded && {backgroundColor: pillBg},
-                  !isBranded && {backgroundColor: hotpick.surface},
+                  // Filled bg only for Official+active. Every other state
+                  // sits on neutral surface.
+                  isBranded && isActive && {backgroundColor: pillBg},
+                  (!isBranded || !isActive) && {backgroundColor: hotpick.surface},
+                  // Borders signal active state:
+                  //   Official+inactive: Club border (always — pill still
+                  //     reads as Club-themed even when not selected)
+                  //   Non-Official+active: HotPick border
+                  isBranded && !isActive && {borderWidth: 1.5, borderColor: poolBrand.primary},
                   !isBranded && isActive && {borderWidth: 1.5, borderColor: hotpick.primary},
                 ]}
                 onPress={() => setActivePoolId(pool.id)}>
