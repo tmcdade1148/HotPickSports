@@ -74,6 +74,16 @@ export interface DbPool {
   brand_config: Record<string, unknown> | null;
   is_archived: boolean;
   archived_at: string | null;
+  // Super-admin suspension (April 2026 spec). Distinct from is_archived
+  // (organizer toggle). Suspended pools render a banner over picks and
+  // SmackTalk; writes are RLS-blocked.
+  is_suspended: boolean;
+  suspended_at: string | null;
+  suspended_by: string | null;
+  suspension_reason: string | null;
+  // Hidden from Player UIs (e.g., the analytics Platform Pool). Staff
+  // can still see them via super-admin Pool Management.
+  is_hidden_from_users: boolean;
   created_at: string;
   updated_at: string;
 }

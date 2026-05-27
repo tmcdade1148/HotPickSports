@@ -585,8 +585,11 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       }
     }
 
-    // Compute visible pools: hide global pools unless manually joined
+    // Compute visible pools: hide global pools unless manually joined,
+    // AND always hide pools flagged is_hidden_from_users (the analytics
+    // Platform Pool — staff-only visibility per April 2026 spec).
     const visible = pools.filter(p => {
+      if (p.is_hidden_from_users) return false;
       if (!p.is_global) return true;
       return !!manualGlobalJoins[p.id];
     });

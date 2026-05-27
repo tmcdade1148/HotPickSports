@@ -23,7 +23,6 @@ import {
   Users,
   Building2,
   Star,
-  Palette,
   Settings,
   Info,
   BookOpen,
@@ -450,6 +449,9 @@ export function SettingsScreen({route}: any) {
                   // Active private gets the HotPick accent border.
                   isBranded && !isActive && {borderWidth: 1.5, borderColor: colors.border},
                   !isBranded && isActive && {borderWidth: 1.5, borderColor: hotpick.primary},
+                  // Suspended pools get a thick red outline so members
+                  // see at a glance that this Contest is frozen.
+                  pool.is_suspended && {borderWidth: 1.5, borderColor: colors.error},
                 ]}
                 onPress={() => setActivePoolId(pool.id)}>
                 <View style={styles.poolInfo}>
@@ -482,6 +484,11 @@ export function SettingsScreen({route}: any) {
                         )}
                       </Text>
                     <View style={styles.poolMetaRow}>
+                      {pool.is_suspended && (
+                        <Text style={[styles.roleBadge, {color: colors.error, fontWeight: '800'}]}>
+                          SUSPENDED ·{' '}
+                        </Text>
+                      )}
                       {/* Official Club Contests surface the owning Club's
                           name in the meta row so the pill identifies WHICH
                           Club it belongs to (the brand-color background
@@ -671,21 +678,14 @@ export function SettingsScreen({route}: any) {
         </TouchableOpacity>
       </View>
 
-      {/* Admin section — super admin only */}
+      {/* Admin section — super admin only. Partner Admin moved to
+          AdminHome → Club Management (reachable from "HotPick Admin"
+          at the top of Settings). Hardware Admin stays here until we
+          relocate it under AdminHome too. */}
       {userProfile?.is_super_admin && (
         <>
           <Text style={[styles.groupLabel, {color: colors.textSecondary}]}>Admin</Text>
           <View style={[styles.groupCard, {backgroundColor: colors.surface}]}>
-            <TouchableOpacity
-              style={styles.groupRow}
-              onPress={() => navigation.navigate('PartnerAdmin')}>
-              <View style={styles.linkLeft}>
-                <Palette size={20} color={colors.primary} />
-                <Text style={[styles.linkText, {color: colors.textPrimary}]}>Partner Admin</Text>
-              </View>
-              <ChevronRight size={18} color={colors.textSecondary} />
-            </TouchableOpacity>
-            <View style={[styles.groupDivider, {backgroundColor: colors.border}]} />
             <TouchableOpacity
               style={styles.groupRow}
               onPress={() => navigation.navigate('HardwareAdmin')}>

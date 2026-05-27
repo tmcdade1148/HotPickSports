@@ -383,6 +383,14 @@ export function PoolModule({pool}: PoolModuleProps) {
           rank chip. Settings now reaches PoolSettings via the
           Settings tab → My Contests row. */}
 
+      {pool.is_suspended && (
+        <View style={[styles.suspendedBanner, {backgroundColor: colors.error}]}>
+          <Text style={[bodyType.bold, styles.suspendedBannerText, {color: '#FFFFFF'}]} numberOfLines={2}>
+            This Contest has been suspended. For more information contact your pool organizer or admin.
+          </Text>
+        </View>
+      )}
+
       <View style={styles.body}>
         <View style={styles.topRow}>
           <View style={styles.titleBlock}>
@@ -721,6 +729,14 @@ const styles = StyleSheet.create({
     right: 0,
   },
 
+  suspendedBanner: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  suspendedBannerText: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
   body: {
     padding: 16,
   },
