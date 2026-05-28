@@ -8,13 +8,9 @@
 import type {HomeState} from './StateHero';
 
 export function resolveHomeState(
-  visiblePoolCount: number,
   phase: string,
   weekState: string,
 ): HomeState {
-  // Zero-pools is an overlay — overrides every other state combination.
-  if (visiblePoolCount === 0) return 'zero_pools';
-
   // Phase-level off-cycle states take precedence over weekState.
   if (phase === 'OFF_SEASON')        return 'off_season_idle';
   if (phase === 'PRE_SEASON')        return 'pre_season_games';

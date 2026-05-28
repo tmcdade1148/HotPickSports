@@ -1,7 +1,6 @@
 // src/shell/components/home/StateHero.tsx
 // Spec §6.4.3 — StateHero is the Home Screen's hero block.
-// Routes between sub-variants based on (current_phase, week_state)
-// plus the zero-pools overlay.
+// Routes between sub-variants based on (current_phase, week_state).
 //
 // In-cycle variants:
 //   picks_open    → PicksOpenHero
@@ -11,19 +10,21 @@
 //   complete      → CompleteHero
 //
 // Bridge / off-cycle variants:
-//   zero_pools              → ZeroPoolsHero      (overrides everything if no pools)
-//   off_season_idle         → OffSeasonHero      (was pre_season_idle)
+//   off_season_idle         → OffSeasonHero
 //   pre_season_games        → PreSeasonGamesHero (exhibition games window)
 //   regular_complete_bridge → RegularCompleteHero
 //   superbowl_intro_bridge  → SuperBowlIntroHero
 //   season_complete         → SeasonCompleteHero
+//
+// No zero-pools variant: 0-pool users land on the phase-appropriate
+// hero (typically OffSeasonHero today) and the YOUR CONTESTS /
+// YOUR CLUBS sections carry the new-user orientation.
 
 import React from 'react';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {PicksOpenHero} from './PicksOpenHero';
 import {SettlingHero} from './SettlingHero';
 import {CompleteHero} from './CompleteHero';
-import {ZeroPoolsHero} from './ZeroPoolsHero';
 import {OffSeasonHero} from './OffSeasonHero';
 import {PreSeasonGamesHero} from './PreSeasonGamesHero';
 import {RegularCompleteHero} from './RegularCompleteHero';
@@ -31,7 +32,6 @@ import {SuperBowlIntroHero} from './SuperBowlIntroHero';
 import {SeasonCompleteHero} from './SeasonCompleteHero';
 
 export type HomeState =
-  | 'zero_pools'
   | 'off_season_idle'
   | 'pre_season_games'
   | 'picks_open'
@@ -60,7 +60,6 @@ export function StateHero({state}: StateHeroProps) {
     case 'games_live':              return <PicksOpenHero />;
     case 'settling':                return <SettlingHero />;
     case 'complete':                return <CompleteHero />;
-    case 'zero_pools':              return <ZeroPoolsHero />;
     case 'off_season_idle':         return <OffSeasonHero />;
     case 'pre_season_games':        return <PreSeasonGamesHero />;
     case 'regular_complete_bridge': return <RegularCompleteHero />;
