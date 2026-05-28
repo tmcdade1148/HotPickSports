@@ -62,21 +62,9 @@ export function HomeScreen() {
   const activePoolId           = useGlobalStore(s => s.activePoolId);
   const subscribeToCompetitionConfig = useNFLStore(s => s.subscribeToCompetitionConfig);
 
-  // zeroPoolsExploreMode lets a brand-new user dismiss the
-  // ZeroPoolsHero and see the underlying phase-appropriate state
-  // (PreSeasonHero countdown + Join/Create CTAs during pre-season,
-  // for example). We bypass the "zero_pools overrides everything"
-  // rule in resolveHomeState by passing a synthetic visible-pool
-  // count of 1 — the resolver then falls through to the phase /
-  // week_state branches that map to the correct hero.
-  const exploreMode      = useGlobalStore(s => s.zeroPoolsExploreMode);
-  const effectivePoolCount = exploreMode && visiblePools.length === 0
-    ? 1
-    : visiblePools.length;
-
   const homeState = useMemo(
-    () => resolveHomeState(effectivePoolCount, currentPhase, weekState),
-    [effectivePoolCount, currentPhase, weekState],
+    () => resolveHomeState(currentPhase, weekState),
+    [currentPhase, weekState],
   );
 
   const isPicksFlow =
@@ -84,18 +72,14 @@ export function HomeScreen() {
     homeState === 'picks_locked' ||
     homeState === 'games_live';
   const showInsight      = isPicksFlow;
-  // Hero is always rendered now — when exploreMode flips the state
-  // away from zero_pools, the phase-appropriate hero (PreSeasonHero,
-  // PicksOpenHero, etc.) takes over.
+  // Everyone sees the hero + YOUR CONTESTS + YOUR CLUBS — the
+  // off-cycle hero (OffSeasonHero etc.) plus the section headers and
+  // their orientation copy carry the new-user onboarding directly on
+  // the homescreen, so there's no separate ZeroPoolsHero overlay
+  // anymore.
   const showHero         = true;
-  // YOUR CONTESTS section is shown across every non-zero_pools state so
-  // the homepage keeps the same shape during off-season / pre-season /
-  // regular. The Join + Create buttons live inside this section
-  // (they're the only thing in it when the user has 0 visible pools).
-  // The PoolModule cards underneath only render when the user actually
-  // has pools.
-  const showPoolStack    = homeState !== 'zero_pools';
-  const showPartnerStack = homeState !== 'zero_pools';
+  const showPoolStack    = true;
+  const showPartnerStack = true;
 
   // ---------------------------------------------------------------------------
   // Partition pools for the Pool stack + Partner stack.
