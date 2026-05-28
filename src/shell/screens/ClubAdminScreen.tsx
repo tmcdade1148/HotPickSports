@@ -163,34 +163,46 @@ export function ClubAdminScreen() {
       created_at: string;
       pools: PoolEmbed | PoolEmbed[] | null;
     };
-    const entries: RosterEntry[] = [];
+    // Collect pool data + organizer IDs first, then batch the two
+    // lookups into single round-trips (was 2N queries serially).
+    const affList: Array<{pool: PoolEmbed; aff_created_at: string; pool_id: string}> = [];
     for (const aff of (affRows ?? []) as unknown as AffRow[]) {
       const pool = Array.isArray(aff.pools) ? aff.pools[0] : aff.pools;
       if (!pool) continue;
-      // Member count + organizer profile name in parallel
-      const [{count}, {data: orgProfile}] = await Promise.all([
-        supabase
-          .from('pool_members')
-          .select('user_id', {count: 'exact', head: true})
-          .eq('pool_id', aff.pool_id)
-          .eq('status', 'active'),
-        pool.organizer_id
-          ? supabase
-              .from('profiles')
-              .select('poolie_name, first_name')
-              .eq('id', pool.organizer_id)
-              .maybeSingle()
-          : Promise.resolve({data: null}),
-      ]);
-      entries.push({
-        pool_id:        aff.pool_id,
-        pool_name:      pool.name,
-        invite_code:    pool.invite_code,
-        member_count:   count ?? 0,
-        organizer_name: (orgProfile?.poolie_name as string) ?? (orgProfile?.first_name as string) ?? null,
-        created_at:     aff.created_at,
-      });
+      affList.push({pool, aff_created_at: aff.created_at, pool_id: aff.pool_id});
     }
+
+    const rosterPoolIds = affList.map(a => a.pool_id);
+    const organizerIds = Array.from(
+      new Set(affList.map(a => a.pool.organizer_id).filter((id): id is string => !!id)),
+    );
+
+    const [countsRes, profilesRes] = await Promise.all([
+      rosterPoolIds.length > 0
+        ? supabase.rpc('get_pool_member_counts', {p_pool_ids: rosterPoolIds})
+        : Promise.resolve({data: []}),
+      organizerIds.length > 0
+        ? supabase.from('profiles').select('id, poolie_name, first_name').in('id', organizerIds)
+        : Promise.resolve({data: []}),
+    ]);
+
+    const countMap = new Map<string, number>();
+    for (const r of (countsRes.data ?? []) as {pool_id: string; member_count: number}[]) {
+      countMap.set(r.pool_id, Number(r.member_count));
+    }
+    const orgNameMap = new Map<string, string>();
+    for (const p of (profilesRes.data ?? []) as {id: string; poolie_name: string | null; first_name: string | null}[]) {
+      orgNameMap.set(p.id, p.poolie_name ?? p.first_name ?? '');
+    }
+
+    const entries: RosterEntry[] = affList.map(a => ({
+      pool_id:        a.pool_id,
+      pool_name:      a.pool.name,
+      invite_code:    a.pool.invite_code,
+      member_count:   countMap.get(a.pool_id) ?? 0,
+      organizer_name: a.pool.organizer_id ? orgNameMap.get(a.pool.organizer_id) ?? null : null,
+      created_at:     a.aff_created_at,
+    }));
     setRoster(entries);
     setLoading(false);
   }, [user?.id]);

@@ -68,17 +68,17 @@ function AdminPoolManagementScreenImpl() {
 
     const list = ((data ?? []) as Row[]).map(r => ({...r, member_count: 0}));
 
-    // Member counts in parallel chunks
-    await Promise.all(
-      list.map(async p => {
-        const {count} = await supabase
-          .from('pool_members')
-          .select('user_id', {count: 'exact', head: true})
-          .eq('pool_id', p.id)
-          .eq('status', 'active');
-        p.member_count = count ?? 0;
-      }),
-    );
+    // ONE batched member-count query for all pools (was N+1 per pool).
+    if (list.length > 0) {
+      const {data: counts} = await supabase.rpc('get_pool_member_counts', {
+        p_pool_ids: list.map(p => p.id),
+      });
+      const countMap = new Map<string, number>();
+      for (const r of (counts ?? []) as {pool_id: string; member_count: number}[]) {
+        countMap.set(r.pool_id, Number(r.member_count));
+      }
+      for (const p of list) p.member_count = countMap.get(p.id) ?? 0;
+    }
 
     setPools(list);
     setLoading(false);
