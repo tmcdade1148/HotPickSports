@@ -89,7 +89,13 @@ export function HomeScreen() {
   // away from zero_pools, the phase-appropriate hero (PreSeasonHero,
   // PicksOpenHero, etc.) takes over.
   const showHero         = true;
-  const showPoolStack    = homeState !== 'zero_pools' && visiblePools.length > 0;
+  // YOUR CONTESTS section is shown across every non-zero_pools state so
+  // the homepage keeps the same shape during off-season / pre-season /
+  // regular. The Join + Create buttons live inside this section
+  // (they're the only thing in it when the user has 0 visible pools).
+  // The PoolModule cards underneath only render when the user actually
+  // has pools.
+  const showPoolStack    = homeState !== 'zero_pools';
   const showPartnerStack = homeState !== 'zero_pools';
 
   // ---------------------------------------------------------------------------
@@ -303,12 +309,16 @@ export function HomeScreen() {
             there's nothing unread. */}
         <HomeInbox />
 
-        {showPoolStack && visiblePools.length > 0 && (
+        {showPoolStack && (
           <View style={styles.section}>
             <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textTertiary}]}>
               YOUR {LEXICON.contest.plural.toUpperCase()}
             </Text>
-            {sortedVisiblePools.map(p => (
+            {/* Pool cards only render when the user has visible pools.
+                The Join + Create buttons below are the always-present
+                affordance — they're the section's purpose for zero-pool
+                users browsing in off-season / pre-season explore mode. */}
+            {visiblePools.length > 0 && sortedVisiblePools.map(p => (
               <PoolModule key={p.id} pool={p} />
             ))}
             <View style={styles.poolActionsRow}>

@@ -1,19 +1,18 @@
-// src/shell/components/home/PreSeasonHero.tsx
-// Spec §6.4.3 — pre_season_idle row.
+// src/shell/components/home/PreSeasonGamesHero.tsx
+// Fires when current_phase === 'PRE_SEASON'. NFL exhibition window
+// (Aug 6–Aug 29 for 2026) — games are being played and users can
+// make practice picks, but scores DON'T count toward the regular
+// season total. Countdown still points at season_picks_open_at
+// (Sept 2 for 2026) since that's when scoring becomes real.
 //
-// User HAS pools but the season hasn't started. The pre-season window is
-// also when users actively recruit friends, so the hero surfaces all three
-// growth CTAs alongside the countdown:
-//   • Enter invite code  — join a pool a friend made
-//   • Create a pool      — start your own
-//   • Tell a friend      — share an existing pool's invite code (native Share)
-//
-// Welcome line above the countdown sets the tone: "Welcome to HotPick.
-// Let's get your pool together." (varies for returning users below.)
+// Like OffSeasonHero, the Join / Create CTAs that used to live here
+// moved into the HomeScreen YOUR CONTESTS section so the homepage
+// layout stays consistent across all stages. This hero is greeting
+// + welcome line + "preseason is on" eyebrow + countdown to picks
+// opening + tell-a-friend share.
 
 import React from 'react';
 import {Pressable, Share, StyleSheet, Text, View} from 'react-native';
-import {useNavigation} from '@react-navigation/native';
 import {useTheme} from '@shell/theme/hooks';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useGlobalStore} from '@shell/stores/globalStore';
@@ -21,29 +20,21 @@ import {displayType, bodyType, monoType, spacing, borderRadius} from '@shared/th
 import {useCountdown} from './useCountdown';
 import {getContextGreeting} from './salutation';
 
-export function PreSeasonHero() {
+export function PreSeasonGamesHero() {
   const {colors} = useTheme();
-  const navigation = useNavigation<any>();
 
   const picksOpenAt    = useNFLStore(s => s.picksOpenAt);
   const seasonOpenerAt = useNFLStore(s => s.seasonOpenerAt);
   const currentPhase   = useNFLStore(s => s.currentPhase);
   const visiblePools   = useGlobalStore(s => s.visiblePools);
-  const userProfile    = useGlobalStore(s => s.userProfile);
 
   const target = picksOpenAt ?? seasonOpenerAt;
   const {days, hours, minutes, isExpired} = useCountdown(target);
   const greeting = getContextGreeting(currentPhase, 'idle', 0, null);
 
-  // First pool with an invite code (for share). Many users will only have one.
   const firstPool = visiblePools.find(p => p.invite_code);
   const firstInviteCode = firstPool?.invite_code ?? null;
   const firstPoolName   = firstPool?.name_display || firstPool?.name || null;
-
-  // Returning user gets a slightly different welcome line if they've played
-  // before (have any visible pool). New users see a more inviting opener.
-  const returning = visiblePools.length > 0;
-  const careerPts = userProfile?.total_career_points ?? 0;
 
   const handleShare = async () => {
     if (!firstInviteCode) return;
@@ -63,25 +54,22 @@ export function PreSeasonHero() {
         {greeting}
       </Text>
 
-      {/* Welcome message — sets tone above the countdown. */}
       <Text
         style={[
           displayType.display,
           {fontSize: displayType.size.h2, color: colors.textPrimary},
         ]}>
-        {returning ? 'WELCOME BACK.' : 'WELCOME TO HOTPICK.'}
+        PRESEASON IS HERE.
       </Text>
+      {/* Make the "scores don't count" detail explicit so users don't
+          think their preseason picks are pulling their season ranking
+          down (or up). */}
       <Text style={[bodyType.regular, styles.welcomeSub, {color: colors.textSecondary}]}>
-        {returning
-          ? careerPts > 0
-            ? `${careerPts.toLocaleString()} career pts. Let's run it back.`
-            : "Get your Contest together before kickoff."
-          : "Contests are how the game's played. Join one or start your own."}
+        Practice picks all month. Scores reset for the regular season.
       </Text>
 
-      {/* Countdown — calm pre-kickoff anchor. */}
       <Text style={[bodyType.bold, styles.eyebrow, {color: colors.textSecondary}]}>
-        PICKS OPEN IN
+        REAL PICKS OPEN IN
       </Text>
       <View style={styles.countdownRow}>
         <CountUnit n={days}    label="days" color={colors.textPrimary} subColor={colors.textTertiary} />
@@ -91,33 +79,6 @@ export function PreSeasonHero() {
         <CountUnit n={minutes} label="min"  color={colors.textPrimary} subColor={colors.textTertiary} />
       </View>
 
-      {/* Primary CTAs — get into / start a pool. */}
-      <View style={styles.ctaRow}>
-        <Pressable
-          onPress={() => navigation.navigate('JoinPool')}
-          style={({pressed}) => [
-            styles.ctaPrimary,
-            {backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1},
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="Enter an invite code to join a Contest">
-          <Text style={[bodyType.bold, styles.ctaPrimaryText, {color: colors.onPrimary}]}>Enter invite code</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => navigation.navigate('CreatePool')}
-          style={({pressed}) => [
-            styles.ctaSecondary,
-            {borderColor: colors.border, opacity: pressed ? 0.7 : 1},
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="Create a new Contest you'll organize">
-          <Text style={[bodyType.bold, styles.ctaSecondaryText, {color: colors.textPrimary}]}>
-            Create a Contest
-          </Text>
-        </Pressable>
-      </View>
-
-      {/* Tell-a-friend — only when the user has a pool to share. */}
       {!isExpired && firstInviteCode && (
         <Pressable
           onPress={handleShare}
@@ -185,38 +146,13 @@ const styles = StyleSheet.create({
   },
   colon:        {fontSize: 48, paddingHorizontal: 4, paddingBottom: 10},
   countLabel:   {fontSize: 10, letterSpacing: 2, marginTop: 2},
-
-  ctaRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  ctaPrimary: {
-    flex: 1,
+  shareCta: {
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     borderRadius: borderRadius.lg,
+    borderWidth: 1,
     alignItems: 'center',
+    marginTop: spacing.xs,
   },
-  ctaPrimaryText:   {fontSize: 14, letterSpacing: 0.5, textTransform: 'uppercase'},
-  ctaSecondary: {
-    flex: 1,
-    paddingVertical: spacing.md - 2,
-    paddingHorizontal: spacing.lg,
-    borderRadius: borderRadius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center',
-  },
-  ctaSecondaryText: {fontSize: 14, letterSpacing: 0.5},
-
-  shareCta: {
-    alignSelf: 'stretch',
-    paddingVertical: spacing.sm + 2,
-    paddingHorizontal: spacing.lg,
-    borderRadius: borderRadius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center',
-    marginTop: spacing.sm,
-  },
-  shareText: {fontSize: 13, letterSpacing: 0.5},
+  shareText: {fontSize: 14, letterSpacing: 0.5},
 });
