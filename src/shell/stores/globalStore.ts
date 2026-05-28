@@ -366,13 +366,21 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       await deactivateDeviceTokens(userId).catch(() => {});
     }
 
-    // Clear all per-competition pool + default pool keys
+    // Clear all per-competition pool + default pool keys plus the
+    // DEV-only persisted active competition. The latter is critical
+    // for the multi-account dev flow: without it, a previous user's
+    // sim choice persists into the next user's session and bypasses
+    // their visibility allowlist (LoadingScreen's DEV restore uses
+    // getAllEventsUnfiltered).
     const keys = await AsyncStorage.getAllKeys();
-    const poolKeys = keys.filter(
-      k => k.startsWith(POOL_STORAGE_PREFIX) || k.startsWith(DEFAULT_POOL_PREFIX),
+    const toRemove = keys.filter(
+      k =>
+        k.startsWith(POOL_STORAGE_PREFIX) ||
+        k.startsWith(DEFAULT_POOL_PREFIX) ||
+        k === DEV_ACTIVE_COMPETITION_KEY,
     );
-    if (poolKeys.length > 0) {
-      await AsyncStorage.multiRemove(poolKeys);
+    if (toRemove.length > 0) {
+      await AsyncStorage.multiRemove(toRemove);
     }
     await supabase.auth.signOut();
     set({
@@ -448,8 +456,27 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     // on the wrong competition. If a dev wants to test 2026 in DEV,
     // they switch via Settings → Competition after boot.
     if (wasLoaded) return;
-    if (!visible.includes('nfl_2025_sim')) return;
+
     const current = get().activeSport;
+
+    // Defense in depth — if LoadingScreen restored a persisted
+    // activeSport (e.g. AsyncStorage DEV_ACTIVE_COMPETITION_KEY
+    // carrying nfl_2025_sim from a previous super-admin session)
+    // that this user can't actually see, kick them to a visible
+    // one. Without this, a logout-then-login-as-different-user
+    // can leave a non-beta user looking at sim state.
+    if (current && !visible.includes(current.competition)) {
+      const fallback = getAllEventsUnfiltered().find(e => visible.includes(e.competition));
+      if (fallback) {
+        get().setActiveSport(fallback);
+        set({activePoolId: null});
+      }
+      // Don't also run the sim force-land below — we've just
+      // re-anchored the user. Re-evaluate on next session.
+      return;
+    }
+
+    if (!visible.includes('nfl_2025_sim')) return;
     if (current?.competition === 'nfl_2025_sim') return;
     const sim = getAllEventsUnfiltered().find(e => e.competition === 'nfl_2025_sim');
     if (sim) {
