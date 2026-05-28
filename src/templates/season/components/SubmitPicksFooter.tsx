@@ -1,5 +1,8 @@
-// Bar-sized submit button rendered in the right half of the bottom tab
-// bar on the Picks tab. Replaces the old in-screen SubmitPicksButton.
+// Full-width Submit Picks button rendered at the bottom of SeasonPicksScreen,
+// directly above the bottom tab bar. Uses the shared useSeasonSubmitState
+// hook so the 5-state machine (locked / no_picks / needs_hotpick /
+// in_progress / submitted) stays centralized — no duplication with the
+// (now-removed) tab-bar slot variant.
 
 import React from 'react';
 import {StyleSheet, Text, TouchableOpacity, View} from 'react-native';
@@ -8,13 +11,11 @@ import {useTheme} from '@shell/theme';
 import {useSeasonSubmitState} from '@templates/season/hooks/useSeasonSubmitState';
 import {spacing, borderRadius} from '@shared/theme';
 
-export function SubmitPicksBarSlot() {
+export function SubmitPicksFooter() {
   const {colors} = useTheme();
   const submit = useSeasonSubmitState();
 
-  if (!submit.visible) {
-    return <View style={styles.slot} />;
-  }
+  if (!submit.visible) return null;
 
   const bgColor = (() => {
     switch (submit.state) {
@@ -35,9 +36,6 @@ export function SubmitPicksBarSlot() {
     }
   })();
 
-  // Leading icon per state — provides a non-color affordance so the
-  // five states aren't distinguishable by hue alone (~8% of male users
-  // can't reliably tell warning-yellow from primary-orange).
   const StateIcon = (() => {
     switch (submit.state) {
       case 'locked':        return Lock;
@@ -51,7 +49,7 @@ export function SubmitPicksBarSlot() {
   const isDisabled = !submit.enabled && submit.state !== 'needs_hotpick';
 
   return (
-    <View style={styles.slot}>
+    <View style={[styles.wrapper, {backgroundColor: colors.background, borderTopColor: colors.border}]}>
       <TouchableOpacity
         style={[
           styles.button,
@@ -65,14 +63,12 @@ export function SubmitPicksBarSlot() {
         accessibilityLabel={submit.label}
         accessibilityState={{disabled: isDisabled}}>
         <StateIcon
-          size={14}
+          size={18}
           color={textColor}
           fill={submit.state === 'submitted' ? textColor : 'none'}
           strokeWidth={2}
         />
-        <Text
-          style={[styles.label, {color: textColor}]}
-          numberOfLines={1}>
+        <Text style={[styles.label, {color: textColor}]} numberOfLines={1}>
           {submit.label}
         </Text>
       </TouchableOpacity>
@@ -81,26 +77,27 @@ export function SubmitPicksBarSlot() {
 }
 
 const styles = StyleSheet.create({
-  slot: {
-    flex: 2,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: 6,
+  wrapper: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
   button: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingHorizontal: spacing.sm,
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
     borderRadius: borderRadius.md,
   },
   buttonSubmitted: {
-    opacity: 0.75,
+    opacity: 0.85,
   },
   label: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '700',
-    letterSpacing: 0.3,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
   },
 });

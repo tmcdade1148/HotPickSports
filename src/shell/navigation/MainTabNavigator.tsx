@@ -23,7 +23,6 @@ import {PoweredByHotPick} from '@shell/components/PoweredByHotPick';
 import {PoolSwitcherBar} from '@shell/components/PoolSwitcherBar';
 import {PoolHeader} from '@shell/components/PoolHeader';
 import {PicksHeader} from '@shell/components/PicksHeader';
-import {SubmitPicksBarSlot} from '@shell/components/SubmitPicksBarSlot';
 import {spacing, typography, borderRadius} from '@shared/theme';
 import {LEXICON} from '@shared/lexicon';
 import {useForegroundRefetch} from '@shared/hooks/useForegroundRefetch';
@@ -328,7 +327,6 @@ function GroupedTabBar({state, descriptors, navigation}: BottomTabBarProps) {
   // social side of the app. Routes stay registered so direct nav still works.
   const activeRouteName = state.routes[state.index]?.name;
   const hideGroupedTabs = activeRouteName === 'HomeTab' || activeRouteName === 'PicksTab';
-  const showSubmitSlot  = activeRouteName === 'PicksTab';
 
   return (
     <View style={[s.bar, {backgroundColor: colors.background, borderTopColor: colors.border}]}>
@@ -345,9 +343,6 @@ function GroupedTabBar({state, descriptors, navigation}: BottomTabBarProps) {
           </TouchableOpacity>
         );
       })}
-
-      {/* Underline spanning Leaders + SmackTalk — suppressed on Home */}
-      {showSubmitSlot && <SubmitPicksBarSlot />}
 
       {!hideGroupedTabs && (
       <View style={[s.groupBox, {borderBottomColor: colors.border}]}>

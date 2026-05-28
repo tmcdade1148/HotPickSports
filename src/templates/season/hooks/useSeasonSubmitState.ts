@@ -1,7 +1,9 @@
-// Centralized picks-submit state. Both the bar-level SubmitPicksBarSlot
-// and the (now-removed) in-screen button derived their props from the
-// same store reads in SeasonPicksScreen. This hook is the single source
-// of truth so the bar slot can render without owning a copy of the logic.
+// Centralized picks-submit state — the 5-state machine (locked /
+// no_picks / needs_hotpick / in_progress / submitted) plus the
+// submit action. Consumed by SubmitPicksFooter at the bottom of
+// SeasonPicksScreen. Lives here so the screen and any future
+// surface (e.g. a deep-link confirmation modal) share one source
+// of truth instead of recomputing state from store reads.
 
 import {useCallback} from 'react';
 import {Alert} from 'react-native';
