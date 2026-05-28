@@ -21,6 +21,7 @@ import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {useTheme} from '@shell/theme/hooks';
 import {bodyType, displayType, spacing, borderRadius} from '@shared/theme';
+import {RequireSuperAdmin} from '@shell/components/RequireSuperAdmin';
 
 type EscalatedMessage = {
   id: string;
@@ -46,6 +47,14 @@ function formatAge(iso: string): string {
 }
 
 export function AdminModerationQueueScreen() {
+  return (
+    <RequireSuperAdmin>
+      <AdminModerationQueueScreenImpl />
+    </RequireSuperAdmin>
+  );
+}
+
+function AdminModerationQueueScreenImpl() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
   const profile = useGlobalStore(s => s.userProfile);
@@ -91,8 +100,8 @@ export function AdminModerationQueueScreen() {
   }, []);
 
   useEffect(() => {
-    if (profile?.is_super_admin) load();
-  }, [profile?.is_super_admin, load]);
+    load();
+  }, [load]);
 
   const writeAudit = async (action: string, msg: EscalatedMessage, extra: Record<string, unknown> = {}) => {
     if (!profile) return;
@@ -209,14 +218,6 @@ export function AdminModerationQueueScreen() {
       ],
     );
   };
-
-  if (!profile?.is_super_admin) {
-    return (
-      <SafeAreaView style={[styles.shell, {backgroundColor: colors.background}]} edges={['top']}>
-        <Text style={[bodyType.regular, {color: colors.error, padding: spacing.lg}]}>Not authorized.</Text>
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={[styles.shell, {backgroundColor: colors.background}]} edges={['top']}>

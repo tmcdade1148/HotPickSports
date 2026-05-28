@@ -15,16 +15,23 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import {ChevronLeft} from 'lucide-react-native';
 import {supabase} from '@shared/config/supabase';
-import {useGlobalStore} from '@shell/stores/globalStore';
 import {useTheme} from '@shell/theme/hooks';
 import {bodyType, displayType, spacing, borderRadius} from '@shared/theme';
+import {RequireSuperAdmin} from '@shell/components/RequireSuperAdmin';
 
 type TargetOption = {label: string; value: string};
 
 export function AdminBroadcastScreen() {
+  return (
+    <RequireSuperAdmin>
+      <AdminBroadcastScreenImpl />
+    </RequireSuperAdmin>
+  );
+}
+
+function AdminBroadcastScreenImpl() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
-  const profile = useGlobalStore(s => s.userProfile);
 
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
@@ -103,13 +110,6 @@ export function AdminBroadcastScreen() {
     );
   };
 
-  if (!profile?.is_super_admin) {
-    return (
-      <SafeAreaView style={[styles.shell, {backgroundColor: colors.background}]} edges={['top']}>
-        <Text style={[bodyType.regular, {color: colors.error, padding: spacing.lg}]}>Not authorized.</Text>
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={[styles.shell, {backgroundColor: colors.background}]} edges={['top']}>

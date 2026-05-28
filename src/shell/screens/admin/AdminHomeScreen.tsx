@@ -15,21 +15,29 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import {ChevronLeft, AlertTriangle, Megaphone, Activity, Shield, Target, ChevronRight, Building} from 'lucide-react-native';
 import {supabase} from '@shared/config/supabase';
-import {useGlobalStore} from '@shell/stores/globalStore';
 import {useTheme} from '@shell/theme/hooks';
 import {bodyType, displayType, spacing, borderRadius} from '@shared/theme';
+import {RequireSuperAdmin} from '@shell/components/RequireSuperAdmin';
 
 export function AdminHomeScreen() {
+  // Auth gate at the wrapper so every admin screen guarantees it's
+  // running for a super_admin without each one re-checking.
+  return (
+    <RequireSuperAdmin>
+      <AdminHomeScreenImpl />
+    </RequireSuperAdmin>
+  );
+}
+
+function AdminHomeScreenImpl() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
-  const profile = useGlobalStore(s => s.userProfile);
 
   const [escalatedCount, setEscalatedCount] = useState<number | null>(null);
   const [poolCount, setPoolCount] = useState<number | null>(null);
   const [clubCount, setClubCount] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!profile?.is_super_admin) return;
     (async () => {
       const [{count: esc}, {count: pools}, {count: clubs}] = await Promise.all([
         supabase
@@ -51,17 +59,7 @@ export function AdminHomeScreen() {
       setPoolCount(pools ?? 0);
       setClubCount(clubs ?? 0);
     })();
-  }, [profile?.is_super_admin]);
-
-  if (!profile?.is_super_admin) {
-    return (
-      <SafeAreaView style={[styles.shell, {backgroundColor: colors.background}]} edges={['top']}>
-        <Text style={[bodyType.regular, {color: colors.error, padding: spacing.lg}]}>
-          Not authorized.
-        </Text>
-      </SafeAreaView>
-    );
-  }
+  }, []);
 
   return (
     <SafeAreaView style={[styles.shell, {backgroundColor: colors.background}]} edges={['top']}>

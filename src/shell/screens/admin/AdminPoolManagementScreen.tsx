@@ -14,9 +14,9 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import {ChevronLeft} from 'lucide-react-native';
 import {supabase} from '@shared/config/supabase';
-import {useGlobalStore} from '@shell/stores/globalStore';
 import {useTheme} from '@shell/theme/hooks';
 import {bodyType, displayType, spacing, borderRadius} from '@shared/theme';
+import {RequireSuperAdmin} from '@shell/components/RequireSuperAdmin';
 
 type PoolRow = {
   id: string;
@@ -32,9 +32,16 @@ type PoolRow = {
 type StatusFilter = 'all' | 'active' | 'suspended' | 'archived' | 'hidden';
 
 export function AdminPoolManagementScreen() {
+  return (
+    <RequireSuperAdmin>
+      <AdminPoolManagementScreenImpl />
+    </RequireSuperAdmin>
+  );
+}
+
+function AdminPoolManagementScreenImpl() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
-  const profile = useGlobalStore(s => s.userProfile);
 
   const [pools, setPools] = useState<PoolRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,8 +85,8 @@ export function AdminPoolManagementScreen() {
   }, []);
 
   useEffect(() => {
-    if (profile?.is_super_admin) load();
-  }, [profile?.is_super_admin, load]);
+    load();
+  }, [load]);
 
   const filtered = useMemo(() => {
     return pools.filter(p => {
@@ -162,13 +169,6 @@ export function AdminPoolManagementScreen() {
     Alert.alert(p.name ?? '—', `${p.competition} · ${p.member_count} members`, buttons);
   };
 
-  if (!profile?.is_super_admin) {
-    return (
-      <SafeAreaView style={[styles.shell, {backgroundColor: colors.background}]} edges={['top']}>
-        <Text style={[bodyType.regular, {color: colors.error, padding: spacing.lg}]}>Not authorized.</Text>
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={[styles.shell, {backgroundColor: colors.background}]} edges={['top']}>

@@ -9,8 +9,17 @@ import {useNavigation} from '@react-navigation/native';
 import {ChevronLeft, Activity} from 'lucide-react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {bodyType, displayType, spacing} from '@shared/theme';
+import {RequireSuperAdmin} from '@shell/components/RequireSuperAdmin';
 
 export function AdminPlatformHealthScreen() {
+  return (
+    <RequireSuperAdmin>
+      <AdminPlatformHealthScreenImpl />
+    </RequireSuperAdmin>
+  );
+}
+
+function AdminPlatformHealthScreenImpl() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
 
