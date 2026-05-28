@@ -170,7 +170,9 @@ const styles = StyleSheet.create({
   wrap: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
-    paddingBottom: spacing.lg,
+    // No bottom padding — the next section's marginTop is the sole
+    // hero-to-section gap so the spacing matches section-to-section.
+    paddingBottom: 0,
     gap: spacing.sm,
   },
   welcomeSub:    {fontSize: 14, lineHeight: 20, marginTop: 4, marginBottom: spacing.md},
@@ -182,7 +184,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',  // colons + digits align vertically by baseline of the full row
     gap: 2,
-    marginBottom: spacing.lg,
+    // No marginBottom — section.marginTop on the next row carries
+    // the gap. Keeps hero→section spacing equal to section→section.
   },
   countUnit:    {flex: 1, alignItems: 'center'},
   countNumber:  {fontSize: 56, lineHeight: 60},
@@ -202,7 +205,9 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     borderWidth: 1,
     alignItems: 'center',
-    marginTop: spacing.xs,
+    // Breathing room from the countdown now that the row has no
+    // own marginBottom.
+    marginTop: spacing.md,
   },
   shareText: {fontSize: 14, letterSpacing: 0.5},
 });

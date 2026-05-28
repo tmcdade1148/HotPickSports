@@ -138,7 +138,8 @@ const styles = StyleSheet.create({
   wrap: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
-    paddingBottom: spacing.lg,
+    // See OffSeasonHero — section.marginTop carries the gap.
+    paddingBottom: 0,
     gap: spacing.sm,
   },
   salutation:    {fontSize: 13},
@@ -151,7 +152,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
-    marginBottom: spacing.lg,
   },
   countUnit:    {flex: 1, alignItems: 'center'},
   countNumber:  {fontSize: 56, lineHeight: 60},
@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     borderWidth: 1,
     alignItems: 'center',
-    marginTop: spacing.xs,
+    marginTop: spacing.md,
   },
   shareText: {fontSize: 14, letterSpacing: 0.5},
 });
