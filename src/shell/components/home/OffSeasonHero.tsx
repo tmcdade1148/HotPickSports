@@ -18,20 +18,21 @@ import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {displayType, bodyType, monoType, spacing, borderRadius} from '@shared/theme';
 import {useCountdown} from './useCountdown';
-import {getContextGreeting} from './salutation';
 
 export function OffSeasonHero() {
   const {colors} = useTheme();
 
   const picksOpenAt    = useNFLStore(s => s.picksOpenAt);
   const seasonOpenerAt = useNFLStore(s => s.seasonOpenerAt);
-  const currentPhase   = useNFLStore(s => s.currentPhase);
   const visiblePools   = useGlobalStore(s => s.visiblePools);
   const userProfile    = useGlobalStore(s => s.userProfile);
+  // sportIdentity.displayName is the sport-specific brand: 'HotPick
+  // Football' for NFL, 'HotPick Hockey' for NHL, etc. Falls back to
+  // 'HotPick' if no sport is active.
+  const sportName      = useGlobalStore(s => s.activeSport?.sportIdentity?.displayName) ?? 'HotPick';
 
   const target = picksOpenAt ?? seasonOpenerAt;
   const {days, hours, minutes, isExpired} = useCountdown(target);
-  const greeting = getContextGreeting(currentPhase, 'idle', 0, null);
 
   // First pool with an invite code (for share). Many users will only have one.
   const firstPool = visiblePools.find(p => p.invite_code);
@@ -57,16 +58,15 @@ export function OffSeasonHero() {
 
   return (
     <View style={styles.wrap}>
-      <Text style={[bodyType.regular, styles.salutation, {color: colors.textSecondary}]}>
-        {greeting}
-      </Text>
-
+      {/* Dropped the contextual greeting line that used to sit above the
+          headline. The sport-name welcome carries the welcome on its
+          own and the greeting felt redundant. */}
       <Text
         style={[
           displayType.display,
           {fontSize: displayType.size.h2, color: colors.textPrimary},
         ]}>
-        {returning ? 'WELCOME BACK.' : 'WELCOME TO HOTPICK.'}
+        {returning ? 'WELCOME BACK.' : `WELCOME TO ${sportName.toUpperCase()}.`}
       </Text>
       <Text style={[bodyType.regular, styles.welcomeSub, {color: colors.textSecondary}]}>
         {returning
@@ -156,7 +156,6 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.lg,
     gap: spacing.sm,
   },
-  salutation:    {fontSize: 13},
   welcomeSub:    {fontSize: 14, lineHeight: 20, marginTop: 4, marginBottom: spacing.md},
   eyebrow:       {fontSize: 11, letterSpacing: 2, marginTop: spacing.sm, marginBottom: spacing.sm},
   countdownRow: {

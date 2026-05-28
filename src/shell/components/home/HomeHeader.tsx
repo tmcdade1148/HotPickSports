@@ -40,17 +40,20 @@ export function HomeHeader() {
       </View>
       <View style={styles.rightCluster}>
         <View style={[styles.pill, {borderColor: colors.primary}]}>
-          {/* adjustsFontSizeToFit + a max-width cap keeps long labels
-              like 'NFL26 · OFFSEASON' / 'NFL26 · SEASON DONE' from
-              spilling into the gear icon and squeezing the wordmark.
-              In-cycle labels (NFL26 · W08, NFL26 · WC) keep their
-              full 16.5px because they fit. Long ones scale down to
-              minimumFontScale = 0.7 before the cap kicks in. */}
+          {/* Static font-size step based on label length — iOS
+              adjustsFontSizeToFit was ignoring our cap with italic +
+              letterSpacing in play, leaving the long off-cycle labels
+              ('NFL26 · OFFSEASON' / 'NFL26 · SEASON DONE') at full
+              size and crowding the wordmark. ≤12 chars (W08, WC, DIV,
+              SB) keeps the full 16.5px; everything longer steps down
+              to 13px. */}
           <Text
-            adjustsFontSizeToFit
             numberOfLines={1}
-            minimumFontScale={0.7}
-            style={[bodyType.bold, styles.pillText, {color: colors.primary}]}>
+            style={[
+              bodyType.bold,
+              period.length > 12 ? styles.pillTextCompact : styles.pillText,
+              {color: colors.primary},
+            ]}>
             {period}
           </Text>
         </View>
@@ -135,14 +138,18 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: borderRadius.full,
     borderWidth: 1,
-    // Cap so 'NFL26 · OFFSEASON' / 'NFL26 · SEASON DONE' / etc. can't
-    // grow into the gear icon. Long labels shrink via the Text's
-    // adjustsFontSizeToFit; short ones (NFL26 · W08) keep full size.
-    maxWidth: 220,
   },
   pillText: {
     fontSize: 16.5,
     letterSpacing: 1.2,
+    fontStyle: 'italic',
+  },
+  // Compact font for long off-cycle labels (OFFSEASON, PRESEASON,
+  // SEASON DONE, WK 18 DONE) so they fit without crowding the
+  // HOTPICK SPORTS wordmark or the gear icon.
+  pillTextCompact: {
+    fontSize: 13,
+    letterSpacing: 1.1,
     fontStyle: 'italic',
   },
   gearBtn: {
