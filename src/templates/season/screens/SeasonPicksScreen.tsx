@@ -5,6 +5,7 @@ import {useSeasonStore} from '../stores/seasonStore';
 import {WeekSelector} from '../components/WeekSelector';
 import {SeasonMatchCard} from '../components/SeasonMatchCard';
 import {PicksProgressHeader} from '../components/PicksProgressHeader';
+import {SubmitPicksFooter} from '../components/SubmitPicksFooter';
 import {useAuth} from '@shared/hooks/useAuth';
 import {spacing, borderRadius} from '@shared/theme';
 import type {DbSeasonGame} from '@shared/types/database';
@@ -400,6 +401,7 @@ export function SeasonPicksScreen() {
         </View>
       ) : (
         <SectionList
+          style={styles.listFlex}
           sections={sections}
           keyExtractor={item => item.game_id}
           renderItem={renderGame}
@@ -412,6 +414,7 @@ export function SeasonPicksScreen() {
         />
       )}
 
+      <SubmitPicksFooter />
     </View>
   );
 }
@@ -423,7 +426,10 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   list: {
     paddingTop: 0,
-    paddingBottom: 100,
+    paddingBottom: spacing.md,
+  },
+  listFlex: {
+    flex: 1,
   },
   cardWrapper: {
     marginBottom: spacing.sm,
