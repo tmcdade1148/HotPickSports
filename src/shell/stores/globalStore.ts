@@ -5,7 +5,7 @@ import type {DbPool, DbProfile, DbPoolMember} from '@shared/types/database';
 import type {BrandConfig} from '@shell/theme/types';
 import {supabase} from '@shared/config/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {getEventsByPriority} from '@sports/registry';
+import {getAllEventsUnfiltered, getEventsByPriority} from '@sports/registry';
 import {deactivateDeviceTokens} from '@shell/services/pushNotifications';
 import {nflSeason} from '@sports/nfl/config';
 
@@ -409,6 +409,10 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   visibleCompetitionsLoaded: false,
 
   loadVisibleCompetitions: async () => {
+    // Capture pre-load state so we know whether this is the first
+    // resolve of the session (used by the beta force-land below).
+    const wasLoaded = get().visibleCompetitionsLoaded;
+
     const {data, error} = await supabase.rpc('get_visible_competitions');
     if (error) {
       // Fail open: if the RPC errors, treat everything as visible so
@@ -418,10 +422,27 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       return;
     }
     const rows = (data ?? []) as Array<{competition: string}>;
-    set({
-      visibleCompetitions: rows.map(r => r.competition),
-      visibleCompetitionsLoaded: true,
-    });
+    const visible = rows.map(r => r.competition);
+    set({visibleCompetitions: visible, visibleCompetitionsLoaded: true});
+
+    // Beta-tester force-land — on the FIRST resolve of a session, if
+    // the user has access to nfl_2025_sim, drop them onto sim so
+    // they're testing against the live simulator state. After the
+    // initial sync we leave activeSport alone so a super-admin can
+    // still switch to nfl_2026 manually via Settings → Competition
+    // and stay there for the rest of the session. DEV preserves the
+    // persisted competition for hot-reload sanity.
+    if (wasLoaded || __DEV__) return;
+    if (!visible.includes('nfl_2025_sim')) return;
+    const current = get().activeSport;
+    if (current?.competition === 'nfl_2025_sim') return;
+    const sim = getAllEventsUnfiltered().find(e => e.competition === 'nfl_2025_sim');
+    if (sim) {
+      get().setActiveSport(sim);
+      // Clear sticky pool so the user lands on the sim pool list
+      // instead of an nfl_2026 pool that no longer matches.
+      set({activePoolId: null});
+    }
   },
 
   loadManagedClub: async userId => {
