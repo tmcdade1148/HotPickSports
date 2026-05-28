@@ -5,18 +5,16 @@
 // season total. Countdown still points at season_picks_open_at
 // (Sept 2 for 2026) since that's when scoring becomes real.
 //
-// Like OffSeasonHero, the Join / Create CTAs that used to live here
-// moved into the HomeScreen YOUR CONTESTS section so the homepage
-// layout stays consistent across all stages. This hero is greeting
-// + welcome line + "preseason is on" eyebrow + countdown to picks
-// opening + tell-a-friend share.
+// Like OffSeasonHero, the Join / Create CTAs live in the HomeScreen
+// YOUR CONTESTS section and the tell-a-friend share lives in
+// RecruiterBand below the hero — so this hero is just the greeting +
+// welcome line + 'preseason is on' eyebrow + countdown.
 
 import React from 'react';
-import {Pressable, Share, StyleSheet, Text, View} from 'react-native';
+import {StyleSheet, Text, View} from 'react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
-import {useGlobalStore} from '@shell/stores/globalStore';
-import {displayType, bodyType, monoType, spacing, borderRadius} from '@shared/theme';
+import {displayType, bodyType, monoType, spacing} from '@shared/theme';
 import {useCountdown} from './useCountdown';
 import {getContextGreeting} from './salutation';
 
@@ -26,27 +24,10 @@ export function PreSeasonGamesHero() {
   const picksOpenAt    = useNFLStore(s => s.picksOpenAt);
   const seasonOpenerAt = useNFLStore(s => s.seasonOpenerAt);
   const currentPhase   = useNFLStore(s => s.currentPhase);
-  const visiblePools   = useGlobalStore(s => s.visiblePools);
 
   const target = picksOpenAt ?? seasonOpenerAt;
-  const {days, hours, minutes, isExpired} = useCountdown(target);
+  const {days, hours, minutes} = useCountdown(target);
   const greeting = getContextGreeting(currentPhase, 'idle', 0, null);
-
-  const firstPool = visiblePools.find(p => p.invite_code);
-  const firstInviteCode = firstPool?.invite_code ?? null;
-  const firstPoolName   = firstPool?.name_display || firstPool?.name || null;
-
-  const handleShare = async () => {
-    if (!firstInviteCode) return;
-    const message = firstPoolName
-      ? `Join my HotPick Contest "${firstPoolName}" — invite code ${firstInviteCode}`
-      : `Join me on HotPick — invite code ${firstInviteCode}`;
-    try {
-      await Share.share({message});
-    } catch {
-      // user cancelled / unavailable
-    }
-  };
 
   return (
     <View style={styles.wrap}>
@@ -78,26 +59,6 @@ export function PreSeasonGamesHero() {
         <Text style={[displayType.display, styles.colon, {color: colors.primary}]}>:</Text>
         <CountUnit n={minutes} label="min"  color={colors.textPrimary} subColor={colors.textTertiary} />
       </View>
-
-      {!isExpired && firstInviteCode && (
-        <Pressable
-          onPress={handleShare}
-          style={({pressed}) => [
-            styles.shareCta,
-            {borderColor: colors.border, opacity: pressed ? 0.7 : 1},
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel={`Invite a friend to ${firstPoolName ?? 'your Contest'}`}>
-          <Text style={[bodyType.bold, styles.shareText, {color: colors.textPrimary}]}>
-            Invite friends
-            {firstPoolName ? (
-              <Text style={[bodyType.regular, {color: colors.textSecondary}]}>
-                {'  ·  '}{firstPoolName}
-              </Text>
-            ) : null}
-          </Text>
-        </Pressable>
-      )}
     </View>
   );
 }
@@ -158,13 +119,4 @@ const styles = StyleSheet.create({
   // See OffSeasonHero — negative margin pulls colons toward digits.
   colon:        {fontSize: 44, lineHeight: 60, marginBottom: 12, marginHorizontal: -24},
   countLabel:   {fontSize: 10, letterSpacing: 2, marginTop: 2},
-  shareCta: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    alignItems: 'center',
-    marginTop: spacing.md,
-  },
-  shareText: {fontSize: 14, letterSpacing: 0.5},
 });

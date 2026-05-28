@@ -12,11 +12,11 @@
 // of existing pools.
 
 import React, {useEffect} from 'react';
-import {Pressable, Share, StyleSheet, Text, View} from 'react-native';
+import {StyleSheet, Text, View} from 'react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useGlobalStore} from '@shell/stores/globalStore';
-import {displayType, bodyType, monoType, spacing, borderRadius} from '@shared/theme';
+import {displayType, bodyType, monoType, spacing} from '@shared/theme';
 import {useCountdown} from './useCountdown';
 
 export function OffSeasonHero() {
@@ -35,7 +35,7 @@ export function OffSeasonHero() {
   const sportName      = activeSport?.sportIdentity?.displayName ?? 'HotPick';
 
   const target = picksOpenAt ?? seasonOpenerAt;
-  const {days, hours, minutes, isExpired} = useCountdown(target);
+  const {days, hours, minutes} = useCountdown(target);
 
   // Trigger the prior-sport-history check on first mount (cached
   // per session inside loadPriorSportHistory).
@@ -46,11 +46,6 @@ export function OffSeasonHero() {
 
   const hasPriorPicks = activeSport ? priorSportHistory[activeSport.sport] === true : false;
 
-  // First pool with an invite code (for share). Many users will only have one.
-  const firstPool = visiblePools.find(p => p.invite_code);
-  const firstInviteCode = firstPool?.invite_code ?? null;
-  const firstPoolName   = firstPool?.name_display || firstPool?.name || null;
-
   // Returning = either has a current pool, OR has prior-season picks
   // in this sport. The latter catches users coming back for a new
   // season before they've joined any Contest yet — they should still
@@ -58,18 +53,7 @@ export function OffSeasonHero() {
   // opener.
   const returning = hasPriorPicks || visiblePools.length > 0;
   const careerPts = userProfile?.total_career_points ?? 0;
-
-  const handleShare = async () => {
-    if (!firstInviteCode) return;
-    const message = firstPoolName
-      ? `Join my HotPick Contest "${firstPoolName}" — invite code ${firstInviteCode}`
-      : `Join me on HotPick — invite code ${firstInviteCode}`;
-    try {
-      await Share.share({message});
-    } catch {
-      // user cancelled / unavailable
-    }
-  };
+  // Tell-a-friend share moved to RecruiterBand below the hero.
 
   return (
     <View style={styles.wrap}>
@@ -107,27 +91,6 @@ export function OffSeasonHero() {
         <Text style={[displayType.display, styles.colon, {color: colors.primary}]}>:</Text>
         <CountUnit n={minutes} label="min"  color={colors.textPrimary} subColor={colors.textTertiary} />
       </View>
-
-      {/* Tell-a-friend — only when the user has a pool to share. */}
-      {!isExpired && firstInviteCode && (
-        <Pressable
-          onPress={handleShare}
-          style={({pressed}) => [
-            styles.shareCta,
-            {borderColor: colors.border, opacity: pressed ? 0.7 : 1},
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel={`Invite a friend to ${firstPoolName ?? 'your Contest'}`}>
-          <Text style={[bodyType.bold, styles.shareText, {color: colors.textPrimary}]}>
-            Invite friends
-            {firstPoolName ? (
-              <Text style={[bodyType.regular, {color: colors.textSecondary}]}>
-                {'  ·  '}{firstPoolName}
-              </Text>
-            ) : null}
-          </Text>
-        </Pressable>
-      )}
     </View>
   );
 }
@@ -198,16 +161,4 @@ const styles = StyleSheet.create({
   // the row fits on narrow screens).
   colon:        {fontSize: 44, lineHeight: 60, marginBottom: 12, marginHorizontal: -24},
   countLabel:   {fontSize: 10, letterSpacing: 2, marginTop: 2},
-
-  shareCta: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    alignItems: 'center',
-    // Breathing room from the countdown now that the row has no
-    // own marginBottom.
-    marginTop: spacing.md,
-  },
-  shareText: {fontSize: 14, letterSpacing: 0.5},
 });

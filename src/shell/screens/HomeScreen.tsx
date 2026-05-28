@@ -18,6 +18,7 @@ import {SystemMessageSlot} from '@shell/components/home/SystemMessageSlot';
 import {HomeHeader} from '@shell/components/home/HomeHeader';
 import {IdentityBar} from '@shell/components/home/IdentityBar';
 import {StateHero} from '@shell/components/home/StateHero';
+import {RecruiterBand} from '@shell/components/home/RecruiterBand';
 import {Insight} from '@shell/components/home/Insight';
 import {HomeInbox} from '@shell/components/home/HomeInbox';
 import {PoolModule} from '@shell/components/home/PoolModule';
@@ -276,6 +277,15 @@ export function HomeScreen() {
         <SystemMessageSlot />
         <IdentityBar />
         {showHero && <StateHero state={homeState} />}
+
+        {/* Off-cycle recruiter section — surfaces roster count +
+            invite-link share CTA. Only meaningful during off-season
+            and preseason; in-cycle the picks UI takes the focus.
+            Self-hides when the user has no Contest with an invite
+            code to share. */}
+        {(homeState === 'off_season_idle' || homeState === 'pre_season_games') && (
+          <RecruiterBand />
+        )}
 
         {showInsight && <Insight />}
 
