@@ -90,7 +90,7 @@ export function OffSeasonHero() {
           ? careerPts > 0
             ? `${careerPts.toLocaleString()} career pts. Let's run it back.`
             : "Get your Contest together before kickoff."
-          : "Contests are how the game's played. Join one or start your own."}
+          : "Pick the winners each week of the NFL season. Your picks play across every Contest you're in — friends at work, the group chat, your local bar — at the same time. One set of picks, many leagues."}
       </Text>
 
       <Text style={[bodyType.bold, styles.eyebrow, {color: colors.textTertiary}]}>
