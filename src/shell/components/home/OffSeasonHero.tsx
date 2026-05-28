@@ -11,7 +11,7 @@
 // season_picks_open_at, plus the tell-a-friend share for organizers
 // of existing pools.
 
-import React from 'react';
+import React, {useEffect} from 'react';
 import {Pressable, Share, StyleSheet, Text, View} from 'react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
@@ -26,22 +26,37 @@ export function OffSeasonHero() {
   const seasonOpenerAt = useNFLStore(s => s.seasonOpenerAt);
   const visiblePools   = useGlobalStore(s => s.visiblePools);
   const userProfile    = useGlobalStore(s => s.userProfile);
+  const activeSport    = useGlobalStore(s => s.activeSport);
+  const priorSportHistory   = useGlobalStore(s => s.priorSportHistory);
+  const loadPriorSportHistory = useGlobalStore(s => s.loadPriorSportHistory);
   // sportIdentity.displayName is the sport-specific brand: 'HotPick
   // Football' for NFL, 'HotPick Hockey' for NHL, etc. Falls back to
   // 'HotPick' if no sport is active.
-  const sportName      = useGlobalStore(s => s.activeSport?.sportIdentity?.displayName) ?? 'HotPick';
+  const sportName      = activeSport?.sportIdentity?.displayName ?? 'HotPick';
 
   const target = picksOpenAt ?? seasonOpenerAt;
   const {days, hours, minutes, isExpired} = useCountdown(target);
+
+  // Trigger the prior-sport-history check on first mount (cached
+  // per session inside loadPriorSportHistory).
+  useEffect(() => {
+    if (!activeSport) return;
+    loadPriorSportHistory(activeSport.sport, activeSport.competition).catch(() => {});
+  }, [activeSport, loadPriorSportHistory]);
+
+  const hasPriorPicks = activeSport ? priorSportHistory[activeSport.sport] === true : false;
 
   // First pool with an invite code (for share). Many users will only have one.
   const firstPool = visiblePools.find(p => p.invite_code);
   const firstInviteCode = firstPool?.invite_code ?? null;
   const firstPoolName   = firstPool?.name_display || firstPool?.name || null;
 
-  // Returning user gets a slightly different welcome line if they've played
-  // before (have any visible pool). New users see a more inviting opener.
-  const returning = visiblePools.length > 0;
+  // Returning = either has a current pool, OR has prior-season picks
+  // in this sport. The latter catches users coming back for a new
+  // season before they've joined any Contest yet — they should still
+  // see 'Welcome back to HotPick Football' rather than the new-user
+  // opener.
+  const returning = hasPriorPicks || visiblePools.length > 0;
   const careerPts = userProfile?.total_career_points ?? 0;
 
   const handleShare = async () => {
@@ -66,7 +81,9 @@ export function OffSeasonHero() {
           displayType.display,
           {fontSize: displayType.size.h2, color: colors.textPrimary},
         ]}>
-        {returning ? 'WELCOME BACK.' : `WELCOME TO ${sportName.toUpperCase()}.`}
+        {returning
+          ? `WELCOME BACK TO ${sportName.toUpperCase()}.`
+          : `WELCOME TO ${sportName.toUpperCase()}.`}
       </Text>
       <Text style={[bodyType.regular, styles.welcomeSub, {color: colors.textSecondary}]}>
         {returning
