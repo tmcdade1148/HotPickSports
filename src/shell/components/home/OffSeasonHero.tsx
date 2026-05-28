@@ -93,7 +93,7 @@ export function OffSeasonHero() {
           : "Contests are how the game's played. Join one or start your own."}
       </Text>
 
-      <Text style={[bodyType.bold, styles.eyebrow, {color: colors.textSecondary}]}>
+      <Text style={[bodyType.bold, styles.eyebrow, {color: colors.textTertiary}]}>
         PICKS OPEN IN
       </Text>
       {/* flex-1 on each cell + adjustsFontSizeToFit lets the row stay
@@ -174,7 +174,10 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   welcomeSub:    {fontSize: 14, lineHeight: 20, marginTop: 4, marginBottom: spacing.md},
-  eyebrow:       {fontSize: 11, letterSpacing: 2, marginTop: spacing.sm, marginBottom: spacing.sm},
+  // Match HomeScreen sectionTitle (YOUR CONTESTS / YOUR CLUBS) so the
+  // 'PICKS OPEN IN' eyebrow reads as a section header in the same
+  // visual language.
+  eyebrow:       {fontSize: 11, letterSpacing: 1.8, marginTop: spacing.sm, marginBottom: spacing.sm},
   countdownRow: {
     flexDirection: 'row',
     alignItems: 'center',  // colons + digits align vertically by baseline of the full row
