@@ -63,9 +63,21 @@ export function HomeScreen() {
   const activePoolId           = useGlobalStore(s => s.activePoolId);
   const subscribeToCompetitionConfig = useNFLStore(s => s.subscribeToCompetitionConfig);
 
+  // zeroPoolsExploreMode lets a brand-new user dismiss the
+  // ZeroPoolsHero and see the underlying phase-appropriate state
+  // (PreSeasonHero countdown + Join/Create CTAs during pre-season,
+  // for example). We bypass the "zero_pools overrides everything"
+  // rule in resolveHomeState by passing a synthetic visible-pool
+  // count of 1 — the resolver then falls through to the phase /
+  // week_state branches that map to the correct hero.
+  const exploreMode      = useGlobalStore(s => s.zeroPoolsExploreMode);
+  const effectivePoolCount = exploreMode && visiblePools.length === 0
+    ? 1
+    : visiblePools.length;
+
   const homeState = useMemo(
-    () => resolveHomeState(visiblePools.length, currentPhase, weekState),
-    [visiblePools.length, currentPhase, weekState],
+    () => resolveHomeState(effectivePoolCount, currentPhase, weekState),
+    [effectivePoolCount, currentPhase, weekState],
   );
 
   const isPicksFlow =
@@ -73,14 +85,12 @@ export function HomeScreen() {
     homeState === 'picks_locked' ||
     homeState === 'games_live';
   const showInsight      = isPicksFlow;
-  // zeroPoolsExploreMode lets a brand-new user dismiss the
-  // ZeroPoolsHero and browse YOUR CLUBS even without joining or
-  // creating a Contest. The pool stack stays hidden (nothing to
-  // show), but the partner stack becomes visible.
-  const exploreMode      = useGlobalStore(s => s.zeroPoolsExploreMode);
-  const showHero         = !(homeState === 'zero_pools' && exploreMode);
-  const showPoolStack    = homeState !== 'zero_pools';
-  const showPartnerStack = homeState !== 'zero_pools' || exploreMode;
+  // Hero is always rendered now — when exploreMode flips the state
+  // away from zero_pools, the phase-appropriate hero (PreSeasonHero,
+  // PicksOpenHero, etc.) takes over.
+  const showHero         = true;
+  const showPoolStack    = homeState !== 'zero_pools' && visiblePools.length > 0;
+  const showPartnerStack = homeState !== 'zero_pools';
 
   // ---------------------------------------------------------------------------
   // Partition pools for the Pool stack + Partner stack.
