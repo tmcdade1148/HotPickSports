@@ -16,6 +16,13 @@ import {EventDetailScreen} from '@shell/screens/EventDetailScreen';
 import {ProfileScreen} from '@shell/screens/ProfileScreen';
 import {SettingsScreen} from '@shell/screens/SettingsScreen';
 import {PartnerAdminScreen} from '@shell/screens/PartnerAdminScreen';
+import {ClubAdminScreen} from '@shell/screens/ClubAdminScreen';
+import {AdminHomeScreen} from '@shell/screens/admin/AdminHomeScreen';
+import {AdminModerationQueueScreen} from '@shell/screens/admin/AdminModerationQueueScreen';
+import {AdminPoolManagementScreen} from '@shell/screens/admin/AdminPoolManagementScreen';
+import {AdminBroadcastScreen} from '@shell/screens/admin/AdminBroadcastScreen';
+import {AdminPlatformHealthScreen} from '@shell/screens/admin/AdminPlatformHealthScreen';
+import {SuspensionGate} from '@shell/components/SuspensionGate';
 import {PartnerDirectoryScreen} from '@shell/screens/PartnerDirectoryScreen';
 import {PartnerRosterScreen} from '@shell/screens/PartnerRosterScreen';
 import {PoolMembersScreen} from '@shell/screens/PoolMembersScreen';
@@ -163,6 +170,11 @@ function navigateToReset() {
 export function RootNavigator() {
   return (
     <NavigationContainer ref={navigationRef} linking={linking}>
+      {/* SuspensionGate sits inside NavigationContainer so it has theme
+          + safe-area context. When the signed-in user is platform-
+          suspended it renders a full-screen card that cannot be
+          dismissed; otherwise it renders the navigator as normal. */}
+      <SuspensionGate>
       <Stack.Navigator
         initialRouteName="Loading"
         screenOptions={{headerShown: false}}>
@@ -205,8 +217,16 @@ export function RootNavigator() {
         <Stack.Screen name="FlaggedMessages" component={FlaggedMessagesScreen} />
         <Stack.Screen name="MessageCenter" component={MessageCenterScreen} />
         <Stack.Screen name="PartnerAdmin" component={PartnerAdminScreen} />
+        <Stack.Screen name="ClubAdmin" component={ClubAdminScreen} />
         <Stack.Screen name="PartnerDirectory" component={PartnerDirectoryScreen} />
         <Stack.Screen name="PartnerRoster" component={PartnerRosterScreen} />
+        {/* Super-admin section. Routes are registered but the only way
+            in is Settings → HotPick Admin (gated on is_super_admin). */}
+        <Stack.Screen name="AdminHome" component={AdminHomeScreen} />
+        <Stack.Screen name="AdminModerationQueue" component={AdminModerationQueueScreen} />
+        <Stack.Screen name="AdminPoolManagement" component={AdminPoolManagementScreen} />
+        <Stack.Screen name="AdminBroadcast" component={AdminBroadcastScreen} />
+        <Stack.Screen name="AdminPlatformHealth" component={AdminPlatformHealthScreen} />
         <Stack.Screen name="HardwareAdmin" component={HardwareAdminScreen} />
         <Stack.Screen name="About" component={AboutScreen} />
         <Stack.Screen name="Instructions" component={InstructionsScreen} />
@@ -215,6 +235,7 @@ export function RootNavigator() {
         <Stack.Screen name="CommunityGuidelines" component={CommunityGuidelinesScreen} />
         <Stack.Screen name="NotificationPreferences" component={NotificationPreferencesScreen} />
       </Stack.Navigator>
+      </SuspensionGate>
     </NavigationContainer>
   );
 }

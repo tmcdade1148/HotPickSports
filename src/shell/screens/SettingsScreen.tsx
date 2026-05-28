@@ -1,10 +1,11 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   Alert,
+  Linking,
   ScrollView,
   ActivityIndicator,
   StyleSheet,
@@ -22,7 +23,6 @@ import {
   Users,
   Building2,
   Star,
-  Palette,
   Settings,
   Info,
   BookOpen,
@@ -33,6 +33,7 @@ import {
   Trash2,
   MessageSquare,
   Bell,
+  HelpCircle,
 } from 'lucide-react-native';
 import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
@@ -57,7 +58,16 @@ export function SettingsScreen({route}: any) {
   // Show global pool in settings when user has no visible private pools
   const userPools = visiblePools.length > 0 ? visiblePools : allPools;
   const poolRoles = useGlobalStore(s => s.poolRoles);
+
+  // Club Admin gating reads from the globalStore.managedClub slice,
+  // which is loaded alongside the user profile (no per-Settings-mount
+  // refetch).
+  const managedClub = useGlobalStore(s => s.managedClub);
   const activePoolId = useGlobalStore(s => s.activePoolId);
+  // Member counts come from the Home screen's rank loader (kept in
+  // userRankByPool). If the user lands on Settings first the map is
+  // empty — count just doesn't render until Home loads.
+  const userRankByPool = useGlobalStore(s => s.userRankByPool);
   const activeSport = useGlobalStore(s => s.activeSport);
   const setActiveSport = useGlobalStore(s => s.setActiveSport);
   const rawDefaultPoolId = useGlobalStore(s => s.defaultPoolId);
@@ -247,6 +257,47 @@ export function SettingsScreen({route}: any) {
         <ChevronRight size={20} color={colors.textSecondary} />
       </TouchableOpacity>
 
+      {/* HotPick Admin — visible only to platform super_admins.
+          Entry point to the AdminHome hub (Moderation Queue, Pool
+          Management, Broadcast, etc.). Per April 2026 Super Admin
+          spec §5.1. */}
+      {userProfile?.is_super_admin && (
+        <View style={[styles.groupCard, {backgroundColor: colors.surface, marginBottom: spacing.md}]}>
+          <TouchableOpacity
+            style={styles.groupRow}
+            onPress={() => navigation.navigate('AdminHome')}>
+            <View style={styles.linkLeft}>
+              <Shield size={20} color={colors.primary} />
+              <Text style={[styles.linkText, {color: colors.textPrimary}]}>HotPick Admin</Text>
+            </View>
+            <ChevronRight size={18} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Club Admin — visible only when the user organizes a Club Pool
+          (the de facto Partner Admin). Resolves the Club name on mount
+          via SettingsScreen's existing managed-club effect (see top of
+          component). */}
+      {managedClub !== null && (
+        <View style={[styles.groupCard, {backgroundColor: colors.surface, marginBottom: spacing.md}]}>
+          <TouchableOpacity
+            style={styles.groupRow}
+            onPress={() => navigation.navigate('ClubAdmin')}>
+            <View style={styles.linkLeft}>
+              <Settings size={20} color={colors.primary} />
+              <View>
+                <Text style={[styles.linkText, {color: colors.textPrimary}]}>Club Admin</Text>
+                <Text style={{fontSize: 12, color: colors.textSecondary, marginTop: 2}}>
+                  Managing: {managedClub.name}
+                </Text>
+              </View>
+            </View>
+            <ChevronRight size={18} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Inbox section */}
       <Text style={[styles.groupLabel, {color: colors.textSecondary}]}>Inbox</Text>
       <View style={[styles.groupCard, {backgroundColor: colors.surface}]}>
@@ -303,35 +354,51 @@ export function SettingsScreen({route}: any) {
             Tap a Contest to make it active. Tap the ★ to pin a Contest to the
             top of your Home Screen — the rest sort alphabetically.
           </Text>
-          {/* Pool list — partner pools first, then HotPick pools (global pool hidden) */}
+          {/* Pool list — Official Club Contests first, then everything else
+              (Affiliated + Private mix alphabetically). Only Official rows
+              wear Club brand colors; Affiliated/Private render as neutral
+              pills per product call. */}
           {[
-            ...userPools.filter(p => !!(p.brand_config as any)?.is_branded),
+            ...userPools.filter(p => !!p.owning_club_id),
             'DIVIDER' as const,
-            ...userPools.filter(p => !(p.brand_config as any)?.is_branded),
+            ...userPools.filter(p => !p.owning_club_id),
           ].map((poolOrDivider) => {
             if (poolOrDivider === 'DIVIDER') {
-              const hasPartner = userPools.some(p => !!(p.brand_config as any)?.is_branded);
-              if (!hasPartner) return null;
+              const hasOfficial = userPools.some(p => !!p.owning_club_id);
+              if (!hasOfficial) return null;
               return <View key="partner-divider" style={{height: 16}} />;
             }
             const pool = poolOrDivider as typeof userPools[0];
             const poolBrand = getPoolColors(pool);
-            const isBranded = !!(pool.brand_config as any)?.is_branded;
+            // `isBranded` here means "this row IS an Official Club
+            // Contest" — only Official rows wear Club brand colors.
+            // Affiliated pools render neutral, same as Private.
+            const isBranded = !!pool.owning_club_id;
             const isActive = pool.id === activePoolId;
             const hotpick = {primary: colors.primary, secondary: colors.secondary, surface: colors.surface};
 
-            // Partner pills: secondary bg when inactive, primary bg when active
-            // HotPick pills: no bg when inactive, primary border when active
-            const pillBg = isBranded
-              ? (isActive ? poolBrand.primary : poolBrand.secondary)
-              : undefined;
-            // Contrast text for partner pill backgrounds
-            const pillTextColor = isBranded
+            // Three visual states:
+            //   • Official + active:   solid Club primary bg + contrast text
+            //   • Official + inactive: neutral surface + 1.5px NEUTRAL
+            //                          outline + standard text. Reads as a
+            //                          quiet, unselected row (per 2026-05-27
+            //                          product call). The "Mes Que · Gaffer"
+            //                          subtitle still calls out the Club
+            //                          relationship — the pill itself doesn't
+            //                          need to be Club-colored when not active.
+            //   • Non-Official:        neutral bg; HotPick primary border
+            //                          only when active.
+            const pillBg = isBranded && isActive ? poolBrand.primary : undefined;
+            const pillTextColor = isBranded && isActive
               ? (isLightColor(pillBg!) ? '#181818' : '#FFFFFF')
-              : (isActive ? hotpick.primary : colors.textPrimary);
-            const pillIconColor = isBranded
+              : isActive
+                ? hotpick.primary
+                : colors.textPrimary;
+            const pillIconColor = isBranded && isActive
               ? (isLightColor(pillBg!) ? '#181818' : '#FFFFFF')
-              : (isActive ? hotpick.primary : colors.textSecondary);
+              : isActive
+                ? hotpick.primary
+                : colors.textSecondary;
 
             const poolGlowColor = isBranded
               ? (pool.brand_config as any)?.secondary_color || '#0E6666'
@@ -342,9 +409,18 @@ export function SettingsScreen({route}: any) {
                 key={pool.id}
                 style={[
                   styles.poolRow,
-                  isBranded && {backgroundColor: pillBg},
-                  !isBranded && {backgroundColor: hotpick.surface},
+                  // Filled bg only for Official+active. Every other state
+                  // sits on neutral surface.
+                  isBranded && isActive && {backgroundColor: pillBg},
+                  (!isBranded || !isActive) && {backgroundColor: hotpick.surface},
+                  // Borders: inactive Official gets a quiet neutral outline
+                  // so it doesn't disappear into the rest of the list.
+                  // Active private gets the HotPick accent border.
+                  isBranded && !isActive && {borderWidth: 1.5, borderColor: colors.border},
                   !isBranded && isActive && {borderWidth: 1.5, borderColor: hotpick.primary},
+                  // Suspended pools get a thick red outline so members
+                  // see at a glance that this Contest is frozen.
+                  pool.is_suspended && {borderWidth: 1.5, borderColor: colors.error},
                 ]}
                 onPress={() => setActivePoolId(pool.id)}>
                 <View style={styles.poolInfo}>
@@ -370,8 +446,33 @@ export function SettingsScreen({route}: any) {
                         ]}
                         numberOfLines={1}>
                         {pool.name}
+                        {userRankByPool[pool.id]?.memberCount != null && (
+                          <Text style={[styles.poolMemberCount, {color: pillTextColor + 'AA'}]}>
+                            {`  (${userRankByPool[pool.id].memberCount})`}
+                          </Text>
+                        )}
                       </Text>
                     <View style={styles.poolMetaRow}>
+                      {pool.is_suspended && (
+                        <Text style={[styles.roleBadge, {color: colors.error, fontWeight: '800'}]}>
+                          SUSPENDED ·{' '}
+                        </Text>
+                      )}
+                      {/* Official Club Contests surface the owning Club's
+                          name in the meta row so the pill identifies WHICH
+                          Club it belongs to (the brand-color background
+                          alone doesn't say "Mes Que" out loud). Read off
+                          the brand_config snapshot — kept fresh by the
+                          partners_propagate_brand trigger. */}
+                      {isBranded && (
+                        <Text style={[styles.roleBadge, {color: pillTextColor + 'CC', fontWeight: '700'}]}>
+                          {(() => {
+                            const bc = pool.brand_config as Record<string, unknown> | null;
+                            return typeof bc?.partner_name === 'string' ? bc.partner_name : LEXICON.club.short;
+                          })()}
+                          {(pool.is_global || poolRoles[pool.id]) ? ' · ' : ''}
+                        </Text>
+                      )}
                       {pool.is_global ? (
                         <Text style={[styles.globalBadge, {color: colors.textSecondary}, isBranded && {color: pillTextColor + 'AA'}]}>Global Contest</Text>
                       ) : poolRoles[pool.id] ? (
@@ -419,11 +520,9 @@ export function SettingsScreen({route}: any) {
                       </Text>
                     </View>
                   )}
-                  {isActive && (
-                    <Text style={[styles.activeLabel, {color: isBranded ? pillTextColor : hotpick.primary}]}>
-                      Active
-                    </Text>
-                  )}
+                  {/* "Active" label removed — the pill's visual state
+                      (brand color bg for Official, primary border for
+                      everything else) already signals active. */}
                   {(poolRoles[pool.id] === 'organizer' || poolRoles[pool.id] === 'admin') && (
                     <TouchableOpacity
                       onPress={() =>
@@ -551,21 +650,14 @@ export function SettingsScreen({route}: any) {
         </TouchableOpacity>
       </View>
 
-      {/* Admin section — super admin only */}
+      {/* Admin section — super admin only. Partner Admin moved to
+          AdminHome → Club Management (reachable from "HotPick Admin"
+          at the top of Settings). Hardware Admin stays here until we
+          relocate it under AdminHome too. */}
       {userProfile?.is_super_admin && (
         <>
           <Text style={[styles.groupLabel, {color: colors.textSecondary}]}>Admin</Text>
           <View style={[styles.groupCard, {backgroundColor: colors.surface}]}>
-            <TouchableOpacity
-              style={styles.groupRow}
-              onPress={() => navigation.navigate('PartnerAdmin')}>
-              <View style={styles.linkLeft}>
-                <Palette size={20} color={colors.primary} />
-                <Text style={[styles.linkText, {color: colors.textPrimary}]}>Partner Admin</Text>
-              </View>
-              <ChevronRight size={18} color={colors.textSecondary} />
-            </TouchableOpacity>
-            <View style={[styles.groupDivider, {backgroundColor: colors.border}]} />
             <TouchableOpacity
               style={styles.groupRow}
               onPress={() => navigation.navigate('HardwareAdmin')}>
@@ -607,6 +699,33 @@ export function SettingsScreen({route}: any) {
           </View>
         </>
       )}
+
+      {/* Get Help — fires a mailto: to the support inbox. v1 fallback per
+          the 2026-05-27 product call (deferred a fuller in-app ticket
+          form). Pre-populates a context line so support knows who's
+          writing and from which app build. */}
+      <TouchableOpacity
+        style={[styles.signOutButton, {borderColor: colors.border, marginTop: 0}]}
+        onPress={() => {
+          const subject = encodeURIComponent('HotPick — Help request');
+          const body = encodeURIComponent(
+            `\n\n\n---\nFrom: ${userProfile?.poolie_name ?? user?.email ?? 'a HotPick user'}\n` +
+            `Email: ${user?.email ?? ''}\n` +
+            `User ID: ${user?.id ?? ''}\n` +
+            `Please describe what you need help with above this line.`,
+          );
+          Linking.openURL(
+            `mailto:support@hotpicksports.com?subject=${subject}&body=${body}`,
+          ).catch(() => {
+            Alert.alert(
+              'Email not available',
+              'Reach us at support@hotpicksports.com',
+            );
+          });
+        }}>
+        <HelpCircle size={18} color={colors.textPrimary} />
+        <Text style={[styles.signOutText, {color: colors.textPrimary}]}>Get Help</Text>
+      </TouchableOpacity>
 
       {/* Sign out */}
       <TouchableOpacity style={[styles.signOutButton, {borderColor: colors.error}]} onPress={handleSignOut}>
@@ -743,6 +862,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
     flexShrink: 1,
+  },
+  poolMemberCount: {
+    fontSize: 13,
+    fontWeight: '500',
   },
   inviteCode: {
     fontSize: 12,

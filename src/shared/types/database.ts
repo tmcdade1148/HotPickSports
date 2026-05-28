@@ -37,6 +37,12 @@ export interface DbProfile {
   career_hotpick_correct: number;
   career_hotpick_total: number;
   is_super_admin: boolean;
+  // Platform-wide suspension (super_admin action). Suspended users see
+  // a root-level modal they can't bypass; their writes are RLS-blocked.
+  is_platform_suspended: boolean;
+  platform_suspended_at: string | null;
+  platform_suspended_by: string | null;
+  platform_suspension_reason: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -57,10 +63,27 @@ export interface DbPool {
   name_display: string | null;
   pool_start_date: string;
   partner_id: string | null;
+  /**
+   * If non-NULL, this pool is an Official Contest of that Club. A Club can
+   * have many (e.g., ESPN regional pools). Mutually exclusive with
+   * pool_partner_affiliations rows — enforced by DB trigger.
+   * @see supabase/migrations/260526_pool_affiliations_and_owning_club.sql
+   */
+  owning_club_id: string | null;
   invite_slug: string | null;
   brand_config: Record<string, unknown> | null;
   is_archived: boolean;
   archived_at: string | null;
+  // Super-admin suspension (April 2026 spec). Distinct from is_archived
+  // (organizer toggle). Suspended pools render a banner over picks and
+  // SmackTalk; writes are RLS-blocked.
+  is_suspended: boolean;
+  suspended_at: string | null;
+  suspended_by: string | null;
+  suspension_reason: string | null;
+  // Hidden from Player UIs (e.g., the analytics Platform Pool). Staff
+  // can still see them via super-admin Pool Management.
+  is_hidden_from_users: boolean;
   created_at: string;
   updated_at: string;
 }

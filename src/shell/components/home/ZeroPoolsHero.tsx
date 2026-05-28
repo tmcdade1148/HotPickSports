@@ -32,7 +32,9 @@ export function ZeroPoolsHero() {
         GET IN A CONTEST.
       </Text>
       <Text style={[bodyType.regular, styles.sub, {color: colors.textSecondary}]}>
-        Contests are how HotPick is played. Join one a friend made, or run your own.
+        A Contest is a friendly competition between people who already know
+        each other. To get into one, you'll need an invite code from the
+        person organizing it (the Gaffer).
       </Text>
 
       <View style={styles.ctaRow}>
@@ -44,7 +46,7 @@ export function ZeroPoolsHero() {
           ]}
           accessibilityRole="button"
           accessibilityLabel="Enter an invite code to join a Contest">
-          <Text style={[bodyType.bold, styles.ctaPrimaryText, {color: colors.onPrimary}]}>Enter invite code</Text>
+          <Text style={[bodyType.bold, styles.ctaPrimaryText, {color: colors.onPrimary}]}>Have an invite code?</Text>
         </Pressable>
         <Pressable
           onPress={() => navigation.navigate('CreatePool')}
@@ -59,6 +61,11 @@ export function ZeroPoolsHero() {
           </Text>
         </Pressable>
       </View>
+
+      <Text style={[bodyType.regular, styles.privacy, {color: colors.textTertiary}]}>
+        All Contests on HotPick are private. There's no public matchmaking —
+        this is built for groups who already know each other.
+      </Text>
     </View>
   );
 }
@@ -93,4 +100,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   ctaSecondaryText: {fontSize: 14, letterSpacing: 0.5},
+  privacy: {
+    fontSize: 12,
+    lineHeight: 17,
+    fontStyle: 'italic',
+    marginTop: spacing.md,
+  },
 });

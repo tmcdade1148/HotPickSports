@@ -4,7 +4,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  Switch,
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
@@ -19,6 +18,9 @@ import {useTheme} from '@shell/theme';
 /**
  * CreatePoolScreen — Form to create a new pool for the active event.
  * Generates an invite code automatically. Sets the new pool as active.
+ * All Contests are private (invite-only). The public-Contest switch was
+ * removed per the 2026-05-27 product call — HotPick is for groups who
+ * already know each other; there's no public matchmaking.
  */
 export function CreatePoolScreen({navigation}: any) {
   const {colors} = useTheme();
@@ -28,7 +30,6 @@ export function CreatePoolScreen({navigation}: any) {
   const createPool = useGlobalStore(s => s.createPool);
 
   const [poolName, setPoolName] = useState('');
-  const [isPublic, setIsPublic] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,7 +49,7 @@ export function CreatePoolScreen({navigation}: any) {
       userId: user.id,
       competition: activeSport.competition,
       name: poolName.trim(),
-      isPublic,
+      isPublic: false,
     });
 
     setCreating(false);
@@ -113,20 +114,10 @@ export function CreatePoolScreen({navigation}: any) {
             autoFocus
           />
 
-          <View style={styles.switchRow}>
-            <View style={styles.switchInfo}>
-              <Text style={styles.switchLabel}>Public Contest</Text>
-              <Text style={styles.switchHint}>
-                Anyone can find and join this Contest
-              </Text>
-            </View>
-            <Switch
-              value={isPublic}
-              onValueChange={setIsPublic}
-              trackColor={{false: colors.border, true: colors.primary}}
-              thumbColor="#FFFFFF"
-            />
-          </View>
+          <Text style={styles.privacyHint}>
+            All Contests on HotPick are private. Only people you share the
+            invite code with can join.
+          </Text>
 
           {error && <Text style={styles.error}>{error}</Text>}
 
@@ -189,28 +180,12 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderColor: colors.border,
     marginBottom: spacing.lg,
   },
-  switchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  switchInfo: {
-    flex: 1,
-    marginRight: spacing.md,
-  },
-  switchLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: colors.textPrimary,
-  },
-  switchHint: {
+  privacyHint: {
     fontSize: 12,
+    fontStyle: 'italic',
     color: colors.textSecondary,
-    marginTop: 2,
+    marginBottom: spacing.lg,
+    lineHeight: 17,
   },
   error: {
     color: colors.error,

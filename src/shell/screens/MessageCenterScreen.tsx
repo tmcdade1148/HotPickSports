@@ -12,6 +12,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import {ChevronLeft, Megaphone, MessageCircle} from 'lucide-react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
+import {formatRelativeTime} from '@shared/utils/format';
 import {supabase} from '@shared/config/supabase';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
@@ -34,29 +35,57 @@ interface MessageItem {
  */
 export function MessageCenterScreen() {
   const navigation = useNavigation<any>();
-  const userPools = useGlobalStore(s => s.visiblePools);
   const userId = useGlobalStore(s => s.user?.id);
 
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // poolNameMap was stored in React state previously, but the for-loops
+  // below run *inside* fetchMessages — the freshly-built local `nameMap`
+  // is the only correct source there (state is async / stale-closured).
+  // Carry it on the messages themselves via `poolName` and drop the
+  // state entirely.
 
-  // Settings page always uses HotPick colors
   const {colors} = useTheme();
 
-  const poolNameMap: Record<string, string> = {};
-  for (const p of userPools) {
-    poolNameMap[p.id] = p.name;
-  }
-
   const fetchMessages = useCallback(async () => {
-    if (userPools.length === 0 || !userId) {
+    if (!userId) {
       setMessages([]);
       setLoading(false);
       return;
     }
 
-    const poolIds = userPools.map(p => p.id);
+    // Pull the user's full active pool membership directly — across
+    // every competition + including hidden pools like the Platform
+    // Pool. The global store's userPools slice is scoped to the
+    // active competition and would drop platform-wide broadcasts.
+    const {data: memberRows} = await supabase
+      .from('pool_members')
+      .select('pool_id, pools!inner(id, name, is_hidden_from_users)')
+      .eq('user_id', userId)
+      .eq('status', 'active');
+
+    type RawRow = {
+      pool_id: string;
+      pools: {id: string; name: string | null; is_hidden_from_users: boolean}
+           | {id: string; name: string | null; is_hidden_from_users: boolean}[]
+           | null;
+    };
+
+    const poolIds: string[] = [];
+    const nameMap: Record<string, string> = {};
+    for (const r of ((memberRows ?? []) as unknown) as RawRow[]) {
+      const p = Array.isArray(r.pools) ? r.pools[0] : r.pools;
+      if (!p) continue;
+      poolIds.push(p.id);
+      nameMap[p.id] = p.is_hidden_from_users ? 'HotPick' : (p.name ?? 'Contest');
+    }
+
+    if (poolIds.length === 0) {
+      setMessages([]);
+      setLoading(false);
+      return;
+    }
     const items: MessageItem[] = [];
 
     // 1. Fetch all broadcasts for user's pools (last 30 days)
@@ -96,7 +125,7 @@ export function MessageCenterScreen() {
 
     // Resolve sender names
     const senderIdArr = [...senderIds];
-    let nameMap: Record<string, string> = {};
+    let senderNameMap: Record<string, string> = {};
     if (senderIdArr.length > 0) {
       const {data: profiles} = await supabase
         .from('profiles')
@@ -104,7 +133,7 @@ export function MessageCenterScreen() {
         .in('id', senderIdArr);
 
       for (const p of profiles ?? []) {
-        nameMap[p.id] = p.poolie_name || 'Gaffer';
+        senderNameMap[p.id] = p.poolie_name || 'Gaffer';
       }
     }
 
@@ -113,9 +142,9 @@ export function MessageCenterScreen() {
         id: `bc-${b.id}`,
         type: 'broadcast',
         poolId: b.pool_id,
-        poolName: poolNameMap[b.pool_id] ?? 'Contest',
+        poolName: nameMap[b.pool_id] ?? 'Contest',
         message: b.message,
-        senderName: nameMap[b.organizer_id] ?? 'Gaffer',
+        senderName: senderNameMap[b.organizer_id] ?? 'Gaffer',
         sentAt: b.sent_at,
       });
     }
@@ -125,9 +154,9 @@ export function MessageCenterScreen() {
         id: `mod-${n.id}`,
         type: 'moderator_note',
         poolId: n.pool_id,
-        poolName: poolNameMap[n.pool_id] ?? 'Contest',
+        poolName: nameMap[n.pool_id] ?? 'Contest',
         message: n.message,
-        senderName: nameMap[n.organizer_id] ?? 'Moderator',
+        senderName: senderNameMap[n.organizer_id] ?? 'Moderator',
         sentAt: n.sent_at,
       });
     }
@@ -139,7 +168,21 @@ export function MessageCenterScreen() {
 
     setMessages(items);
     setLoading(false);
-  }, [userPools, userId]);
+
+    // Mark every pool the user is in as read up to now. Upsert one row
+    // per (user_id, pool_id); the HomeInbox banner subscribes to UPDATE
+    // events on this table so the unread count clears in real-time as
+    // soon as the upsert lands.
+    if (userId && poolIds.length > 0) {
+      const nowIso = new Date().toISOString();
+      await supabase
+        .from('notification_read_state')
+        .upsert(
+          poolIds.map(pid => ({user_id: userId, pool_id: pid, last_read_at: nowIso})),
+          {onConflict: 'user_id,pool_id'},
+        );
+    }
+  }, [userId]);
 
   useEffect(() => {
     fetchMessages();
@@ -183,7 +226,7 @@ export function MessageCenterScreen() {
                 </Text>
               </View>
               <Text style={[styles.timeLabel, {color: colors.textSecondary}]}>
-                {formatDate(item.sentAt)}
+                {formatRelativeTime(item.sentAt)}
               </Text>
             </View>
             <Text style={[styles.messageText, {color: colors.textPrimary}]}>
@@ -253,23 +296,6 @@ export function MessageCenterScreen() {
 }
 
 /** Format a date string into a readable format */
-function formatDate(dateStr: string): string {
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  const diffMin = Math.round((now - then) / 60000);
-
-  if (diffMin < 1) return 'Just now';
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHrs = Math.round(diffMin / 60);
-  if (diffHrs < 24) return `${diffHrs}h ago`;
-  const diffDays = Math.round(diffHrs / 24);
-  if (diffDays < 7) return `${diffDays}d ago`;
-
-  // Older than a week — show date
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,

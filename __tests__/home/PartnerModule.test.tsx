@@ -89,7 +89,7 @@ describe('PartnerModule tap routing (spec §6.4.7)', () => {
     let tree: ReactTestRenderer.ReactTestRenderer;
     ReactTestRenderer.act(() => {
       tree = ReactTestRenderer.create(
-        <PartnerModule partnerId={mesquiteId} alignedPools={[alignedPool]} />,
+        <PartnerModule partnerId={mesquiteId} />,
       );
     });
 
@@ -109,7 +109,7 @@ describe('PartnerModule tap routing (spec §6.4.7)', () => {
     let tree: ReactTestRenderer.ReactTestRenderer;
     ReactTestRenderer.act(() => {
       tree = ReactTestRenderer.create(
-        <PartnerModule partnerId={mesquiteId} alignedPools={[alignedPool]} />,
+        <PartnerModule partnerId={mesquiteId} />,
       );
     });
 
@@ -127,7 +127,7 @@ describe('PartnerModule tap routing (spec §6.4.7)', () => {
     let tree: ReactTestRenderer.ReactTestRenderer;
     ReactTestRenderer.act(() => {
       tree = ReactTestRenderer.create(
-        <PartnerModule partnerId={mesquiteId} alignedPools={[alignedPool]} />,
+        <PartnerModule partnerId={mesquiteId} />,
       );
     });
 

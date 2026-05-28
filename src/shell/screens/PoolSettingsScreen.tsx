@@ -13,6 +13,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {
@@ -20,22 +21,21 @@ import {
   Copy,
   Share2,
   Archive,
-  Globe,
   Award,
   Megaphone,
   AlertTriangle,
   Plus,
   Star,
   Users,
+  X,
   XCircle,
 } from 'lucide-react-native';
 import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
+import {normalizeRosterPass} from '@shared/utils/format';
 import {BroadcastComposer} from '@shell/components/BroadcastComposer';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
-import type {BrandConfig} from '@shell/theme/types';
-import {HOTPICK_DEFAULTS} from '@shell/theme/defaults';
 
 interface InviteCodeRow {
   id: string;
@@ -57,17 +57,53 @@ export function PoolSettingsScreen() {
   const poolMembers = useGlobalStore(s => s.poolMembers);
   const updatePoolSettings = useGlobalStore(s => s.updatePoolSettings);
   const archivePool = useGlobalStore(s => s.archivePool);
+  // Current user's role in THIS Contest. Drives whether Gaffer-only
+  // controls render. Admin = Organizer minus two (no promote/demote,
+  // no archive) per the April 2026 spec.
+  const myRole = useGlobalStore(s => s.poolRoles[poolId]);
+  const isOrganizer = myRole === 'organizer';
+  const isAdmin = myRole === 'admin';
+
+  // One-time intro for a new Admin. Persisted per-Contest in AsyncStorage
+  // so we don't pester returning Admins. Default true (shown) until we
+  // know better — hides instantly once we load the dismissed flag.
+  const adminIntroKey = `dismissed_admin_intro_${poolId}`;
+  const [showAdminIntro, setShowAdminIntro] = useState(false);
+  useEffect(() => {
+    if (!isAdmin) return;
+    AsyncStorage.getItem(adminIntroKey)
+      .then(val => {
+        if (val !== 'true') setShowAdminIntro(true);
+      })
+      .catch(() => {});
+  }, [isAdmin, adminIntroKey]);
+  const dismissAdminIntro = () => {
+    setShowAdminIntro(false);
+    AsyncStorage.setItem(adminIntroKey, 'true').catch(() => {});
+  };
+  // Club Rosters section reads + writes through the affiliations slice
+  // so the home screen + Contest cards see updates without an extra
+  // round-trip.
+  const poolAffiliationsMap = useGlobalStore(s => s.poolAffiliations);
+  const loadPoolAffiliationsFn = useGlobalStore(s => s.loadPoolAffiliations);
+  const partnersById = useGlobalStore(s => s.partnersById);
+  const owningClub = useGlobalStore(s => {
+    const p = s.userPools.find(x => x.id === poolId);
+    return p?.owning_club_id ? s.partnersById?.[p.owning_club_id] : null;
+  });
 
   const pool = useMemo(
     () => userPools.find(p => p.id === poolId),
     [userPools, poolId],
   );
 
-  const poolBrand = useMemo(() => {
-    const bc = pool?.brand_config as unknown as BrandConfig | null | undefined;
-    return bc?.is_branded ? bc : null;
-  }, [pool]);
-  const accentColor = poolBrand?.secondary_color ?? HOTPICK_DEFAULTS.primary_color;
+  // Contest Settings stays HotPick-themed regardless of which Club(s)
+  // the Contest is affiliated with. Per the 2026-05-26 product call,
+  // Club brand colors live only on Official Club Contest *cards* on
+  // Home — not on any settings/admin surfaces. Affiliation pills here
+  // wear neutral chrome; their identity comes from the Club name
+  // alone.
+  const accentColor = colors.primary;
 
   const [poolName, setPoolName] = useState(pool?.name ?? '');
   const [saving, setSaving] = useState(false);
@@ -117,6 +153,13 @@ export function PoolSettingsScreen() {
   useEffect(() => {
     fetchCodes();
   }, [fetchCodes]);
+
+  // Pull this pool's affiliations into the store on mount so the
+  // Club Rosters section renders the live list. The store loader
+  // dedupes per pool so calling it here is cheap on re-mount.
+  useEffect(() => {
+    if (poolId) loadPoolAffiliationsFn([poolId]).catch(() => {});
+  }, [poolId, loadPoolAffiliationsFn]);
 
   useEffect(() => {
     if (!pool?.partner_id) {
@@ -239,9 +282,39 @@ export function PoolSettingsScreen() {
     }
   };
 
+  // Remove a Club from this Contest's roster. Confirms first; the
+  // store's loader is then re-run so the list re-paints in place.
+  const [removingPartnerId, setRemovingPartnerId] = useState<string | null>(null);
+  const handleRemoveAffiliation = (partnerId: string, partnerName: string) => {
+    Alert.alert(
+      `Remove ${partnerName}?`,
+      `Your Contest will leave ${partnerName}'s roster. You can re-affiliate any time.`,
+      [
+        {text: 'Cancel', style: 'cancel'},
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            setRemovingPartnerId(partnerId);
+            const {error} = await supabase.rpc('remove_pool_affiliation', {
+              p_pool_id:    poolId,
+              p_partner_id: partnerId,
+            });
+            setRemovingPartnerId(null);
+            if (error) {
+              Alert.alert('Could not remove', error.message);
+              return;
+            }
+            loadPoolAffiliationsFn([poolId]).catch(() => {});
+          },
+        },
+      ],
+    );
+  };
+
   const handleAddCode = async () => {
     setCodeError(null);
-    const normalized = newCode.toUpperCase().replace(/[\s-]/g, '');
+    const normalized = normalizeRosterPass(newCode);
     if (normalized.length < 6 || normalized.length > 12) {
       setCodeError('Code must be 6–12 characters.');
       return;
@@ -376,6 +449,32 @@ export function PoolSettingsScreen() {
           <View style={{width: 24}} />
         </View>
 
+        {/* Admin intro — shown once per Contest to a freshly-promoted
+            Pool Admin so they know what they can and can't do. The
+            Gaffer never sees this; once dismissed, persisted in
+            AsyncStorage and never shown again on this device. */}
+        {showAdminIntro && (
+          <View style={styles.adminIntroCard}>
+            <Text style={styles.adminIntroTitle}>
+              You're an Admin of this Contest.
+            </Text>
+            <Text style={styles.adminIntroBody}>
+              That means you can send broadcasts, action flagged
+              messages, warn or remove members, and edit Contest
+              settings — the same day-to-day stuff the Gaffer can do.
+              {'\n\n'}
+              Two things stay with the Gaffer only:
+              {'\n'}   • Naming other Admins
+              {'\n'}   • Archiving the Contest
+              {'\n\n'}
+              If you have questions, message the Gaffer.
+            </Text>
+            <TouchableOpacity onPress={dismissAdminIntro} style={styles.adminIntroDismiss}>
+              <Text style={styles.adminIntroDismissText}>Got it</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Pool Name */}
         <Text style={styles.sectionTitle}>Contest Name</Text>
         <View style={styles.nameRow}>
@@ -400,6 +499,64 @@ export function PoolSettingsScreen() {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* CLUB ROSTERS — moved here from below Communication so it
+            sits with the other Contest identity controls (name lives
+            in the row above; "which Clubs does this Contest belong to"
+            is conceptually the next thing). */}
+        <Text style={styles.sectionTitle}>Club Rosters</Text>
+        {/* Official Club Contest: the owning Club is non-removable;
+            shown as a pinned pill at the top of the list. Additional
+            affiliations are blocked at the RPC level (POOL_IS_OFFICIAL),
+            so we hide the Add button below for these pools. */}
+        {pool.owning_club_id && owningClub && (
+          <View style={[styles.clubPillRow, {borderColor: colors.border, backgroundColor: colors.surface}]}>
+            <Text style={[styles.clubPillName, {color: colors.textPrimary}]} numberOfLines={1}>
+              {owningClub.name}
+            </Text>
+            <Text style={[styles.clubPillBadge, {color: colors.textTertiary}]}>OWNING CLUB</Text>
+          </View>
+        )}
+        {!pool.owning_club_id && (poolAffiliationsMap[poolId] ?? []).map(aff => {
+          const live = partnersById[aff.partnerId];
+          const displayName = live?.name ?? aff.partnerName;
+          const isRemoving = removingPartnerId === aff.partnerId;
+          return (
+            <View
+              key={aff.partnerId}
+              style={[styles.clubPillRow, {borderColor: colors.border, backgroundColor: colors.surface}]}>
+              <Text style={[styles.clubPillName, {color: colors.textPrimary}]} numberOfLines={1}>
+                {displayName}
+              </Text>
+              {aff.isPrimary && (
+                <Text style={[styles.clubPillBadge, {color: colors.textTertiary}]}>LEAD</Text>
+              )}
+              <TouchableOpacity
+                onPress={() => handleRemoveAffiliation(aff.partnerId, displayName)}
+                disabled={isRemoving}
+                hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+                style={styles.clubPillRemove}
+                accessibilityRole="button"
+                accessibilityLabel={`Remove ${displayName} affiliation`}>
+                {isRemoving ? (
+                  <ActivityIndicator size="small" color={colors.error} />
+                ) : (
+                  <X size={16} color={colors.error} strokeWidth={2.25} />
+                )}
+              </TouchableOpacity>
+            </View>
+          );
+        })}
+        {!pool.owning_club_id && (
+          <TouchableOpacity
+            style={[styles.broadcastButton, {borderColor: colors.primary}]}
+            onPress={() => navigation.navigate('PartnerDirectory', {poolId})}>
+            <Users size={18} color={colors.primary} />
+            <Text style={[styles.broadcastText, {color: colors.primary}]}>
+              Add/Edit Clubs
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {/* Invite Codes — list view, multiple codes per pool. */}
         {!pool.is_global && (
@@ -476,9 +633,7 @@ export function PoolSettingsScreen() {
               <TextInput
                 style={styles.addCodeInput}
                 value={newCode}
-                onChangeText={text =>
-                  setNewCode(text.toUpperCase().replace(/[\s-]/g, ''))
-                }
+                onChangeText={text => setNewCode(normalizeRosterPass(text))}
                 placeholder="WINGS26"
                 placeholderTextColor={colors.textSecondary}
                 maxLength={12}
@@ -536,16 +691,10 @@ export function PoolSettingsScreen() {
           )}
         </View>
 
-        {/* Privacy label — switch hidden; pools are always private at launch */}
-        <View style={styles.toggleRow}>
-          <Globe size={18} color={colors.textSecondary} />
-          <View style={styles.toggleInfo}>
-            <Text style={styles.toggleLabel}>Private Contest</Text>
-            <Text style={styles.toggleDesc}>
-              Only people with the invite code can join
-            </Text>
-          </View>
-        </View>
+        {/* Privacy placeholder block removed (2026-05-27) — all
+            Contests are now private by definition, so the always-on
+            label was vestigial. Privacy posture is communicated at
+            Create-time + on the empty-state hero instead. */}
 
         {/* Communication & Moderation */}
         <Text style={styles.sectionTitle}>Communication</Text>
@@ -556,88 +705,11 @@ export function PoolSettingsScreen() {
           <Text style={[styles.broadcastText, {color: accentColor}]}>Send Broadcast</Text>
         </TouchableOpacity>
 
-        <Text style={styles.sectionTitle}>Club</Text>
-
-        {pool.partner_id && partnerRow && (
-          <View style={[styles.partnerCard, {marginBottom: 0}]}>
-            <Text style={[styles.partnerCardHint, {fontStyle: 'italic'}]}>
-              {partnerRow.club_pool_id === pool.id
-                ? `This Contest is ${partnerRow.name}'s Contest.`
-                : `This Contest is on ${partnerRow.name}'s roster.`}
-            </Text>
-          </View>
-        )}
-
-        {pool.partner_id && partnerRow && partnerRow.club_pool_id === pool.id && (
-          <View style={styles.partnerCard}>
-            <Text style={styles.partnerCardTitle}>
-              {partnerRow.name} perk
-            </Text>
-            <Text style={styles.partnerCardHint}>
-              Shows on every Contest on {partnerRow.name}'s roster. Max 120 chars.
-            </Text>
-            <View style={styles.perkInputRow}>
-              <TextInput
-                style={styles.perkIconInput}
-                value={perkIcon}
-                onChangeText={setPerkIcon}
-                placeholder="🎁"
-                placeholderTextColor={colors.textSecondary}
-                maxLength={16}
-              />
-              <TextInput
-                style={styles.perkTextInput}
-                value={perkText}
-                onChangeText={text => {
-                  if (text.length <= 120) setPerkText(text);
-                }}
-                placeholder="$1 off any draft, Sundays."
-                placeholderTextColor={colors.textSecondary}
-                multiline
-                maxLength={120}
-              />
-            </View>
-            <Text style={styles.perkCharCount}>{perkText.length}/120</Text>
-            <TouchableOpacity
-              style={[
-                styles.perkSaveButton,
-                (!perkDirty || perkSaving) && styles.perkSaveButtonDisabled,
-              ]}
-              onPress={handleSavePerk}
-              disabled={!perkDirty || perkSaving}>
-              {perkSaving ? (
-                <ActivityIndicator size="small" color={colors.onPrimary} />
-              ) : (
-                <Text style={styles.perkSaveText}>Save Perk</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {pool.partner_id && partnerRow && partnerRow.club_pool_id === pool.id && (
-          <TouchableOpacity
-            style={[styles.broadcastButton, {borderColor: accentColor}]}
-            onPress={() => {
-              setPartnerBroadcastMessage('');
-              setPartnerBroadcastVisible(true);
-            }}>
-            <Megaphone size={18} color={accentColor} />
-            <Text style={[styles.broadcastText, {color: accentColor}]}>
-              Send {partnerRow.name} Broadcast
-            </Text>
-          </TouchableOpacity>
-        )}
-
-        {!(partnerRow && partnerRow.club_pool_id === pool.id) && (
-          <TouchableOpacity
-            style={[styles.broadcastButton, {borderColor: colors.primary}]}
-            onPress={() => navigation.navigate('PartnerDirectory', {poolId})}>
-            <Users size={18} color={colors.primary} />
-            <Text style={[styles.broadcastText, {color: colors.primary}]}>
-              {pool.partner_id ? 'Change roster' : "Join a Club's roster"}
-            </Text>
-          </TouchableOpacity>
-        )}
+        {/* Club Pool admin tools (perk editor + partner broadcast)
+            moved to ClubAdminScreen (Settings → Club Admin). Reachable
+            from there for any user organizing a Club Pool. The
+            "Add/Edit Clubs" button now lives in the Club Rosters
+            section at the top of this screen. */}
 
         <Text style={styles.sectionTitle}>Moderation</Text>
         <TouchableOpacity
@@ -648,13 +720,20 @@ export function PoolSettingsScreen() {
         </TouchableOpacity>
 
         {/* Danger Zone */}
-        <Text style={[styles.sectionTitle, styles.dangerTitle]}>
-          Danger Zone
-        </Text>
-        <TouchableOpacity style={styles.archiveButton} onPress={handleArchive}>
-          <Archive size={18} color={colors.error} />
-          <Text style={styles.archiveText}>Archive Contest</Text>
-        </TouchableOpacity>
+        {/* Danger Zone — Organizer-only (Admin can't archive per
+            April 2026 spec capability matrix). Section hides
+            entirely for Admin so the screen ends cleanly. */}
+        {isOrganizer && (
+          <>
+            <Text style={[styles.sectionTitle, styles.dangerTitle]}>
+              Danger Zone
+            </Text>
+            <TouchableOpacity style={styles.archiveButton} onPress={handleArchive}>
+              <Archive size={18} color={colors.error} />
+              <Text style={styles.archiveText}>Archive Contest</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </ScrollView>
 
       <BroadcastComposer
@@ -773,6 +852,41 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginTop: spacing.lg,
     marginBottom: spacing.sm,
     paddingHorizontal: spacing.lg,
+  },
+
+  // Admin intro tooltip — one-time per Contest.
+  adminIntroCard: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.lg,
+    padding: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  adminIntroTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+  },
+  adminIntroBody: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.textSecondary,
+  },
+  adminIntroDismiss: {
+    marginTop: spacing.md,
+    alignSelf: 'flex-end',
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.primary,
+  },
+  adminIntroDismissText: {
+    color: colors.onPrimary,
+    fontWeight: '700',
+    fontSize: 13,
   },
   nameRow: {
     flexDirection: 'row',
@@ -956,29 +1070,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: '700',
     color: colors.primary,
   },
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.lg,
-    gap: spacing.sm,
-  },
-  toggleInfo: {
-    flex: 1,
-  },
-  toggleLabel: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: colors.textPrimary,
-  },
-  toggleDesc: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
   toggleIndicator: {
     width: 44,
     height: 26,
@@ -999,6 +1090,31 @@ const createStyles = (colors: any) => StyleSheet.create({
   toggleDotOn: {
     alignSelf: 'flex-end',
   },
+  // Club Rosters pills — one row per affiliated Club with inline Remove.
+  clubPillRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  clubPillName: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  clubPillBadge: {
+    fontSize: 10,
+    letterSpacing: 1,
+    fontWeight: '700',
+  },
+  clubPillRemove: {
+    padding: 4,
+  },
+
   broadcastButton: {
     flexDirection: 'row',
     alignItems: 'center',

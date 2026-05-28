@@ -54,6 +54,11 @@ const mockStoreState = {
   poolIndicators:   {} as Record<string, {orgUnread: number; mostRecentAt: string | null}>,
   userRankByPool:   {} as Record<string, {rank: number; memberCount: number; total: number}>,
   weekRankByPool:   {} as Record<string, {rank: number; memberCount: number; weekPoints: number}>,
+  // Affiliations slice — keyed by poolId. Empty by default; the legacy
+  // single-Club fallback path kicks in via pool.partner_id + brand_config.
+  poolAffiliations: {} as Record<string, unknown[]>,
+  partnersById:     {} as Record<string, unknown>,
+  partnerIndicators: {} as Record<string, {unread: number; mostRecentAt: string | null}>,
 };
 
 jest.mock('@shell/stores/globalStore', () => ({
@@ -144,14 +149,15 @@ describe('PoolModule tap routing (spec §6.4.6)', () => {
     });
 
     const pressables = findPressables(tree!.root);
-    // Pressable order (redesign-v3, settings gear added):
+    // Pressable order (redesign-v5, per-Contest settings gear dropped):
     //   [0] card body
-    //   [1] settings gear (lower-right)
-    //   [2] SmackTalk badge
-    expect(pressables.length).toBeGreaterThanOrEqual(3);
-    const smackPress = pressables.find(p =>
-      String(p.props.accessibilityLabel ?? '').toLowerCase().includes('smacktalk'),
-    )?.props.onPress;
+    //   [1] Chirps badge (was "SmackTalk")
+    expect(pressables.length).toBeGreaterThanOrEqual(2);
+    const smackPress = pressables.find(p => {
+      const label = String(p.props.accessibilityLabel ?? '').toLowerCase();
+      // Label vocabulary moved from "SmackTalk" to "Chirps" per lexicon spec.
+      return label.includes('chirp') || label.includes('smacktalk');
+    })?.props.onPress;
     expect(typeof smackPress).toBe('function');
 
     ReactTestRenderer.act(() => {
@@ -183,16 +189,16 @@ describe('PoolModule tap routing (spec §6.4.6)', () => {
     expect(mockNavigate).toHaveBeenCalledWith('LeaderboardTab');
   });
 
-  test('partner-aligned pool: no rank chip rendered (renders card + gear + SmackTalk + partner roster link)', () => {
+  test('partner-aligned pool: no rank chip rendered (renders card + gear + Chirps + affiliation row + info pill)', () => {
     let tree: ReactTestRenderer.ReactTestRenderer;
     ReactTestRenderer.act(() => {
       tree = ReactTestRenderer.create(<PoolModule pool={partnerPool} />);
     });
-    // Redesign-v3: SmackTalk badge is always visible (even with zero
-    // unread — muted state), a settings gear sits in the lower-right,
-    // and the "Aligned with…" row is a Pressable that opens the partner
-    // roster. So a partner-aligned pool renders four Pressables: card
-    // body, settings gear, SmackTalk badge, partner roster link.
+    // Redesign-v6: the broadcast indicator (Megaphone) became a
+    // Pressable that routes to Message Center (was a plain View that
+    // fell through to the card-level Leaderboard nav).
+    // Four Pressables: card body, broadcast indicator, Chirps badge,
+    // affiliated-Club name.
     expect(findPressables(tree!.root)).toHaveLength(4);
   });
 });

@@ -1,13 +1,15 @@
 // Locks the user-facing lexicon to the spec's locked decisions
 // (260520_HotPick_LexiconImplementation_Spec.docx §2). Any accidental drift
 // from "Contest" / "Player" / "Gaffer" / "Club" / "Ladder" / "Chirp" /
-// "Endorsed by X" trips this test before users see it.
+// "Affiliated with X" trips this test before users see it.
 
 import {
   LEXICON,
-  endorsedBy,
+  affiliatedWith,
   gafferOf,
   clubsContest,
+  clubContestTagline,
+  independentContestLabel,
   countLabel,
 } from '../src/shared/lexicon';
 
@@ -49,13 +51,6 @@ describe('LEXICON constants', () => {
   });
 });
 
-describe('endorsedBy()', () => {
-  it('builds the affiliation line', () => {
-    expect(endorsedBy('Mes Que NFL')).toBe('Endorsed by Mes Que NFL');
-    expect(endorsedBy('Big Tree Inn')).toBe('Endorsed by Big Tree Inn');
-  });
-});
-
 describe('gafferOf()', () => {
   it('keeps the definite article in long copy', () => {
     expect(gafferOf("Stella's Gang")).toBe("the Gaffer of Stella's Gang");
@@ -70,6 +65,54 @@ describe('clubsContest()', () => {
     expect(clubsContest()).toBe("the Club's Contest");
     expect(clubsContest(null)).toBe("the Club's Contest");
     expect(clubsContest('')).toBe("the Club's Contest");
+  });
+});
+
+describe('clubContestTagline()', () => {
+  it('uses "An Official" so multiple official Contests per Club read naturally', () => {
+    expect(clubContestTagline('ESPN')).toBe('An Official ESPN Contest');
+    expect(clubContestTagline("Hammer's Tavern")).toBe(
+      "An Official Hammer's Tavern Contest",
+    );
+  });
+});
+
+describe('affiliatedWith()', () => {
+  it('returns empty string when no clubs', () => {
+    expect(affiliatedWith([])).toBe('');
+    expect(affiliatedWith(['', ''])).toBe('');
+  });
+  it('one affiliation', () => {
+    expect(affiliatedWith(['Hammer'])).toBe('Affiliated with Hammer');
+  });
+  it('two affiliations join with &', () => {
+    expect(affiliatedWith(['Hammer', 'The Crown'])).toBe(
+      'Affiliated with Hammer & The Crown',
+    );
+  });
+  it('three affiliations use serial comma + &', () => {
+    expect(affiliatedWith(['Hammer', 'The Crown', "Joe's"])).toBe(
+      "Affiliated with Hammer, The Crown & Joe's",
+    );
+  });
+  it('four or more collapses the tail to a count', () => {
+    expect(affiliatedWith(['A', 'B', 'C', 'D'])).toBe(
+      'Affiliated with A, B & 2 more',
+    );
+    expect(affiliatedWith(['A', 'B', 'C', 'D', 'E'])).toBe(
+      'Affiliated with A, B & 3 more',
+    );
+  });
+});
+
+describe('independentContestLabel()', () => {
+  it('with a Gaffer name shows the run-by phrase', () => {
+    expect(independentContestLabel('Tom M.')).toBe('Independent · run by Tom M.');
+  });
+  it('without a Gaffer name falls back to the generic noun', () => {
+    expect(independentContestLabel()).toBe('Independent Contest');
+    expect(independentContestLabel(null)).toBe('Independent Contest');
+    expect(independentContestLabel('')).toBe('Independent Contest');
   });
 });
 

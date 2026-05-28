@@ -427,8 +427,8 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
     setSelectedMessageId(null);
 
     Alert.alert(
-      'Report Message',
-      'Flag this message as inappropriate? The Gaffer and admins will be notified and the message will be hidden pending review.',
+      'Report this Chirp?',
+      "A Gaffer or Admin of this Contest will review it within 24 hours. If they take action, you and the person who posted it will be notified. If nothing happens in 24 hours, HotPick staff will step in.\n\nThe message will be hidden in the meantime.",
       [
         {text: 'Cancel', style: 'cancel'},
         {

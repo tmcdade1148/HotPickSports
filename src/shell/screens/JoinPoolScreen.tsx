@@ -12,6 +12,7 @@ import {
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
+import {normalizeRosterPass} from '@shared/utils/format';
 
 /**
  * JoinPoolScreen — Enter a pool invite code (6–12 alphanumeric chars).
@@ -33,8 +34,18 @@ export function JoinPoolScreen({navigation}: any) {
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const normalizeCode = (raw: string) =>
-    raw.toUpperCase().replace(/[\s-]/g, '');
+  // Reuse the same strip-non-alphanumeric + uppercase normalizer that
+  // PartnerDirectory's Roster Pass field uses — same character set,
+  // same forgiveness for pasted dashes / whitespace / punctuation.
+  const normalizeCode = normalizeRosterPass;
+
+  // Detect when the user has pasted a Roster Pass into the invite-code
+  // field. Roster Passes are 8 chars formatted XXXX-XXXX. Require the
+  // dash *and* the 8-char normalized length — a bare 8-char string is
+  // a valid Contest invite code (codes are 6–12 chars), so rescuing on
+  // length alone misidentifies legitimate codes.
+  const looksLikeRosterPass =
+    inviteCode.includes('-') && normalizeCode(inviteCode).length === 8;
 
   const handleJoin = async () => {
     const code = normalizeCode(inviteCode);
@@ -95,6 +106,18 @@ export function JoinPoolScreen({navigation}: any) {
           <Text style={styles.hint}>
             Ask a friend for their Contest invite code ({INVITE_CODE_MIN}–{INVITE_CODE_MAX} letters and numbers).
           </Text>
+
+          {looksLikeRosterPass && !error && (
+            <View style={styles.rescueBox}>
+              <Text style={styles.rescueText}>
+                That looks like a <Text style={styles.rescueBold}>Roster Pass</Text>,
+                not an invite code. Roster Passes connect a Contest you organize
+                to a Club's roster. If you organize a Contest, open it in{' '}
+                <Text style={styles.rescueBold}>Settings → Add/Edit Clubs</Text>{' '}
+                and paste the pass there.
+              </Text>
+            </View>
+          )}
 
           {error && <Text style={styles.error}>{error}</Text>}
 
@@ -165,6 +188,22 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: spacing.lg,
+  },
+  rescueBox: {
+    backgroundColor: colors.surface,
+    borderColor: colors.warning ?? colors.border,
+    borderWidth: 1,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  rescueText: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.textPrimary,
+  },
+  rescueBold: {
+    fontWeight: '700',
   },
   error: {
     color: colors.error,

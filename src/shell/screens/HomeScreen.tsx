@@ -12,12 +12,14 @@ import {isScheduledStatus} from '@sports/nfl/utils/gameStatus';
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {useTheme} from '@shell/theme/hooks';
 import {spacing, bodyType} from '@shared/theme';
+import {hexToRgba} from '@shared/utils/color';
 
 import {SystemMessageSlot} from '@shell/components/home/SystemMessageSlot';
 import {HomeHeader} from '@shell/components/home/HomeHeader';
 import {IdentityBar} from '@shell/components/home/IdentityBar';
 import {StateHero} from '@shell/components/home/StateHero';
 import {Insight} from '@shell/components/home/Insight';
+import {HomeInbox} from '@shell/components/home/HomeInbox';
 import {PoolModule} from '@shell/components/home/PoolModule';
 import {PartnerModule} from '@shell/components/home/PartnerModule';
 import {resolveHomeState} from '@shell/components/home/resolveHomeState';
@@ -40,10 +42,12 @@ export function HomeScreen() {
   const loadHotPickHitRate    = useGlobalStore(s => s.loadHotPickHitRate);
   const loadPoolIndicators    = useGlobalStore(s => s.loadPoolIndicators);
   const loadUserRankByPool    = useGlobalStore(s => s.loadUserRankByPool);
+  const loadPoolAffiliations  = useGlobalStore(s => s.loadPoolAffiliations);
   const loadWeekRankByPool    = useGlobalStore(s => s.loadWeekRankByPool);
   const loadAlignedPartners   = useGlobalStore(s => s.loadAlignedPartners);
   const loadActivePartners    = useGlobalStore(s => s.loadActivePartners);
   const activePartnerIds      = useGlobalStore(s => s.activePartnerIds);
+  const poolAffiliations      = useGlobalStore(s => s.poolAffiliations);
   const loadPartnerIndicators = useGlobalStore(s => s.loadPartnerIndicators);
   const fetchUserPickStatus    = useNFLStore(s => s.fetchUserPickStatus);
   const fetchUserHotPick       = useNFLStore(s => s.fetchUserHotPick);
@@ -79,23 +83,46 @@ export function HomeScreen() {
     const privatePools: string[] = [];
     const alignedMap: Record<string, typeof visiblePools> = {};
     const partners: string[] = [];
-    for (const p of visiblePools) {
-      if (p.partner_id) {
-        if (!alignedMap[p.partner_id]) {
-          alignedMap[p.partner_id] = [];
-          partners.push(p.partner_id);
-        }
-        alignedMap[p.partner_id].push(p);
-      } else {
-        privatePools.push(p.id);
+
+    // A pool is connected to a Club when ANY of these are true:
+    //   1. pool.owning_club_id is set (Official Club Contest)
+    //   2. pool has rows in pool_partner_affiliations (multi-affiliate)
+    //   3. pool.partner_id is set (legacy single-Club fallback)
+    // All three feed YOUR CLUBS — every Club touching the user's pools
+    // gets a tile, with the connected pools listed under it.
+    const attach = (partnerId: string, pool: (typeof visiblePools)[number]) => {
+      if (!alignedMap[partnerId]) {
+        alignedMap[partnerId] = [];
+        partners.push(partnerId);
       }
+      // Avoid double-listing a pool under the same partner.
+      if (!alignedMap[partnerId].some(x => x.id === pool.id)) {
+        alignedMap[partnerId].push(pool);
+      }
+    };
+
+    for (const p of visiblePools) {
+      const affiliates = poolAffiliations[p.id] ?? [];
+      const hasClubConnection =
+        !!p.owning_club_id || affiliates.length > 0 || !!p.partner_id;
+
+      if (!hasClubConnection) {
+        privatePools.push(p.id);
+        continue;
+      }
+
+      if (p.owning_club_id) attach(p.owning_club_id, p);
+      for (const a of affiliates) attach(a.partnerId, p);
+      // Legacy single-Club fallback — only use it when the affiliations
+      // slice hasn't populated yet (matches PoolModule's behavior).
+      if (affiliates.length === 0 && p.partner_id) attach(p.partner_id, p);
     }
     return {
       privatePoolIds:        privatePools,
       alignedPoolsByPartner: alignedMap,
       partnerIds:            partners,
     };
-  }, [visiblePools]);
+  }, [visiblePools, poolAffiliations]);
 
   // Default pool pins to the top of the Home pool stack; the rest sort
   // alphabetically. Set via the star icon in Settings → My Pools.
@@ -148,6 +175,15 @@ export function HomeScreen() {
     if (!userId) return;
     loadPoolIndicators(userId, allPoolIds).catch(() => {});
   }, [userId, allPoolIds, loadPoolIndicators]);
+
+  // Affiliations drive the 3-state Contest card. Cheap one-shot query
+  // gated by RLS to the user's own pools; no Realtime subscription —
+  // Gaffer edits to affiliations are infrequent and a re-mount picks
+  // them up.
+  useEffect(() => {
+    if (allPoolIds.length === 0) return;
+    loadPoolAffiliations(allPoolIds).catch(() => {});
+  }, [allPoolIds, loadPoolAffiliations]);
 
   useEffect(() => {
     if (!userId) return;
@@ -245,6 +281,12 @@ export function HomeScreen() {
 
         {showInsight && <Insight />}
 
+        {/* Unread-message banner — pulls broadcasts + moderator notes
+            across every pool (including the hidden Platform Pool that
+            carries platform-wide admin broadcasts). Self-hides when
+            there's nothing unread. */}
+        <HomeInbox />
+
         {showPoolStack && visiblePools.length > 0 && (
           <View style={styles.section}>
             <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textTertiary}]}>
@@ -258,18 +300,22 @@ export function HomeScreen() {
                 onPress={() => navigation.navigate('JoinPool')}
                 style={({pressed}) => [
                   styles.poolActionBtn,
-                  {borderColor: colors.border, opacity: pressed ? 0.7 : 1},
+                  {
+                    backgroundColor: hexToRgba(colors.ctaAccentOutline, 0.08),
+                    borderColor: colors.ctaAccentOutline,
+                    opacity: pressed ? 0.7 : 1,
+                  },
                 ]}
                 accessibilityRole="button"
                 accessibilityLabel="Join a Contest with an invite code">
-                <KeyRound size={16} color={colors.textSecondary} strokeWidth={2} />
+                <KeyRound size={18} color={colors.ctaAccentOutline} strokeWidth={2.25} />
                 <View style={styles.poolActionLabel}>
                   <Text
-                    style={[bodyType.bold, styles.poolActionPrimary, {color: colors.textPrimary}]}>
+                    style={[bodyType.bold, styles.poolActionPrimary, {color: colors.ctaAccentText}]}>
                     Join a Contest
                   </Text>
                   <Text
-                    style={[bodyType.regular, styles.poolActionSecondary, {color: colors.textTertiary}]}>
+                    style={[bodyType.regular, styles.poolActionSecondary, {color: colors.textSecondary}]}>
                     with invite code
                   </Text>
                 </View>
@@ -278,18 +324,22 @@ export function HomeScreen() {
                 onPress={() => navigation.navigate('CreatePool')}
                 style={({pressed}) => [
                   styles.poolActionBtn,
-                  {borderColor: colors.border, opacity: pressed ? 0.7 : 1},
+                  {
+                    backgroundColor: hexToRgba(colors.ctaAccentOutline, 0.08),
+                    borderColor: colors.ctaAccentOutline,
+                    opacity: pressed ? 0.7 : 1,
+                  },
                 ]}
                 accessibilityRole="button"
                 accessibilityLabel="Create a new Contest and invite friends">
-                <Plus size={16} color={colors.textSecondary} strokeWidth={2} />
+                <Plus size={18} color={colors.ctaAccentOutline} strokeWidth={2.25} />
                 <View style={styles.poolActionLabel}>
                   <Text
-                    style={[bodyType.bold, styles.poolActionPrimary, {color: colors.textPrimary}]}>
+                    style={[bodyType.bold, styles.poolActionPrimary, {color: colors.ctaAccentText}]}>
                     Create a Contest
                   </Text>
                   <Text
-                    style={[bodyType.regular, styles.poolActionSecondary, {color: colors.textTertiary}]}>
+                    style={[bodyType.regular, styles.poolActionSecondary, {color: colors.textSecondary}]}>
                     and invite friends
                   </Text>
                 </View>
@@ -304,11 +354,7 @@ export function HomeScreen() {
               YOUR CLUBS
             </Text>
             {partnerRenderIds.map(pid => (
-              <PartnerModule
-                key={pid}
-                partnerId={pid}
-                alignedPools={alignedPoolsByPartner[pid] ?? []}
-              />
+              <PartnerModule key={pid} partnerId={pid} />
             ))}
           </View>
         )}
@@ -341,8 +387,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderRadius: 12,
-    borderWidth: 1,
-    borderStyle: 'dashed',
+    borderWidth: 1.5,
+    // Android RN occasionally keeps a previously-set borderStyle when
+    // the prop is omitted entirely. Set it explicitly so the button
+    // can't fall back to dashed.
+    borderStyle: 'solid',
   },
   poolActionLabel: {
     flexShrink: 1,

@@ -91,6 +91,12 @@ export interface ThemeColors {
   error: string;
   border: string;
   glow: string;
+
+  // Brand accents for secondary CTAs (Join / Create Contest on Home,
+  // future empty-state buttons). HotPick brand secondaries that read
+  // on both light and dark surfaces without per-mode overrides.
+  ctaAccentOutline: string; // teal — used for border + icon
+  ctaAccentText:    string; // amber — used for label text
 }
 
 /**

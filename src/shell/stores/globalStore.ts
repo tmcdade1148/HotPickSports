@@ -65,6 +65,12 @@ interface GlobalState {
   // Profile — full profile object
   userProfile: DbProfile | null;
   fetchProfile: (userId: string) => Promise<DbProfile | null>;
+  // The Club this user manages (de facto Partner Admin = organizer of
+  // a partners.club_pool_id pool). Null when the user isn't a Club
+  // manager. Settings shows a "Club Admin" entry + ClubAdminScreen
+  // gates on this. v1: at most one Club per user.
+  managedClub: {id: string; name: string} | null;
+  loadManagedClub: (userId: string) => Promise<void>;
   updateProfile: (
     userId: string,
     fields: Partial<DbProfile>,
@@ -171,7 +177,15 @@ interface GlobalState {
   // Brand config — drives useTheme() and useBrand() hooks
   activeBrandConfig: BrandConfig | null;
   setActiveBrandConfig: (config: BrandConfig | null) => void;
-  updatePoolBrandConfig: (poolId: string, config: BrandConfig | null) => void;
+  // Accepts either the typed BrandConfig (from theme defaults) or a
+  // raw jsonb shape (from partner.brand_config / RPC results). The
+  // pool's brand_config column is typed Record<string,unknown> so
+  // both flow through unchanged; reader callsites then narrow what
+  // they need.
+  updatePoolBrandConfig: (
+    poolId: string,
+    config: BrandConfig | Record<string, unknown> | null,
+  ) => void;
 
   // Feature flags
   showGlobalPool: boolean;
@@ -244,7 +258,9 @@ interface GlobalState {
     id: string;
     name: string;
     slug: string;
-    perk_text: string;
+    // Nullable — Clubs without a perk still appear in YOUR CLUBS;
+    // PartnerModule hides its perk row when null.
+    perk_text: string | null;
     perk_icon: string | null;
     logo_url: string | null;
     primary_color: string | null;
@@ -265,6 +281,34 @@ interface GlobalState {
   /** Mark partner notifications read for this user/partner. Called on entry
    *  to PartnerRosterScreen. Clears the indicator on Home. */
   markPartnerNotificationsRead: (userId: string, partnerId: string) => Promise<void>;
+
+  // Pool ↔ Club affiliations (many-to-many). Sourced from
+  // `pool_partner_affiliations`. Each pool maps to an ordered list of its
+  // affiliated Clubs (primary first, then by created_at). Each row carries
+  // its own brand snapshot — never live-joined to `partners` for rendering
+  // (Hard Rule #23).
+  //
+  // PoolModule reads from this slice when populated; falls back to the
+  // legacy singular pool.partner_id + pool.brand_config when not.
+  poolAffiliations: Record<string, PoolAffiliation[]>;
+  loadPoolAffiliations: (poolIds: string[]) => Promise<void>;
+}
+
+export interface PoolAffiliation {
+  partnerId:    string;
+  partnerName:  string;
+  // Full 4-slot Club palette captured at affiliation time. Render
+  // code uses `pickReadableBrandColor` to walk this stack and pick
+  // the one with enough contrast against the current surface
+  // (handles light/dark mode automatically).
+  brandColors: {
+    primary:    string | null;
+    secondary:  string | null;
+    background: string | null;
+    highlight:  string | null;
+  };
+  logoUrl:      string | null;
+  isPrimary:    boolean;
 }
 
 export interface UserHardwareItem {
@@ -317,6 +361,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     set({
       user: null,
       userProfile: null,
+      managedClub: null,
       activePoolId: null,
       defaultPoolId: null,
       userPools: [],
@@ -347,8 +392,38 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   // Profile
   // ---------------------------------------------------------------------------
   userProfile: null,
+  managedClub: null,
+
+  loadManagedClub: async userId => {
+    const {data: memberRows} = await supabase
+      .from('pool_members')
+      .select('pool_id')
+      .eq('user_id', userId)
+      .eq('role', 'organizer')
+      .eq('status', 'active');
+    const orgPoolIds = ((memberRows ?? []) as {pool_id: string}[]).map(r => r.pool_id);
+    if (orgPoolIds.length === 0) {
+      set({managedClub: null});
+      return;
+    }
+    const {data: clubRows} = await supabase
+      .from('partners')
+      .select('id, name')
+      .in('club_pool_id', orgPoolIds)
+      .eq('is_active', true)
+      .limit(1);
+    const row = (clubRows ?? [])[0] as {id: string; name: string} | undefined;
+    set({managedClub: row ? {id: row.id, name: row.name} : null});
+  },
 
   fetchProfile: async userId => {
+    // IMPORTANT: keep this as `select('*')`. SuspensionGate +
+    // is_super_admin gating both read off this row, and narrowing the
+    // select silently drops those columns (RLS doesn't reject the
+    // narrow read, it just returns less data). If you ever need to
+    // reduce the payload, switch to an explicit column list that still
+    // includes: is_platform_suspended, platform_suspension_reason,
+    // is_super_admin.
     const {data} = await supabase
       .from('profiles')
       .select('*')
@@ -357,6 +432,9 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
 
     if (data) {
       set({userProfile: data as DbProfile});
+      // Resolve "do you manage a Club?" alongside the profile load so
+      // Settings + ClubAdminScreen don't each refetch on mount.
+      get().loadManagedClub(userId).catch(() => {});
       return data as DbProfile;
     }
     return null;
@@ -553,8 +631,11 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       }
     }
 
-    // Compute visible pools: hide global pools unless manually joined
+    // Compute visible pools: hide global pools unless manually joined,
+    // AND always hide pools flagged is_hidden_from_users (the analytics
+    // Platform Pool — staff-only visibility per April 2026 spec).
     const visible = pools.filter(p => {
+      if (p.is_hidden_from_users) return false;
       if (!p.is_global) return true;
       return !!manualGlobalJoins[p.id];
     });
@@ -1112,13 +1193,19 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   setActiveBrandConfig: config => set({activeBrandConfig: config}),
   updatePoolBrandConfig: (poolId, config) => {
     // Mirror into visiblePools too — see note in archivePool / updatePoolSettings.
+    const asRecord = config as Record<string, unknown> | null;
     const applyBrand = (p: DbPool) =>
-      p.id === poolId ? {...p, brand_config: config as Record<string, unknown> | null} : p;
+      p.id === poolId ? {...p, brand_config: asRecord} : p;
     set(state => ({
       userPools: state.userPools.map(applyBrand),
       visiblePools: state.visiblePools.map(applyBrand),
-      // If this is the active pool, also update the global theme
-      ...(state.activePoolId === poolId ? {activeBrandConfig: config} : {}),
+      // If this is the active pool, also update the global theme. The
+      // theme reads BrandConfig shape; the cast is safe because a
+      // partner's brand_config carries the same keys as BrandConfig
+      // (partner_name, primary_color, logo, ...).
+      ...(state.activePoolId === poolId
+        ? {activeBrandConfig: config as BrandConfig | null}
+        : {}),
     }));
   },
 
@@ -1562,23 +1649,34 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       id: string;
       name: string;
       slug: string;
-      perk_text: string;
+      perk_text: string | null;
       perk_icon: string | null;
       logo_url: string | null;
       primary_color: string | null;
     }> = {};
     const ids: string[] = [];
     for (const row of rows) {
-      if (!row.perk_text) continue;
       const bc = (row.brand_config ?? {}) as Record<string, unknown>;
       const logo = (bc.logo ?? {}) as Record<string, unknown>;
+      // Tolerate both brand_config logo shapes (REFERENCE.md §15): the
+      // nested `logo.full` (current) and the legacy flat `logo_url`
+      // some partners still carry. Without the flat fallback, those
+      // Clubs render a LogoMark initials block on partner tiles even
+      // though the Contest card below correctly resolves the same
+      // legacy field via its own helper.
+      const logoUrl =
+        typeof logo.full === 'string' && logo.full.length > 0
+          ? (logo.full as string)
+          : typeof bc.logo_url === 'string' && (bc.logo_url as string).length > 0
+            ? (bc.logo_url as string)
+            : null;
       map[row.id] = {
         id:            row.id,
         name:          row.name,
         slug:          row.slug,
         perk_text:     row.perk_text,
         perk_icon:     row.perk_icon,
-        logo_url:      typeof logo.full === 'string' ? logo.full : null,
+        logo_url:      logoUrl,
         primary_color: typeof bc.primary_color === 'string' ? bc.primary_color : null,
       };
       ids.push(row.id);
@@ -1597,20 +1695,22 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       return;
     }
 
-    // Only load partners that are active AND have a configured perk —
-    // partners without a perk are not rendered as Modules per spec §6.4.7.
+    // Load every active Club the user is connected to via their Contests
+    // — Official Clubs, affiliated Clubs, legacy partner_id Clubs.
+    // (Earlier this filtered to perks-only per spec §6.4.7, but the home
+    // YOUR CLUBS list is now the authoritative "Clubs you're connected
+    // to" surface; Clubs without perks still belong there.)
     const {data} = await supabase
       .from('partners')
       .select('id, name, slug, perk_text, perk_icon, brand_config')
       .in('id', partnerIds)
-      .eq('is_active', true)
-      .not('perk_text', 'is', null);
+      .eq('is_active', true);
 
     const map: Record<string, {
       id: string;
       name: string;
       slug: string;
-      perk_text: string;
+      perk_text: string | null;
       perk_icon: string | null;
       logo_url: string | null;
       primary_color: string | null;
@@ -1624,16 +1724,27 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       perk_icon: string | null;
       brand_config: Record<string, unknown> | null;
     }>) {
-      if (!row.perk_text) continue;
       const bc = (row.brand_config ?? {}) as Record<string, unknown>;
       const logo = (bc.logo ?? {}) as Record<string, unknown>;
+      // Tolerate both brand_config logo shapes (REFERENCE.md §15): the
+      // nested `logo.full` (current) and the legacy flat `logo_url`
+      // some partners still carry. Without the flat fallback, those
+      // Clubs render a LogoMark initials block on partner tiles even
+      // though the Contest card below correctly resolves the same
+      // legacy field via its own helper.
+      const logoUrl =
+        typeof logo.full === 'string' && logo.full.length > 0
+          ? (logo.full as string)
+          : typeof bc.logo_url === 'string' && (bc.logo_url as string).length > 0
+            ? (bc.logo_url as string)
+            : null;
       map[row.id] = {
         id:            row.id,
         name:          row.name,
         slug:          row.slug,
         perk_text:     row.perk_text,
         perk_icon:     row.perk_icon,
-        logo_url:      typeof logo.full === 'string' ? logo.full : null,
+        logo_url:      logoUrl,
         primary_color: typeof bc.primary_color === 'string' ? bc.primary_color : null,
       };
     }
@@ -1710,5 +1821,85 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
         },
       },
     }));
+  },
+
+  poolAffiliations: {},
+
+  loadPoolAffiliations: async (poolIds) => {
+    if (poolIds.length === 0) {
+      set({poolAffiliations: {}});
+      return;
+    }
+
+    // One query for all pools. RLS gates SELECT to active members of each
+    // pool, so this is safe to call with the full visible pool list.
+    const {data, error} = await supabase
+      .from('pool_partner_affiliations')
+      .select('pool_id, partner_id, brand_config_snapshot, is_primary, created_at')
+      .in('pool_id', poolIds);
+
+    if (error) {
+      // Don't blow away existing data on transient failures.
+      return;
+    }
+
+    type Row = {
+      pool_id:               string;
+      partner_id:            string;
+      brand_config_snapshot: Record<string, unknown> | null;
+      is_primary:            boolean;
+      created_at:            string;
+    };
+
+    const byPool: Record<string, PoolAffiliation[]> = {};
+    for (const pid of poolIds) byPool[pid] = [];
+
+    for (const row of (data ?? []) as Row[]) {
+      const bc   = (row.brand_config_snapshot ?? {}) as Record<string, unknown>;
+      const logo = (bc.logo ?? {}) as Record<string, unknown>;
+      const logoUrl =
+        typeof logo.full === 'string' && logo.full.length > 0
+          ? logo.full
+          : typeof bc.logo_url === 'string' && bc.logo_url.length > 0
+          ? bc.logo_url
+          : null;
+      const colorOrNull = (key: string): string | null =>
+        typeof bc[key] === 'string' && (bc[key] as string).length > 0
+          ? (bc[key] as string)
+          : null;
+      const brandColors = {
+        primary:    colorOrNull('primary_color'),
+        secondary:  colorOrNull('secondary_color'),
+        background: colorOrNull('background_color'),
+        highlight:  colorOrNull('highlight_color'),
+      };
+      const partnerName =
+        typeof bc.partner_name === 'string' && bc.partner_name.length > 0
+          ? bc.partner_name
+          : 'Club';
+
+      byPool[row.pool_id]?.push({
+        partnerId:    row.partner_id,
+        partnerName,
+        brandColors,
+        logoUrl,
+        isPrimary:    row.is_primary,
+      });
+    }
+
+    // Sort each pool's affiliations: primary first, then by partner name.
+    for (const pid of Object.keys(byPool)) {
+      byPool[pid].sort((a, b) => {
+        if (a.isPrimary !== b.isPrimary) return a.isPrimary ? -1 : 1;
+        return a.partnerName.localeCompare(b.partnerName, undefined, {
+          sensitivity: 'base',
+        });
+      });
+    }
+
+    // Merge — never replace — so a single-pool refresh from
+    // PoolSettings / PartnerDirectory doesn't clobber the rest of the
+    // map loaded by HomeScreen's all-pool fetch.
+    set(state => ({poolAffiliations: {...state.poolAffiliations, ...byPool}}));
   },
 }));

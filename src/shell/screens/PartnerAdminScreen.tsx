@@ -27,8 +27,12 @@ import {
   Pencil,
   Upload,
   Link as LinkIcon,
+  Copy,
+  Ticket,
 } from 'lucide-react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import QRCode from 'react-native-qrcode-svg';
+import {formatRosterPass} from '@shared/utils/format';
 import {launchImageLibrary} from 'react-native-image-picker';
 import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
@@ -77,6 +81,10 @@ interface Partner {
   can_run_pools: boolean;
   // Stored as text in the DB; the app constrains to the PartnerType union.
   partner_type: PartnerType | null;
+  // 8-char alphanumeric. Distinct from pools.invite_code; shared with
+  // Gaffers to authorize affiliating their Contest with this Club's
+  // roster (see 260527_partners_roster_pass migration).
+  roster_pass: string;
 }
 
 // react-native-image-picker returns `asset.type` inconsistently across
@@ -1483,6 +1491,39 @@ export function PartnerAdminScreen() {
                       </Text>
                     </View>
 
+                    {/* Roster Pass — shared by the Club admin with a Gaffer.
+                        Distinct from the Invite Code above (which lets a
+                        user join the Club's pool). The Roster Pass lets a
+                        Gaffer link THEIR Contest to this Club's roster. */}
+                    <View style={styles.signageSection}>
+                      <View style={styles.rosterPassHeaderRow}>
+                        <Ticket size={14} color={colors.primary} strokeWidth={2.25} />
+                        <Text style={styles.poolListLabel}>Roster Pass</Text>
+                      </View>
+                      <Text style={styles.signageCode}>
+                        {formatRosterPass(partner.roster_pass)}
+                      </Text>
+                      <Text style={styles.signageHint}>
+                        Share with a Gaffer who wants to link their Contest to{' '}
+                        {partner.name}'s roster. They enter it on the Affiliate
+                        with a Club page.
+                      </Text>
+                      <TouchableOpacity
+                        style={styles.shareButton}
+                        onPress={() => {
+                          Clipboard.setString(formatRosterPass(partner.roster_pass));
+                          Alert.alert(
+                            'Copied',
+                            `Roster Pass for ${partner.name} copied to clipboard.`,
+                          );
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Copy ${partner.name} Roster Pass`}>
+                        <Copy size={16} color={colors.primary} />
+                        <Text style={styles.shareButtonText}>Copy Roster Pass</Text>
+                      </TouchableOpacity>
+                    </View>
+
                     {/* QR Code */}
                     <View style={styles.qrSection}>
                       <Text style={styles.poolListLabel}>Invite QR Code</Text>
@@ -2182,6 +2223,12 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 12,
     color: colors.textSecondary,
     textAlign: 'center' as const,
+  },
+  rosterPassHeaderRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+    marginBottom: spacing.sm,
   },
 
   // QR Code
