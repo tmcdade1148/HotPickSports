@@ -35,6 +35,25 @@ export function PreSeasonHero() {
   const {days, hours, minutes, isExpired} = useCountdown(target);
   const greeting = getContextGreeting(currentPhase, 'idle', 0, null);
 
+  // DEV diagnostic for the "countdown shows 00:00:00" bug — prints which
+  // competition's date is driving the countdown, the parsed value, the
+  // device's idea of "now," and the resulting diff. Visible in Metro
+  // console + React Native debugger. Stripped from production builds
+  // by Hermes / dev-only guard.
+  if (__DEV__) {
+    const competition = useNFLStore.getState().competition;
+    // eslint-disable-next-line no-console
+    console.log('[PreSeasonHero countdown]', {
+      competition,
+      picksOpenAt: picksOpenAt?.toISOString() ?? null,
+      seasonOpenerAt: seasonOpenerAt?.toISOString() ?? null,
+      target: target?.toISOString() ?? null,
+      nowDevice: new Date().toISOString(),
+      diffMs: target ? target.getTime() - Date.now() : null,
+      days, hours, minutes, isExpired,
+    });
+  }
+
   // First pool with an invite code (for share). Many users will only have one.
   const firstPool = visiblePools.find(p => p.invite_code);
   const firstInviteCode = firstPool?.invite_code ?? null;
