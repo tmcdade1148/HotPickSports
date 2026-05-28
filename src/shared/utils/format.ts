@@ -32,6 +32,28 @@ export function normalizeRosterPass(raw: string): string {
   return raw.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
 }
 
+/**
+ * Human-friendly relative time: "Just now", "5m ago", "2h ago",
+ * "3d ago". Falls back to a short Mmm D date once the input is more
+ * than a week old. Used by MessageCenter and the admin moderation
+ * queue so timestamp copy stays consistent across surfaces.
+ */
+export function formatRelativeTime(iso: string): string {
+  const now = Date.now();
+  const then = new Date(iso).getTime();
+  const diffMin = Math.round((now - then) / 60000);
+
+  if (diffMin < 1) return 'Just now';
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHrs = Math.round(diffMin / 60);
+  if (diffHrs < 24) return `${diffHrs}h ago`;
+  const diffDays = Math.round(diffHrs / 24);
+  if (diffDays < 7) return `${diffDays}d ago`;
+
+  // Older than a week — show date
+  return new Date(iso).toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
+}
+
 /** Full ordinal — "4th", "21st", "12th". */
 export function ordinal(n: number): string {
   return `${n}${ordinalSuffix(n)}`;

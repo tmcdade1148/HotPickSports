@@ -409,6 +409,13 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   },
 
   fetchProfile: async userId => {
+    // IMPORTANT: keep this as `select('*')`. SuspensionGate +
+    // is_super_admin gating both read off this row, and narrowing the
+    // select silently drops those columns (RLS doesn't reject the
+    // narrow read, it just returns less data). If you ever need to
+    // reduce the payload, switch to an explicit column list that still
+    // includes: is_platform_suspended, platform_suspension_reason,
+    // is_super_admin.
     const {data} = await supabase
       .from('profiles')
       .select('*')
@@ -1637,13 +1644,25 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     for (const row of rows) {
       const bc = (row.brand_config ?? {}) as Record<string, unknown>;
       const logo = (bc.logo ?? {}) as Record<string, unknown>;
+      // Tolerate both brand_config logo shapes (REFERENCE.md §15): the
+      // nested `logo.full` (current) and the legacy flat `logo_url`
+      // some partners still carry. Without the flat fallback, those
+      // Clubs render a LogoMark initials block on partner tiles even
+      // though the Contest card below correctly resolves the same
+      // legacy field via its own helper.
+      const logoUrl =
+        typeof logo.full === 'string' && logo.full.length > 0
+          ? (logo.full as string)
+          : typeof bc.logo_url === 'string' && (bc.logo_url as string).length > 0
+            ? (bc.logo_url as string)
+            : null;
       map[row.id] = {
         id:            row.id,
         name:          row.name,
         slug:          row.slug,
         perk_text:     row.perk_text,
         perk_icon:     row.perk_icon,
-        logo_url:      typeof logo.full === 'string' ? logo.full : null,
+        logo_url:      logoUrl,
         primary_color: typeof bc.primary_color === 'string' ? bc.primary_color : null,
       };
       ids.push(row.id);
@@ -1693,13 +1712,25 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     }>) {
       const bc = (row.brand_config ?? {}) as Record<string, unknown>;
       const logo = (bc.logo ?? {}) as Record<string, unknown>;
+      // Tolerate both brand_config logo shapes (REFERENCE.md §15): the
+      // nested `logo.full` (current) and the legacy flat `logo_url`
+      // some partners still carry. Without the flat fallback, those
+      // Clubs render a LogoMark initials block on partner tiles even
+      // though the Contest card below correctly resolves the same
+      // legacy field via its own helper.
+      const logoUrl =
+        typeof logo.full === 'string' && logo.full.length > 0
+          ? (logo.full as string)
+          : typeof bc.logo_url === 'string' && (bc.logo_url as string).length > 0
+            ? (bc.logo_url as string)
+            : null;
       map[row.id] = {
         id:            row.id,
         name:          row.name,
         slug:          row.slug,
         perk_text:     row.perk_text,
         perk_icon:     row.perk_icon,
-        logo_url:      typeof logo.full === 'string' ? logo.full : null,
+        logo_url:      logoUrl,
         primary_color: typeof bc.primary_color === 'string' ? bc.primary_color : null,
       };
     }

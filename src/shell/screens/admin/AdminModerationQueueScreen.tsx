@@ -18,6 +18,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import {ChevronLeft, RefreshCw} from 'lucide-react-native';
 import {supabase} from '@shared/config/supabase';
+import {formatRelativeTime} from '@shared/utils/format';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {useTheme} from '@shell/theme/hooks';
 import {bodyType, displayType, spacing, borderRadius} from '@shared/theme';
@@ -33,18 +34,6 @@ type EscalatedMessage = {
   text: string;
   flagged_at: string;
 };
-
-function formatAge(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
-  const hours = Math.floor(ms / (1000 * 60 * 60));
-  if (hours < 1) {
-    const mins = Math.max(1, Math.floor(ms / (1000 * 60)));
-    return `${mins}m ago`;
-  }
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}
 
 export function AdminModerationQueueScreen() {
   return (
@@ -250,7 +239,7 @@ function AdminModerationQueueScreenImpl() {
                   {msg.pool_name}
                 </Text>
                 <Text style={[bodyType.regular, {color: colors.textTertiary, fontSize: 11}]}>
-                  {formatAge(msg.flagged_at)}
+                  {formatRelativeTime(msg.flagged_at)}
                 </Text>
               </View>
               <View style={styles.badgeRow}>

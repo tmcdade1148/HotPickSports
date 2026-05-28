@@ -12,6 +12,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import {ChevronLeft, Megaphone, MessageCircle} from 'lucide-react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
+import {formatRelativeTime} from '@shared/utils/format';
 import {supabase} from '@shared/config/supabase';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
@@ -225,7 +226,7 @@ export function MessageCenterScreen() {
                 </Text>
               </View>
               <Text style={[styles.timeLabel, {color: colors.textSecondary}]}>
-                {formatDate(item.sentAt)}
+                {formatRelativeTime(item.sentAt)}
               </Text>
             </View>
             <Text style={[styles.messageText, {color: colors.textPrimary}]}>
@@ -295,23 +296,6 @@ export function MessageCenterScreen() {
 }
 
 /** Format a date string into a readable format */
-function formatDate(dateStr: string): string {
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  const diffMin = Math.round((now - then) / 60000);
-
-  if (diffMin < 1) return 'Just now';
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHrs = Math.round(diffMin / 60);
-  if (diffHrs < 24) return `${diffHrs}h ago`;
-  const diffDays = Math.round(diffHrs / 24);
-  if (diffDays < 7) return `${diffDays}d ago`;
-
-  // Older than a week — show date
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
