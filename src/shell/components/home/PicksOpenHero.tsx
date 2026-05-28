@@ -489,15 +489,14 @@ export function PicksOpenHero() {
         }}
         accessibilityRole="button"
         accessibilityLabel={`Go to games — ${ctaAccessibilityLabel}`}>
-        {/* HotPick blue (#34A4D1) destination tag. Hardcoded brand value
-            rather than colors.highlight because highlight flips to amber
-            in dark mode (see hooks.ts), defeating the contrast purpose. */}
+        {/* HotPick blue (#34A4D1) destination tag with a flame icon —
+            the flame is the universal HotPick signal so this reads as
+            "go to the picks/games surface." Hardcoded brand blue
+            rather than colors.highlight because highlight flips to
+            amber in dark mode (see hooks.ts), defeating the contrast
+            purpose. */}
         <View style={styles.gamesTag}>
-          <Text
-            style={[displayType.display, styles.gamesTagText, {color: colors.onPrimary}]}
-            numberOfLines={1}>
-            GAMES
-          </Text>
+          <Flame size={22} color={colors.onPrimary} strokeWidth={2.5} />
         </View>
 
         <View style={[
@@ -722,11 +721,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#34A4D1',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-  gamesTagText: {
-    fontSize: 12,
-    letterSpacing: 1,
   },
   // Right 5/6 — wraps the original label + arrow row. Padding lives
   // here (not on the Pressable) so the GAMES tag bleeds to the edge.
