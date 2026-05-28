@@ -468,18 +468,18 @@ export function PicksOpenHero() {
           the user is done the action is no longer primary: dim the button
           and prefix the label with a small "you can still…" lead-in
           stacked directly above the main text. Vertical padding tightens
-          in two-line mode so the button keeps the same overall height. */}
+          in two-line mode so the button keeps the same overall height.
+          Left 1/6 is a HotPick-blue "GAMES" strip so the destination is
+          obvious at a glance — the button reads as "go to GAMES" not
+          just "do this thing." */}
       <Pressable
         onPress={() => navigation.navigate('PicksTab')}
         style={({pressed}) => {
           const isReviewMode = allPicks && hotPickDesignated && !isLockingWave;
-          const twoLine = (isReviewMode && !allGamesLocked) || weekComplete;
           const dimmed = isReviewMode || isLockingWave || allGamesLocked || weekComplete;
           const baseOpacity = dimmed ? 0.7 : 1;
           return [
             styles.cta,
-            twoLine ? styles.ctaTight : null,
-            weekComplete ? styles.ctaTopAligned : null,
             {
               backgroundColor: colors.primary,
               shadowColor: colors.primary,
@@ -488,31 +488,50 @@ export function PicksOpenHero() {
           ];
         }}
         accessibilityRole="button"
-        accessibilityLabel={ctaAccessibilityLabel}>
-        <View style={styles.ctaLabel}>
-          {/* "You can VIEW or" lead-in only in the dimmed all-done state
-              before any kickoff — suppressed once games start locking. */}
-          {allPicks && hotPickDesignated && !isLockingWave && !allGamesLocked && !weekComplete && (
-            <Text style={[bodyType.regular, styles.ctaLeadIn, {color: colors.onPrimary}]}>
-              You can <Text style={bodyType.bold}>VIEW</Text> or
-            </Text>
-          )}
+        accessibilityLabel={`Go to games — ${ctaAccessibilityLabel}`}>
+        {/* HotPick blue (#34A4D1) destination tag. Hardcoded brand value
+            rather than colors.highlight because highlight flips to amber
+            in dark mode (see hooks.ts), defeating the contrast purpose. */}
+        <View style={styles.gamesTag}>
           <Text
-            style={[displayType.display, styles.ctaText, {color: colors.onPrimary}]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.55}>
-            {ctaLabel}
+            style={[displayType.display, styles.gamesTagText, {color: colors.onPrimary}]}
+            numberOfLines={1}>
+            GAMES
           </Text>
-          {/* Week-complete follow-up — smaller italic line under the main
-              label, mirroring the lead-in pattern but stacked below. */}
-          {weekComplete && (
-            <Text style={[bodyType.regular, styles.ctaFollowOn, {color: colors.onPrimary}]}>
-              see how it played out
-            </Text>
-          )}
         </View>
-        <ArrowRight size={22} color={colors.onPrimary} strokeWidth={3} />
+
+        <View style={[
+          styles.ctaBody,
+          (allPicks && hotPickDesignated && !isLockingWave && !allGamesLocked) || weekComplete
+            ? styles.ctaBodyTight
+            : null,
+          weekComplete ? styles.ctaBodyTopAligned : null,
+        ]}>
+          <View style={styles.ctaLabel}>
+            {/* "You can VIEW or" lead-in only in the dimmed all-done state
+                before any kickoff — suppressed once games start locking. */}
+            {allPicks && hotPickDesignated && !isLockingWave && !allGamesLocked && !weekComplete && (
+              <Text style={[bodyType.regular, styles.ctaLeadIn, {color: colors.onPrimary}]}>
+                You can <Text style={bodyType.bold}>VIEW</Text> or
+              </Text>
+            )}
+            <Text
+              style={[displayType.display, styles.ctaText, {color: colors.onPrimary}]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.55}>
+              {ctaLabel}
+            </Text>
+            {/* Week-complete follow-up — smaller italic line under the main
+                label, mirroring the lead-in pattern but stacked below. */}
+            {weekComplete && (
+              <Text style={[bodyType.regular, styles.ctaFollowOn, {color: colors.onPrimary}]}>
+                see how it played out
+              </Text>
+            )}
+          </View>
+          <ArrowRight size={22} color={colors.onPrimary} strokeWidth={3} />
+        </View>
       </Pressable>
 
       {/* Week recap — once the week has wrapped (all games final). Uses
@@ -685,6 +704,35 @@ const styles = StyleSheet.create({
   },
   cta: {
     flexDirection: 'row',
+    // Outer container is now a flat 0-padding row. Padding moved into
+    // ctaBody so the left "GAMES" tag can butt all the way up to the
+    // edge of the button.
+    borderRadius: borderRadius.md + 2,
+    overflow: 'hidden',
+    shadowOpacity: 0.55,
+    shadowRadius: 24,
+    shadowOffset: {width: 0, height: 8},
+    elevation: 6,
+  },
+  // Left 1/6 of the button — solid HotPick-blue strip with the word
+  // GAMES so the destination is unmistakable. Hardcoded blue (#34A4D1)
+  // is the canonical brand blue from hotpickDefaults.ts.
+  gamesTag: {
+    flex: 1,
+    backgroundColor: '#34A4D1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  gamesTagText: {
+    fontSize: 12,
+    letterSpacing: 1,
+  },
+  // Right 5/6 — wraps the original label + arrow row. Padding lives
+  // here (not on the Pressable) so the GAMES tag bleeds to the edge.
+  ctaBody: {
+    flex: 5,
+    flexDirection: 'row',
     // flex-end so the arrow bottom-aligns with the main label line.
     // Single-line state: visually identical to center (only one line).
     // Two-line state: arrow sits next to "EDIT YOUR PICKS", not centered
@@ -694,11 +742,17 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 15,
     paddingHorizontal: 20,
-    borderRadius: borderRadius.md + 2,
-    shadowOpacity: 0.55,
-    shadowRadius: 24,
-    shadowOffset: {width: 0, height: 8},
-    elevation: 6,
+  },
+  // Tighter vertical padding for two-line states so overall height
+  // matches the single-line state.
+  ctaBodyTight: {
+    paddingVertical: 7,
+  },
+  // weekComplete stacks small text BELOW the main label — flex-start
+  // makes the arrow line up with the top (larger) line instead of the
+  // bottom (smaller follow-on).
+  ctaBodyTopAligned: {
+    alignItems: 'flex-start',
   },
   // flexShrink lets adjustsFontSizeToFit kick in when the label is the
   // long "SOME PICKS ARE STILL EDITABLE" copy. Without this the Text
@@ -708,17 +762,6 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     minWidth: 0,
     alignItems: 'center',
-  },
-  // Tighter vertical padding for the two-line "you can still… / EDIT YOUR PICKS"
-  // configuration so the overall button height matches the single-line state.
-  ctaTight: {
-    paddingVertical: 7,
-  },
-  // weekComplete stacks small text BELOW the main label — flex-start
-  // makes the arrow line up with the top (larger) line instead of the
-  // bottom (smaller follow-on).
-  ctaTopAligned: {
-    alignItems: 'flex-start',
   },
   ctaLeadIn: {
     fontSize: 10,
