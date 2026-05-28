@@ -382,7 +382,7 @@ export function HomeScreen() {
               YOUR CLUBS
             </Text>
             <Text style={[bodyType.regular, styles.sectionNote, {color: colors.textSecondary}]}>
-              Clubs are bars, restaurants, and shops that host their own Contests. Join a Club's roster to play their Contests and unlock their perks.
+              Clubs are bars, organizations, or shops that host their own Contests or simply provide perks to all participants. Contest organizers (who we call the Gaffers) connect with Clubs that align with their Contest's players and everyone receives the perks.
             </Text>
             {partnerIds.map(pid => (
               <PartnerModule key={pid} partnerId={pid} />
