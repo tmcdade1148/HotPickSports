@@ -199,7 +199,10 @@ export function CompleteHero() {
         </Text>
       )}
 
-      {/* CTA — dimmed flame, two-line label, arrow aligned to top. */}
+      {/* CTA — dimmed flame, two-line label, arrow aligned to top. Left
+          1/6 is a HotPick-blue flame strip matching the PicksOpenHero
+          CTA so the navigation destination (Games) is visually
+          consistent across home states. */}
       <Pressable
         onPress={() => navigation.navigate('PicksTab')}
         style={({pressed}) => [
@@ -207,16 +210,21 @@ export function CompleteHero() {
           {backgroundColor: colors.primary, shadowColor: colors.primary, opacity: pressed ? 0.6 : 0.7},
         ]}
         accessibilityRole="button"
-        accessibilityLabel={`Week ${currentWeek} complete — review your picks`}>
-        <View style={styles.ctaLabel}>
-          <Text style={[displayType.display, styles.ctaText, {color: colors.onPrimary}]} numberOfLines={1}>
-            WEEK {currentWeek} COMPLETE
-          </Text>
-          <Text style={[bodyType.regular, styles.ctaFollowOn, {color: colors.onPrimary}]}>
-            review your picks
-          </Text>
+        accessibilityLabel={`Go to games — Week ${currentWeek} complete, review your picks`}>
+        <View style={styles.gamesTag}>
+          <Flame size={22} color={colors.onPrimary} strokeWidth={2.5} />
         </View>
-        <ArrowRight size={22} color={colors.onPrimary} strokeWidth={3} />
+        <View style={styles.ctaBody}>
+          <View style={styles.ctaLabel}>
+            <Text style={[displayType.display, styles.ctaText, {color: colors.onPrimary}]} numberOfLines={1}>
+              WEEK {currentWeek} COMPLETE
+            </Text>
+            <Text style={[bodyType.regular, styles.ctaFollowOn, {color: colors.onPrimary}]}>
+              review your picks
+            </Text>
+          </View>
+          <ArrowRight size={22} color={colors.onPrimary} strokeWidth={3} />
+        </View>
       </Pressable>
 
       {/* Week recap — brand-voice sentence recapping the user's week
@@ -329,16 +337,32 @@ const styles = StyleSheet.create({
   },
   cta: {
     flexDirection: 'row',
+    borderRadius: borderRadius.md + 2,
+    overflow: 'hidden',
+    shadowOpacity: 0.4,
+    shadowRadius: 18,
+    shadowOffset: {width: 0, height: 6},
+    elevation: 4,
+  },
+  // Left 1/6 — solid HotPick-blue strip with a flame icon. Hardcoded
+  // brand blue (#34A4D1) per hotpickDefaults.ts — colors.highlight
+  // flips to amber in dark mode and would defeat the contrast.
+  gamesTag: {
+    flex: 1,
+    backgroundColor: '#34A4D1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Right 5/6 — wraps the original label + arrow. Padding lives here
+  // so the GAMES tag bleeds to the rounded edge.
+  ctaBody: {
+    flex: 5,
+    flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 7,
     paddingHorizontal: 20,
-    borderRadius: borderRadius.md + 2,
-    shadowOpacity: 0.4,
-    shadowRadius: 18,
-    shadowOffset: {width: 0, height: 6},
-    elevation: 4,
   },
   ctaLabel: {
     alignItems: 'center',
