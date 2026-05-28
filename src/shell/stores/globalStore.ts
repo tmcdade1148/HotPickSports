@@ -88,6 +88,15 @@ interface GlobalState {
   visibleCompetitions: string[];
   visibleCompetitionsLoaded: boolean;
   loadVisibleCompetitions: () => Promise<void>;
+
+  // Per-sport "has the user played any earlier season of this sport"
+  // flag, keyed by sport identifier ('football', 'soccer', 'hockey').
+  // Powers the 'WELCOME BACK' vs 'WELCOME TO' branch on OffSeasonHero
+  // (and any other welcome-style surface). 'Prior' = at least one
+  // season_picks row in some OTHER competition of the same sport.
+  // Cached per session — only fetched on first inquiry per sport.
+  priorSportHistory: Record<string, boolean>;
+  loadPriorSportHistory: (sport: string, currentCompetition: string) => Promise<void>;
   updateProfile: (
     userId: string,
     fields: Partial<DbProfile>,
@@ -388,6 +397,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       userProfile: null,
       managedClub: null,
       zeroPoolsExploreMode: false,
+      priorSportHistory: {},
       visibleCompetitions: [],
       visibleCompetitionsLoaded: false,
       activePoolId: null,
@@ -425,6 +435,38 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   setZeroPoolsExploreMode: v => set({zeroPoolsExploreMode: v}),
   visibleCompetitions: [],
   visibleCompetitionsLoaded: false,
+  priorSportHistory: {},
+
+  loadPriorSportHistory: async (sport, currentCompetition) => {
+    // Cache per session — sport history doesn't change mid-app.
+    if (get().priorSportHistory[sport] !== undefined) return;
+
+    const userId = get().user?.id;
+    if (!userId) return;
+
+    // Other competitions in this sport (e.g. 'football' →
+    // nfl_2025_sim if we're on nfl_2026). Read from the registry
+    // unfiltered so beta-gated comps still count as history for
+    // beta testers.
+    const others = getAllEventsUnfiltered()
+      .filter(e => e.sport === sport && e.competition !== currentCompetition)
+      .map(e => e.competition);
+
+    if (others.length === 0) {
+      set(s => ({priorSportHistory: {...s.priorSportHistory, [sport]: false}}));
+      return;
+    }
+
+    const {count} = await supabase
+      .from('season_picks')
+      .select('id', {count: 'exact', head: true})
+      .eq('user_id', userId)
+      .in('competition', others);
+
+    set(s => ({
+      priorSportHistory: {...s.priorSportHistory, [sport]: (count ?? 0) > 0},
+    }));
+  },
 
   loadVisibleCompetitions: async () => {
     // Capture pre-load state so we know whether this is the first
