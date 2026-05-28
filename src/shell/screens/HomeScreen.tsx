@@ -363,6 +363,9 @@ export function HomeScreen() {
                 </View>
               </Pressable>
             </View>
+            <Text style={[bodyType.regular, styles.sectionNote, {color: colors.textTertiary}]}>
+              Or start making picks on your own when the season opens — you can join a Contest any time.
+            </Text>
           </View>
         )}
 
@@ -377,6 +380,9 @@ export function HomeScreen() {
           <View style={styles.section}>
             <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textTertiary}]}>
               YOUR CLUBS
+            </Text>
+            <Text style={[bodyType.regular, styles.sectionNote, {color: colors.textTertiary}]}>
+              Clubs are bars, restaurants, and shops that host their own Contests. Join a Club's roster to play their Contests and unlock their perks.
             </Text>
             {partnerIds.map(pid => (
               <PartnerModule key={pid} partnerId={pid} />
@@ -397,6 +403,18 @@ const styles = StyleSheet.create({
     letterSpacing: 1.8,
     paddingHorizontal: spacing.lg,
     marginBottom: 10,
+  },
+  // Italic explanatory line that sits under a section header or below
+  // a CTA row. Used for the 'Or start making picks on your own…' note
+  // beneath YOUR CONTESTS Join/Create buttons and the 'Clubs are
+  // bars, restaurants…' orientation under YOUR CLUBS.
+  sectionNote: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    lineHeight: 17,
+    paddingHorizontal: spacing.lg,
+    marginTop: 6,
+    marginBottom: 6,
   },
   poolActionsRow: {
     flexDirection: 'row',
