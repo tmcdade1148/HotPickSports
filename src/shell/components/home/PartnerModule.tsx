@@ -23,7 +23,6 @@ import {Megaphone} from 'lucide-react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
-import type {DbPool} from '@shared/types/database';
 import {hexToRgba} from '@shared/utils/color';
 import {LogoMark} from './LogoMark';
 import {partnerInitials} from './teamColors';
@@ -34,9 +33,6 @@ const RECENT_WINDOW_MS = 60 * 60 * 1000;
 
 export interface PartnerModuleProps {
   partnerId: string;
-  // alignedPools is still threaded through for future indicators
-  // (e.g. "5 Contests"), but brand identity no longer reads from it.
-  alignedPools: DbPool[];
 }
 
 export function PartnerModule({partnerId}: PartnerModuleProps) {

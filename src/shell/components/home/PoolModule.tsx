@@ -85,10 +85,10 @@ function resolvePartnerName(brandConfig: unknown): string | null {
 interface Affiliate {
   partnerId: string;
   name: string;
-  // `primaryColor` kept as a convenience pointer; `displayColor` is the
-  // contrast-adjusted color resolved against the current surface and
-  // is what every render site should actually paint with.
-  primaryColor: string | null;
+  // Contrast-adjusted color resolved against the current surface.
+  // Every render site that wants Club color should paint with this —
+  // raw primary lives in PoolAffiliation.brandColors.primary if a
+  // future caller ever needs it.
   displayColor: string | null;
   logoUrl: string | null;
   isPrimary: boolean;
@@ -222,7 +222,6 @@ export function PoolModule({pool}: PoolModuleProps) {
       return affiliationsFromStore.map(a => ({
         partnerId:    a.partnerId,
         name:         a.partnerName,
-        primaryColor: a.primaryColor,
         displayColor: pickReadableBrandColor(
           [
             a.brandColors.primary,
@@ -250,7 +249,6 @@ export function PoolModule({pool}: PoolModuleProps) {
           resolvePartnerName(bc) ??
           legacyPartner?.name ??
           'Club',
-        primaryColor: legacyPrimary,
         displayColor: pickReadableBrandColor(
           [legacyPrimary, legacyHighlight, legacySecondary, legacyBackground],
           surfaceBg,

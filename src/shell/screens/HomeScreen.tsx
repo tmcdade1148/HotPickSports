@@ -354,11 +354,7 @@ export function HomeScreen() {
               YOUR CLUBS
             </Text>
             {partnerRenderIds.map(pid => (
-              <PartnerModule
-                key={pid}
-                partnerId={pid}
-                alignedPools={alignedPoolsByPartner[pid] ?? []}
-              />
+              <PartnerModule key={pid} partnerId={pid} />
             ))}
           </View>
         )}

@@ -32,6 +32,7 @@ import {
 } from 'lucide-react-native';
 import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
+import {normalizeRosterPass} from '@shared/utils/format';
 import {BroadcastComposer} from '@shell/components/BroadcastComposer';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
@@ -313,7 +314,7 @@ export function PoolSettingsScreen() {
 
   const handleAddCode = async () => {
     setCodeError(null);
-    const normalized = newCode.toUpperCase().replace(/[\s-]/g, '');
+    const normalized = normalizeRosterPass(newCode);
     if (normalized.length < 6 || normalized.length > 12) {
       setCodeError('Code must be 6–12 characters.');
       return;
@@ -632,9 +633,7 @@ export function PoolSettingsScreen() {
               <TextInput
                 style={styles.addCodeInput}
                 value={newCode}
-                onChangeText={text =>
-                  setNewCode(text.toUpperCase().replace(/[\s-]/g, ''))
-                }
+                onChangeText={text => setNewCode(normalizeRosterPass(text))}
                 placeholder="WINGS26"
                 placeholderTextColor={colors.textSecondary}
                 maxLength={12}

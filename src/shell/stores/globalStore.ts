@@ -65,6 +65,12 @@ interface GlobalState {
   // Profile — full profile object
   userProfile: DbProfile | null;
   fetchProfile: (userId: string) => Promise<DbProfile | null>;
+  // The Club this user manages (de facto Partner Admin = organizer of
+  // a partners.club_pool_id pool). Null when the user isn't a Club
+  // manager. Settings shows a "Club Admin" entry + ClubAdminScreen
+  // gates on this. v1: at most one Club per user.
+  managedClub: {id: string; name: string} | null;
+  loadManagedClub: (userId: string) => Promise<void>;
   updateProfile: (
     userId: string,
     fields: Partial<DbProfile>,
@@ -283,8 +289,6 @@ interface GlobalState {
 export interface PoolAffiliation {
   partnerId:    string;
   partnerName:  string;
-  // Kept for backward compat — equals brandColors.primary.
-  primaryColor: string | null;
   // Full 4-slot Club palette captured at affiliation time. Render
   // code uses `pickReadableBrandColor` to walk this stack and pick
   // the one with enough contrast against the current surface
@@ -349,6 +353,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     set({
       user: null,
       userProfile: null,
+      managedClub: null,
       activePoolId: null,
       defaultPoolId: null,
       userPools: [],
@@ -379,6 +384,29 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   // Profile
   // ---------------------------------------------------------------------------
   userProfile: null,
+  managedClub: null,
+
+  loadManagedClub: async userId => {
+    const {data: memberRows} = await supabase
+      .from('pool_members')
+      .select('pool_id')
+      .eq('user_id', userId)
+      .eq('role', 'organizer')
+      .eq('status', 'active');
+    const orgPoolIds = ((memberRows ?? []) as {pool_id: string}[]).map(r => r.pool_id);
+    if (orgPoolIds.length === 0) {
+      set({managedClub: null});
+      return;
+    }
+    const {data: clubRows} = await supabase
+      .from('partners')
+      .select('id, name')
+      .in('club_pool_id', orgPoolIds)
+      .eq('is_active', true)
+      .limit(1);
+    const row = (clubRows ?? [])[0] as {id: string; name: string} | undefined;
+    set({managedClub: row ? {id: row.id, name: row.name} : null});
+  },
 
   fetchProfile: async userId => {
     const {data} = await supabase
@@ -389,6 +417,9 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
 
     if (data) {
       set({userProfile: data as DbProfile});
+      // Resolve "do you manage a Club?" alongside the profile load so
+      // Settings + ClubAdminScreen don't each refetch on mount.
+      get().loadManagedClub(userId).catch(() => {});
       return data as DbProfile;
     }
     return null;
@@ -1805,7 +1836,6 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       byPool[row.pool_id]?.push({
         partnerId:    row.partner_id,
         partnerName,
-        primaryColor: brandColors.primary,
         brandColors,
         logoUrl,
         isPrimary:    row.is_primary,

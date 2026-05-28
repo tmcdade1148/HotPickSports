@@ -89,25 +89,24 @@ function AdminPoolManagementScreenImpl() {
   }, [load]);
 
   const filtered = useMemo(() => {
+    // Single predicate per filter bucket. 'all' and 'hidden' surface
+    // hidden pools; the others exclude them so the analytics Platform
+    // Pool doesn't appear in the active/suspended/archived lists.
+    const matchesFilter = (p: PoolRow): boolean => {
+      switch (filter) {
+        case 'all':       return true;
+        case 'hidden':    return p.is_hidden_from_users;
+        case 'active':    return !p.is_suspended && !p.is_archived && !p.is_hidden_from_users;
+        case 'suspended': return p.is_suspended  && !p.is_hidden_from_users;
+        case 'archived':  return p.is_archived   && !p.is_hidden_from_users;
+      }
+    };
+    const q = search.trim().toLowerCase();
     return pools.filter(p => {
-      if (filter === 'active' && (p.is_suspended || p.is_archived)) return false;
-      if (filter === 'suspended' && !p.is_suspended) return false;
-      if (filter === 'archived' && !p.is_archived) return false;
-      if (filter === 'hidden' && !p.is_hidden_from_users) return false;
-      if (filter === 'all') {/* no status filter */}
-      if (filter !== 'hidden' && p.is_hidden_from_users && filter !== 'all') {
-        // Don't show hidden pools in active/suspended/archived buckets
-        // unless explicitly viewing 'all' or 'hidden'.
-        return false;
-      }
-      if (search.trim().length > 0) {
-        const q = search.toLowerCase();
-        const hit =
-          (p.name ?? '').toLowerCase().includes(q) ||
-          p.competition.toLowerCase().includes(q);
-        if (!hit) return false;
-      }
-      return true;
+      if (!matchesFilter(p)) return false;
+      if (q.length === 0) return true;
+      return (p.name ?? '').toLowerCase().includes(q)
+          || p.competition.toLowerCase().includes(q);
     });
   }, [pools, filter, search]);
 

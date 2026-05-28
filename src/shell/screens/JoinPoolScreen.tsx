@@ -12,6 +12,7 @@ import {
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
+import {normalizeRosterPass} from '@shared/utils/format';
 
 /**
  * JoinPoolScreen — Enter a pool invite code (6–12 alphanumeric chars).
@@ -33,8 +34,10 @@ export function JoinPoolScreen({navigation}: any) {
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const normalizeCode = (raw: string) =>
-    raw.toUpperCase().replace(/[\s-]/g, '');
+  // Reuse the same strip-non-alphanumeric + uppercase normalizer that
+  // PartnerDirectory's Roster Pass field uses — same character set,
+  // same forgiveness for pasted dashes / whitespace / punctuation.
+  const normalizeCode = normalizeRosterPass;
 
   // Detect when the user has pasted a Roster Pass into the invite-code
   // field. Roster Passes are 8 chars formatted XXXX-XXXX. Require the

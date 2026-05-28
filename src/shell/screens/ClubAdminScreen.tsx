@@ -107,31 +107,23 @@ export function ClubAdminScreen() {
   const [broadcastMsg, setBroadcastMsg] = useState('');
   const [broadcastSending, setBroadcastSending] = useState(false);
 
-  // Resolve the Club this user manages. v1: one Club per Partner Admin.
-  // The user is the organizer of a pool whose id == partners.club_pool_id.
+  // Resolve the Club this user manages. v1: one Club per Partner
+  // Admin. The "do I manage a Club" question is already answered by
+  // globalStore.managedClub (loaded with the profile); we read the
+  // partner's full row by id here so we get brand_config + roster
+  // pass + public_info that the slice doesn't carry.
+  const managedClub = useGlobalStore(s => s.managedClub);
   const loadPartner = useCallback(async () => {
-    if (!user?.id) return;
-    setLoading(true);
-
-    // 1. pools the user organizes/admins
-    const {data: poolRows} = await supabase
-      .from('pool_members')
-      .select('pool_id, role')
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .in('role', ['organizer', 'admin']);
-
-    const poolIds = (poolRows ?? []).map((r: {pool_id: string}) => r.pool_id);
-    if (poolIds.length === 0) {
+    if (!user?.id || !managedClub) {
       setLoading(false);
       return;
     }
+    setLoading(true);
 
-    // 2. the first partner whose club_pool_id matches any of those
     const {data: partnerRows} = await supabase
       .from('partners')
       .select('id, name, slug, perk_text, perk_icon, brand_config, is_active, roster_pass, club_pool_id, public_info')
-      .in('club_pool_id', poolIds)
+      .eq('id', managedClub.id)
       .eq('is_active', true)
       .limit(1);
 
@@ -205,7 +197,7 @@ export function ClubAdminScreen() {
     }));
     setRoster(entries);
     setLoading(false);
-  }, [user?.id]);
+  }, [user?.id, managedClub]);
 
   useEffect(() => {
     loadPartner();
