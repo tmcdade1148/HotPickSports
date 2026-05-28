@@ -121,12 +121,18 @@ export function LoadingScreen({navigation}: any) {
         }
 
         // ── ROUND 2 (parallel) ──────────────────────────────────────
-        // fetchUserPools and AsyncStorage reads need only competition string.
+        // fetchUserPools and AsyncStorage reads need only competition
+        // string. Use the resolved active sport (set inside fetchProfile
+        // → loadVisibleCompetitions, which may have force-landed a beta
+        // tester onto nfl_2025_sim) rather than the stale defaultEvent
+        // computed before the visibility list resolved.
+        const resolvedCompetition =
+          useGlobalStore.getState().activeSport?.competition ?? defaultEvent.competition;
         const [, defaultId, activeId] = await Promise.all([
-          fetchUserPools(session.user.id, defaultEvent.competition),
-          AsyncStorage.getItem(`hotpick_default_pool_${defaultEvent.competition}`)
+          fetchUserPools(session.user.id, resolvedCompetition),
+          AsyncStorage.getItem(`hotpick_default_pool_${resolvedCompetition}`)
             .catch(() => null),
-          AsyncStorage.getItem(`hotpick_active_pool_${defaultEvent.competition}`)
+          AsyncStorage.getItem(`hotpick_active_pool_${resolvedCompetition}`)
             .catch(() => null),
         ]);
 
@@ -157,7 +163,7 @@ export function LoadingScreen({navigation}: any) {
           // ── ROUND 3 (parallel) ────────────────────────────────────
           const poolIds = pools.map(p => p.id);
           await Promise.all([
-            useGlobalStore.getState().loadDefaultPoolId(defaultEvent.competition),
+            useGlobalStore.getState().loadDefaultPoolId(resolvedCompetition),
             fetchSmackUnreadCounts(session.user.id, poolIds),
           ]);
         }

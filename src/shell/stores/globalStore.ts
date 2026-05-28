@@ -503,8 +503,13 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       get().loadManagedClub(userId).catch(() => {});
       // Resolve which competitions this user can see (filters the
       // sport switcher; beta-only competitions like nfl_2025_sim only
-      // surface for whitelisted testers).
-      get().loadVisibleCompetitions().catch(() => {});
+      // surface for whitelisted testers). AWAITED so the beta force-
+      // land inside loadVisibleCompetitions runs before LoadingScreen
+      // proceeds to fetch pools / set activePoolId. Without the await,
+      // beta users get a brief NFL2026 activeSport + 2026 pool set
+      // active before the sport flips to sim, and the persisted 2026
+      // pool sticks. ~50-200ms latency cost on session boot.
+      await get().loadVisibleCompetitions().catch(() => {});
       return data as DbProfile;
     }
     return null;
