@@ -72,7 +72,14 @@ interface GlobalState {
   managedClub: {id: string; name: string} | null;
   loadManagedClub: (userId: string) => Promise<void>;
 
-  // List of competitions the current user is allowed to see. Loaded from
+  // Ephemeral session flag — set when a zero-pools user taps "pop in
+  // and look around" from the ZeroPoolsHero. HomeScreen reads this to
+  // hide the hero and reveal the partner stack so brand-new users can
+  // explore Clubs without first joining or creating a Contest.
+  // Resets on logout; deliberately not persisted so it's a one-time
+  // nudge per session.
+  zeroPoolsExploreMode: boolean;
+  setZeroPoolsExploreMode: (v: boolean) => void;
   // the get_visible_competitions RPC on session init. Used by the sport
   // registry / switcher to filter beta-only competitions (nfl_2025_sim
   // today) from users who aren't on the beta list. Empty array means
@@ -372,6 +379,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       user: null,
       userProfile: null,
       managedClub: null,
+      zeroPoolsExploreMode: false,
       visibleCompetitions: [],
       visibleCompetitionsLoaded: false,
       activePoolId: null,
@@ -405,6 +413,8 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   // ---------------------------------------------------------------------------
   userProfile: null,
   managedClub: null,
+  zeroPoolsExploreMode: false,
+  setZeroPoolsExploreMode: v => set({zeroPoolsExploreMode: v}),
   visibleCompetitions: [],
   visibleCompetitionsLoaded: false,
 

@@ -73,8 +73,14 @@ export function HomeScreen() {
     homeState === 'picks_locked' ||
     homeState === 'games_live';
   const showInsight      = isPicksFlow;
+  // zeroPoolsExploreMode lets a brand-new user dismiss the
+  // ZeroPoolsHero and browse YOUR CLUBS even without joining or
+  // creating a Contest. The pool stack stays hidden (nothing to
+  // show), but the partner stack becomes visible.
+  const exploreMode      = useGlobalStore(s => s.zeroPoolsExploreMode);
+  const showHero         = !(homeState === 'zero_pools' && exploreMode);
   const showPoolStack    = homeState !== 'zero_pools';
-  const showPartnerStack = homeState !== 'zero_pools';
+  const showPartnerStack = homeState !== 'zero_pools' || exploreMode;
 
   // ---------------------------------------------------------------------------
   // Partition pools for the Pool stack + Partner stack.
@@ -277,7 +283,7 @@ export function HomeScreen() {
         <HomeHeader />
         <SystemMessageSlot />
         <IdentityBar />
-        <StateHero state={homeState} />
+        {showHero && <StateHero state={homeState} />}
 
         {showInsight && <Insight />}
 

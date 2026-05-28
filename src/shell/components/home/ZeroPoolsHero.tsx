@@ -13,11 +13,13 @@ import React from 'react';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {useTheme} from '@shell/theme/hooks';
+import {useGlobalStore} from '@shell/stores/globalStore';
 import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
 
 export function ZeroPoolsHero() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
+  const setExplore = useGlobalStore(s => s.setZeroPoolsExploreMode);
 
   return (
     <View style={styles.wrap}>
@@ -62,6 +64,21 @@ export function ZeroPoolsHero() {
         </Pressable>
       </View>
 
+      {/* Soft escape — lets a brand-new user dismiss the hero and
+          browse YOUR CLUBS without committing to joining or creating
+          a Contest yet. Flips the session-scoped explore flag in
+          globalStore; HomeScreen reads it to hide the hero and reveal
+          the partner stack. */}
+      <Pressable
+        onPress={() => setExplore(true)}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel="Skip and look around the app first">
+        <Text style={[bodyType.regular, styles.exploreLink, {color: colors.textSecondary}]}>
+          or pop in and look around →
+        </Text>
+      </Pressable>
+
       <Text style={[bodyType.regular, styles.privacy, {color: colors.textTertiary}]}>
         All Contests on HotPick are private. There's no public matchmaking —
         this is built for groups who already know each other.
@@ -100,6 +117,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   ctaSecondaryText: {fontSize: 14, letterSpacing: 0.5},
+  exploreLink: {
+    fontSize: 13,
+    textDecorationLine: 'underline',
+    marginTop: spacing.md,
+    alignSelf: 'flex-start',
+  },
   privacy: {
     fontSize: 12,
     lineHeight: 17,
