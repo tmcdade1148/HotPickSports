@@ -10,7 +10,7 @@ import {
   useGlobalStore,
   DEV_ACTIVE_COMPETITION_KEY,
 } from '@shell/stores/globalStore';
-import {getDefaultEvent, getEventsByPriority} from '@sports/registry';
+import {getDefaultEvent, getAllEventsUnfiltered} from '@sports/registry';
 
 /**
  * LoadingScreen — bootstraps auth session and navigates to the first real screen.
@@ -83,7 +83,11 @@ export function LoadingScreen({navigation}: any) {
               DEV_ACTIVE_COMPETITION_KEY,
             );
             if (persistedCompetition) {
-              const match = getEventsByPriority().find(
+              // DEV-only: look across ALL events (including gated ones
+              // like nfl_2025_sim) so a beta tester's persisted dev
+              // selection survives hot reload. Production restricts via
+              // visibleCompetitions at every other call site.
+              const match = getAllEventsUnfiltered().find(
                 e => e.competition === persistedCompetition,
               );
               if (match) eventToActivate = match;

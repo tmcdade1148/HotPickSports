@@ -22,6 +22,7 @@ export function PoolSelectionScreen({navigation}: any) {
   const styles = createStyles(colors);
   const user = useGlobalStore(s => s.user);
   const activeSport = useGlobalStore(s => s.activeSport);
+  const visibleCompetitions = useGlobalStore(s => s.visibleCompetitions);
   const setActiveSport = useGlobalStore(s => s.setActiveSport);
   const userPools = useGlobalStore(s => s.visiblePools);
   const isLoadingPools = useGlobalStore(s => s.isLoadingPools);
@@ -30,9 +31,9 @@ export function PoolSelectionScreen({navigation}: any) {
 
   useEffect(() => {
     if (!activeSport) {
-      setActiveSport(getDefaultEvent());
+      setActiveSport(getDefaultEvent(visibleCompetitions));
     }
-  }, [activeSport, setActiveSport]);
+  }, [activeSport, setActiveSport, visibleCompetitions]);
 
   useEffect(() => {
     if (user?.id && activeSport?.competition) {

@@ -82,7 +82,8 @@ export function PoolWelcomeScreen({navigation}: any) {
   const initializeAndNavigate = async () => {
     if (!user?.id) return;
 
-    const defaultEvent = getDefaultEvent();
+    const visibleCompetitions = useGlobalStore.getState().visibleCompetitions;
+    const defaultEvent = getDefaultEvent(visibleCompetitions);
     refreshAvailableEvents();
     setActiveSport(defaultEvent);
 
