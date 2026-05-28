@@ -62,21 +62,32 @@ export function PartnerRosterScreen() {
   const route = useRoute<RouteProp<Params, 'PartnerRoster'>>();
   const slug = route.params.slug;
 
-  const userId          = useGlobalStore(s => s.user?.id);
-  const visiblePools    = useGlobalStore(s => s.visiblePools);
-  const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
-  const markRead        = useGlobalStore(s => s.markPartnerNotificationsRead);
+  const userId           = useGlobalStore(s => s.user?.id);
+  const visiblePools     = useGlobalStore(s => s.visiblePools);
+  const poolAffiliations = useGlobalStore(s => s.poolAffiliations);
+  const setActivePoolId  = useGlobalStore(s => s.setActivePoolId);
+  const markRead         = useGlobalStore(s => s.markPartnerNotificationsRead);
 
   const [partner, setPartner]      = useState<PartnerRow | null>(null);
   const [broadcasts, setBroadcasts] = useState<BroadcastRow[]>([]);
   const [loading, setLoading]      = useState(true);
 
   // Aligned pools the user actually belongs to with this partner.
-  // Derived from visiblePools so we don't need a new query.
-  const alignedPools: DbPool[] = useMemo(
-    () => (partner ? visiblePools.filter(p => p.partner_id === partner.id) : []),
-    [partner, visiblePools],
-  );
+  // A pool connects to a Club via ANY of three paths (must match the
+  // HomeScreen YOUR CLUBS partition exactly, or a Club tile can open to
+  // an empty roster):
+  //   1. pool.owning_club_id === partner.id  (Official Club Contest)
+  //   2. pool has a row in pool_partner_affiliations for this partner
+  //   3. pool.partner_id === partner.id      (legacy single-Club)
+  const alignedPools: DbPool[] = useMemo(() => {
+    if (!partner) return [];
+    return visiblePools.filter(p => {
+      if (p.owning_club_id === partner.id) return true;
+      if (p.partner_id === partner.id) return true;
+      const affiliates = poolAffiliations[p.id] ?? [];
+      return affiliates.some(a => a.partnerId === partner.id);
+    });
+  }, [partner, visiblePools, poolAffiliations]);
 
   // ---------------------------------------------------------------------------
   // Fetch partner + broadcasts.
