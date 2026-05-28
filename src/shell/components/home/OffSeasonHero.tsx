@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
   // flex:1 number cells, tightening the visual gap without breaking
   // the responsive layout (cells still split the row width evenly so
   // the row fits on narrow screens).
-  colon:        {fontSize: 44, lineHeight: 60, marginBottom: 12, marginHorizontal: -16},
+  colon:        {fontSize: 44, lineHeight: 60, marginBottom: 12, marginHorizontal: -24},
   countLabel:   {fontSize: 10, letterSpacing: 2, marginTop: 2},
 
   shareCta: {
