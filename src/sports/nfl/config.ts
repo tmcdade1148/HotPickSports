@@ -2,10 +2,13 @@ import type {SeasonConfig} from '@shared/types/templates';
 
 /**
  * Production NFL config — nfl_2026.
- * Parked as 'upcoming' until the real NFL 2026-27 season launches in Sept 2026.
- * Until then, nfl_2025_sim is the active event for all users (App Store review,
- * beta testers, and dev). Flip this back to 'active' and flip nfl_2025_sim to
- * 'completed' when the real season launches.
+ * Marked 'active' so it's the default sport for every non-beta user
+ * (PRE_SEASON now → REGULAR in Sept 2026). nfl_2025_sim, also 'active',
+ * outranks this for beta testers via the force-land in globalStore.
+ * Without this 'active' bump, non-beta users fell through to
+ * worldCup2026 (also 'upcoming' but with an earlier startDate) as the
+ * default — wrong NFL state leaked through nflStore + the hardcoded
+ * NFL header label.
  */
 export const nflSeason: SeasonConfig = {
   competition: 'nfl_2026',
@@ -13,7 +16,7 @@ export const nflSeason: SeasonConfig = {
   sport: 'football',
   name: 'NFL 2026-27 Season',
   shortName: 'NFL',
-  status: 'upcoming',
+  status: 'active',
   startDate: '2026-09-09',
   endDate: '2027-02-08',
   picksOpenDate: '2026-09-02',
