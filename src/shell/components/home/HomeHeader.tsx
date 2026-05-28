@@ -74,6 +74,7 @@ function shortPeriod(
     ? String(seasonYear).slice(-2)
     : '26';
   const sport = `NFL${suffix}`;
+  if (phase === 'OFF_SEASON')        return `${sport} · OFFSEASON`;
   if (phase === 'PRE_SEASON')        return `${sport} · PRESEASON`;
   if (phase === 'REGULAR_COMPLETE')  return `${sport} · WK 18 DONE`;
   if (phase === 'SUPERBOWL_INTRO')   return `${sport} · SB WEEK`;
