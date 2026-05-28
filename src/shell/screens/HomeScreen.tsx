@@ -348,7 +348,7 @@ export function HomeScreen() {
               </Pressable>
             </View>
             <Text style={[bodyType.regular, styles.sectionNote, {color: colors.textSecondary}]}>
-              Or start making picks on your own when the season opens — you can join a Contest any time.
+              Join as many Contests as you'd like — they all live right here so you can keep track of them in one place. Jump into one any time, or just start making your picks on your own when the season opens.
             </Text>
           </View>
         )}
