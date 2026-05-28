@@ -400,18 +400,24 @@ export function SeasonPicksScreen() {
           <Text style={styles.emptyTitle}>No Games</Text>
         </View>
       ) : (
-        <SectionList
-          style={styles.listFlex}
-          sections={sections}
-          keyExtractor={item => item.game_id}
-          renderItem={renderGame}
-          renderSectionHeader={renderSectionHeader}
-          contentContainerStyle={styles.list}
-          ItemSeparatorComponent={() => (
-            <View style={[styles.separator, {backgroundColor: colors.border}]} />
-          )}
-          stickySectionHeadersEnabled={false}
-        />
+        // Wrapping the SectionList in a flex:1 View (rather than putting
+        // flex:1 directly on the SectionList style prop) avoids a quirk
+        // where the internal VirtualizedList style merge pushed the
+        // sibling header views (PicksProgressHeader + widgets) down and
+        // left a large gap below the WeekSelector.
+        <View style={styles.listFlex}>
+          <SectionList
+            sections={sections}
+            keyExtractor={item => item.game_id}
+            renderItem={renderGame}
+            renderSectionHeader={renderSectionHeader}
+            contentContainerStyle={styles.list}
+            ItemSeparatorComponent={() => (
+              <View style={[styles.separator, {backgroundColor: colors.border}]} />
+            )}
+            stickySectionHeadersEnabled={false}
+          />
+        </View>
       )}
 
       <SubmitPicksFooter />
