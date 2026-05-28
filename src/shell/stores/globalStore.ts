@@ -152,7 +152,13 @@ interface GlobalState {
   // Pool settings management
   updatePoolSettings: (
     poolId: string,
-    settings: {name?: string; isPublic?: boolean},
+    settings: {
+      name?: string;
+      isPublic?: boolean;
+      // Pass an empty string to clear a previously-set welcome message;
+      // pass undefined to leave it unchanged.
+      welcomeMessage?: string;
+    },
   ) => Promise<{success: boolean; error?: string}>;
   archivePool: (
     poolId: string,
@@ -976,6 +982,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       p_pool_id: poolId,
       p_name: settings.name ?? null,
       p_is_public: settings.isPublic ?? null,
+      p_welcome_message: settings.welcomeMessage ?? null,
     });
 
     if (error) {
@@ -996,6 +1003,9 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
             ...(settings.name !== undefined ? {name: settings.name} : {}),
             ...(settings.isPublic !== undefined
               ? {is_public: settings.isPublic}
+              : {}),
+            ...(settings.welcomeMessage !== undefined
+              ? {welcome_message: settings.welcomeMessage.trim() || null}
               : {}),
           }
         : p;
