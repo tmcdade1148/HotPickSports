@@ -40,7 +40,17 @@ export function HomeHeader() {
       </View>
       <View style={styles.rightCluster}>
         <View style={[styles.pill, {borderColor: colors.primary}]}>
-          <Text style={[bodyType.bold, styles.pillText, {color: colors.primary}]}>
+          {/* adjustsFontSizeToFit + a max-width cap keeps long labels
+              like 'NFL26 · OFFSEASON' / 'NFL26 · SEASON DONE' from
+              spilling into the gear icon and squeezing the wordmark.
+              In-cycle labels (NFL26 · W08, NFL26 · WC) keep their
+              full 16.5px because they fit. Long ones scale down to
+              minimumFontScale = 0.7 before the cap kicks in. */}
+          <Text
+            adjustsFontSizeToFit
+            numberOfLines={1}
+            minimumFontScale={0.7}
+            style={[bodyType.bold, styles.pillText, {color: colors.primary}]}>
             {period}
           </Text>
         </View>
@@ -125,6 +135,10 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: borderRadius.full,
     borderWidth: 1,
+    // Cap so 'NFL26 · OFFSEASON' / 'NFL26 · SEASON DONE' / etc. can't
+    // grow into the gear icon. Long labels shrink via the Text's
+    // adjustsFontSizeToFit; short ones (NFL26 · W08) keep full size.
+    maxWidth: 220,
   },
   pillText: {
     fontSize: 16.5,

@@ -46,7 +46,6 @@ export function HomeScreen() {
   const loadWeekRankByPool    = useGlobalStore(s => s.loadWeekRankByPool);
   const loadAlignedPartners   = useGlobalStore(s => s.loadAlignedPartners);
   const loadActivePartners    = useGlobalStore(s => s.loadActivePartners);
-  const activePartnerIds      = useGlobalStore(s => s.activePartnerIds);
   const poolAffiliations      = useGlobalStore(s => s.poolAffiliations);
   const loadPartnerIndicators = useGlobalStore(s => s.loadPartnerIndicators);
   const fetchUserPickStatus    = useNFLStore(s => s.fetchUserPickStatus);
@@ -173,13 +172,6 @@ export function HomeScreen() {
     homeState === 'games_live'   ||
     homeState === 'settling'     ||
     homeState === 'complete';
-
-  // Partner render order: aligned first, then the rest of the active
-  // partner roster.
-  const partnerRenderIds = useMemo(() => {
-    const unaligned = activePartnerIds.filter(id => !partnerIds.includes(id));
-    return [...partnerIds, ...unaligned];
-  }, [partnerIds, activePartnerIds]);
 
   useEffect(() => {
     const unsub = subscribeToCompetitionConfig();
@@ -374,12 +366,19 @@ export function HomeScreen() {
           </View>
         )}
 
-        {showPartnerStack && (partnerIds.length > 0 || activePartnerIds.length > 0) && (
+        {showPartnerStack && (
+          // YOUR CLUBS lists only the Clubs the user is connected to
+          // through their pools (partnerIds — clubs touching at least
+          // one of their visible pools). The dedicated browse-all
+          // surface is PartnerDirectory, so we don't surface
+          // unconnected active partners here. Header stays even when
+          // the user has zero club connections so the homepage layout
+          // stays consistent across states.
           <View style={styles.section}>
             <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textTertiary}]}>
               YOUR CLUBS
             </Text>
-            {partnerRenderIds.map(pid => (
+            {partnerIds.map(pid => (
               <PartnerModule key={pid} partnerId={pid} />
             ))}
           </View>
