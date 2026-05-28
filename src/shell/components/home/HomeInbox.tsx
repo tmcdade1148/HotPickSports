@@ -1,8 +1,16 @@
 // HomeInbox — small card at the top of Home indicating unread messages.
 //
-// Loads unread counts on mount + subscribes to organizer_notifications
-// inserts via Realtime so the badge updates without a refresh. Tap →
-// MessageCenter. Hides itself when there's nothing unread.
+// Architecture:
+//   - poolIds cached in component state, fetched once at mount (and
+//     refetched only when membership changes). Membership rarely
+//     shifts mid-session, so re-querying it on every Realtime tick
+//     was wasted work.
+//   - Realtime subscription is filtered to pool_id=in.(...) for the
+//     user's pools — was previously firing on every organizer_notifications
+//     INSERT platform-wide, including broadcasts to pools the user
+//     has nothing to do with.
+//   - The recompute path (on Realtime tick) only runs the two
+//     unread/read-state queries; it doesn't re-fetch membership.
 //
 // "Unread" = organizer_notifications rows with sent_at >
 // notification_read_state.last_read_at, scoped to pools the user is
@@ -20,42 +28,45 @@ import {useTheme} from '@shell/theme/hooks';
 import {bodyType, spacing, borderRadius} from '@shared/theme';
 import {hexToRgba} from '@shared/utils/color';
 
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
 export function HomeInbox() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
   const user = useGlobalStore(s => s.user);
 
+  const [poolIds, setPoolIds] = useState<string[] | null>(null);
   const [unread, setUnread] = useState(0);
   const [latestPreview, setLatestPreview] = useState<string | null>(null);
 
-  const recompute = useCallback(async () => {
+  // Load membership once when the user changes. The user's set of
+  // active pool memberships is stable mid-session — membership joins/
+  // leaves go through dedicated screens, not the Home Realtime path.
+  useEffect(() => {
+    let cancelled = false;
     if (!user?.id) {
-      setUnread(0);
-      setLatestPreview(null);
+      setPoolIds(null);
       return;
     }
-    // Resolve the user's full active pool membership across ALL
-    // competitions (including the hidden Platform Pool). Can't use
-    // useGlobalStore(s => s.userPools) here — that slice is scoped to
-    // the active competition and would silently drop messages from
-    // pools in other competitions, including platform-wide admin
-    // broadcasts that live on the cross-competition Platform Pool.
-    const {data: membershipRows} = await supabase
-      .from('pool_members')
-      .select('pool_id')
-      .eq('user_id', user.id)
-      .eq('status', 'active');
-    const poolIds = ((membershipRows ?? []) as {pool_id: string}[]).map(r => r.pool_id);
-    if (poolIds.length === 0) {
-      setUnread(0);
-      setLatestPreview(null);
-      return;
-    }
+    (async () => {
+      const {data} = await supabase
+        .from('pool_members')
+        .select('pool_id')
+        .eq('user_id', user.id)
+        .eq('status', 'active');
+      if (cancelled) return;
+      setPoolIds(((data ?? []) as {pool_id: string}[]).map(r => r.pool_id));
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
-    // One query for unread broadcasts/notes across every pool the user
-    // is in. The exact same surface MessageCenter consults — just
-    // counted instead of listed. 30-day window matches MessageCenter.
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const recompute = useCallback(async () => {
+    if (!user?.id || !poolIds || poolIds.length === 0) {
+      setUnread(0);
+      setLatestPreview(null);
+      return;
+    }
+    const thirtyDaysAgo = new Date(Date.now() - THIRTY_DAYS_MS).toISOString();
     const [{data: msgs}, {data: readState}] = await Promise.all([
       supabase
         .from('organizer_notifications')
@@ -85,7 +96,6 @@ export function HomeInbox() {
       notification_type: string;
       recipient_user_ids: string[] | null;
     }>) {
-      // Moderator notes: only count when this user is in recipient list.
       if (m.notification_type === 'moderator_note') {
         if (!m.recipient_user_ids?.includes(user.id)) continue;
       }
@@ -97,33 +107,45 @@ export function HomeInbox() {
     }
     setUnread(unreadCount);
     setLatestPreview(mostRecentUnread?.message ?? null);
-  }, [user?.id]);
+  }, [user?.id, poolIds]);
 
   useEffect(() => {
     recompute();
   }, [recompute]);
 
-  // Realtime: new organizer_notifications row inserted → recompute.
-  // Channel scoped per-user so signing-out tears it down cleanly.
+  // Realtime — scoped to pools the user actually belongs to. The
+  // postgres_changes filter must be a single comma-list inside
+  // `pool_id=in.(...)`. Channel re-binds when poolIds changes.
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id || !poolIds || poolIds.length === 0) return;
+    const inList = poolIds.join(',');
     const channel = supabase
       .channel(`home-inbox-${user.id}`)
       .on(
         'postgres_changes',
-        {event: 'INSERT', schema: 'public', table: 'organizer_notifications'},
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'organizer_notifications',
+          filter: `pool_id=in.(${inList})`,
+        },
         () => recompute(),
       )
       .on(
         'postgres_changes',
-        {event: 'UPDATE', schema: 'public', table: 'notification_read_state', filter: `user_id=eq.${user.id}`},
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'notification_read_state',
+          filter: `user_id=eq.${user.id}`,
+        },
         () => recompute(),
       )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id, recompute]);
+  }, [user?.id, poolIds, recompute]);
 
   if (unread === 0) return null;
 
