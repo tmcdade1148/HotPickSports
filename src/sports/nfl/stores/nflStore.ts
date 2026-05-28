@@ -220,12 +220,23 @@ export const useNFLStore = create<NFLState>((set, get) => ({
   setPoolStandings: standings => set({poolStandings: standings}),
 
   fetchCompetitionConfig: async () => {
+    // Snapshot the competition at call time. If activeSport flips
+    // mid-flight (e.g. visibility eviction switches us from sim to
+    // nfl_2026 between this fetch firing and the network returning),
+    // the late response would otherwise overwrite the new
+    // competition's data with the old one's. Discard if we've moved on.
     const {competition} = get();
 
     const {data: config} = await supabase
       .from('competition_config')
       .select('key, value')
       .eq('competition', competition);
+
+    // Stale-write guard — drop the result if the store's competition
+    // has changed since we kicked off this fetch.
+    if (get().competition !== competition) {
+      return;
+    }
 
     if (!config) {
       return;
