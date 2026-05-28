@@ -68,7 +68,7 @@ export function PreSeasonGamesHero() {
         Practice picks all month. Scores reset for the regular season.
       </Text>
 
-      <Text style={[bodyType.bold, styles.eyebrow, {color: colors.textSecondary}]}>
+      <Text style={[bodyType.bold, styles.eyebrow, {color: colors.textTertiary}]}>
         REAL PICKS OPEN IN
       </Text>
       <View style={styles.countdownRow}>
@@ -143,7 +143,10 @@ const styles = StyleSheet.create({
   },
   salutation:    {fontSize: 13},
   welcomeSub:    {fontSize: 14, lineHeight: 20, marginTop: 4, marginBottom: spacing.md},
-  eyebrow:       {fontSize: 11, letterSpacing: 2, marginTop: spacing.sm, marginBottom: spacing.sm},
+  // Match HomeScreen sectionTitle (YOUR CONTESTS / YOUR CLUBS) so the
+  // 'REAL PICKS OPEN IN' eyebrow reads as a section header in the
+  // same visual language.
+  eyebrow:       {fontSize: 11, letterSpacing: 1.8, marginTop: spacing.sm, marginBottom: spacing.sm},
   countdownRow: {
     flexDirection: 'row',
     alignItems: 'center',
