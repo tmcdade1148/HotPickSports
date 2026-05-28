@@ -344,22 +344,29 @@ function GroupedTabBar({state, descriptors, navigation}: BottomTabBarProps) {
         );
       })}
 
-      {!hideGroupedTabs && (
-      <View style={[s.groupBox, {borderBottomColor: colors.border}]}>
-        {grouped.map(route => {
-          const realIndex = indexOfVisible(route);
-          return (
-            <TouchableOpacity
-              key={route.key}
-              onPress={() => onTabPress(route, realIndex)}
-              style={s.groupTab}
-              accessibilityRole="button"
-              accessibilityState={state.index === realIndex ? {selected: true} : {}}>
-              {renderTabContent(route, realIndex)}
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      {hideGroupedTabs ? (
+        // Reserve the same flex slot the Leaders+SmackTalk box would
+        // occupy so Home + Games keep their left-anchored positions
+        // when the grouped tabs are hidden (Home and Picks tabs).
+        // Without this, the leading tabs would stretch to fill the
+        // gap and shift right.
+        <View style={s.groupBoxPlaceholder} />
+      ) : (
+        <View style={[s.groupBox, {borderBottomColor: colors.border}]}>
+          {grouped.map(route => {
+            const realIndex = indexOfVisible(route);
+            return (
+              <TouchableOpacity
+                key={route.key}
+                onPress={() => onTabPress(route, realIndex)}
+                style={s.groupTab}
+                accessibilityRole="button"
+                accessibilityState={state.index === realIndex ? {selected: true} : {}}>
+                {renderTabContent(route, realIndex)}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       )}
 
       {trailing.map(route => {
@@ -405,6 +412,9 @@ const groupedTabStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     borderBottomWidth: 3,
     marginHorizontal: 2,
+  },
+  groupBoxPlaceholder: {
+    flex: 2,
   },
   groupTab: {
     flex: 1,
