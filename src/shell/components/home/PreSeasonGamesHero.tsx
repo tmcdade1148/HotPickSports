@@ -113,13 +113,19 @@ function CountUnit({
   color: string;
   subColor: string;
 }) {
+  // See OffSeasonHero for the rationale — flex:1 cells +
+  // adjustsFontSizeToFit keep the countdown row inside narrow screens.
   return (
-    <View style={{alignItems: 'flex-start'}}>
+    <View style={styles.countUnit}>
       <Text
+        adjustsFontSizeToFit
+        numberOfLines={1}
+        minimumFontScale={0.5}
         style={[
           displayType.display,
           monoType.regular,
-          {fontSize: displayType.size.display2, color, lineHeight: displayType.size.display2 * 0.9},
+          styles.countNumber,
+          {color},
         ]}>
         {n}
       </Text>
@@ -140,11 +146,13 @@ const styles = StyleSheet.create({
   eyebrow:       {fontSize: 11, letterSpacing: 2, marginTop: spacing.sm, marginBottom: spacing.sm},
   countdownRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 6,
+    alignItems: 'center',
+    gap: 2,
     marginBottom: spacing.lg,
   },
-  colon:        {fontSize: 48, paddingHorizontal: 4, paddingBottom: 10},
+  countUnit:    {flex: 1, alignItems: 'center'},
+  countNumber:  {fontSize: 56, lineHeight: 60},
+  colon:        {fontSize: 44, lineHeight: 60, marginBottom: 12},
   countLabel:   {fontSize: 10, letterSpacing: 2, marginTop: 2},
   shareCta: {
     paddingVertical: spacing.md,

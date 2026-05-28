@@ -79,6 +79,10 @@ export function OffSeasonHero() {
       <Text style={[bodyType.bold, styles.eyebrow, {color: colors.textSecondary}]}>
         PICKS OPEN IN
       </Text>
+      {/* flex-1 on each cell + adjustsFontSizeToFit lets the row stay
+          inside the screen width on smaller iPhones (SE / mini) where
+          fixed display2 sizing of three 2-digit pairs ran off the right
+          edge. Numbers and colons share the row evenly. */}
       <View style={styles.countdownRow}>
         <CountUnit n={days}    label="days" color={colors.textPrimary} subColor={colors.textTertiary} />
         <Text style={[displayType.display, styles.colon, {color: colors.primary}]}>:</Text>
@@ -122,13 +126,21 @@ function CountUnit({
   color: string;
   subColor: string;
 }) {
+  // flex:1 lets each cell share remaining row width evenly; the colon
+  // Texts in between are auto-sized. adjustsFontSizeToFit + a high
+  // numberOfLines guard keeps the digits inside the cell on narrow
+  // screens without wrapping to a second line.
   return (
-    <View style={{alignItems: 'flex-start'}}>
+    <View style={styles.countUnit}>
       <Text
+        adjustsFontSizeToFit
+        numberOfLines={1}
+        minimumFontScale={0.5}
         style={[
           displayType.display,
           monoType.regular,
-          {fontSize: displayType.size.display2, color, lineHeight: displayType.size.display2 * 0.9},
+          styles.countNumber,
+          {color},
         ]}>
         {n}
       </Text>
@@ -149,11 +161,16 @@ const styles = StyleSheet.create({
   eyebrow:       {fontSize: 11, letterSpacing: 2, marginTop: spacing.sm, marginBottom: spacing.sm},
   countdownRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 6,
+    alignItems: 'center',  // colons + digits align vertically by baseline of the full row
+    gap: 2,
     marginBottom: spacing.lg,
   },
-  colon:        {fontSize: 48, paddingHorizontal: 4, paddingBottom: 10},
+  countUnit:    {flex: 1, alignItems: 'center'},
+  countNumber:  {fontSize: 56, lineHeight: 60},
+  // Match the digit lineHeight so the colon sits visually centered
+  // between the two adjacent number cells. paddingBottom was too
+  // aggressive (10px) on iOS — dragged colons below the digit baseline.
+  colon:        {fontSize: 44, lineHeight: 60, marginBottom: 12},
   countLabel:   {fontSize: 10, letterSpacing: 2, marginTop: 2},
 
   shareCta: {
