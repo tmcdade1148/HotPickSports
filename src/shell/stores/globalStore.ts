@@ -430,9 +430,14 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     // they're testing against the live simulator state. After the
     // initial sync we leave activeSport alone so a super-admin can
     // still switch to nfl_2026 manually via Settings → Competition
-    // and stay there for the rest of the session. DEV preserves the
-    // persisted competition for hot-reload sanity.
-    if (wasLoaded || __DEV__) return;
+    // and stay there for the rest of the session.
+    //
+    // Note: this fires in DEV too. Earlier versions skipped DEV to
+    // preserve the LoadingScreen DEV_ACTIVE_COMPETITION_KEY
+    // hot-reload sanity, but per Tom that was sticking beta testers
+    // on the wrong competition. If a dev wants to test 2026 in DEV,
+    // they switch via Settings → Competition after boot.
+    if (wasLoaded) return;
     if (!visible.includes('nfl_2025_sim')) return;
     const current = get().activeSport;
     if (current?.competition === 'nfl_2025_sim') return;
