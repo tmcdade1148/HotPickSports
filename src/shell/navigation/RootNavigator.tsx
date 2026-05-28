@@ -22,6 +22,7 @@ import {AdminModerationQueueScreen} from '@shell/screens/admin/AdminModerationQu
 import {AdminPoolManagementScreen} from '@shell/screens/admin/AdminPoolManagementScreen';
 import {AdminBroadcastScreen} from '@shell/screens/admin/AdminBroadcastScreen';
 import {AdminPlatformHealthScreen} from '@shell/screens/admin/AdminPlatformHealthScreen';
+import {AdminBetaTestersScreen} from '@shell/screens/admin/AdminBetaTestersScreen';
 import {SuspensionGate} from '@shell/components/SuspensionGate';
 import {PartnerDirectoryScreen} from '@shell/screens/PartnerDirectoryScreen';
 import {PartnerRosterScreen} from '@shell/screens/PartnerRosterScreen';
@@ -227,6 +228,7 @@ export function RootNavigator() {
         <Stack.Screen name="AdminPoolManagement" component={AdminPoolManagementScreen} />
         <Stack.Screen name="AdminBroadcast" component={AdminBroadcastScreen} />
         <Stack.Screen name="AdminPlatformHealth" component={AdminPlatformHealthScreen} />
+        <Stack.Screen name="AdminBetaTesters" component={AdminBetaTestersScreen} />
         <Stack.Screen name="HardwareAdmin" component={HardwareAdminScreen} />
         <Stack.Screen name="About" component={AboutScreen} />
         <Stack.Screen name="Instructions" component={InstructionsScreen} />

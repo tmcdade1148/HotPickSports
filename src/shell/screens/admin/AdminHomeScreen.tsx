@@ -13,7 +13,7 @@ import React, {useEffect, useState} from 'react';
 import {ScrollView, StyleSheet, Text, View, Pressable} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
-import {ChevronLeft, AlertTriangle, Megaphone, Activity, Shield, Target, ChevronRight, Building} from 'lucide-react-native';
+import {ChevronLeft, AlertTriangle, Megaphone, Activity, Shield, Target, ChevronRight, Building, Users} from 'lucide-react-native';
 import {supabase} from '@shared/config/supabase';
 import {useTheme} from '@shell/theme/hooks';
 import {bodyType, displayType, spacing, borderRadius} from '@shared/theme';
@@ -119,6 +119,14 @@ function AdminHomeScreenImpl() {
           title="Broadcast"
           subtitle="Send to all users or a sport. 1 per 24 hours."
           onPress={() => navigation.navigate('AdminBroadcast')}
+        />
+
+        <Card
+          color={colors}
+          icon={<Users size={22} color={colors.primary} strokeWidth={2.25} />}
+          title="Beta Testers"
+          subtitle="Manage who can see NFL 2025 SIM."
+          onPress={() => navigation.navigate('AdminBetaTesters')}
         />
 
         <Card
