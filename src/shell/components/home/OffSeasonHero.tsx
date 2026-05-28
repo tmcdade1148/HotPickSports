@@ -189,7 +189,11 @@ const styles = StyleSheet.create({
   // Match the digit lineHeight so the colon sits visually centered
   // between the two adjacent number cells. paddingBottom was too
   // aggressive (10px) on iOS — dragged colons below the digit baseline.
-  colon:        {fontSize: 44, lineHeight: 60, marginBottom: 12},
+  // Negative horizontal margins pull the colons into the adjacent
+  // flex:1 number cells, tightening the visual gap without breaking
+  // the responsive layout (cells still split the row width evenly so
+  // the row fits on narrow screens).
+  colon:        {fontSize: 44, lineHeight: 60, marginBottom: 12, marginHorizontal: -16},
   countLabel:   {fontSize: 10, letterSpacing: 2, marginTop: 2},
 
   shareCta: {

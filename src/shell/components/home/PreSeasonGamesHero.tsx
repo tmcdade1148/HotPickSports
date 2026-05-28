@@ -155,7 +155,8 @@ const styles = StyleSheet.create({
   },
   countUnit:    {flex: 1, alignItems: 'center'},
   countNumber:  {fontSize: 56, lineHeight: 60},
-  colon:        {fontSize: 44, lineHeight: 60, marginBottom: 12},
+  // See OffSeasonHero — negative margin pulls colons toward digits.
+  colon:        {fontSize: 44, lineHeight: 60, marginBottom: 12, marginHorizontal: -16},
   countLabel:   {fontSize: 10, letterSpacing: 2, marginTop: 2},
   shareCta: {
     paddingVertical: spacing.md,
