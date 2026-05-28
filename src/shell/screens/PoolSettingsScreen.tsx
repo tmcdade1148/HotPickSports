@@ -106,6 +106,10 @@ export function PoolSettingsScreen() {
   const accentColor = colors.primary;
 
   const [poolName, setPoolName] = useState(pool?.name ?? '');
+  const [welcomeMessage, setWelcomeMessage] = useState(
+    pool?.welcome_message ?? '',
+  );
+  const [savingWelcome, setSavingWelcome] = useState(false);
   const [saving, setSaving] = useState(false);
   const [broadcastVisible, setBroadcastVisible] = useState(false);
 
@@ -279,6 +283,29 @@ export function PoolSettingsScreen() {
       Alert.alert('Saved', 'Contest name updated.');
     } else {
       Alert.alert('Error', result.error ?? 'Failed to update Contest name');
+    }
+  };
+
+  // Welcome message — auto-posted to SmackTalk as the Gaffer when a
+  // new member joins. Empty string clears a previously-set welcome.
+  const currentWelcome   = pool?.welcome_message ?? '';
+  const hasWelcomeChanged = welcomeMessage.trim() !== currentWelcome.trim();
+  const handleSaveWelcome = async () => {
+    if (!hasWelcomeChanged) return;
+    setSavingWelcome(true);
+    const result = await updatePoolSettings(poolId, {
+      welcomeMessage: welcomeMessage.trim(),
+    });
+    setSavingWelcome(false);
+    if (result.success) {
+      Alert.alert(
+        'Saved',
+        welcomeMessage.trim()
+          ? 'New members will see your welcome message in SmackTalk.'
+          : 'Welcome message cleared.',
+      );
+    } else {
+      Alert.alert('Error', result.error ?? 'Failed to update welcome message');
     }
   };
 
@@ -495,6 +522,39 @@ export function PoolSettingsScreen() {
               disabled={saving}>
               <Text style={styles.saveButtonText}>
                 {saving ? 'Saving...' : 'Save'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Welcome Message — auto-posted to SmackTalk as the Gaffer
+            when a new member joins. Sets Contest culture from the
+            first message a recruit sees. */}
+        <Text style={styles.sectionTitle}>Welcome Message</Text>
+        <Text style={styles.welcomeHint}>
+          Posted in SmackTalk as you when a new player joins your Contest. Leave blank for no auto-welcome.
+        </Text>
+        <TextInput
+          style={styles.welcomeInput}
+          value={welcomeMessage}
+          onChangeText={setWelcomeMessage}
+          maxLength={500}
+          multiline
+          placeholder="Welcome to the Contest! Here's how we play…"
+          placeholderTextColor={colors.textSecondary}
+          textAlignVertical="top"
+        />
+        <View style={styles.welcomeFooter}>
+          <Text style={styles.welcomeCount}>
+            {welcomeMessage.length}/500
+          </Text>
+          {hasWelcomeChanged && (
+            <TouchableOpacity
+              style={[styles.saveButton, savingWelcome && styles.saveButtonDisabled]}
+              onPress={handleSaveWelcome}
+              disabled={savingWelcome}>
+              <Text style={styles.saveButtonText}>
+                {savingWelcome ? 'Saving...' : 'Save'}
               </Text>
             </TouchableOpacity>
           )}
@@ -918,6 +978,38 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.onPrimary,
     fontSize: 15,
     fontWeight: '600',
+  },
+  // Welcome message
+  welcomeHint: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 18,
+    paddingHorizontal: spacing.lg,
+    marginTop: -spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  welcomeInput: {
+    minHeight: 100,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    fontSize: 15,
+    lineHeight: 21,
+    color: colors.textPrimary,
+    backgroundColor: colors.surface,
+    marginHorizontal: spacing.lg,
+  },
+  welcomeFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+  },
+  welcomeCount: {
+    color: colors.textTertiary,
+    fontSize: 12,
   },
   // Invite-code list
   codeCard: {

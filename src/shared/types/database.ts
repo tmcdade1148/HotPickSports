@@ -61,6 +61,7 @@ export interface DbPool {
   member_limit: number | null;
   status: string;
   name_display: string | null;
+  welcome_message: string | null;
   pool_start_date: string;
   partner_id: string | null;
   /**
