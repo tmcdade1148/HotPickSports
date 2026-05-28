@@ -177,7 +177,15 @@ interface GlobalState {
   // Brand config — drives useTheme() and useBrand() hooks
   activeBrandConfig: BrandConfig | null;
   setActiveBrandConfig: (config: BrandConfig | null) => void;
-  updatePoolBrandConfig: (poolId: string, config: BrandConfig | null) => void;
+  // Accepts either the typed BrandConfig (from theme defaults) or a
+  // raw jsonb shape (from partner.brand_config / RPC results). The
+  // pool's brand_config column is typed Record<string,unknown> so
+  // both flow through unchanged; reader callsites then narrow what
+  // they need.
+  updatePoolBrandConfig: (
+    poolId: string,
+    config: BrandConfig | Record<string, unknown> | null,
+  ) => void;
 
   // Feature flags
   showGlobalPool: boolean;
@@ -1185,13 +1193,19 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   setActiveBrandConfig: config => set({activeBrandConfig: config}),
   updatePoolBrandConfig: (poolId, config) => {
     // Mirror into visiblePools too — see note in archivePool / updatePoolSettings.
+    const asRecord = config as Record<string, unknown> | null;
     const applyBrand = (p: DbPool) =>
-      p.id === poolId ? {...p, brand_config: config as Record<string, unknown> | null} : p;
+      p.id === poolId ? {...p, brand_config: asRecord} : p;
     set(state => ({
       userPools: state.userPools.map(applyBrand),
       visiblePools: state.visiblePools.map(applyBrand),
-      // If this is the active pool, also update the global theme
-      ...(state.activePoolId === poolId ? {activeBrandConfig: config} : {}),
+      // If this is the active pool, also update the global theme. The
+      // theme reads BrandConfig shape; the cast is safe because a
+      // partner's brand_config carries the same keys as BrandConfig
+      // (partner_name, primary_color, logo, ...).
+      ...(state.activePoolId === poolId
+        ? {activeBrandConfig: config as BrandConfig | null}
+        : {}),
     }));
   },
 

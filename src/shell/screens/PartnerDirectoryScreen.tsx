@@ -120,7 +120,7 @@ export function PartnerDirectoryScreen() {
     // Keep brand_config snapshot on the pool in sync — the DB trigger
     // handles primary-affiliation rotation, but the in-memory pool record
     // needs the new brand for the active session.
-    updatePoolBrandConfig(poolId, (partner.brand_config as any) ?? null);
+    updatePoolBrandConfig(poolId, partner.brand_config ?? null);
   };
 
   // Roster Pass redemption path: Gaffer enters the 8-char pass a Club
@@ -187,7 +187,7 @@ export function PartnerDirectoryScreen() {
     setPassInput('');
     await refreshAffiliations();
     loadPoolAffiliations([poolId]).catch(() => {});
-    updatePoolBrandConfig(poolId, (result.brand_config as any) ?? null);
+    updatePoolBrandConfig(poolId, result.brand_config ?? null);
     Alert.alert('Affiliated', `Your Contest is now on ${result.partner_name}'s roster.`);
   };
 

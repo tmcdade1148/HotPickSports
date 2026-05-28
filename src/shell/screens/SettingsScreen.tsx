@@ -466,7 +466,10 @@ export function SettingsScreen({route}: any) {
                           partners_propagate_brand trigger. */}
                       {isBranded && (
                         <Text style={[styles.roleBadge, {color: pillTextColor + 'CC', fontWeight: '700'}]}>
-                          {((pool.brand_config as any)?.partner_name as string | undefined) ?? LEXICON.club.short}
+                          {(() => {
+                            const bc = pool.brand_config as Record<string, unknown> | null;
+                            return typeof bc?.partner_name === 'string' ? bc.partner_name : LEXICON.club.short;
+                          })()}
                           {(pool.is_global || poolRoles[pool.id]) ? ' · ' : ''}
                         </Text>
                       )}

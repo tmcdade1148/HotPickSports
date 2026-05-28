@@ -1,7 +1,15 @@
-/** "th" / "st" / "nd" / "rd" suffix for a positive integer rank. */
+/**
+ * "th" / "st" / "nd" / "rd" suffix for a positive integer rank.
+ *
+ * Handles the English-language teen exception correctly for any
+ * three-digit (or larger) input — e.g. 112th, 213th, 1011th. The
+ * check is `n % 100 in [11, 13]`, not `n in [11, 13]`, which is what
+ * a naive implementation breaks on.
+ */
 export function ordinalSuffix(n: number): string {
-  if (n >= 11 && n <= 13) return 'th';
-  switch (n % 10) {
+  const mod100 = Math.abs(n) % 100;
+  if (mod100 >= 11 && mod100 <= 13) return 'th';
+  switch (mod100 % 10) {
     case 1:  return 'st';
     case 2:  return 'nd';
     case 3:  return 'rd';
@@ -41,13 +49,17 @@ export function normalizeRosterPass(raw: string): string {
 export function formatRelativeTime(iso: string): string {
   const now = Date.now();
   const then = new Date(iso).getTime();
-  const diffMin = Math.round((now - then) / 60000);
+  // floor (not round) on each bucket — "Just now" should cover the
+  // full first minute (0-59s), "1m ago" begins at exactly 60s, etc.
+  // Rounding biases the early thresholds upward and makes the bands
+  // surprising for users staring at a freshly-received message.
+  const diffMin = Math.floor((now - then) / 60000);
 
   if (diffMin < 1) return 'Just now';
   if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHrs = Math.round(diffMin / 60);
+  const diffHrs = Math.floor(diffMin / 60);
   if (diffHrs < 24) return `${diffHrs}h ago`;
-  const diffDays = Math.round(diffHrs / 24);
+  const diffDays = Math.floor(diffHrs / 24);
   if (diffDays < 7) return `${diffDays}d ago`;
 
   // Older than a week — show date
