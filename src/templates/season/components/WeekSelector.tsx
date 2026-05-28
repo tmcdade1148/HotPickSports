@@ -48,6 +48,11 @@ export function WeekSelector({
       ref={scrollRef}
       horizontal
       showsHorizontalScrollIndicator={false}
+      // flexGrow:0 stops the horizontal ScrollView's outer view from
+      // claiming remaining vertical space in its parent column. Without
+      // this, the chips render at the top of an oversized container and
+      // a visible gap appears below them on the Picks screen.
+      style={styles.scroll}
       contentContainerStyle={styles.container}>
       {weeks.map(week => {
         const isActiveWeek = week === realWeek; // the DB current week
@@ -91,6 +96,10 @@ export function WeekSelector({
 }
 
 const createStyles = (colors: any) => StyleSheet.create({
+  scroll: {
+    flexGrow: 0,
+    flexShrink: 0,
+  },
   container: {
     paddingHorizontal: spacing.md,
     paddingTop: spacing.sm,
