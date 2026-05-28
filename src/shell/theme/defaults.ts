@@ -164,6 +164,10 @@ export const SEMANTIC_COLORS = {
   error: '#C21D1D',
   border: '#E0E0E0',
   glow: '#51A1A6',
+  // Brand accents for secondary CTAs. HotPick teal + amber that read
+  // on both light and dark surfaces without per-mode tweaks.
+  ctaAccentOutline: '#45615E',
+  ctaAccentText:    '#E39032',
 } as const;
 
 /**
@@ -175,4 +179,8 @@ export const SEMANTIC_COLORS_DARK = {
   error: '#C21D1D',
   border: '#2C3A52',
   glow: '#51A1A6',
+  // Brand accents for secondary CTAs. Same hues in dark mode — both
+  // colors clear WCAG 3:1 against dark surfaceElevated.
+  ctaAccentOutline: '#45615E',
+  ctaAccentText:    '#E39032',
 } as const;

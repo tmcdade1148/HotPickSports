@@ -25,13 +25,6 @@ import {PartnerModule} from '@shell/components/home/PartnerModule';
 import {resolveHomeState} from '@shell/components/home/resolveHomeState';
 import {LEXICON} from '@shared/lexicon';
 
-// HotPick brand accents for the two Home CTAs. Outline (border + icon)
-// in teal #45615E; label text in amber #E39032. Hard-coded here (not
-// read from useTheme) — these are HotPick brand secondaries kept
-// stable regardless of which slot the active theme uses.
-const CTA_OUTLINE = '#45615E';
-const CTA_TEXT    = '#E39032';
-
 export function HomeScreen() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
@@ -308,17 +301,17 @@ export function HomeScreen() {
                 style={({pressed}) => [
                   styles.poolActionBtn,
                   {
-                    backgroundColor: hexToRgba(CTA_OUTLINE, 0.08),
-                    borderColor: CTA_OUTLINE,
+                    backgroundColor: hexToRgba(colors.ctaAccentOutline, 0.08),
+                    borderColor: colors.ctaAccentOutline,
                     opacity: pressed ? 0.7 : 1,
                   },
                 ]}
                 accessibilityRole="button"
                 accessibilityLabel="Join a Contest with an invite code">
-                <KeyRound size={18} color={CTA_OUTLINE} strokeWidth={2.25} />
+                <KeyRound size={18} color={colors.ctaAccentOutline} strokeWidth={2.25} />
                 <View style={styles.poolActionLabel}>
                   <Text
-                    style={[bodyType.bold, styles.poolActionPrimary, {color: CTA_TEXT}]}>
+                    style={[bodyType.bold, styles.poolActionPrimary, {color: colors.ctaAccentText}]}>
                     Join a Contest
                   </Text>
                   <Text
@@ -332,17 +325,17 @@ export function HomeScreen() {
                 style={({pressed}) => [
                   styles.poolActionBtn,
                   {
-                    backgroundColor: hexToRgba(CTA_OUTLINE, 0.08),
-                    borderColor: CTA_OUTLINE,
+                    backgroundColor: hexToRgba(colors.ctaAccentOutline, 0.08),
+                    borderColor: colors.ctaAccentOutline,
                     opacity: pressed ? 0.7 : 1,
                   },
                 ]}
                 accessibilityRole="button"
                 accessibilityLabel="Create a new Contest and invite friends">
-                <Plus size={18} color={CTA_OUTLINE} strokeWidth={2.25} />
+                <Plus size={18} color={colors.ctaAccentOutline} strokeWidth={2.25} />
                 <View style={styles.poolActionLabel}>
                   <Text
-                    style={[bodyType.bold, styles.poolActionPrimary, {color: CTA_TEXT}]}>
+                    style={[bodyType.bold, styles.poolActionPrimary, {color: colors.ctaAccentText}]}>
                     Create a Contest
                   </Text>
                   <Text
