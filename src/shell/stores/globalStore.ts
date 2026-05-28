@@ -71,6 +71,16 @@ interface GlobalState {
   // gates on this. v1: at most one Club per user.
   managedClub: {id: string; name: string} | null;
   loadManagedClub: (userId: string) => Promise<void>;
+
+  // List of competitions the current user is allowed to see. Loaded from
+  // the get_visible_competitions RPC on session init. Used by the sport
+  // registry / switcher to filter beta-only competitions (nfl_2025_sim
+  // today) from users who aren't on the beta list. Empty array means
+  // "not loaded yet" — the registry treats that as "show everything"
+  // so the app doesn't break before the RPC resolves.
+  visibleCompetitions: string[];
+  visibleCompetitionsLoaded: boolean;
+  loadVisibleCompetitions: () => Promise<void>;
   updateProfile: (
     userId: string,
     fields: Partial<DbProfile>,
@@ -362,6 +372,8 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       user: null,
       userProfile: null,
       managedClub: null,
+      visibleCompetitions: [],
+      visibleCompetitionsLoaded: false,
       activePoolId: null,
       defaultPoolId: null,
       userPools: [],
@@ -381,7 +393,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   availableEvents: [],
 
   refreshAvailableEvents: () => {
-    const all = getEventsByPriority();
+    const all = getEventsByPriority(get().visibleCompetitions);
     set({
       availableEvents: all,
       activeEventCards: all.filter(e => e.status === 'active').slice(0, 2),
@@ -393,6 +405,24 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   // ---------------------------------------------------------------------------
   userProfile: null,
   managedClub: null,
+  visibleCompetitions: [],
+  visibleCompetitionsLoaded: false,
+
+  loadVisibleCompetitions: async () => {
+    const {data, error} = await supabase.rpc('get_visible_competitions');
+    if (error) {
+      // Fail open: if the RPC errors, treat everything as visible so
+      // we don't accidentally hide the user's active sport. The server
+      // is still authoritative for pool/data access via RLS.
+      set({visibleCompetitions: [], visibleCompetitionsLoaded: true});
+      return;
+    }
+    const rows = (data ?? []) as Array<{competition: string}>;
+    set({
+      visibleCompetitions: rows.map(r => r.competition),
+      visibleCompetitionsLoaded: true,
+    });
+  },
 
   loadManagedClub: async userId => {
     const {data: memberRows} = await supabase
@@ -435,6 +465,10 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       // Resolve "do you manage a Club?" alongside the profile load so
       // Settings + ClubAdminScreen don't each refetch on mount.
       get().loadManagedClub(userId).catch(() => {});
+      // Resolve which competitions this user can see (filters the
+      // sport switcher; beta-only competitions like nfl_2025_sim only
+      // surface for whitelisted testers).
+      get().loadVisibleCompetitions().catch(() => {});
       return data as DbProfile;
     }
     return null;

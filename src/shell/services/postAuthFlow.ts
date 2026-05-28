@@ -43,7 +43,10 @@ export async function runPostAuthFlow({
   navigation,
 }: PostAuthOptions): Promise<void> {
   const store = useGlobalStore.getState();
-  const defaultEvent = getDefaultEvent();
+  // visibleCompetitions hasn't loaded yet at post-auth time (loaded by
+  // fetchProfile below). Falls back to public events only — beta users
+  // will see the gated comp(s) re-appear after the RPC resolves.
+  const defaultEvent = getDefaultEvent(store.visibleCompetitions);
 
   // Step 1: Set auth state
   store.setUser(user);
