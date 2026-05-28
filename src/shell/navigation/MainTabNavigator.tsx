@@ -484,7 +484,6 @@ export function MainTabNavigator() {
   const seasonInitialize = useSeasonStore(s => s.initialize);
   const seasonConfig = useSeasonStore(s => s.config);
   const nflInitialize = useNFLStore(s => s.initialize);
-  const nflCompetitionInStore = useNFLStore(s => s.competition);
   const didInit = useRef(false);
 
   useEffect(() => {
@@ -511,12 +510,26 @@ export function MainTabNavigator() {
   // hardcoded defaults (competition: 'nfl_2026', weekState: 'picks_open',
   // currentPhase: 'REGULAR', currentWeek: 1) and the redesigned Home shows
   // stale state regardless of what competition_config holds.
+  //
+  // We deliberately do NOT skip when nflCompetitionInStore === activeSport
+  // because the nflStore default ('nfl_2026') matches the most common
+  // activeSport on first mount, and a skip there would mean
+  // fetchCompetitionConfig() never runs — leaving picksOpenAt / weekState
+  // / currentWeek stuck at their hardcoded defaults. initialize() has its
+  // own internal alreadyInitialized check that skips the heavy state reset
+  // while still always re-fetching config, so calling it freely here is
+  // cheap.
+  const nflInitializedFor = useRef<string | null>(null);
   useEffect(() => {
     if (!activeSport) return;
     if (activeSport.templateType !== 'season') return;
-    if (nflCompetitionInStore === activeSport.competition) return;
+    // Re-fire on every activeSport change. The useRef guard prevents
+    // duplicate calls within the same competition without the false
+    // negative the previous `nflCompetitionInStore === ...` guard had.
+    if (nflInitializedFor.current === activeSport.competition) return;
+    nflInitializedFor.current = activeSport.competition;
     nflInitialize(activeSport.competition).catch(() => {});
-  }, [activeSport?.competition, activeSport?.templateType, nflInitialize, nflCompetitionInStore]);
+  }, [activeSport?.competition, activeSport?.templateType, nflInitialize]);
 
   return (
     <Tab.Navigator
