@@ -363,7 +363,7 @@ export function HomeScreen() {
                 </View>
               </Pressable>
             </View>
-            <Text style={[bodyType.regular, styles.sectionNote, {color: colors.textTertiary}]}>
+            <Text style={[bodyType.regular, styles.sectionNote, {color: colors.textSecondary}]}>
               Or start making picks on your own when the season opens — you can join a Contest any time.
             </Text>
           </View>
@@ -381,7 +381,7 @@ export function HomeScreen() {
             <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textTertiary}]}>
               YOUR CLUBS
             </Text>
-            <Text style={[bodyType.regular, styles.sectionNote, {color: colors.textTertiary}]}>
+            <Text style={[bodyType.regular, styles.sectionNote, {color: colors.textSecondary}]}>
               Clubs are bars, restaurants, and shops that host their own Contests. Join a Club's roster to play their Contests and unlock their perks.
             </Text>
             {partnerIds.map(pid => (
@@ -404,14 +404,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     marginBottom: 10,
   },
-  // Italic explanatory line that sits under a section header or below
-  // a CTA row. Used for the 'Or start making picks on your own…' note
-  // beneath YOUR CONTESTS Join/Create buttons and the 'Clubs are
-  // bars, restaurants…' orientation under YOUR CLUBS.
+  // Explanatory line that sits under a section header or below a CTA
+  // row. Mirrors the welcomeSub style on OffSeasonHero (14px / 20
+  // lineHeight / textSecondary, non-italic) so the HotPick description
+  // and the YOUR CONTESTS / YOUR CLUBS notes read as the same voice.
   sectionNote: {
-    fontSize: 12,
-    fontStyle: 'italic',
-    lineHeight: 17,
+    fontSize: 14,
+    lineHeight: 20,
     paddingHorizontal: spacing.lg,
     marginTop: 6,
     marginBottom: 6,
