@@ -38,7 +38,13 @@ export function OffSeasonHero() {
   const heroSub  = identity?.offseasonHeroSub        ?? 'Plenty of time to set up your Contest and get everyone in before kickoff.';
   const cdLabel  = identity?.offseasonCountdownLabel ?? 'DAYS UNTIL PICKS OPEN';
 
-  const target = picksOpenAt ?? seasonOpenerAt;
+  // Off-season target = regular-season kickoff (seasonOpenerAt /
+  // 'season_opener_date'). Spec §6 says "target = picks open" but
+  // the label reads "DAYS UNTIL THE REGULAR SEASON" — Tom locked
+  // the off-season countdown to kickoff so the label and target
+  // line up. Pre-season hero keeps the picks-open target since its
+  // label reads "Regular season picks open in".
+  const target = seasonOpenerAt ?? picksOpenAt;
   const {days, hours, minutes} = useCountdown(target);
   const daysNum = parseInt(days, 10);
   // Compliance rule (spec §6): days-only above 14 days, add
