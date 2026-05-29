@@ -1,17 +1,22 @@
 // src/shell/components/home/OffSeasonHero.tsx
-// Renamed from PreSeasonHero. Fires when current_phase === 'OFF_SEASON'
-// — the long quiet window between SEASON_COMPLETE and the first
-// preseason game. Today (May–Aug) that's most of the calendar for an
-// NFL user.
+// Off-season home variant per the OffseasonPreseasonHome spec
+// (May 29, 2026). Regular-season picks are not yet open; this is
+// the long preparation window where new users sign up and Gaffers
+// set up Contests. The countdown is the visual hero — a single
+// big number with a small sub-line that switches to
+// hours/minutes only when ≤ 14 days remain.
 //
-// The Join / Create / share CTAs that used to live here moved into the
-// HomeScreen YOUR CONTESTS section so the homepage layout stays
-// consistent across all states (off-season, pre-season, in-cycle).
-// This hero is now just the greeting + welcome line + countdown to
-// season_picks_open_at, plus the tell-a-friend share for organizers
-// of existing pools.
+// All sport-specific copy reads from activeSport.sportIdentity so
+// "FOOTBALL'S ON ITS WAY BACK." becomes "HOCKEY'S ON ITS WAY BACK."
+// etc. when new sports ship. No hardcoded strings here.
+//
+// Below the hero, the spec layout calls for: Create button (primary
+// solid orange), Join button (neutral outline), the cross-Contest
+// strip, then the Clubs teaser. The Create / Join buttons live in
+// HomeScreen alongside the strip + teaser so this component owns
+// only the hero block.
 
-import React, {useEffect} from 'react';
+import React from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
@@ -19,112 +24,64 @@ import {useGlobalStore} from '@shell/stores/globalStore';
 import {displayType, bodyType, monoType, spacing} from '@shared/theme';
 import {useCountdown} from './useCountdown';
 
+const HOURS_MINS_THRESHOLD_DAYS = 14;
+
 export function OffSeasonHero() {
   const {colors} = useTheme();
 
   const picksOpenAt    = useNFLStore(s => s.picksOpenAt);
   const seasonOpenerAt = useNFLStore(s => s.seasonOpenerAt);
-  const visiblePools   = useGlobalStore(s => s.visiblePools);
-  const userProfile    = useGlobalStore(s => s.userProfile);
   const activeSport    = useGlobalStore(s => s.activeSport);
-  const priorSportHistory   = useGlobalStore(s => s.priorSportHistory);
-  const loadPriorSportHistory = useGlobalStore(s => s.loadPriorSportHistory);
-  // sportIdentity.displayName is the sport-specific brand: 'HotPick
-  // Football' for NFL, 'HotPick Hockey' for NHL, etc. Falls back to
-  // 'HotPick' if no sport is active.
-  const sportName      = activeSport?.sportIdentity?.displayName ?? 'HotPick';
+  const identity       = activeSport?.sportIdentity;
+
+  const headline = identity?.offseasonHeadline       ?? 'THE SEASON IS ON ITS WAY BACK.';
+  const heroSub  = identity?.offseasonHeroSub        ?? 'Plenty of time to set up your Contest and get everyone in before kickoff.';
+  const cdLabel  = identity?.offseasonCountdownLabel ?? 'DAYS UNTIL PICKS OPEN';
 
   const target = picksOpenAt ?? seasonOpenerAt;
   const {days, hours, minutes} = useCountdown(target);
-
-  // Trigger the prior-sport-history check on first mount (cached
-  // per session inside loadPriorSportHistory).
-  useEffect(() => {
-    if (!activeSport) return;
-    loadPriorSportHistory(activeSport.sport, activeSport.competition).catch(() => {});
-  }, [activeSport, loadPriorSportHistory]);
-
-  const hasPriorPicks = activeSport ? priorSportHistory[activeSport.sport] === true : false;
-
-  // Returning = either has a current pool, OR has prior-season picks
-  // in this sport. The latter catches users coming back for a new
-  // season before they've joined any Contest yet — they should still
-  // see 'Welcome back to HotPick Football' rather than the new-user
-  // opener.
-  const returning = hasPriorPicks || visiblePools.length > 0;
-  const careerPts = userProfile?.total_career_points ?? 0;
-  // Tell-a-friend share moved to RecruiterBand below the hero.
+  const daysNum = parseInt(days, 10);
+  // Compliance rule (spec §6): days-only above 14 days, add
+  // hours+minutes at 14 or fewer. No urgency styling. The countdown
+  // is a calendar marker, not a betting timer.
+  const showHoursMinutes = Number.isFinite(daysNum) && daysNum <= HOURS_MINS_THRESHOLD_DAYS;
 
   return (
     <View style={styles.wrap}>
-      {/* Dropped the contextual greeting line that used to sit above the
-          headline. The sport-name welcome carries the welcome on its
-          own and the greeting felt redundant. */}
       <Text
         style={[
           displayType.display,
-          {fontSize: displayType.size.h2, color: colors.textPrimary},
+          styles.headline,
+          {color: colors.textPrimary},
         ]}>
-        {returning
-          ? `WELCOME BACK TO ${sportName.toUpperCase()}.`
-          : `WELCOME TO ${sportName.toUpperCase()}.`}
+        {headline}
       </Text>
-      <Text style={[bodyType.regular, styles.welcomeSub, {color: colors.textSecondary}]}>
-        {returning
-          ? careerPts > 0
-            ? `${careerPts.toLocaleString()} career pts. Let's run it back.`
-            : "Get your Contest together before kickoff."
-          : "Pick the winners each week of the NFL season. Your picks play across every Contest you're in — friends at work, the group chat, your local bar — at the same time. One set of picks, many leagues."}
+      <Text style={[bodyType.regular, styles.heroSub, {color: colors.textSecondary}]}>
+        {heroSub}
       </Text>
 
-      <Text style={[bodyType.bold, styles.eyebrow, {color: colors.textTertiary}]}>
-        PICKS OPEN IN
-      </Text>
-      {/* flex-1 on each cell + adjustsFontSizeToFit lets the row stay
-          inside the screen width on smaller iPhones (SE / mini) where
-          fixed display2 sizing of three 2-digit pairs ran off the right
-          edge. Numbers and colons share the row evenly. */}
-      <View style={styles.countdownRow}>
-        <CountUnit n={days}    label="days" color={colors.textPrimary} subColor={colors.textTertiary} />
-        <Text style={[displayType.display, styles.colon, {color: colors.primary}]}>:</Text>
-        <CountUnit n={hours}   label="hrs"  color={colors.textPrimary} subColor={colors.textTertiary} />
-        <Text style={[displayType.display, styles.colon, {color: colors.primary}]}>:</Text>
-        <CountUnit n={minutes} label="min"  color={colors.textPrimary} subColor={colors.textTertiary} />
+      {/* Countdown — single big number anchored center; days-only
+          by default, hours/minutes appear inside the final two
+          weeks. Number is plain text, no animation. */}
+      <View style={styles.countdownBlock}>
+        <Text
+          style={[
+            displayType.display,
+            monoType.regular,
+            styles.bigNumber,
+            {color: colors.textPrimary},
+          ]}>
+          {days}
+        </Text>
+        <Text style={[bodyType.bold, styles.countdownLabel, {color: colors.primary}]}>
+          {cdLabel}
+        </Text>
+        {showHoursMinutes && (
+          <Text style={[bodyType.regular, styles.countdownSub, {color: colors.textSecondary}]}>
+            {hours} hours, {minutes} minutes to go
+          </Text>
+        )}
       </View>
-    </View>
-  );
-}
-
-function CountUnit({
-  n,
-  label,
-  color,
-  subColor,
-}: {
-  n: string;
-  label: string;
-  color: string;
-  subColor: string;
-}) {
-  // flex:1 lets each cell share remaining row width evenly; the colon
-  // Texts in between are auto-sized. adjustsFontSizeToFit + a high
-  // numberOfLines guard keeps the digits inside the cell on narrow
-  // screens without wrapping to a second line.
-  return (
-    <View style={styles.countUnit}>
-      <Text
-        adjustsFontSizeToFit
-        numberOfLines={1}
-        minimumFontScale={0.5}
-        style={[
-          displayType.display,
-          monoType.regular,
-          styles.countNumber,
-          {color},
-        ]}>
-        {n}
-      </Text>
-      <Text style={[bodyType.bold, styles.countLabel, {color: subColor}]}>{label}</Text>
     </View>
   );
 }
@@ -133,32 +90,37 @@ const styles = StyleSheet.create({
   wrap: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
-    // No bottom padding — the next section's marginTop is the sole
-    // hero-to-section gap so the spacing matches section-to-section.
     paddingBottom: 0,
     gap: spacing.sm,
   },
-  welcomeSub:    {fontSize: 14, lineHeight: 20, marginTop: 4, marginBottom: spacing.md},
-  // Match HomeScreen sectionTitle (YOUR CONTESTS / YOUR CLUBS) so the
-  // 'PICKS OPEN IN' eyebrow reads as a section header in the same
-  // visual language.
-  eyebrow:       {fontSize: 11, letterSpacing: 1.8, marginTop: spacing.sm, marginBottom: spacing.sm},
-  countdownRow: {
-    flexDirection: 'row',
-    alignItems: 'center',  // colons + digits align vertically by baseline of the full row
-    gap: 2,
-    // No marginBottom — section.marginTop on the next row carries
-    // the gap. Keeps hero→section spacing equal to section→section.
+  headline: {
+    fontSize: 36,
+    lineHeight: 40,
+    letterSpacing: -0.5,
   },
-  countUnit:    {flex: 1, alignItems: 'center'},
-  countNumber:  {fontSize: 56, lineHeight: 60},
-  // Match the digit lineHeight so the colon sits visually centered
-  // between the two adjacent number cells. paddingBottom was too
-  // aggressive (10px) on iOS — dragged colons below the digit baseline.
-  // Negative horizontal margins pull the colons into the adjacent
-  // flex:1 number cells, tightening the visual gap without breaking
-  // the responsive layout (cells still split the row width evenly so
-  // the row fits on narrow screens).
-  colon:        {fontSize: 44, lineHeight: 60, marginBottom: 12, marginHorizontal: -24},
-  countLabel:   {fontSize: 10, letterSpacing: 2, marginTop: 2},
+  heroSub: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 4,
+    marginBottom: spacing.md,
+  },
+  countdownBlock: {
+    alignItems: 'center',
+    marginTop: spacing.sm,
+    gap: spacing.xs,
+  },
+  bigNumber: {
+    fontSize: 96,
+    lineHeight: 100,
+    letterSpacing: -2,
+  },
+  countdownLabel: {
+    fontSize: 11,
+    letterSpacing: 1.8,
+    marginTop: spacing.xs,
+  },
+  countdownSub: {
+    fontSize: 13,
+    marginTop: 2,
+  },
 });

@@ -18,7 +18,10 @@ import {SystemMessageSlot} from '@shell/components/home/SystemMessageSlot';
 import {HomeHeader} from '@shell/components/home/HomeHeader';
 import {IdentityBar} from '@shell/components/home/IdentityBar';
 import {StateHero} from '@shell/components/home/StateHero';
-import {RecruiterBand} from '@shell/components/home/RecruiterBand';
+import {CrossContestStrip} from '@shell/components/home/CrossContestStrip';
+import {OffSeasonActions, PreSeasonActions} from '@shell/components/home/OffCycleActions';
+import {usePreseasonDays} from '@shell/components/home/PreSeasonGamesHero';
+import {CalendarDays} from 'lucide-react-native';
 import {Insight} from '@shell/components/home/Insight';
 import {HomeInbox} from '@shell/components/home/HomeInbox';
 import {PoolModule} from '@shell/components/home/PoolModule';
@@ -278,13 +281,27 @@ export function HomeScreen() {
         <IdentityBar />
         {showHero && <StateHero state={homeState} />}
 
-        {/* Off-cycle recruiter section — surfaces roster count +
-            invite-link share CTA. Only meaningful during off-season
-            and preseason; in-cycle the picks UI takes the focus.
-            Self-hides when the user has no Contest with an invite
-            code to share. */}
-        {(homeState === 'off_season_idle' || homeState === 'pre_season_games') && (
-          <RecruiterBand />
+        {/* Off-cycle layout per the OffseasonPreseasonHome spec
+            (May 29, 2026): action stack → cross-Contest strip →
+            Clubs teaser. The pool list + Join/Create-as-list-affordance
+            from the regular YOUR CONTESTS section don't apply here;
+            the action stack owns Create/Join, and the Clubs teaser
+            shrinks to one line. RecruiterBand is silent in the spec,
+            so we drop it from these states. */}
+        {homeState === 'off_season_idle' && (
+          <>
+            <OffSeasonActions />
+            <CrossContestStrip />
+            <ClubsTeaser />
+          </>
+        )}
+        {homeState === 'pre_season_games' && (
+          <>
+            <PreSeasonActions />
+            <PreseasonCountdownLine />
+            <CrossContestStrip />
+            <ClubsTeaser />
+          </>
         )}
 
         {showInsight && <Insight />}
@@ -295,7 +312,12 @@ export function HomeScreen() {
             there's nothing unread. */}
         <HomeInbox />
 
-        {showPoolStack && (
+        {/* In-cycle YOUR CONTESTS section — replaced on off-cycle
+            states (off_season_idle / pre_season_games) by the action
+            stack + cross-Contest strip above. */}
+        {showPoolStack
+          && homeState !== 'off_season_idle'
+          && homeState !== 'pre_season_games' && (
           <View style={styles.section}>
             <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textTertiary}]}>
               YOUR {LEXICON.contest.plural.toUpperCase()}
@@ -363,14 +385,12 @@ export function HomeScreen() {
           </View>
         )}
 
-        {showPartnerStack && (
-          // YOUR CLUBS lists only the Clubs the user is connected to
-          // through their pools (partnerIds — clubs touching at least
-          // one of their visible pools). The dedicated browse-all
-          // surface is PartnerDirectory, so we don't surface
-          // unconnected active partners here. Header stays even when
-          // the user has zero club connections so the homepage layout
-          // stays consistent across states.
+        {showPartnerStack
+          && homeState !== 'off_season_idle'
+          && homeState !== 'pre_season_games' && (
+          // In-cycle YOUR CLUBS section with the full Gaffer / Perks
+          // explainer. Off-cycle states use the shrunken one-line
+          // ClubsTeaser per spec.
           <View style={styles.section}>
             <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textTertiary}]}>
               YOUR CLUBS
@@ -387,6 +407,69 @@ export function HomeScreen() {
     </View>
   );
 }
+
+// ----------------------------------------------------------------------
+// Off-cycle inline helpers per the OffseasonPreseasonHome spec.
+// ----------------------------------------------------------------------
+
+/** Demoted preseason countdown — small calendar-icon row that
+ *  replaces the big offseason countdown anchor. Reads days from
+ *  the shared usePreseasonDays hook. */
+function PreseasonCountdownLine() {
+  const {colors} = useTheme();
+  const days = usePreseasonDays();
+  const activeSport = useGlobalStore(s => s.activeSport);
+  const label = activeSport?.sportIdentity?.preseasonCountdownLabel
+    ?? 'Regular season picks open in';
+  return (
+    <View style={[offCycleStyles.countdownRow, {borderColor: colors.border}]}>
+      <CalendarDays size={16} color={colors.textTertiary} strokeWidth={2} />
+      <Text style={[bodyType.regular, offCycleStyles.countdownText, {color: colors.textPrimary}]}>
+        {label}{' '}
+        <Text style={bodyType.bold}>{days} days</Text>
+      </Text>
+    </View>
+  );
+}
+
+/** One-line Clubs teaser for off-cycle states per spec §6 + Appendix.
+ *  Replaces the longer Gaffer/Perks explainer that lives in the
+ *  in-cycle YOUR CLUBS section. */
+function ClubsTeaser() {
+  const {colors} = useTheme();
+  return (
+    <View style={offCycleStyles.clubsBlock}>
+      <Text style={[bodyType.bold, offCycleStyles.clubsLabel, {color: colors.textTertiary}]}>
+        YOUR CLUBS
+      </Text>
+      <Text style={[bodyType.regular, offCycleStyles.clubsTeaser, {color: colors.textSecondary}]}>
+        Bars, shops, and brands that back Contests with perks. You'll meet them once you're in one.
+      </Text>
+    </View>
+  );
+}
+
+const offCycleStyles = StyleSheet.create({
+  countdownRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  countdownText: {fontSize: 14, lineHeight: 20},
+  clubsBlock: {
+    marginTop: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    gap: 6,
+  },
+  clubsLabel:  {fontSize: 11, letterSpacing: 1.8, marginBottom: 4},
+  clubsTeaser: {fontSize: 14, lineHeight: 20},
+});
 
 const styles = StyleSheet.create({
   wrap:    {flex: 1},

@@ -27,6 +27,14 @@ export const nflSeason: SeasonConfig = {
     sportMark: '',       // football icon asset — populate when assets are added
     sportWordmark: '',   // "HotPick Football" text lockup — populate when assets are added
     accentColor: '#013369',
+    // Copy block per the OffseasonPreseasonHome spec (May 29, 2026).
+    // Lexicon-locked strings — match exactly, no rewording.
+    offseasonHeadline:       "FOOTBALL'S ON ITS WAY BACK.",
+    offseasonHeroSub:        'Plenty of time to set up your Contest and get everyone in before kickoff.',
+    offseasonCountdownLabel: 'DAYS UNTIL THE REGULAR SEASON',
+    preseasonHeadline:       "THE FIELD'S OPEN.",
+    preseasonHeroSub:        'Set up your Contest for the season, or take a few practice picks to see how it runs. Nothing counts yet. Scores reset for the regular season.',
+    preseasonCountdownLabel: 'Regular season picks open in',
   },
 
   tabs: [
