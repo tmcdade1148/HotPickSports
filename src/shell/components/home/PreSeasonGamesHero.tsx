@@ -50,7 +50,7 @@ export function PreSeasonGamesHero() {
       </Text>
 
       <Text style={[bodyType.bold, styles.eyebrow, {color: colors.textTertiary}]}>
-        REAL PICKS OPEN IN
+        REGULAR SEASON PICKS OPEN IN
       </Text>
       <View style={styles.countdownRow}>
         <CountUnit n={days}    label="days" color={colors.textPrimary} subColor={colors.textTertiary} />
