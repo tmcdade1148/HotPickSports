@@ -19,7 +19,7 @@ import {useTheme} from '@shell/theme/hooks';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
-import {getPeriodLabel} from './periodLabel';
+import {shortPeriod, COMPACT_PERIOD_LENGTH} from './shortPeriod';
 
 export function HomeHeader() {
   const {colors} = useTheme();
@@ -51,7 +51,7 @@ export function HomeHeader() {
             numberOfLines={1}
             style={[
               bodyType.bold,
-              period.length > 12 ? styles.pillTextCompact : styles.pillText,
+              period.length > COMPACT_PERIOD_LENGTH ? styles.pillTextCompact : styles.pillText,
               {color: colors.primary},
             ]}>
             {period}
@@ -71,39 +71,6 @@ export function HomeHeader() {
       </View>
     </View>
   );
-}
-
-/** Short form: "NFL26 · W08", "NFL26 · PRESEASON", "NFL26 · WC", "NFL26 · SB" */
-function shortPeriod(
-  phase: string,
-  week: number | null,
-  playoffStart = 19,
-  seasonYear?: number,
-): string {
-  // Two-digit suffix tied to season — e.g. "NFL26" for the 2025-26 season
-  // (Sep 2025 → Feb 2026). The competition_config seasonYear is the
-  // year the Super Bowl falls in, so the suffix is the last 2 digits.
-  const suffix = typeof seasonYear === 'number' && seasonYear > 0
-    ? String(seasonYear).slice(-2)
-    : '26';
-  const sport = `NFL${suffix}`;
-  if (phase === 'OFF_SEASON')        return `${sport} · OFFSEASON`;
-  if (phase === 'PRE_SEASON')        return `${sport} · PRESEASON`;
-  if (phase === 'REGULAR_COMPLETE')  return `${sport} · WK 18 DONE`;
-  if (phase === 'SUPERBOWL_INTRO')   return `${sport} · SB WEEK`;
-  if (phase === 'SUPERBOWL')         return `${sport} · SB`;
-  if (phase === 'SEASON_COMPLETE')   return `${sport} · SEASON DONE`;
-
-  if (phase === 'PLAYOFFS' && typeof week === 'number') {
-    const offset = week - playoffStart;
-    if (offset === 0) return `${sport} · WC`;
-    if (offset === 1) return `${sport} · DIV`;
-    if (offset === 2) return `${sport} · CONF`;
-    return `${sport} · PLAYOFFS`;
-  }
-
-  if (typeof week === 'number') return `${sport} · W${String(week).padStart(2, '0')}`;
-  return `${sport} · ${getPeriodLabel(phase, week, playoffStart)}`;
 }
 
 const styles = StyleSheet.create({
