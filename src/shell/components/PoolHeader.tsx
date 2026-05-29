@@ -16,7 +16,7 @@ import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
-import {getPeriodLabel} from './home/periodLabel';
+import {shortPeriod, COMPACT_PERIOD_LENGTH} from './home/shortPeriod';
 
 const NAME_MAX_FONT  = 40;
 const NAME_MIN_FONT  = 12;
@@ -63,7 +63,13 @@ export function PoolHeader() {
         </View>
         <View style={styles.rightCluster}>
           <View style={[styles.pill, {borderColor: colors.primary}]}>
-            <Text style={[bodyType.bold, styles.pillText, {color: colors.primary}]}>
+            <Text
+              numberOfLines={1}
+              style={[
+                bodyType.bold,
+                period.length > COMPACT_PERIOD_LENGTH ? styles.pillTextCompact : styles.pillText,
+                {color: colors.primary},
+              ]}>
               {period}
             </Text>
           </View>
@@ -108,34 +114,6 @@ export function PoolHeader() {
   );
 }
 
-function shortPeriod(
-  phase: string,
-  week: number | null,
-  playoffStart = 19,
-  seasonYear?: number,
-): string {
-  const suffix = typeof seasonYear === 'number' && seasonYear > 0
-    ? String(seasonYear).slice(-2)
-    : '26';
-  const sport = `NFL${suffix}`;
-  if (phase === 'PRE_SEASON')        return `${sport} · PRESEASON`;
-  if (phase === 'REGULAR_COMPLETE')  return `${sport} · WK 18 DONE`;
-  if (phase === 'SUPERBOWL_INTRO')   return `${sport} · SB WEEK`;
-  if (phase === 'SUPERBOWL')         return `${sport} · SB`;
-  if (phase === 'SEASON_COMPLETE')   return `${sport} · SEASON DONE`;
-
-  if (phase === 'PLAYOFFS' && typeof week === 'number') {
-    const offset = week - playoffStart;
-    if (offset === 0) return `${sport} · WC`;
-    if (offset === 1) return `${sport} · DIV`;
-    if (offset === 2) return `${sport} · CONF`;
-    return `${sport} · PLAYOFFS`;
-  }
-
-  if (typeof week === 'number') return `${sport} · W${String(week).padStart(2, '0')}`;
-  return `${sport} · ${getPeriodLabel(phase, week, playoffStart)}`;
-}
-
 const styles = StyleSheet.create({
   topRow: {
     flexDirection: 'row',
@@ -172,6 +150,13 @@ const styles = StyleSheet.create({
   pillText: {
     fontSize: 16.5,
     letterSpacing: 1.2,
+    fontStyle: 'italic',
+  },
+  // Compact font for long off-cycle labels — matches HomeHeader so
+  // the pill looks the same across every tab.
+  pillTextCompact: {
+    fontSize: 13,
+    letterSpacing: 1.1,
     fontStyle: 'italic',
   },
   gearBtn: {
