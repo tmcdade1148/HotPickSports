@@ -1,122 +1,108 @@
 // src/shell/components/home/PreSeasonGamesHero.tsx
-// Fires when current_phase === 'PRE_SEASON'. NFL exhibition window
-// (Aug 6–Aug 29 for 2026) — games are being played and users can
-// make practice picks, but scores DON'T count toward the regular
-// season total. Countdown still points at season_picks_open_at
-// (Sept 2 for 2026) since that's when scoring becomes real.
+// Pre-season home variant per the OffseasonPreseasonHome spec
+// (May 29, 2026). Practice picks are live; the action stack
+// (Create / Make picks / Join) is the dominant element. The
+// countdown is demoted to a one-line calendar marker. All
+// sport-specific copy reads from activeSport.sportIdentity.
 //
-// Like OffSeasonHero, the Join / Create CTAs live in the HomeScreen
-// YOUR CONTESTS section and the tell-a-friend share lives in
-// RecruiterBand below the hero — so this hero is just the greeting +
-// welcome line + 'preseason is on' eyebrow + countdown.
+// The action stack itself lives in HomeScreen alongside the
+// cross-Contest strip and Clubs teaser so this hero owns only the
+// status eyebrow + headline + sub block.
+//
+// Note on preseason picks: per Tom (May 2026) preseason picks /
+// scores are NOT persisted to the season totals — they reset for
+// the regular season. The "Make your picks" route works because
+// picks are user-level (Hard Rule #2) and the SeasonPicksScreen
+// renders games independently of a selected pool. Ephemeral-save
+// behavior is a separate follow-up spec.
 
 import React from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
-import {displayType, bodyType, monoType, spacing} from '@shared/theme';
+import {useGlobalStore} from '@shell/stores/globalStore';
+import {displayType, bodyType, spacing} from '@shared/theme';
 import {useCountdown} from './useCountdown';
-import {getContextGreeting} from './salutation';
 
 export function PreSeasonGamesHero() {
   const {colors} = useTheme();
 
   const picksOpenAt    = useNFLStore(s => s.picksOpenAt);
   const seasonOpenerAt = useNFLStore(s => s.seasonOpenerAt);
-  const currentPhase   = useNFLStore(s => s.currentPhase);
+  const activeSport    = useGlobalStore(s => s.activeSport);
+  const identity       = activeSport?.sportIdentity;
+
+  const headline = identity?.preseasonHeadline       ?? "THE FIELD'S OPEN.";
+  const heroSub  = identity?.preseasonHeroSub        ?? 'Practice picks all month. Scores reset for the regular season.';
 
   const target = picksOpenAt ?? seasonOpenerAt;
-  const {days, hours, minutes} = useCountdown(target);
-  const greeting = getContextGreeting(currentPhase, 'idle', 0, null);
+  const {days} = useCountdown(target);
 
   return (
     <View style={styles.wrap}>
-      <Text style={[bodyType.regular, styles.salutation, {color: colors.textSecondary}]}>
-        {greeting}
-      </Text>
+      {/* Status eyebrow — small green dot + 'PRACTICE PICKS ARE LIVE'.
+          Static indicator, not animated (compliance §7). */}
+      <View style={styles.eyebrowRow}>
+        <View style={[styles.statusDot, {backgroundColor: colors.success}]} />
+        <Text style={[bodyType.bold, styles.eyebrowLabel, {color: colors.success}]}>
+          PRACTICE PICKS ARE LIVE
+        </Text>
+      </View>
 
       <Text
         style={[
           displayType.display,
-          {fontSize: displayType.size.h2, color: colors.textPrimary},
+          styles.headline,
+          {color: colors.textPrimary},
         ]}>
-        PRESEASON IS HERE.
+        {headline}
       </Text>
-      {/* Make the "scores don't count" detail explicit so users don't
-          think their preseason picks are pulling their season ranking
-          down (or up). */}
-      <Text style={[bodyType.regular, styles.welcomeSub, {color: colors.textSecondary}]}>
-        Practice picks all month. Scores reset for the regular season.
+      <Text style={[bodyType.regular, styles.heroSub, {color: colors.textSecondary}]}>
+        {heroSub}
       </Text>
-
-      <Text style={[bodyType.bold, styles.eyebrow, {color: colors.textTertiary}]}>
-        REGULAR SEASON PICKS OPEN IN
-      </Text>
-      <View style={styles.countdownRow}>
-        <CountUnit n={days}    label="days" color={colors.textPrimary} subColor={colors.textTertiary} />
-        <Text style={[displayType.display, styles.colon, {color: colors.primary}]}>:</Text>
-        <CountUnit n={hours}   label="hrs"  color={colors.textPrimary} subColor={colors.textTertiary} />
-        <Text style={[displayType.display, styles.colon, {color: colors.primary}]}>:</Text>
-        <CountUnit n={minutes} label="min"  color={colors.textPrimary} subColor={colors.textTertiary} />
-      </View>
     </View>
   );
 }
 
-function CountUnit({
-  n,
-  label,
-  color,
-  subColor,
-}: {
-  n: string;
-  label: string;
-  color: string;
-  subColor: string;
-}) {
-  // See OffSeasonHero for the rationale — flex:1 cells +
-  // adjustsFontSizeToFit keep the countdown row inside narrow screens.
-  return (
-    <View style={styles.countUnit}>
-      <Text
-        adjustsFontSizeToFit
-        numberOfLines={1}
-        minimumFontScale={0.5}
-        style={[
-          displayType.display,
-          monoType.regular,
-          styles.countNumber,
-          {color},
-        ]}>
-        {n}
-      </Text>
-      <Text style={[bodyType.bold, styles.countLabel, {color: subColor}]}>{label}</Text>
-    </View>
-  );
+// Export the days counter for the HomeScreen's demoted countdown row.
+export function usePreseasonDays(): string {
+  const picksOpenAt    = useNFLStore(s => s.picksOpenAt);
+  const seasonOpenerAt = useNFLStore(s => s.seasonOpenerAt);
+  const target = picksOpenAt ?? seasonOpenerAt;
+  const {days} = useCountdown(target);
+  return days;
 }
 
 const styles = StyleSheet.create({
   wrap: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
-    // See OffSeasonHero — section.marginTop carries the gap.
     paddingBottom: 0,
-    gap: spacing.sm,
+    gap: spacing.xs,
   },
-  salutation:    {fontSize: 13},
-  welcomeSub:    {fontSize: 14, lineHeight: 20, marginTop: 4, marginBottom: spacing.md},
-  // Match HomeScreen sectionTitle (YOUR CONTESTS / YOUR CLUBS) so the
-  // 'REAL PICKS OPEN IN' eyebrow reads as a section header in the
-  // same visual language.
-  eyebrow:       {fontSize: 11, letterSpacing: 1.8, marginTop: spacing.sm, marginBottom: spacing.sm},
-  countdownRow: {
+  eyebrowRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
   },
-  countUnit:    {flex: 1, alignItems: 'center'},
-  countNumber:  {fontSize: 56, lineHeight: 60},
-  // See OffSeasonHero — negative margin pulls colons toward digits.
-  colon:        {fontSize: 44, lineHeight: 60, marginBottom: 12, marginHorizontal: -24},
-  countLabel:   {fontSize: 10, letterSpacing: 2, marginTop: 2},
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  eyebrowLabel: {
+    fontSize: 11,
+    letterSpacing: 1.8,
+  },
+  headline: {
+    fontSize: 36,
+    lineHeight: 40,
+    letterSpacing: -0.5,
+  },
+  heroSub: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 4,
+  },
 });

@@ -35,6 +35,17 @@ export interface SportIdentity {
   sportWordmark: string;
   /** Optional sport-specific accent color (overrides event.color when set) */
   accentColor?: string;
+  // ----- Home-screen copy strings (per the OffseasonPreseasonHome
+  // spec). Sport-specific so HotPick Football's "FOOTBALL'S ON ITS
+  // WAY BACK." can become "HOCKEY'S ON ITS WAY BACK." etc. when
+  // additional sports ship. Heroes fall back gracefully if a sport
+  // hasn't filled these in.
+  offseasonHeadline?: string;       // 'FOOTBALL'S ON ITS WAY BACK.'
+  offseasonHeroSub?: string;        // 'Plenty of time to set up your Contest…'
+  offseasonCountdownLabel?: string; // 'DAYS UNTIL THE REGULAR SEASON'
+  preseasonHeadline?: string;       // "THE FIELD'S OPEN."
+  preseasonHeroSub?: string;        // 'Set up your Contest for the season…'
+  preseasonCountdownLabel?: string; // 'Regular season picks open in [N] days'
 }
 
 export interface BaseEventConfig {
