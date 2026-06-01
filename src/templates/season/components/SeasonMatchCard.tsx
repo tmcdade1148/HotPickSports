@@ -34,6 +34,12 @@ interface SeasonMatchCardProps {
    * scheduled game at or after this time is wave-locked — even if lock_at is null.
    */
   liveAnchorTime?: number | null;
+  /**
+   * True once the user has designated a HotPick for the week. When set, the
+   * rank badge on every card that ISN'T the chosen HotPick is dimmed, so the
+   * one chosen HotPick stands out.
+   */
+  hotPickSelected?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -140,6 +146,7 @@ export function SeasonMatchCard({
   pickSplit,
   picksAreOpen = true,
   liveAnchorTime,
+  hotPickSelected = false,
 }: SeasonMatchCardProps) {
   const {colors} = useTheme();
   const brand = useBrand();
@@ -242,8 +249,9 @@ export function SeasonMatchCard({
 
       {/* ── Main row: rank circle | teams | flame ── */}
       <View style={styles.mainRow}>
-        {/* Rank circle */}
-        <View style={styles.rankColumn}>
+        {/* Rank circle — dimmed on every card except the chosen HotPick once a
+            HotPick has been designated, so the one that counts stands out. */}
+        <View style={[styles.rankColumn, hotPickSelected && !isHotPick && styles.rankColumnDimmed]}>
           <View
             style={[
               styles.rankCircle,
@@ -479,6 +487,10 @@ const createStyles = (colors: any) => StyleSheet.create({
   rankColumn: {
     alignItems: 'center',
     width: 44,
+  },
+  // Dimmed when a HotPick is set and this card isn't it.
+  rankColumnDimmed: {
+    opacity: 0.3,
   },
   rankCircle: {
     width: 30,

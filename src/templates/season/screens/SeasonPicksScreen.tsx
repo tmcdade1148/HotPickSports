@@ -17,17 +17,32 @@ import {supabase} from '@shared/config/supabase';
 import {DemoIntroModal, DemoScoreModal} from '@shell/components/home/DemoModals';
 
 // ---------------------------------------------------------------------------
-// Game ordering — two groups. Once a game locks (kicks off) it jumps to a
-// "LOCKED" group at the top, ordered by kickoff time with the most recent
-// kickoff at the top → oldest at the bottom, so the list tracks the week's
-// progress as games start (regardless of HotPick rank). Games that haven't
-// kicked off stay in an "OPEN" group below, ranked by HotPick value (1 → 16)
-// since those are still pickable. The per-game kickoff time shows on each card.
+// Game ordering — once a game actually kicks off it rises to the top, grouped
+// into kickoff-time WAVES: one section per kickoff time, headed by that time
+// (e.g. "SUN 1:00 PM"), newest wave first. So the list tracks the week's
+// progress — Thursday on top first, then the Sunday 1pm block above it, then
+// 4pm, SNF, MNF — each with its own time header, rank-ordered within the wave.
+// Games not yet started stay in a single "OPEN" group below, ranked by HotPick
+// value (1 → 16) since those are the picks you can still make. A game lifts up
+// only when it kicks off, not when its picks merely lock (the Sunday seal).
 // ---------------------------------------------------------------------------
 
 /** Effective HotPick rank for ordering: frozen_rank (locked at deadline) ?? live rank. */
 function effectiveRank(g: DbSeasonGame): number {
   return g.frozen_rank ?? g.rank ?? 999;
+}
+
+/** Kickoff time as a wave-section header, e.g. "SUN 1:00 PM" (local time). */
+function kickoffHeader(date: Date): string {
+  const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+  const day = days[date.getDay()];
+  let hours = date.getHours();
+  const minutes = date.getMinutes();
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  if (hours === 0) hours = 12;
+  const minStr = minutes < 10 ? `0${minutes}` : String(minutes);
+  return `${day} ${hours}:${minStr} ${ampm}`;
 }
 
 /**
@@ -257,40 +272,40 @@ export function SeasonPicksScreen() {
   const picksAreOpen =
     (weekState === 'picks_open' || weekState === 'live') && currentWeek === dbCurrentWeek;
 
-  // Two groups: LOCKED (games that have actually STARTED, or the whole week is
-  // locked) on top, ordered by kickoff recency (newest first); OPEN (not yet
-  // started) below, ordered by HotPick rank 1→16. A game only lifts to the top
-  // once it kicks off — not when its picks merely lock (Sunday seal).
+  // Started games (or the whole week locked) rise to the top, grouped into
+  // kickoff-time WAVES — one section per kickoff time, labelled with that time
+  // (e.g. "SUN 1:00 PM"), newest wave first. So as the week plays out each new
+  // wave lands on top with its own time header. A game only lifts up once it
+  // actually kicks off, not when its picks merely lock (Sunday seal). Games not
+  // yet started stay in a single rank-ordered "OPEN" group below (rank helps
+  // prioritize the picks you can still make).
   const sections = useMemo(() => {
-    const locked: DbSeasonGame[] = [];
+    const started: DbSeasonGame[] = [];
     const open: DbSeasonGame[] = [];
     for (const g of games) {
-      (!picksAreOpen || hasStarted(g) ? locked : open).push(g);
+      (!picksAreOpen || hasStarted(g) ? started : open).push(g);
     }
     const byRank = (a: DbSeasonGame, b: DbSeasonGame) => effectiveRank(a) - effectiveRank(b);
-    // LOCKED group is ordered by kickoff time, most recent at the top → oldest
-    // at the bottom, so as the week progresses each newly-kicked-off game lands
-    // at the top of the list (regardless of HotPick rank). OPEN stays rank-
-    // ordered since those games are still pickable and rank helps prioritize.
-    // Newest kickoff first; within the same wave (e.g. all the 1pm games),
-    // fall back to HotPick rank so the block reads 1→16 like it did at open.
-    const byKickoffDesc = (a: DbSeasonGame, b: DbSeasonGame) => {
-      const diff = new Date(b.kickoff_at).getTime() - new Date(a.kickoff_at).getTime();
-      return diff !== 0 ? diff : effectiveRank(a) - effectiveRank(b);
-    };
-    locked.sort(byKickoffDesc);
-    open.sort(byRank);
-    const isFinalGame = (g: DbSeasonGame) => {
-      const s = (g.status ?? '').toUpperCase();
-      return s === 'FINAL' || s === 'STATUS_FINAL' || s === 'COMPLETED';
-    };
+
     const out: {title: string; data: DbSeasonGame[]}[] = [];
-    if (locked.length) {
-      // Label the top group FINAL once its games are decided (incl. demo reveal),
-      // otherwise LOCKED (kicked off but still in progress / pre-kickoff lock).
-      out.push({title: locked.every(isFinalGame) ? 'FINAL' : 'LOCKED', data: locked});
+
+    // Bucket started games by kickoff timestamp → one wave section each.
+    const waves = new Map<number, DbSeasonGame[]>();
+    for (const g of started) {
+      const key = new Date(g.kickoff_at).getTime();
+      const bucket = waves.get(key);
+      if (bucket) bucket.push(g);
+      else waves.set(key, [g]);
     }
-    if (open.length) out.push({title: 'OPEN', data: open});
+    // Newest kickoff wave first; rank-order within each wave (reads 1→16).
+    for (const key of [...waves.keys()].sort((a, b) => b - a)) {
+      out.push({title: kickoffHeader(new Date(key)), data: waves.get(key)!.sort(byRank)});
+    }
+
+    if (open.length) {
+      open.sort(byRank);
+      out.push({title: 'OPEN', data: open});
+    }
     return out;
   }, [games, picksAreOpen]);
 
@@ -328,6 +343,7 @@ export function SeasonPicksScreen() {
         pickSplit={pickStats[item.game_id] ?? null}
         picksAreOpen={picksAreOpen}
         liveAnchorTime={liveAnchorTime}
+        hotPickSelected={hotPickCount > 0}
       />
     </View>
   );
