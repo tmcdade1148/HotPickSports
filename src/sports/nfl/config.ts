@@ -32,9 +32,9 @@ export const nflSeason: SeasonConfig = {
     offseasonHeadline:       "FOOTBALL'S ON ITS WAY BACK.",
     offseasonHeroSub:        'Plenty of time to set up your Contest and get everyone in before kickoff.',
     offseasonCountdownLabel: 'DAYS UNTIL THE REGULAR SEASON',
-    preseasonHeadline:       "THE PRACTICE FIELD'S OPEN.",
+    preseasonHeadline:       "IT'S STARTING TO GET REAL.",
     preseasonHeroSub:        'Set up your Contest for the season, or take a few practice picks to see how it runs. Nothing counts yet. Scores reset for the regular season.',
-    preseasonCountdownLabel: 'Regular season picks open in',
+    preseasonCountdownLabel: 'Regular season games kickoff in',
   },
 
   tabs: [

@@ -40,12 +40,12 @@ export function PreSeasonGamesHero() {
 
   return (
     <View style={styles.wrap}>
-      {/* Status eyebrow — small green dot + 'PRACTICE PICKS ARE LIVE'.
+      {/* Status eyebrow — small green dot + nudge toward the regular season.
           Static indicator, not animated (compliance §7). */}
       <View style={styles.eyebrowRow}>
         <View style={[styles.statusDot, {backgroundColor: colors.success}]} />
         <Text style={[bodyType.bold, styles.eyebrowLabel, {color: colors.success}]}>
-          PRACTICE PICKS ARE LIVE
+          Closing in on the regular season. Picks open September 2nd.
         </Text>
       </View>
 
@@ -65,10 +65,13 @@ export function PreSeasonGamesHero() {
 }
 
 // Export the days counter for the HomeScreen's demoted countdown row.
+// Targets the regular-season KICKOFF (seasonOpenerAt, ~Sept 9) — the line now
+// reads "Regular season games kickoff in N days". Falls back to picks-open if
+// the opener date isn't loaded.
 export function usePreseasonDays(): string {
   const picksOpenAt    = useNFLStore(s => s.picksOpenAt);
   const seasonOpenerAt = useNFLStore(s => s.seasonOpenerAt);
-  const target = picksOpenAt ?? seasonOpenerAt;
+  const target = seasonOpenerAt ?? picksOpenAt;
   const {days} = useCountdown(target);
   return days;
 }
@@ -92,8 +95,9 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   eyebrowLabel: {
+    flex: 1,
     fontSize: 11,
-    letterSpacing: 1.8,
+    letterSpacing: 0.3,
   },
   headline: {
     fontSize: 36,
