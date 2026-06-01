@@ -151,6 +151,47 @@ export function PreSeasonActions() {
   return <OffCycleActionStack joinSubtitle="with a code, any time, even mid-season" />;
 }
 
+// Lighter off-cycle actions for a RETURNING user (one who already has Contests
+// for the upcoming season — shown above this in the YOUR CONTESTS stack). They
+// don't need the big "Create a Contest" primary CTA, just a compact
+// create/join-another row — but we keep the demo.
+export function ReturningOffCycleActions() {
+  const navigation = useNavigation<any>();
+  const {colors} = useTheme();
+  const launchDemo = useLaunchDemo();
+
+  return (
+    <View style={styles.stack}>
+      <View style={styles.lightRow}>
+        <Pressable
+          onPress={() => navigation.navigate('CreatePool')}
+          style={({pressed}) => [styles.lightBtn, {borderColor: colors.border, opacity: pressed ? 0.7 : 1}]}
+          accessibilityRole="button"
+          accessibilityLabel="Create another Contest and invite friends">
+          <Plus size={18} color={colors.primary} strokeWidth={2.25} />
+          <Text style={[bodyType.bold, styles.lightLabel, {color: colors.textPrimary}]}>Create another</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => navigation.navigate('JoinPool')}
+          style={({pressed}) => [styles.lightBtn, {borderColor: colors.border, opacity: pressed ? 0.7 : 1}]}
+          accessibilityRole="button"
+          accessibilityLabel="Join another Contest with an invite code">
+          <KeyRound size={18} color={colors.primary} strokeWidth={2.25} />
+          <Text style={[bodyType.bold, styles.lightLabel, {color: colors.textPrimary}]}>Join another</Text>
+        </Pressable>
+      </View>
+      <ActionBtn
+        variant="orangeOutline"
+        title="See how it works"
+        subtitle="play a quick demo week"
+        icon={<Play size={20} color={colors.primary} strokeWidth={2.25} fill={colors.primary} />}
+        onPress={launchDemo}
+        accessibilityLabel="Play a quick demo week to see how it works"
+      />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   stack: {
     paddingHorizontal: spacing.lg,
@@ -174,4 +215,17 @@ const styles = StyleSheet.create({
   labelWrap: {flex: 1, gap: 1},
   titleText: {fontSize: 16, letterSpacing: 0.2},
   subText:   {fontSize: 13, lineHeight: 17},
+  // Compact 'create / join another' row for returning users.
+  lightRow: {flexDirection: 'row', gap: spacing.sm},
+  lightBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1.5,
+  },
+  lightLabel: {fontSize: 14, letterSpacing: 0.2},
 });

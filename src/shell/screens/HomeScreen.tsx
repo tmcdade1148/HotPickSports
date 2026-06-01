@@ -19,7 +19,7 @@ import {HomeHeader} from '@shell/components/home/HomeHeader';
 import {IdentityBar} from '@shell/components/home/IdentityBar';
 import {StateHero} from '@shell/components/home/StateHero';
 import {CrossContestStrip} from '@shell/components/home/CrossContestStrip';
-import {OffSeasonActions, PreSeasonActions} from '@shell/components/home/OffCycleActions';
+import {OffSeasonActions, PreSeasonActions, ReturningOffCycleActions} from '@shell/components/home/OffCycleActions';
 import {usePreseasonDays} from '@shell/components/home/PreSeasonGamesHero';
 import {CalendarDays} from 'lucide-react-native';
 import {Insight} from '@shell/components/home/Insight';
@@ -307,7 +307,7 @@ export function HomeScreen() {
         {homeState === 'off_season_idle' && (
           <>
             {offCycleContests}
-            <OffSeasonActions />
+            {visiblePools.length > 0 ? <ReturningOffCycleActions /> : <OffSeasonActions />}
             <CrossContestStrip />
             <ClubsTeaser />
           </>
@@ -315,7 +315,7 @@ export function HomeScreen() {
         {homeState === 'pre_season_games' && (
           <>
             {offCycleContests}
-            <PreSeasonActions />
+            {visiblePools.length > 0 ? <ReturningOffCycleActions /> : <PreSeasonActions />}
             <PreseasonCountdownLine />
             <CrossContestStrip />
             <ClubsTeaser />
