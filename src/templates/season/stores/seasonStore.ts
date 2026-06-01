@@ -44,6 +44,17 @@ export interface WeekLeaderboardEntry {
   submitted_at: string | null;
 }
 
+/**
+ * Regular-season podium entry — a top finisher in the pool's final regular
+ * season standings (phase = REGULAR), used by the Week 18 → Wild Card bridge.
+ */
+export interface PodiumEntry {
+  user_id: string;
+  display_name: string;
+  total_points: number;
+  rank: number;
+}
+
 interface SeasonState {
   config: SeasonConfig | null;
   poolId: string;
@@ -85,6 +96,13 @@ interface SeasonState {
   fetchLeaderboard: () => Promise<void>;
   fetchWeekLeaderboard: (week?: number) => Promise<void>;
 
+  /** Pool's final REGULAR-season top finishers (always phase=REGULAR, even
+   *  during REGULAR_COMPLETE/PLAYOFFS) + the current user's regular total.
+   *  Drives the Week 18 → Wild Card winner podium. */
+  regularSeasonPodium: PodiumEntry[];
+  regularSeasonUserPoints: number | null;
+  loadRegularSeasonPodium: (userId: string) => Promise<void>;
+
   // Picks completion
   isWeekComplete: boolean;
   setWeekComplete: (val: boolean) => void;
@@ -120,6 +138,8 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
   leaderboard: [],
   weekLeaderboard: [],
   weekLeaderboardDisplayedWeek: null,
+  regularSeasonPodium: [],
+  regularSeasonUserPoints: null,
   userNames: {},
   userAvatars: {},
   isLoading: false,
@@ -543,6 +563,81 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       userNames: names,
       userAvatars: avatars,
       isLoading: false,
+    });
+  },
+
+  loadRegularSeasonPodium: async (userId: string) => {
+    const {config, poolId} = get();
+    if (!config || !poolId) {
+      set({regularSeasonPodium: [], regularSeasonUserPoints: null});
+      return;
+    }
+
+    // Active pool members + pool_start_date (same scoping as fetchLeaderboard).
+    const [membersResult, poolResult] = await Promise.all([
+      supabase.from('pool_members').select('user_id').eq('pool_id', poolId).eq('status', 'active'),
+      supabase.from('pools').select('pool_start_date').eq('id', poolId).single(),
+    ]);
+    const memberIds = (membersResult.data ?? []).map(m => m.user_id);
+    if (memberIds.length === 0) {
+      set({regularSeasonPodium: [], regularSeasonUserPoints: null});
+      return;
+    }
+
+    let startWeek = 1;
+    if (poolResult.data?.pool_start_date) {
+      const {data: firstGame} = await supabase
+        .from('season_games')
+        .select('week')
+        .eq('competition', config.competition)
+        .gte('kickoff_at', poolResult.data.pool_start_date)
+        .order('kickoff_at', {ascending: true})
+        .limit(1)
+        .maybeSingle();
+      if (firstGame?.week) startWeek = firstGame.week;
+    }
+
+    // Always REGULAR phase — this is the regular-season final standings, shown
+    // during REGULAR_COMPLETE/PLAYOFFS when the live leaderboard is playoff-scoped.
+    const {data: totals} = await supabase
+      .from('season_user_totals')
+      .select('user_id, week_points')
+      .eq('competition', config.competition)
+      .in('user_id', memberIds)
+      .eq('phase', 'REGULAR')
+      .gte('week', startWeek);
+
+    const byUser: Record<string, number> = {};
+    for (const row of totals ?? []) {
+      byUser[row.user_id] = (byUser[row.user_id] ?? 0) + (row.week_points ?? 0);
+    }
+    const userIds = Object.keys(byUser);
+    if (userIds.length === 0) {
+      set({regularSeasonPodium: [], regularSeasonUserPoints: null});
+      return;
+    }
+
+    // Display names.
+    const {data: profiles} = await supabase
+      .from('profiles')
+      .select('id, poolie_name, first_name, last_name')
+      .in('id', userIds);
+    const names: Record<string, string> = {};
+    for (const p of profiles ?? []) names[p.id] = formatLeaderboardName(p);
+
+    // Sort desc by points, ties A→Z (consistent with the Ladder).
+    const sorted = userIds
+      .map(id => ({user_id: id, display_name: names[id] ?? 'Player', total_points: byUser[id]}))
+      .sort((a, b) =>
+        b.total_points !== a.total_points
+          ? b.total_points - a.total_points
+          : a.display_name.localeCompare(b.display_name, undefined, {sensitivity: 'base'}),
+      );
+
+    const podium: PodiumEntry[] = sorted.slice(0, 3).map((e, i) => ({...e, rank: i + 1}));
+    set({
+      regularSeasonPodium: podium,
+      regularSeasonUserPoints: byUser[userId] ?? 0,
     });
   },
 

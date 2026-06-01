@@ -1499,6 +1499,19 @@ async function runFullSeason() {
       await waitWhilePaused();
       if (seasonRun.stop) throw new Error('__STOP__');
       if (wk >= 22) { log('=== Season complete — Week 22 done. ===', 'success'); break; }
+
+      // Regular-season → playoffs bridge: pause on REGULAR_COMPLETE between
+      // Week 18 and Wild Card so the winner podium / playoff-reset bridge
+      // shows before the playoff scoreboard resets.
+      if (wk === 18) {
+        log('=== Week 18 done — REGULAR SEASON COMPLETE (winner podium) ===', 'info');
+        await setPhaseOnly('REGULAR_COMPLETE', 'idle', false);
+        await refreshState();
+        await settleStep(SEASON_STEP_PAUSE_MS);
+        await waitWhilePaused();
+        if (seasonRun.stop) throw new Error('__STOP__');
+      }
+
       await cpNextWeek();      // advance week + carry phase
       await refreshState();
       await settleStep(1500);  // wait for the app to show the new week opening

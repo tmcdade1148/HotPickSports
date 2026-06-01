@@ -2,11 +2,12 @@
 // Spec §6.4.3 — regular_complete_bridge row.
 //
 // Phase: REGULAR_COMPLETE (between Week 18 finalization and PLAYOFFS open).
-// Surfaces the playoff-reset framing per the plan: pool leaderboards reset
-// when entering PLAYOFFS, so users see explicit "regular season closed,
-// playoffs incoming" copy here.
+// Publicly acknowledges the regular-season WINNERS — the pool's top-3
+// finishers — before the playoff scoreboard resets, then frames the reset.
+// The podium reads the regular-season final standings (always phase=REGULAR),
+// not the live leaderboard, which flips to playoff scope here.
 
-import React from 'react';
+import React, {useEffect} from 'react';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {useTheme} from '@shell/theme/hooks';
@@ -16,16 +17,26 @@ import {useGlobalStore} from '@shell/stores/globalStore';
 import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
 import {getContextGreeting} from './salutation';
 
+const MEDALS = ['\u{1F947}', '\u{1F948}', '\u{1F949}']; // 🥇 🥈 🥉
+
 export function RegularCompleteHero() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
 
   const currentPhase = useNFLStore(s => s.currentPhase);
   const userId       = useGlobalStore(s => s.user?.id);
-  const seasonTotal  = useSeasonStore(
-    s => (userId ? s.getUserScore(userId)?.total_points : undefined) ?? 0,
-  );
+
+  const podium     = useSeasonStore(s => s.regularSeasonPodium);
+  const userPoints = useSeasonStore(s => s.regularSeasonUserPoints);
+  const loadPodium = useSeasonStore(s => s.loadRegularSeasonPodium);
+
+  useEffect(() => {
+    if (userId) loadPodium(userId).catch(() => {});
+  }, [userId, loadPodium]);
+
   const greeting = getContextGreeting(currentPhase, 'idle', 0, null);
+  const winner = podium[0];
+  const userIsWinner = !!winner && winner.user_id === userId;
 
   return (
     <View style={styles.wrap}>
@@ -36,23 +47,59 @@ export function RegularCompleteHero() {
         REGULAR SEASON COMPLETE
       </Text>
 
-      <View style={[styles.card, {backgroundColor: colors.surfaceElevated, borderColor: colors.border}]}>
-        <Text
-          style={[
-            displayType.display,
-            {fontSize: displayType.size.h1, color: colors.textPrimary, lineHeight: displayType.size.h1 * 0.95},
-          ]}>
-          {seasonTotal.toLocaleString()} PTS
-        </Text>
-        <Text style={[bodyType.regular, styles.subtitle, {color: colors.textSecondary}]}>
-          Regular season closed. Playoff scoreboard resets — everyone starts fresh.
-        </Text>
-        <View style={[styles.tag, {backgroundColor: colors.primary + '22', borderColor: colors.primary}]}>
-          <Text style={[bodyType.bold, styles.tagText, {color: colors.primary}]}>
-            PLAYOFFS INCOMING
+      {winner ? (
+        <View style={[styles.card, {backgroundColor: colors.surfaceElevated, borderColor: colors.border}]}>
+          <Text style={[bodyType.bold, styles.cardLabel, {color: colors.textSecondary}]}>
+            REGULAR SEASON {podium.length > 1 ? 'WINNERS' : 'WINNER'}
           </Text>
+
+          {podium.map(entry => (
+            <View key={entry.user_id} style={styles.podiumRow}>
+              <Text style={styles.medal}>{MEDALS[entry.rank - 1] ?? `${entry.rank}.`}</Text>
+              <Text
+                style={[
+                  entry.rank === 1 ? displayType.display : bodyType.bold,
+                  styles.podiumName,
+                  {color: colors.textPrimary, fontSize: entry.rank === 1 ? 22 : 16},
+                ]}
+                numberOfLines={1}>
+                {entry.display_name}
+              </Text>
+              <Text style={[bodyType.bold, styles.podiumPts, {color: colors.primary}]}>
+                {entry.total_points.toLocaleString()} pts
+              </Text>
+            </View>
+          ))}
+
+          {userPoints != null && !userIsWinner && (
+            <Text style={[bodyType.regular, styles.youRow, {color: colors.textSecondary}]}>
+              You finished with {userPoints.toLocaleString()} pts.
+            </Text>
+          )}
+
+          <Text style={[bodyType.regular, styles.subtitle, {color: colors.textSecondary}]}>
+            Playoff scoreboard resets — everyone starts fresh.
+          </Text>
+          <View style={[styles.tag, {backgroundColor: colors.primary + '22', borderColor: colors.primary}]}>
+            <Text style={[bodyType.bold, styles.tagText, {color: colors.primary}]}>
+              PLAYOFFS INCOMING
+            </Text>
+          </View>
         </View>
-      </View>
+      ) : (
+        // No regular-season scores resolved yet — keep the reset framing
+        // without an empty podium.
+        <View style={[styles.card, {backgroundColor: colors.surfaceElevated, borderColor: colors.border}]}>
+          <Text style={[bodyType.regular, styles.subtitle, {color: colors.textSecondary}]}>
+            Regular season closed. Playoff scoreboard resets — everyone starts fresh.
+          </Text>
+          <View style={[styles.tag, {backgroundColor: colors.primary + '22', borderColor: colors.primary}]}>
+            <Text style={[bodyType.bold, styles.tagText, {color: colors.primary}]}>
+              PLAYOFFS INCOMING
+            </Text>
+          </View>
+        </View>
+      )}
 
       <Pressable
         onPress={() => navigation.navigate('LeaderboardTab')}
@@ -61,9 +108,9 @@ export function RegularCompleteHero() {
           {borderColor: colors.border, opacity: pressed ? 0.7 : 1},
         ]}
         accessibilityRole="button"
-        accessibilityLabel="See your regular season recap">
+        accessibilityLabel="See the regular season final standings">
         <Text style={[bodyType.bold, styles.ctaText, {color: colors.textPrimary}]}>
-          See regular season recap
+          See final standings
         </Text>
       </Pressable>
     </View>
@@ -80,7 +127,13 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     gap: spacing.sm,
   },
-  subtitle: {fontSize: 14, lineHeight: 20},
+  cardLabel:  {fontSize: 11, letterSpacing: 2, marginBottom: spacing.xs},
+  podiumRow:  {flexDirection: 'row', alignItems: 'center', gap: spacing.sm},
+  medal:      {fontSize: 20, width: 28, textAlign: 'center'},
+  podiumName: {flex: 1, letterSpacing: -0.3},
+  podiumPts:  {fontSize: 14},
+  youRow:     {fontSize: 13, marginTop: spacing.xs},
+  subtitle:   {fontSize: 14, lineHeight: 20, marginTop: spacing.xs},
   tag: {
     alignSelf: 'flex-start',
     paddingHorizontal: spacing.sm + 4,
