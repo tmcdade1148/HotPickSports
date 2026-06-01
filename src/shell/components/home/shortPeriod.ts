@@ -17,6 +17,18 @@ import {getPeriodLabel} from './periodLabel';
 export const COMPACT_PERIOD_LENGTH = 12;
 
 /**
+ * Pull the 4-digit season year out of a competition string
+ * ('nfl_2026' → 2026, 'nfl_2025_sim' → 2025). Used so the header pill's year
+ * is sourced from the SAME store as its phase (nflStore.competition) rather
+ * than seasonStore.seasonYear, which goes stale when seasonStore isn't
+ * re-initialized (e.g. a no-pool account that earlier touched the 2025 sim).
+ */
+export function yearFromCompetition(competition?: string | null): number | undefined {
+  const m = competition?.match(/(\d{4})/);
+  return m ? Number(m[1]) : undefined;
+}
+
+/**
  * Map (phase, currentWeek) to the sport+period label shown in the
  * header pill. `seasonYear` controls the NFL prefix suffix
  * (NFL26 / NFL27 / etc.) and defaults to '26'.

@@ -20,15 +20,18 @@ import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
-import {shortPeriod, COMPACT_PERIOD_LENGTH} from './shortPeriod';
+import {shortPeriod, COMPACT_PERIOD_LENGTH, yearFromCompetition} from './shortPeriod';
 
 export function HomeHeader() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
   const currentPhase     = useNFLStore(s => s.currentPhase);
   const currentWeek      = useNFLStore(s => s.currentWeek);
+  const competition      = useNFLStore(s => s.competition);
   const playoffStartWeek = useSeasonStore(s => s.config?.playoffStartWeek);
-  const seasonYear       = useSeasonStore(s => s.seasonYear);
+  // Year from the active competition (same store as the phase) — not the
+  // sometimes-stale seasonStore.seasonYear.
+  const seasonYear       = yearFromCompetition(competition);
 
   const isDemoActive = useGlobalStore(s => s.isDemoActive);
   const period = isDemoActive

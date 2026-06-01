@@ -16,7 +16,7 @@ import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
-import {shortPeriod, COMPACT_PERIOD_LENGTH} from './home/shortPeriod';
+import {shortPeriod, COMPACT_PERIOD_LENGTH, yearFromCompetition} from './home/shortPeriod';
 
 const NAME_MAX_FONT  = 40;
 const NAME_MIN_FONT  = 12;
@@ -28,8 +28,11 @@ export function PoolHeader() {
   const navigation = useNavigation<any>();
   const currentPhase     = useNFLStore(s => s.currentPhase);
   const currentWeek      = useNFLStore(s => s.currentWeek);
+  const competition      = useNFLStore(s => s.competition);
   const playoffStartWeek = useSeasonStore(s => s.config?.playoffStartWeek);
-  const seasonYear       = useSeasonStore(s => s.seasonYear);
+  // Year from the active competition (same store as the phase) — not the
+  // sometimes-stale seasonStore.seasonYear.
+  const seasonYear       = yearFromCompetition(competition);
 
   const visiblePools = useGlobalStore(s => s.visiblePools);
   const activePoolId = useGlobalStore(s => s.activePoolId);
