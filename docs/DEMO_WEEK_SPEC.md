@@ -38,6 +38,8 @@ dissolves that: no public user ever writes a preseason pick on `nfl_2026`.
 | Exit CTA | **Create a Contest** (Gaffer funnel) |
 | Internal preseason gate | **Dev-flag testers** (beta allowlist), not super-admin-only |
 | Build order | **Demo first**, internal preseason path after |
+| `nfl_demo` registration (was O-5) | **Not in the registry** — entered purely via the demo RPC + explicit store set; never a switcher event card |
+| Demo outcome tone (was O-6) | **Clearly positive, but still show the swing** — seed winners so a sensible pick set lands clearly net-positive while the HotPick swing is visible |
 
 ---
 
@@ -218,13 +220,12 @@ infinite spinner (un-initialized `seasonStore` + `PRE_SEASON` gate in
 
 ## 8. Gating & visibility
 
-- **`nfl_demo` is NOT added to `GATED_COMPETITIONS`** and is **not** a sport-switcher event
-  card (`status` excluded from the registry's public list, or simply never registered in
-  `ALL_EVENTS`). It is reachable **only** through the demo entry flow — it must never appear
-  as a selectable competition in the switcher or as one of the Home Screen's max-2 event
-  cards (Hard Rule #19). Decide between "registered but filtered everywhere" vs. "not in the
-  registry at all, entered purely via RPC + explicit store set" — **Open item O-5**; leaning
-  not-in-registry to avoid leak surface.
+- **`nfl_demo` is NOT in the registry** (decided). It is never added to `ALL_EVENTS` /
+  `GATED_COMPETITIONS`, so it can never surface as a sport-switcher event card or as one of
+  the Home Screen's max-2 event cards (Hard Rule #19). It is reachable **only** through the
+  demo entry flow, which sets the active competition/pool explicitly in the store via the
+  `enter_demo` RPC. This keeps the leak surface minimal — there is no public list it could
+  accidentally appear in.
 - The demo pool is `is_hidden_from_users = true` and excluded from `visiblePools` so it
   never shows in the user's real Contest stack or count.
 
@@ -272,8 +273,8 @@ Separate workstream, summarized so Phase 1 doesn't foreclose it.
    + memberships. Resolve O-1, O-2 first.
 2. **Server surface** — `enter_demo` / `reset_demo` RPCs; `demo-settle` Edge Function
    (after O-3 scoring-extraction decision).
-3. **Demo config object** — a `SeasonConfig` for `nfl_demo` (likely derived from
-   `nflSeason`, not registered in the public switcher; O-5).
+3. **Demo config object** — a `SeasonConfig` for `nfl_demo` derived from `nflSeason`, held
+   privately for the demo flow and **not** added to the registry (§8).
 4. **Entry wiring** — retarget `OffCycleActions` middle button to the demo for non-internal
    users; `enter_demo()` + store init on press.
 5. **Submit branch** — demo submit calls `demo-settle` (O-4).
@@ -293,11 +294,9 @@ Separate workstream, summarized so Phase 1 doesn't foreclose it.
 - **O-3** Is `nfl-calculate-scores` scoring already an importable pure function? If not,
   extract to `_shared/scoring.ts` so `demo-settle` and the cron scorer share one impl.
 - **O-4** Where the demo submit branch lives — submit hook vs. a demo wrapper screen.
-- **O-5** `nfl_demo` registered-but-filtered vs. not-in-registry (entered purely via RPC).
-- **O-6** Demo HotPick scoring: a wrong HotPick is negative (−rank). Decide whether the
-  curated week guarantees a *positive* demo outcome (better first impression) or an honest
-  mix. Recommendation: seed winners so a "reasonable" pick set lands clearly positive,
-  while still showing the HotPick swing.
+
+_Resolved: O-5 (not in registry) and O-6 (clearly-positive outcome, swing still visible)
+are now decisions — see §2._
 
 ---
 
