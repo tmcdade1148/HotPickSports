@@ -75,6 +75,22 @@ interface GlobalState {
   isDemoActive: boolean;
   enterDemo: () => Promise<void>;
   exitDemo: () => void;
+  // Demo flow UI state: the scoring-explainer modal on entry, the
+  // score-breakdown modal + revealed-results state after settling.
+  demoIntroOpen: boolean;
+  demoScoreOpen: boolean;
+  demoRevealed: boolean;
+  demoResult: {
+    weekPoints: number;
+    correctPicks: number;
+    totalPicks: number;
+    hotpickRank: number | null;
+    hotpickCorrect: boolean | null;
+  } | null;
+  dismissDemoIntro: () => void;
+  dismissDemoScore: () => void;
+  setDemoResult: (r: GlobalState['demoResult']) => void;
+  clearDemoReveal: () => void;
 
   // Profile — full profile object
   userProfile: DbProfile | null;
@@ -714,6 +730,10 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   // New-user onboarding demo (spec: docs/DEMO_WEEK_SPEC.md)
   // ---------------------------------------------------------------------------
   isDemoActive: false,
+  demoIntroOpen: false,
+  demoScoreOpen: false,
+  demoRevealed: false,
+  demoResult: null,
   enterDemo: async () => {
     const {isDemoActive, activeSport, activePoolId} = get();
     // Snapshot the prior selection once (so re-entry doesn't clobber it).
@@ -729,13 +749,18 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       // ignore — non-critical to rendering the demo picks screen
     }
     // Set state directly (not via setActiveSport) to avoid its async
-    // loadPersistedPoolId racing our activePoolId write.
+    // loadPersistedPoolId racing our activePoolId write. Open the scoring
+    // explainer, clear any prior reveal.
     set({
       isDemoActive: true,
       activeSport: getDemoEvent(),
       activePoolId: DEMO_POOL_ID,
       activeBrandConfig: null,
       userPools: [],
+      demoIntroOpen: true,
+      demoScoreOpen: false,
+      demoRevealed: false,
+      demoResult: null,
     });
   },
   exitDemo: () => {
@@ -743,19 +768,31 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     const prevPool = _preDemoPoolId;
     _preDemoSport = null;
     _preDemoPoolId = null;
+    const demoReset = {
+      isDemoActive: false,
+      demoIntroOpen: false,
+      demoScoreOpen: false,
+      demoRevealed: false,
+      demoResult: null,
+    };
     if (prevSport) {
       const cached = get().poolsByCompetition[prevSport.competition] ?? [];
       set({
-        isDemoActive: false,
+        ...demoReset,
         activeSport: prevSport,
         activePoolId: prevPool,
         userPools: cached,
         activeBrandConfig: null,
       });
     } else {
-      set({isDemoActive: false});
+      set(demoReset);
     }
   },
+  dismissDemoIntro: () => set({demoIntroOpen: false}),
+  dismissDemoScore: () => set({demoScoreOpen: false}),
+  setDemoResult: r => set({demoResult: r, demoRevealed: true, demoScoreOpen: true}),
+  clearDemoReveal: () =>
+    set({demoRevealed: false, demoResult: null, demoScoreOpen: false}),
 
   // ---------------------------------------------------------------------------
   // Pool state

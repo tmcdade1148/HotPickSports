@@ -7,9 +7,9 @@
 
 import {useCallback, useState} from 'react';
 import {Alert} from 'react-native';
-import {useNavigation} from '@react-navigation/native';
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
+import {useGlobalStore} from '@shell/stores/globalStore';
 import {supabase} from '@shared/config/supabase';
 import {DEMO_COMPETITION} from '@sports/registry';
 
@@ -39,7 +39,6 @@ export function useSeasonSubmitState(): SeasonSubmitState {
   const pickCount      = useSeasonStore(s => s.getPickCount());
   const currentWeek    = useNFLStore(s => s.currentWeek);
 
-  const navigation = useNavigation<any>();
   const isDemo = config?.competition === DEMO_COMPETITION;
   const [demoSubmitting, setDemoSubmitting] = useState(false);
 
@@ -95,22 +94,30 @@ export function useSeasonSubmitState(): SeasonSubmitState {
     if (state !== 'in_progress') return;
 
     // Demo: settle server-side (demo-settle scores the already-saved picks),
-    // then reveal the bespoke result screen. Picks are pool-independent and
-    // saved per-tap, so there's nothing to batch-write here.
+    // then reveal the results IN PLACE — flip the games to completed and open
+    // the score-breakdown modal. Picks are pool-independent and saved per-tap,
+    // so there's nothing to batch-write here.
     if (isDemo) {
       setDemoSubmitting(true);
       supabase.functions
         .invoke('demo-settle', {body: {}})
         .then(({data, error}) => {
           setDemoSubmitting(false);
-          if (error || (data && data.success === false)) {
+          if (error || !data || data.success === false) {
             Alert.alert(
               'Could not score your demo week',
               'Something went wrong settling the demo. Please try again.',
             );
             return;
           }
-          navigation.navigate('DemoResult');
+          useSeasonStore.getState().applyDemoReveal(data.picks ?? []);
+          useGlobalStore.getState().setDemoResult({
+            weekPoints: data.week_points ?? 0,
+            correctPicks: data.correct_picks ?? 0,
+            totalPicks: data.total_picks ?? 0,
+            hotpickRank: data.hotpick_rank ?? null,
+            hotpickCorrect: data.is_hotpick_correct ?? null,
+          });
         })
         .catch(() => {
           setDemoSubmitting(false);
@@ -123,7 +130,7 @@ export function useSeasonSubmitState(): SeasonSubmitState {
     }
 
     setWeekComplete(true);
-  }, [state, isDemo, navigation, setWeekComplete]);
+  }, [state, isDemo, setWeekComplete]);
 
   return {
     visible,

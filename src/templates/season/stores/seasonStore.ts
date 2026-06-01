@@ -98,6 +98,15 @@ interface SeasonState {
   /** Subscribe to live score updates for the current week's games.
    *  Patches individual game rows in place. Returns an unsubscribe fn. */
   subscribeToGameScores: () => () => void;
+
+  // ── Onboarding demo (spec: docs/DEMO_WEEK_SPEC.md) ──
+  /** Reveal demo results in place: flip local games to FINAL (they already
+   *  carry winner_team + scores from the seed) and stamp each pick's
+   *  server-scored is_correct / points so the cards render as completed. */
+  applyDemoReveal: (picks: {game_id: string; is_correct: boolean; points: number}[]) => void;
+  /** Undo a demo reveal for a "Try again": drop cached games + picks and
+   *  re-fetch the (scheduled, pickable) demo games from the DB. */
+  resetDemoGames: () => Promise<void>;
 }
 
 export const useSeasonStore = create<SeasonState>((set, get) => ({
@@ -784,5 +793,30 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
     return () => {
       supabase.removeChannel(channel);
     };
+  },
+
+  applyDemoReveal: picks => {
+    const pmap = new Map(picks.map(p => [p.game_id, p]));
+    set(state => {
+      const games = state.games.map(g => ({...g, status: 'FINAL'}));
+      const weekPicks = state.weekPicks.map(p => {
+        const r = pmap.get(p.game_id);
+        return r ? {...p, is_correct: r.is_correct, points: r.points} : p;
+      });
+      return {
+        games,
+        weekPicks,
+        allWeekGames: {...state.allWeekGames, [state.currentWeek]: games},
+        isWeekComplete: true,
+      };
+    });
+  },
+
+  resetDemoGames: async () => {
+    const week = get().currentWeek;
+    // Drop cache + picks so fetchWeekGames hits the DB and restores the
+    // scheduled (pickable) games rather than returning the FINAL-patched cache.
+    set({allWeekGames: {}, weekPicks: [], isWeekComplete: false});
+    await get().fetchWeekGames(week);
   },
 }));

@@ -16,6 +16,7 @@ import {supabase} from '@shared/config/supabase';
 import {useAuth} from '@shared/hooks/useAuth';
 import {useTheme} from '@shell/theme';
 import {useGlobalStore} from '@shell/stores/globalStore';
+import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {DEMO_COMPETITION} from '@sports/registry';
 import {LEXICON} from '@shared/lexicon';
 import {bodyType, displayType, spacing, borderRadius} from '@shared/theme';
@@ -48,6 +49,8 @@ export function DemoResultScreen() {
   const {user} = useAuth();
   const userProfile = useGlobalStore(s => s.userProfile);
   const exitDemo = useGlobalStore(s => s.exitDemo);
+  const clearDemoReveal = useGlobalStore(s => s.clearDemoReveal);
+  const resetDemoGames = useSeasonStore(s => s.resetDemoGames);
 
   const [total, setTotal] = useState<DemoTotal | null>(null);
   const [loading, setLoading] = useState(true);
@@ -90,9 +93,16 @@ export function DemoResultScreen() {
     exitDemo();
     navigation.navigate('Home');
   };
-  const handleTryAgain = () => {
-    // Picks are still in place on the (immutable) demo games; go back to the
-    // Picks tab to adjust and re-settle. demo-settle is an idempotent upsert.
+  const handleTryAgain = async () => {
+    // Wipe the previous run (server picks + scores), clear the local reveal,
+    // and restore fresh scheduled games, then return to the Picks tab.
+    try {
+      await supabase.rpc('reset_demo');
+    } catch {
+      // non-critical
+    }
+    clearDemoReveal();
+    await resetDemoGames();
     navigation.goBack();
   };
 

@@ -1,6 +1,7 @@
 import React, {useEffect, useCallback, useMemo, useState} from 'react';
-import {View, Text, SectionList, ActivityIndicator, Alert, StyleSheet} from 'react-native';
-import {useFocusEffect} from '@react-navigation/native';
+import {View, Text, SectionList, ActivityIndicator, Alert, StyleSheet, TouchableOpacity} from 'react-native';
+import {useFocusEffect, useNavigation} from '@react-navigation/native';
+import {BarChart3} from 'lucide-react-native';
 import {useSeasonStore} from '../stores/seasonStore';
 import {WeekSelector} from '../components/WeekSelector';
 import {SeasonMatchCard} from '../components/SeasonMatchCard';
@@ -13,6 +14,7 @@ import {useTheme} from '@shell/theme';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {supabase} from '@shared/config/supabase';
+import {DemoIntroModal, DemoScoreModal} from '@shell/components/home/DemoModals';
 
 // ---------------------------------------------------------------------------
 // Game ordering — games are arranged by HotPick rank (1 at top → 16 at bottom).
@@ -63,6 +65,16 @@ export function SeasonPicksScreen() {
   const picksOpenAt = useNFLStore(s => s.picksOpenAt);
   const activePoolId = useGlobalStore(s => s.activePoolId);
   const subscribeToGameScores = useSeasonStore(s => s.subscribeToGameScores);
+
+  // ── Onboarding demo state (inert unless the demo is active) ──
+  const navigation = useNavigation<any>();
+  const isDemoActive = useGlobalStore(s => s.isDemoActive);
+  const demoIntroOpen = useGlobalStore(s => s.demoIntroOpen);
+  const demoScoreOpen = useGlobalStore(s => s.demoScoreOpen);
+  const demoRevealed = useGlobalStore(s => s.demoRevealed);
+  const demoResult = useGlobalStore(s => s.demoResult);
+  const dismissDemoIntro = useGlobalStore(s => s.dismissDemoIntro);
+  const dismissDemoScore = useGlobalStore(s => s.dismissDemoScore);
 
   // Check if all games are final for this week
   const allGamesFinal = games.length > 0 && games.every(g => {
@@ -250,8 +262,16 @@ export function SeasonPicksScreen() {
     const byRank = (a: DbSeasonGame, b: DbSeasonGame) => effectiveRank(a) - effectiveRank(b);
     locked.sort(byRank);
     open.sort(byRank);
+    const isFinalGame = (g: DbSeasonGame) => {
+      const s = (g.status ?? '').toUpperCase();
+      return s === 'FINAL' || s === 'STATUS_FINAL' || s === 'COMPLETED';
+    };
     const out: {title: string; data: DbSeasonGame[]}[] = [];
-    if (locked.length) out.push({title: 'LOCKED', data: locked});
+    if (locked.length) {
+      // Label the top group FINAL once its games are decided (incl. demo reveal),
+      // otherwise LOCKED (kicked off but still in progress / pre-kickoff lock).
+      out.push({title: locked.every(isFinalGame) ? 'FINAL' : 'LOCKED', data: locked});
+    }
     if (open.length) out.push({title: 'OPEN', data: open});
     return out;
   }, [games, picksAreOpen]);
@@ -411,7 +431,38 @@ export function SeasonPicksScreen() {
         </View>
       )}
 
-      <SubmitPicksFooter />
+      {/* Demo: once revealed, swap the submit button for a Ladder link. */}
+      {isDemoActive && demoRevealed ? (
+        <View style={[styles.demoFooter, {backgroundColor: colors.background, borderTopColor: colors.border}]}>
+          <TouchableOpacity
+            style={[styles.demoLadderBtn, {backgroundColor: colors.primary}]}
+            onPress={() => navigation.navigate('DemoResult')}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="View the Ladder">
+            <BarChart3 size={18} color={colors.onPrimary} strokeWidth={2.25} />
+            <Text style={[styles.demoLadderLabel, {color: colors.onPrimary}]}>View the Ladder</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <SubmitPicksFooter />
+      )}
+
+      {/* Demo onboarding modals — inert unless the demo is active. */}
+      {isDemoActive && (
+        <>
+          <DemoIntroModal visible={demoIntroOpen} onClose={dismissDemoIntro} />
+          <DemoScoreModal
+            visible={demoScoreOpen}
+            result={demoResult}
+            onClose={dismissDemoScore}
+            onViewLadder={() => {
+              dismissDemoScore();
+              navigation.navigate('DemoResult');
+            }}
+          />
+        </>
+      )}
     </View>
   );
 }
@@ -420,6 +471,26 @@ const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  demoFooter: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  demoLadderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+  },
+  demoLadderLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
   },
   list: {
     paddingTop: 0,

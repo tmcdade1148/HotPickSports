@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
       return json({success: false, error: 'no_picks'}, 400);
     }
 
-    const {userScores} = scorePicks(games ?? [], picks);
+    const {userScores, pickResults} = scorePicks(games ?? [], picks);
     const agg = userScores.find((u) => u.user_id === userId) ?? {
       user_id: userId, week_points: 0, correct_picks: 0, total_picks: 0,
       is_hotpick_correct: null, hotpick_rank: null,
@@ -112,6 +112,11 @@ Deno.serve(async (req) => {
       total_picks: agg.total_picks,
       is_hotpick_correct: agg.is_hotpick_correct,
       hotpick_rank: agg.hotpick_rank,
+      // Per-pick results so the client can reveal each game as completed
+      // (✓/✗ + points) without computing scores itself (Hard Rule #3).
+      picks: pickResults.map((p) => ({
+        game_id: p.game_id, is_correct: p.is_correct, points: p.points,
+      })),
     });
   } catch (err) {
     return json({success: false, error: String(err)}, 500);
