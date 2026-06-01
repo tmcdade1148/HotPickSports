@@ -13,6 +13,7 @@ import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {useTheme} from '@shell/theme/hooks';
 import {spacing, bodyType} from '@shared/theme';
 import {hexToRgba} from '@shared/utils/color';
+import {ordinalSuffix} from '@shared/utils/format';
 
 import {SystemMessageSlot} from '@shell/components/home/SystemMessageSlot';
 import {HomeHeader} from '@shell/components/home/HomeHeader';
@@ -331,6 +332,7 @@ export function HomeScreen() {
             {offCycleContests}
             {visiblePools.length > 0 ? <ReturningOffCycleActions /> : <PreSeasonActions />}
             <PreseasonCountdownLine />
+            <PreseasonPicksOpenLine />
             <CrossContestStrip />
             {offCycleClubs ?? <ClubsTeaser />}
           </>
@@ -464,6 +466,23 @@ function PreseasonCountdownLine() {
   );
 }
 
+/** Pre-season line stating when Week 1 picks open (from season_picks_open_at).
+ *  Sits under the kickoff countdown. Hidden until the date is loaded. */
+function PreseasonPicksOpenLine() {
+  const {colors} = useTheme();
+  const picksOpenAt = useNFLStore(s => s.picksOpenAt);
+  if (!picksOpenAt) return null;
+  const day = picksOpenAt.getDate();
+  const dateLabel =
+    `${picksOpenAt.toLocaleDateString('en-US', {month: 'long'})} ${day}${ordinalSuffix(day)}`;
+  return (
+    <Text style={[bodyType.regular, offCycleStyles.picksOpenLine, {color: colors.textSecondary}]}>
+      Week 1 picks open{' '}
+      <Text style={[bodyType.bold, {color: colors.textPrimary}]}>{dateLabel}</Text>
+    </Text>
+  );
+}
+
 /** One-line Clubs teaser for off-cycle states per spec §6 + Appendix.
  *  Replaces the longer Gaffer/Perks explainer that lives in the
  *  in-cycle YOUR CLUBS section. */
@@ -494,6 +513,12 @@ const offCycleStyles = StyleSheet.create({
     borderWidth: 1,
   },
   countdownText: {fontSize: 14, lineHeight: 20},
+  picksOpenLine: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+  },
   clubsBlock: {
     marginTop: spacing.lg,
     paddingHorizontal: spacing.lg,

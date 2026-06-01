@@ -40,7 +40,7 @@ export function PreSeasonGamesHero() {
       <View style={styles.eyebrowRow}>
         <View style={[styles.statusDot, {backgroundColor: colors.success}]} />
         <Text style={[bodyType.bold, styles.eyebrowLabel, {color: colors.success}]}>
-          Closing in on the regular season. Picks open September 2nd.
+          Closing in on the regular season.
         </Text>
       </View>
 
