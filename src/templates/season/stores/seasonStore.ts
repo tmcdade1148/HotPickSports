@@ -527,6 +527,17 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       }
     }
 
+    // Break ties alphabetically by display name (names are only known now, so
+    // re-sort here): higher total_points first, then A→Z within equal scores.
+    leaderboard.sort((a, b) => {
+      if (b.total_points !== a.total_points) return b.total_points - a.total_points;
+      return (names[a.user_id] ?? '').localeCompare(
+        names[b.user_id] ?? '',
+        undefined,
+        {sensitivity: 'base'},
+      );
+    });
+
     set({
       leaderboard,
       userNames: names,
@@ -723,6 +734,16 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
           updatedNames[p.id] = formatLeaderboardName(p);
           updatedAvatars[p.id] = p.avatar_key ?? null;
         }
+        // Break ties alphabetically by display name now that names are known:
+        // higher week_points first, then A→Z within equal scores.
+        weekEntries.sort((a, b) => {
+          if (b.week_points !== a.week_points) return b.week_points - a.week_points;
+          return (updatedNames[a.user_id] ?? '').localeCompare(
+            updatedNames[b.user_id] ?? '',
+            undefined,
+            {sensitivity: 'base'},
+          );
+        });
         set({
           weekLeaderboard: weekEntries,
           weekLeaderboardDisplayedWeek: targetWeek,
