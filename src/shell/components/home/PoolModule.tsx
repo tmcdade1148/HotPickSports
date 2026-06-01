@@ -39,6 +39,7 @@ import {
 } from 'lucide-react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useGlobalStore} from '@shell/stores/globalStore';
+import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
 import {hexToRgba, pickReadableBrandColor, readableTextOn} from '@shared/utils/color';
 import {
@@ -178,6 +179,23 @@ export function PoolModule({pool}: PoolModuleProps) {
 
   const rankData = useGlobalStore(s => s.userRankByPool[pool.id]);
   const weekRank = useGlobalStore(s => s.weekRankByPool[pool.id]);
+
+  // Season + week rank stay hidden until there are actual Week 1 scores to
+  // rank on. Before that — OFF_SEASON, PRE_SEASON, and Week 1 while it's still
+  // picks_open / locked / live — every player is tied at zero, so a rank would
+  // be meaningless (and misleading). Scores first exist once Week 1 starts
+  // settling, or any time we're past Week 1 / into the playoff phases.
+  const currentPhase = useNFLStore(s => s.currentPhase);
+  const currentWeek  = useNFLStore(s => s.currentWeek);
+  const weekState    = useNFLStore(s => s.weekState);
+  const scoresAvailable =
+    (currentPhase === 'REGULAR' &&
+      (currentWeek > 1 || weekState === 'settling' || weekState === 'complete')) ||
+    currentPhase === 'REGULAR_COMPLETE' ||
+    currentPhase === 'PLAYOFFS' ||
+    currentPhase === 'SUPERBOWL_INTRO' ||
+    currentPhase === 'SUPERBOWL' ||
+    currentPhase === 'SEASON_COMPLETE';
 
   // The owning Club, if any. Loaded into partnersById alongside aligned
   // partners. Falls back to null (no header band) if not yet cached.
@@ -397,7 +415,7 @@ export function PoolModule({pool}: PoolModuleProps) {
               numberOfLines={1}>
               {(pool.name || '').toUpperCase()}
             </Text>
-            {rankData && (
+            {scoresAvailable && rankData && (
               <>
                 <View style={styles.rankRow}>
                   <Text style={[bodyType.regular, styles.rankLabel, {color: colors.textSecondary}]}>
