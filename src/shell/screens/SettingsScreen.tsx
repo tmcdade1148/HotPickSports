@@ -617,7 +617,14 @@ export function SettingsScreen({route}: any) {
           super-admin sees only that one row. */}
       {(userProfile?.is_super_admin || managedClub !== null) && (
         <>
-          <Text style={[styles.groupLabel, {color: colors.textSecondary}]}>Admin</Text>
+          <View style={styles.adminLabelRow}>
+            <Text style={[styles.groupLabel, {color: colors.textSecondary}]}>Admin</Text>
+            {/* Access level for the logged-in user, in red. The section only
+                shows for super-admins or Club managers, so it's one of those. */}
+            <Text style={[styles.accessBadge, {color: colors.error}]}>
+              {userProfile?.is_super_admin ? 'Super Admin' : 'Club Admin'}
+            </Text>
+          </View>
           <View style={[styles.groupCard, {backgroundColor: colors.surface}]}>
             {userProfile?.is_super_admin && (
               <>
@@ -968,6 +975,20 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
     marginTop: spacing.md,
     marginLeft: spacing.xs,
+  },
+  adminLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+  },
+  accessBadge: {
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+    marginRight: spacing.xs,
   },
   groupCard: {
     borderRadius: borderRadius.lg,
