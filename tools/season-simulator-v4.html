@@ -804,17 +804,13 @@ async function cpOpenPicks() {
   await api(`competition_config?competition=eq.${COMPETITION}&key=eq.week_state`, 'PATCH', { value: 'picks_open' });
   await api(`competition_config?competition=eq.${COMPETITION}&key=eq.picks_open`, 'PATCH', { value: true });
   await api(`competition_config?competition=eq.${COMPETITION}&key=eq.picks_locked`, 'PATCH', { value: false });
-  // Clear lock_at on every current-week game and push sunday_lock_anchor far future
+  // Clear lock_at on every current-week game so all games are pickable at open;
+  // each game locks at its own kickoff (cpKickoffWave sets it per wave).
   await api(
     `season_games?competition=eq.${COMPETITION}&week=eq.${wk}`,
     'PATCH',
     { lock_at: null }
   );
-  // sunday_lock_anchor: upsert (the key always exists but belt-and-suspenders)
-  try {
-    await api(`competition_config?competition=eq.${COMPETITION}&key=eq.sunday_lock_anchor`,
-      'PATCH', { value: '2099-01-01T00:00:00Z' });
-  } catch {}
 
   // Auto-seed fake member picks for the current week (skip if any fake
   // already has picks — idempotent re-runs).
@@ -960,10 +956,11 @@ async function cpKickoffWave(wave) {
     return;
   }
 
-  // Lock this wave (and later waves if Sunday+)
+  // Per-game locking: only THIS wave's games lock when it kicks off. Later
+  // waves stay unlocked until they kick off (no Sunday seal). Earlier waves are
+  // already locked from their own kickoff.
   const waveOrder = ['thursday', 'sunday1', 'sunday4', 'snf', 'mnf'];
   const thisIdx = waveOrder.indexOf(wave);
-  const isSundayOrLater = thisIdx >= 1;
   const PAST = '2020-01-01T00:00:00Z';
   const FAR_FUTURE = '2099-01-01T00:00:00Z';
 
@@ -971,23 +968,14 @@ async function cpKickoffWave(wave) {
     const gWave = detectWave(g.kickoff_at);
     const gIdx = waveOrder.indexOf(gWave);
     if (gIdx === thisIdx) {
-      // This wave — lock
-      await api(`season_games?competition=eq.${COMPETITION}&game_id=eq.${g.game_id}`,
-        'PATCH', { lock_at: PAST });
-    } else if (isSundayOrLater && gIdx > thisIdx) {
-      // Sunday+ also seals everything later
+      // This wave kicks off — lock it.
       await api(`season_games?competition=eq.${COMPETITION}&game_id=eq.${g.game_id}`,
         'PATCH', { lock_at: PAST });
     } else if (gIdx > thisIdx) {
-      // Pre-Sunday: future waves stay unlocked
+      // Later waves stay unlocked until their own kickoff.
       await api(`season_games?competition=eq.${COMPETITION}&game_id=eq.${g.game_id}`,
         'PATCH', { lock_at: FAR_FUTURE });
     }
-  }
-
-  if (isSundayOrLater) {
-    await api(`competition_config?competition=eq.${COMPETITION}&key=eq.sunday_lock_anchor`,
-      'PATCH', { value: PAST });
   }
 
   // Mark these games IN_PROGRESS with period/clock and 0-0 starting score
@@ -1657,10 +1645,6 @@ async function resetToReviewerState() {
     await api(`competition_config?competition=eq.${COMPETITION}&key=eq.week_state`, 'PATCH', { value: 'picks_open' });
     await api(`competition_config?competition=eq.${COMPETITION}&key=eq.picks_open`, 'PATCH', { value: true });
     await api(`competition_config?competition=eq.${COMPETITION}&key=eq.picks_locked`, 'PATCH', { value: false });
-    try {
-      await api(`competition_config?competition=eq.${COMPETITION}&key=eq.sunday_lock_anchor`,
-        'PATCH', { value: '2099-01-01T00:00:00Z' });
-    } catch {}
     log('✓ Sim state set to Week 8 picks_open.', 'success');
 
     // 5. Reload games state so the fake-pick seeder has current simGames cached,
@@ -1782,10 +1766,6 @@ async function resetToStartOfSeason() {
     await api(`competition_config?competition=eq.${COMPETITION}&key=eq.picks_locked`, 'PATCH', { value: false });
     await api(`competition_config?competition=eq.${COMPETITION}&key=eq.is_season_complete`, 'PATCH', { value: false });
     await api(`competition_config?competition=eq.${COMPETITION}&key=eq.scoring_locked`, 'PATCH', { value: false });
-    try {
-      await api(`competition_config?competition=eq.${COMPETITION}&key=eq.sunday_lock_anchor`,
-        'PATCH', { value: '2099-01-01T00:00:00Z' });
-    } catch {}
     log('✓ Competition config set: REGULAR / Week 1 / picks_open.', 'success');
 
     // 5. Reload games state so the fake-pick seeder has current simGames cached,

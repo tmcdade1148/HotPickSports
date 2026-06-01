@@ -30,11 +30,6 @@ interface SeasonMatchCardProps {
    */
   picksAreOpen?: boolean;
   /**
-   * Earliest kickoff (ms) of any live/final game this week. When set, any
-   * scheduled game at or after this time is wave-locked — even if lock_at is null.
-   */
-  liveAnchorTime?: number | null;
-  /**
    * True once the user has designated a HotPick for the week. When set, the
    * rank badge on every card that ISN'T the chosen HotPick is dimmed, so the
    * one chosen HotPick stands out.
@@ -145,7 +140,6 @@ export function SeasonMatchCard({
   userId,
   pickSplit,
   picksAreOpen = true,
-  liveAnchorTime,
   hotPickSelected = false,
 }: SeasonMatchCardProps) {
   const {colors} = useTheme();
@@ -166,16 +160,13 @@ export function SeasonMatchCard({
     status === 'FINAL' || status === 'STATUS_FINAL' || status === 'COMPLETED';
   const isLive = status === 'IN_PROGRESS' || status === 'LIVE';
   const kickoffDate = new Date(game.kickoff_at);
-  // Two-wave locking: games before Sunday 1pm ET lock at kickoff; all others
-  // lock at the Sunday 1pm anchor. lock_at is set by nfl-open-picks and
-  // enforced server-side by the enforce_pick_lock trigger. Client mirrors
-  // that check here for display.
-  const lockAtPassed = !!game.lock_at && new Date(game.lock_at) <= new Date();
-  // Wave-lock fallback: if this game has no lock_at (simulator) and a game at
-  // or before this kickoff is already live/final, lock this game too.
-  // Only applies when lock_at is missing — when lock_at is set, it's authoritative.
-  const waveLocked = !game.lock_at && liveAnchorTime != null && kickoffDate.getTime() <= liveAnchorTime;
-  const isLocked = !picksAreOpen || isFinal || isLive || lockAtPassed || waveLocked;
+  // Per-game locking: each game locks at its OWN kickoff, never before. lock_at
+  // is set to the game's kickoff by nfl-open-picks and enforced server-side by
+  // the enforce_pick_lock trigger; the client mirrors that authoritative value
+  // here. (A live/final status also locks, covering any game whose status has
+  // updated even if lock_at somehow wasn't written.)
+  const lockAtPassed = !!game.lock_at && new Date(game.lock_at).getTime() <= Date.now();
+  const isLocked = !picksAreOpen || isFinal || isLive || lockAtPassed;
   const rank = game.frozen_rank ?? game.rank ?? 0;
 
   // Flame is tappable if this game has a pick and isn't already the hotpick

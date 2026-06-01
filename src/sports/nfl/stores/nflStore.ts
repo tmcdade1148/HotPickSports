@@ -69,8 +69,6 @@ interface NFLState {
   picksOpenAt: Date | null;
   /** Opening game kickoff date — drives PRE_SEASON "Season starts in:" countdown. */
   seasonOpenerAt: Date | null;
-  /** First Sunday 1pm ET kickoff this week — all Sunday+ games lock at this time. */
-  sundayLockAnchor: Date | null;
   userHotPick: DbSeasonPick | null;
   userHotPickGame: DbSeasonGame | null;
   liveScores: Record<string, GameScore>;
@@ -134,7 +132,6 @@ export const useNFLStore = create<NFLState>((set, get) => ({
   picksDeadline: null,
   picksOpenAt: null,
   seasonOpenerAt: null,
-  sundayLockAnchor: null,
   userHotPick: null,
   userHotPickGame: null,
   liveScores: {},
@@ -276,17 +273,11 @@ export const useNFLStore = create<NFLState>((set, get) => ({
       seasonOpenerAt = new Date(cfg.season_opener_date);
     }
 
-    // Parse Sunday lock anchor — first Sunday 1pm ET kickoff this week
-    let sundayLockAnchor: Date | null = null;
-    if (cfg.sunday_lock_anchor && typeof cfg.sunday_lock_anchor === 'string') {
-      sundayLockAnchor = new Date(cfg.sunday_lock_anchor);
-    }
-
     // Parse current phase (REGULAR | PLAYOFFS | SUPERBOWL)
     const currentPhase =
       typeof cfg.current_phase === 'string' ? cfg.current_phase : 'REGULAR';
 
-    set({currentWeek, seasonYear, weekState, picksDeadline, picksOpenAt, seasonOpenerAt, sundayLockAnchor, currentPhase});
+    set({currentWeek, seasonYear, weekState, picksDeadline, picksOpenAt, seasonOpenerAt, currentPhase});
 
     // Sandbox-only heartbeat. After ingesting a config step on nfl_2025_sim,
     // echo the simulator's step token back into sim_app_heartbeat so the

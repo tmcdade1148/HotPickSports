@@ -18,13 +18,13 @@ import {DemoIntroModal, DemoScoreModal} from '@shell/components/home/DemoModals'
 
 // ---------------------------------------------------------------------------
 // Game ordering — once a game actually kicks off it rises to the top, grouped
-// into kickoff-time WAVES: one section per kickoff time, headed by that time
-// (e.g. "SUN 1:00 PM"), newest wave first. So the list tracks the week's
-// progress — Thursday on top first, then the Sunday 1pm block above it, then
-// 4pm, SNF, MNF — each with its own time header, rank-ordered within the wave.
-// Games not yet started stay in a single "OPEN" group below, ranked by HotPick
-// value (1 → 16) since those are the picks you can still make. A game lifts up
-// only when it kicks off, not when its picks merely lock (the Sunday seal).
+// into broad kickoff WAVES (THURSDAY NIGHT / SUNDAY 1PM / SUNDAY 4PM / SUNDAY
+// NIGHT / MONDAY NIGHT). One section per wave, newest wave first, rank-ordered
+// within the wave. So the list tracks the week's progress — Thursday on top
+// first, then the Sunday 1pm block above it, then 4pm, SNF, MNF. Games not yet
+// started stay in a single "OPEN" group below, ranked by HotPick value (1 → 16)
+// since those are the picks you can still make. A game lifts up only when it
+// kicks off — each game locks at its own kickoff, never before.
 // ---------------------------------------------------------------------------
 
 /** Effective HotPick rank for ordering: frozen_rank (locked at deadline) ?? live rank. */
@@ -32,33 +32,42 @@ function effectiveRank(g: DbSeasonGame): number {
   return g.frozen_rank ?? g.rank ?? 999;
 }
 
-/** Kickoff time as a wave-section header, e.g. "SUN 1:00 PM" (local time). */
-function kickoffHeader(date: Date): string {
-  const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-  const day = days[date.getDay()];
-  let hours = date.getHours();
-  const minutes = date.getMinutes();
-  const ampm = hours >= 12 ? 'PM' : 'AM';
-  hours = hours % 12;
-  if (hours === 0) hours = 12;
-  const minStr = minutes < 10 ? `0${minutes}` : String(minutes);
-  return `${day} ${hours}:${minStr} ${ampm}`;
+/**
+ * Broad kickoff "wave" bucket for a game — groups all games in the same slot
+ * under one header (e.g. every 1pm game → "SUNDAY 1PM", every 4pm game →
+ * "SUNDAY 4PM") instead of one header per exact kickoff. Slots are detected
+ * from the UTC kickoff (timezone-independent), matching the NFL schedule waves.
+ * Returns a stable key (for bucketing) + a display label.
+ */
+function waveBucket(g: DbSeasonGame): {key: string; label: string} {
+  const d = new Date(g.kickoff_at);
+  const day = d.getUTCDay(); // 0=Sun, 1=Mon, 4=Thu, 5=Fri, 6=Sat
+  const hour = d.getUTCHours();
+  if (day === 4 && hour >= 17) return {key: 'thu', label: 'THURSDAY NIGHT'};
+  if (day === 5 && hour < 4) return {key: 'thu', label: 'THURSDAY NIGHT'};
+  if (day === 5) return {key: 'fri', label: 'FRIDAY'};
+  if (day === 6) return {key: 'sat', label: 'SATURDAY'};
+  if (day === 0 && hour >= 13 && hour < 17) return {key: 'sun_am', label: 'SUNDAY MORNING'};
+  if (day === 0 && hour >= 17 && hour < 20) return {key: 'sun1', label: 'SUNDAY 1PM'};
+  if (day === 0 && hour >= 20 && hour < 23) return {key: 'sun4', label: 'SUNDAY 4PM'};
+  if (day === 0 && hour >= 23) return {key: 'snf', label: 'SUNDAY NIGHT'};
+  if (day === 1 && hour < 4) return {key: 'snf', label: 'SUNDAY NIGHT'};
+  if (day === 1 && hour >= 17) return {key: 'mnf', label: 'MONDAY NIGHT'};
+  if (day === 2 && hour < 4) return {key: 'mnf', label: 'MONDAY NIGHT'};
+  return {key: 'other', label: 'OTHER'};
 }
 
 /**
- * Has this game actually STARTED? (live, final, or its real kickoff time has
- * passed). Deliberately NOT based on lock_at: picks can lock for a game well
- * before it starts — the "Sunday seal" locks the 4pm / SNF / MNF games at the
- * first Sunday 1pm kickoff — but those games haven't kicked off yet, so they
- * must stay in the lower group (not float to the top) until they actually play.
+ * Has this game actually STARTED? Based purely on game STATUS (live or final),
+ * which is the reliable cross-environment signal — ESPN sets it at kickoff in
+ * production, and the simulator sets it when a wave kicks off. Deliberately NOT
+ * based on kickoff_at (the simulator runs on real 2025 schedule timestamps that
+ * are already in the past) nor lock_at (a game can be locked without having
+ * started). Not-yet-started games stay in the lower group until they play.
  */
 function hasStarted(g: DbSeasonGame): boolean {
   const s = (g.status ?? '').toUpperCase();
-  if (s === 'FINAL' || s === 'STATUS_FINAL' || s === 'COMPLETED' || s === 'IN_PROGRESS' || s === 'LIVE') {
-    return true;
-  }
-  if (new Date(g.kickoff_at).getTime() <= Date.now()) return true;
-  return false;
+  return s === 'FINAL' || s === 'STATUS_FINAL' || s === 'COMPLETED' || s === 'IN_PROGRESS' || s === 'LIVE';
 }
 
 /**
@@ -253,22 +262,9 @@ export function SeasonPicksScreen() {
     [pickCount, hotPickCount, setCurrentWeek],
   );
 
-  // Wave-lock fallback: earliest kickoff of any live/final game this week.
-  // Used by SeasonMatchCard to lock games without lock_at that kicked off at
-  // or before this time. Games with lock_at use lock_at as authoritative.
-  const liveAnchorTime = useMemo(() => {
-    if (weekState !== 'live') return null;
-    const liveOrFinalKickoffs = games
-      .filter(g => {
-        const s = (g.status ?? '').toUpperCase();
-        return s === 'IN_PROGRESS' || s === 'LIVE' || s === 'FINAL' || s === 'STATUS_FINAL' || s === 'COMPLETED';
-      })
-      .map(g => new Date(g.kickoff_at).getTime());
-    return liveOrFinalKickoffs.length > 0 ? Math.min(...liveOrFinalKickoffs) : null;
-  }, [weekState, games]);
-
-  // Picks remain interactive through 'live'; individual cards lock per kickoff.
-  // 'locked' state and beyond are fully locked (all games sit in the LOCKED group).
+  // Picks remain interactive through 'live'; individual cards lock per kickoff
+  // (each game locks at its own kickoff). 'locked' state and beyond are fully
+  // locked (all games sit in the started/wave groups).
   const picksAreOpen =
     (weekState === 'picks_open' || weekState === 'live') && currentWeek === dbCurrentWeek;
 
@@ -289,17 +285,24 @@ export function SeasonPicksScreen() {
 
     const out: {title: string; data: DbSeasonGame[]}[] = [];
 
-    // Bucket started games by kickoff timestamp → one wave section each.
-    const waves = new Map<number, DbSeasonGame[]>();
+    // Bucket started games into broad waves (1pm / 4pm / SNF / MNF / …) → one
+    // section per wave, ordered by the wave's earliest kickoff, newest first.
+    type Wave = {label: string; start: number; games: DbSeasonGame[]};
+    const waves = new Map<string, Wave>();
     for (const g of started) {
-      const key = new Date(g.kickoff_at).getTime();
-      const bucket = waves.get(key);
-      if (bucket) bucket.push(g);
-      else waves.set(key, [g]);
+      const {key, label} = waveBucket(g);
+      const start = new Date(g.kickoff_at).getTime();
+      const w = waves.get(key);
+      if (w) {
+        w.games.push(g);
+        if (start < w.start) w.start = start;
+      } else {
+        waves.set(key, {label, start, games: [g]});
+      }
     }
-    // Newest kickoff wave first; rank-order within each wave (reads 1→16).
-    for (const key of [...waves.keys()].sort((a, b) => b - a)) {
-      out.push({title: kickoffHeader(new Date(key)), data: waves.get(key)!.sort(byRank)});
+    // Newest wave on top; rank-order within each wave (reads 1→16).
+    for (const w of [...waves.values()].sort((a, b) => b.start - a.start)) {
+      out.push({title: w.label, data: w.games.sort(byRank)});
     }
 
     if (open.length) {
@@ -342,7 +345,6 @@ export function SeasonPicksScreen() {
         userId={user?.id ?? ''}
         pickSplit={pickStats[item.game_id] ?? null}
         picksAreOpen={picksAreOpen}
-        liveAnchorTime={liveAnchorTime}
         hotPickSelected={hotPickCount > 0}
       />
     </View>
