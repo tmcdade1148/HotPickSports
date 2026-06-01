@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HotPick — Season Simulator v3.1</title>
+<title>HotPick — Season Simulator v3.2</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0D1117; color: #8A97AA; font-size: 14px; line-height: 1.4; }
@@ -220,6 +220,49 @@
           <code>current_week=1</code>, <code>week_state=idle</code>, <code>picks_open=false</code>.
           Wipes ALL picks, ALL totals, ALL SmackTalk in the sim pool.
           Resets all 22 weeks of games to scheduled. Does NOT seed fake picks &mdash; preseason has none.
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <h2 style="padding: 0;">Phase &amp; Jump</h2>
+
+        <div style="font-size: 11px; color: #8A97AA; margin-bottom: 8px;">
+          Set phase only (no data wipe) &mdash; preview the off-cycle home screens.
+        </div>
+        <button class="btn btn-secondary btn-full" id="btn-phase-offseason"
+          onclick="setPhaseOnly('OFF_SEASON','idle',false)" disabled>Set phase: Off-Season</button>
+        <button class="btn btn-secondary btn-full" id="btn-phase-preseason"
+          onclick="setPhaseOnly('PRE_SEASON','idle',false)" disabled style="margin-top: 8px;">Set phase: Pre-Season</button>
+        <button class="btn btn-secondary btn-full" id="btn-phase-regcomplete"
+          onclick="setPhaseOnly('REGULAR_COMPLETE','idle',false)" disabled style="margin-top: 8px;">Set phase: Regular Complete</button>
+        <button class="btn btn-secondary btn-full" id="btn-phase-sbintro"
+          onclick="setPhaseOnly('SUPERBOWL_INTRO','idle',false)" disabled style="margin-top: 8px;">Set phase: Super Bowl Intro</button>
+        <button class="btn btn-secondary btn-full" id="btn-phase-seasoncomplete"
+          onclick="setPhaseOnly('SEASON_COMPLETE','idle',false)" disabled style="margin-top: 8px;">Set phase: Season Complete</button>
+
+        <div style="display: flex; gap: 8px; margin-top: 14px; align-items: stretch;">
+          <input id="jump-week-input" type="number" min="1" max="22" value="18"
+            style="width: 70px; padding: 0 10px; border-radius: 6px; border: 1px solid #2C3A52; background: #0D1117; color: #E6EDF3; font-size: 14px;" />
+          <button class="btn btn-warning" style="flex: 1;" id="btn-jump-week"
+            onclick="jumpToWeek(parseInt(document.getElementById('jump-week-input').value, 10))" disabled>Jump to week</button>
+        </div>
+        <div style="font-size: 11px; color: #8A97AA; margin-top: 6px;">
+          Teleport to any week (1&ndash;22): sets the matching phase
+          (<code>REGULAR</code> / <code>PLAYOFFS</code> / <code>SUPERBOWL</code>), opens
+          picks, resets that week&rsquo;s games to scheduled, clears + reseeds that
+          week&rsquo;s fake picks. Other weeks are left untouched.
+        </div>
+
+        <button class="btn btn-warning btn-full" id="btn-jump-playoffs"
+          onclick="jumpToWeek(19)" disabled style="margin-top: 10px;">Jump to Playoffs (Wk 19 &middot; Wild Card)</button>
+        <button class="btn btn-warning btn-full" id="btn-jump-superbowl"
+          onclick="jumpToWeek(22)" disabled style="margin-top: 8px;">Jump to Super Bowl (Wk 22)</button>
+
+        <button class="btn btn-secondary btn-full" id="btn-toggle-scoring-lock"
+          onclick="toggleScoringLock()" disabled style="margin-top: 14px;">Toggle scoring lock</button>
+        <div style="font-size: 11px; color: #8A97AA; margin-top: 6px;">
+          Flips the <code>scoring_locked</code> emergency brake. Works even while
+          locked, so you can unlock from here.
         </div>
       </div>
     </aside>
@@ -453,11 +496,20 @@ async function refreshState() {
 
 function updateButtons() {
   const ready = state.currentWeek != null && !state.scoringLocked;
+  const connected = state.currentWeek != null;
   document.getElementById('btn-run-week').disabled = !ready;
   document.getElementById('btn-reset-reviewer').disabled = !ready;
   document.getElementById('btn-reset-to-week8').disabled = !ready;
   document.getElementById('btn-reset-to-week1').disabled = !ready;
   document.getElementById('btn-reset-to-preseason').disabled = !ready;
+  // Phase setters + scoring-lock toggle work even while scoring is locked
+  // (you need to be able to unlock from here).
+  ['btn-phase-offseason', 'btn-phase-preseason', 'btn-phase-regcomplete',
+   'btn-phase-sbintro', 'btn-phase-seasoncomplete', 'btn-toggle-scoring-lock']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.disabled = !connected; });
+  // Jumps clean + reseed a week, so gate them like the resets.
+  ['btn-jump-week', 'btn-jump-playoffs', 'btn-jump-superbowl']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.disabled = !ready; });
 }
 
 // Translate week_state → checkpoint completion status
@@ -681,19 +733,22 @@ async function cpOpenPicks() {
   const wk = state.currentWeek;
   log(`[Week ${wk}] Opening picks…`, 'info');
 
-  // Phase gate: if we're outside the weekly cycle, bump to REGULAR.
-  // The simulator currently only models the regular-season flow, so REGULAR
-  // is the correct destination phase. If you ever spec playoff/superbowl
-  // checkpoint flows, this logic will need to branch.
-  const WEEKLY_CYCLE = ['REGULAR', 'PLAYOFFS', 'SUPERBOWL'];
-  if (state.phase && !WEEKLY_CYCLE.includes(state.phase)) {
-    log(`Phase is ${state.phase} (outside weekly cycle). Transitioning to REGULAR…`, 'info');
+  // Phase gate: set current_phase to match the week (REGULAR ≤18, PLAYOFFS
+  // 19–21, SUPERBOWL 22). This bumps off-cycle phases (PRE_SEASON, etc.) into
+  // the weekly cycle AND carries REGULAR → PLAYOFFS → SUPERBOWL as the week
+  // crosses 18/21, so the weekly cycle works all the way through the Super Bowl.
+  const targetPhase = phaseForWeek(wk);
+  if (state.phase !== targetPhase) {
+    log(`Phase ${state.phase} → ${targetPhase} for Week ${wk}…`, 'info');
     await api(
       `competition_config?competition=eq.${COMPETITION}&key=eq.current_phase`,
       'PATCH',
-      { value: 'REGULAR' }
+      { value: targetPhase }
     );
-    log(`✓ Phase transitioned to REGULAR.`, 'success');
+    if (targetPhase === 'PLAYOFFS' || targetPhase === 'SUPERBOWL') {
+      await api(`competition_config?competition=eq.${COMPETITION}&key=eq.playoff_start_week`, 'PATCH', { value: 19 });
+    }
+    log(`✓ Phase set to ${targetPhase}.`, 'success');
   }
 
   await api(`competition_config?competition=eq.${COMPETITION}&key=eq.week_state`, 'PATCH', { value: 'picks_open' });
@@ -898,7 +953,7 @@ async function seedPlaceholderWeekTotals(wk) {
     competition: COMPETITION,
     season_year: SEASON_YEAR,
     week: wk,
-    phase: 'REGULAR',
+    phase: totalsPhaseForWeek(wk),
     week_points: 0,
     playoff_points: 0,
     correct_picks: 0,
@@ -1041,7 +1096,129 @@ async function cpNextWeek() {
   await api(`competition_config?competition=eq.${COMPETITION}&key=eq.week_state`, 'PATCH', { value: 'picks_open' });
   await api(`competition_config?competition=eq.${COMPETITION}&key=eq.picks_open`, 'PATCH', { value: true });
   await api(`competition_config?competition=eq.${COMPETITION}&key=eq.picks_locked`, 'PATCH', { value: false });
-  log(`&#128275; Advanced to Week ${next}.`, 'success');
+  // Carry phase across the regular→playoffs (wk 19) and playoffs→SB (wk 22)
+  // boundaries so the cycle keeps working through the Super Bowl.
+  const targetPhase = phaseForWeek(next);
+  await api(`competition_config?competition=eq.${COMPETITION}&key=eq.current_phase`, 'PATCH', { value: targetPhase });
+  if (targetPhase === 'PLAYOFFS' || targetPhase === 'SUPERBOWL') {
+    await api(`competition_config?competition=eq.${COMPETITION}&key=eq.playoff_start_week`, 'PATCH', { value: 19 });
+  }
+  log(`&#128275; Advanced to Week ${next} (${targetPhase}).`, 'success');
+}
+
+// ─────────────────────────────────────────────────────────────
+// Phase & Jump controls (v3.2)
+// ─────────────────────────────────────────────────────────────
+
+// Coarse current_phase for a given week (the weekly cycle phases).
+function phaseForWeek(week) {
+  if (week >= 22) return 'SUPERBOWL';
+  if (week >= 19) return 'PLAYOFFS';
+  return 'REGULAR';
+}
+
+// Per-week season_user_totals.phase — mirrors nfl-calculate-scores so playoff
+// leaderboards (which filter phase != 'REGULAR') include the placeholder rows.
+function totalsPhaseForWeek(week) {
+  if (week === 19) return 'WILDCARD';
+  if (week === 20) return 'DIVISIONAL';
+  if (week === 21) return 'CONFERENCE';
+  if (week === 22) return 'SUPERBOWL';
+  return 'REGULAR';
+}
+
+// Set current_phase + week_state + picks_open only — no data wipe. Use to
+// preview off-cycle / bridge home screens (OFF_SEASON, PRE_SEASON,
+// REGULAR_COMPLETE, SUPERBOWL_INTRO, SEASON_COMPLETE).
+async function setPhaseOnly(phase, weekState, picksOpen) {
+  try {
+    log(`Setting phase → ${phase} (week_state=${weekState}, picks_open=${picksOpen})…`, 'info');
+    await api(`competition_config?competition=eq.${COMPETITION}&key=eq.current_phase`, 'PATCH', { value: phase });
+    await api(`competition_config?competition=eq.${COMPETITION}&key=eq.week_state`, 'PATCH', { value: weekState });
+    await api(`competition_config?competition=eq.${COMPETITION}&key=eq.picks_open`, 'PATCH', { value: picksOpen });
+    // SEASON_COMPLETE also flips is_season_complete so the app reads it correctly.
+    await api(`competition_config?competition=eq.${COMPETITION}&key=eq.is_season_complete`, 'PATCH', { value: phase === 'SEASON_COMPLETE' });
+    log(`✓ Phase set to ${phase}. No data wiped.`, 'success');
+    await refreshState();
+  } catch (e) {
+    log(`Set phase failed: ${e.message}`, 'error');
+  }
+}
+
+// Teleport to any week without stepping through the season. Sets the matching
+// phase + playoff_start_week, opens picks, and gives that week a clean slate
+// (games → scheduled, picks/totals cleared, fake picks reseeded). Other weeks
+// are untouched — so you can land on Wk 18 and run the playoff/SB transition,
+// or drop straight into a playoff round.
+async function jumpToWeek(n) {
+  if (!Number.isInteger(n) || n < 1 || n > 22) {
+    log('Enter a week between 1 and 22.', 'error');
+    return;
+  }
+  const targetPhase = phaseForWeek(n);
+  const round = n >= 19 ? ` (${totalsPhaseForWeek(n)})` : '';
+  if (!confirm(
+    `Jump to Week ${n}?\n\n` +
+    `TARGET STATE:\n` +
+    `  - current_week = ${n}\n` +
+    `  - current_phase = ${targetPhase}${round}\n` +
+    `  - week_state = picks_open\n` +
+    (n >= 19 ? `  - playoff_start_week = 19\n` : '') +
+    `\nBLAST RADIUS (Week ${n} only):\n` +
+    `  - RESET Week ${n} games to scheduled (clear scores/winner)\n` +
+    `  - DELETE Week ${n} picks + totals, then reseed fake-member picks\n` +
+    `  - All OTHER weeks are left untouched\n\nContinue?`
+  )) return;
+
+  try {
+    log(`=== Jumping to Week ${n} (${targetPhase}) ===`, 'info');
+
+    await api(`competition_config?competition=eq.${COMPETITION}&key=eq.current_week`, 'PATCH', { value: n });
+    await api(`competition_config?competition=eq.${COMPETITION}&key=eq.current_phase`, 'PATCH', { value: targetPhase });
+    await api(`competition_config?competition=eq.${COMPETITION}&key=eq.week_state`, 'PATCH', { value: 'picks_open' });
+    await api(`competition_config?competition=eq.${COMPETITION}&key=eq.picks_open`, 'PATCH', { value: true });
+    await api(`competition_config?competition=eq.${COMPETITION}&key=eq.picks_locked`, 'PATCH', { value: false });
+    if (n >= 19) {
+      await api(`competition_config?competition=eq.${COMPETITION}&key=eq.playoff_start_week`, 'PATCH', { value: 19 });
+    }
+
+    // Clean the target week only.
+    await api(`season_picks?competition=eq.${COMPETITION}&week=eq.${n}`, 'DELETE');
+    await api(`season_user_totals?competition=eq.${COMPETITION}&week=eq.${n}`, 'DELETE');
+    await api(
+      `season_games?competition=eq.${COMPETITION}&week=eq.${n}`,
+      'PATCH',
+      {
+        status: 'scheduled', home_score: null, away_score: null, winner_team: null,
+        is_finalized: false, current_period: null, game_clock: null, lock_at: null,
+      }
+    );
+    log(`✓ Week ${n} reset to scheduled; picks + totals cleared.`, 'success');
+
+    // Load the target week's games, then reseed fake picks against them.
+    state.currentWeek = n;
+    await loadWeekGames();
+    await seedFakeWeekPicks(n);
+
+    log(`=== Now at Week ${n} (${targetPhase}), picks open. ===`, 'success');
+    await refreshState();
+    await loadWeekGames();
+  } catch (e) {
+    log(`Jump to week failed: ${e.message}`, 'error');
+  }
+}
+
+// Flip the scoring_locked emergency brake. Enabled even while locked so you
+// can unlock from here.
+async function toggleScoringLock() {
+  try {
+    const next = !state.scoringLocked;
+    await api(`competition_config?competition=eq.${COMPETITION}&key=eq.scoring_locked`, 'PATCH', { value: next });
+    log(`✓ scoring_locked → ${next}.`, next ? 'warn' : 'success');
+    await refreshState();
+  } catch (e) {
+    log(`Toggle scoring lock failed: ${e.message}`, 'error');
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1618,7 +1795,7 @@ function renderHomeScreenSpec() {
   el.innerHTML = html;
 }
 
-log('Season Simulator v3.1 loaded. Paste service role key and click Connect.', 'info');
+log('Season Simulator v3.2 loaded. Paste service role key and click Connect.', 'info');
 </script>
 </body>
 </html>
