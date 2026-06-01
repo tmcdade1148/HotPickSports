@@ -781,10 +781,18 @@ export const useNFLStore = create<NFLState>((set, get) => ({
             userPickCount: 0,
             weekResult: null,
             poolStandings: [],
-            liveScores: {},
-            highestRankedGame: null,
             weekFirstKickoff: null,
           });
+          // Repopulate live scores + highest-ranked game after the config
+          // change. We must NOT leave liveScores empty: the Home live-scores
+          // effect only re-runs on competition/currentWeek change, so within a
+          // week it would stay {} until the next Realtime tick — and an empty
+          // map makes getHotPickImpact return 'unavailable', dropping the
+          // HotPick win/loss state (e.g. a Thursday final losing its result
+          // when Sunday's games kick off). fetchLiveScores REPLACES the map, so
+          // it's correct on week rollover too (new week → only its games).
+          await get().fetchLiveScores().catch(() => {});
+          await get().fetchHighestRankedGame().catch(() => {});
         },
       )
       .subscribe();
