@@ -702,16 +702,8 @@ export const useNFLStore = create<NFLState>((set, get) => ({
    */
   subscribeToLiveScores: () => {
     const {competition, currentWeek} = get();
-    const name = `live-scores-${competition}-week${currentWeek}`;
-    // Same defensive cleanup as subscribeToCompetitionConfig — never add
-    // callbacks to an already-subscribed channel with this topic.
-    for (const ch of supabase.getChannels()) {
-      if (ch.topic === name || ch.topic === `realtime:${name}`) {
-        supabase.removeChannel(ch);
-      }
-    }
     const channel = supabase
-      .channel(name)
+      .channel(`live-scores-${competition}-week${currentWeek}`)
       .on(
         'postgres_changes',
         {
@@ -828,20 +820,10 @@ export const useNFLStore = create<NFLState>((set, get) => ({
    */
   subscribeToCompetitionConfig: () => {
     const {competition} = get();
-    const name = `competition-config-${competition}`;
-    // Defensive: switching competitions (e.g. entering/leaving the demo) can
-    // leave a previously-subscribed channel with this same topic alive — and
-    // adding postgres_changes callbacks to an already-subscribed channel
-    // throws ("cannot add callbacks ... after subscribe()"). Tear down any
-    // stale channel with this topic before re-subscribing so we always start
-    // from a clean, unsubscribed channel.
-    for (const ch of supabase.getChannels()) {
-      if (ch.topic === name || ch.topic === `realtime:${name}`) {
-        supabase.removeChannel(ch);
-      }
-    }
+    // Channel topics are made unique by the wrapper in config/supabase.ts, so
+    // re-subscribing after a competition switch never collides with a live one.
     const channel = supabase
-      .channel(name)
+      .channel(`competition-config-${competition}`)
       .on(
         'postgres_changes',
         {

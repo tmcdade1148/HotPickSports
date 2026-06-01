@@ -14,3 +14,31 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     detectSessionInUrl: false,
   },
 });
+
+// ---------------------------------------------------------------------------
+// Realtime channel safety wrapper.
+//
+// supabase-js v2 dedupes Realtime channels by topic: calling channel(topic)
+// when a channel with that topic already exists returns the SAME (possibly
+// already-subscribed) channel. Re-subscribing then throws:
+//   "cannot add postgres_changes callbacks for realtime:<topic> after subscribe()"
+// This fires whenever a component re-subscribes after a remount or after
+// switching the active competition in/out of the onboarding demo, before the
+// previous channel's async teardown completes.
+//
+// We append a unique suffix to every channel topic so channel() always returns
+// a fresh, unsubscribed channel and .on() never lands on a live one. Each
+// subscription still removes its own channel in its effect cleanup, so this
+// does not leak. (The postgres_changes filter — not the topic name — is what
+// scopes the data, so a suffixed topic is functionally identical.)
+// ---------------------------------------------------------------------------
+let _channelSeq = 0;
+const _origChannel = supabase.channel.bind(supabase);
+(supabase as unknown as {channel: (name: string, opts?: unknown) => unknown}).channel = (
+  name: string,
+  opts?: unknown,
+) =>
+  opts === undefined
+    ? (_origChannel as any)(`${name}__${++_channelSeq}`)
+    : (_origChannel as any)(`${name}__${++_channelSeq}`, opts);
+
