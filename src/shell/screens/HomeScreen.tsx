@@ -287,6 +287,20 @@ export function HomeScreen() {
     </View>
   ) : null;
 
+  // Off-cycle Clubs: if the user's upcoming-season Contests carry valid Club
+  // affiliations (partnerIds, derived from visiblePools above), show the real
+  // YOUR CLUBS stack instead of the generic one-line teaser.
+  const offCycleClubs = partnerIds.length > 0 ? (
+    <View style={styles.section}>
+      <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textTertiary}]}>
+        YOUR CLUBS
+      </Text>
+      {partnerIds.map(pid => (
+        <PartnerModule key={pid} partnerId={pid} />
+      ))}
+    </View>
+  ) : null;
+
   return (
     <View style={[styles.wrap, {backgroundColor: colors.background}]}>
       <ScrollView
@@ -309,7 +323,7 @@ export function HomeScreen() {
             {offCycleContests}
             {visiblePools.length > 0 ? <ReturningOffCycleActions /> : <OffSeasonActions />}
             <CrossContestStrip />
-            <ClubsTeaser />
+            {offCycleClubs ?? <ClubsTeaser />}
           </>
         )}
         {homeState === 'pre_season_games' && (
@@ -318,7 +332,7 @@ export function HomeScreen() {
             {visiblePools.length > 0 ? <ReturningOffCycleActions /> : <PreSeasonActions />}
             <PreseasonCountdownLine />
             <CrossContestStrip />
-            <ClubsTeaser />
+            {offCycleClubs ?? <ClubsTeaser />}
           </>
         )}
 
