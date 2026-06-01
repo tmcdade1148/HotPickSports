@@ -2,10 +2,10 @@
 // StateHero → Insight → Pool/Partner stacks). All Supabase reads live
 // in store loaders fired here so child modules can stay presentational.
 
-import React, {useEffect, useMemo} from 'react';
+import React, {useCallback, useEffect, useMemo} from 'react';
 import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {KeyRound, Plus} from 'lucide-react-native';
-import {useNavigation} from '@react-navigation/native';
+import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {isScheduledStatus} from '@sports/nfl/utils/gameStatus';
@@ -172,6 +172,35 @@ export function HomeScreen() {
     const unsub = subscribeToCompetitionConfig();
     return unsub;
   }, [subscribeToCompetitionConfig, competition]);
+
+  // Refetch the live slices whenever Home regains focus. Realtime is the
+  // primary update path, but a missed event (socket hiccup, or just sitting on
+  // another tab while week_state advanced) would otherwise leave Home stale
+  // until a manual pull-to-refresh. AppState's foreground refetch only fires on
+  // OS background→active, not in-app tab switches — this covers that gap so
+  // returning to Home always shows current state. Cheap + idempotent; skips the
+  // first focus since mount already fetched everything.
+  const didFocusInit = React.useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (!didFocusInit.current) {
+        didFocusInit.current = true;
+        return;
+      }
+      if (!userId || !competition) return;
+      const nfl = useNFLStore.getState();
+      nfl.fetchCompetitionConfig().catch(() => {});
+      if (currentWeek > 0) {
+        nfl.fetchUserPickStatus(userId).catch(() => {});
+        nfl.fetchUserHotPick(userId, currentWeek).catch(() => {});
+        nfl.fetchLiveScores().catch(() => {});
+      }
+      if (allPoolIds.length > 0) {
+        loadPoolIndicators(userId, allPoolIds).catch(() => {});
+        loadUserRankByPool(userId, allPoolIds).catch(() => {});
+      }
+    }, [userId, competition, currentWeek, allPoolIds, loadPoolIndicators, loadUserRankByPool]),
+  );
 
   useEffect(() => {
     if (!userId || !competition) return;
