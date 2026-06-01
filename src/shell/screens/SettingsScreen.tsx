@@ -257,47 +257,6 @@ export function SettingsScreen({route}: any) {
         <ChevronRight size={20} color={colors.textSecondary} />
       </TouchableOpacity>
 
-      {/* HotPick Admin — visible only to platform super_admins.
-          Entry point to the AdminHome hub (Moderation Queue, Pool
-          Management, Broadcast, etc.). Per April 2026 Super Admin
-          spec §5.1. */}
-      {userProfile?.is_super_admin && (
-        <View style={[styles.groupCard, {backgroundColor: colors.surface, marginBottom: spacing.md}]}>
-          <TouchableOpacity
-            style={styles.groupRow}
-            onPress={() => navigation.navigate('AdminHome')}>
-            <View style={styles.linkLeft}>
-              <Shield size={20} color={colors.primary} />
-              <Text style={[styles.linkText, {color: colors.textPrimary}]}>HotPick Admin</Text>
-            </View>
-            <ChevronRight size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Club Admin — visible only when the user organizes a Club Pool
-          (the de facto Partner Admin). Resolves the Club name on mount
-          via SettingsScreen's existing managed-club effect (see top of
-          component). */}
-      {managedClub !== null && (
-        <View style={[styles.groupCard, {backgroundColor: colors.surface, marginBottom: spacing.md}]}>
-          <TouchableOpacity
-            style={styles.groupRow}
-            onPress={() => navigation.navigate('ClubAdmin')}>
-            <View style={styles.linkLeft}>
-              <Settings size={20} color={colors.primary} />
-              <View>
-                <Text style={[styles.linkText, {color: colors.textPrimary}]}>Club Admin</Text>
-                <Text style={{fontSize: 12, color: colors.textSecondary, marginTop: 2}}>
-                  Managing: {managedClub.name}
-                </Text>
-              </View>
-            </View>
-            <ChevronRight size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
-        </View>
-      )}
-
       {/* Inbox section */}
       <Text style={[styles.groupLabel, {color: colors.textSecondary}]}>Inbox</Text>
       <View style={[styles.groupCard, {backgroundColor: colors.surface}]}>
@@ -650,27 +609,41 @@ export function SettingsScreen({route}: any) {
         </TouchableOpacity>
       </View>
 
-      {/* Admin section — super admin only. Partner Admin moved to
-          AdminHome → Club Management (reachable from "HotPick Admin"
-          at the top of Settings). Hardware Admin stays here until we
-          relocate it under AdminHome too. */}
-      {userProfile?.is_super_admin && (
+      {/* Admin section — the single home for all admin entry points.
+          Visible to platform super_admins and/or Club managers. Each row
+          is individually gated: the super-admin tools (HotPick Admin hub,
+          Hardware Admin, Competition switcher) on is_super_admin; Club Admin
+          on managing a Club (managedClub) — so a Club manager who isn't a
+          super-admin sees only that one row. */}
+      {(userProfile?.is_super_admin || managedClub !== null) && (
         <>
           <Text style={[styles.groupLabel, {color: colors.textSecondary}]}>Admin</Text>
           <View style={[styles.groupCard, {backgroundColor: colors.surface}]}>
-            <TouchableOpacity
-              style={styles.groupRow}
-              onPress={() => navigation.navigate('HardwareAdmin')}>
-              <View style={styles.linkLeft}>
-                <Award size={20} color={colors.primary} />
-                <Text style={[styles.linkText, {color: colors.textPrimary}]}>Hardware Admin</Text>
-              </View>
-              <ChevronRight size={18} color={colors.textSecondary} />
-            </TouchableOpacity>
-            <View style={[styles.groupDivider, {backgroundColor: colors.border}]} />
-            <TouchableOpacity
-              style={styles.groupRow}
-              onPress={() => {
+            {userProfile?.is_super_admin && (
+              <>
+                <TouchableOpacity
+                  style={styles.groupRow}
+                  onPress={() => navigation.navigate('AdminHome')}>
+                  <View style={styles.linkLeft}>
+                    <Shield size={20} color={colors.primary} />
+                    <Text style={[styles.linkText, {color: colors.textPrimary}]}>HotPick Admin</Text>
+                  </View>
+                  <ChevronRight size={18} color={colors.textSecondary} />
+                </TouchableOpacity>
+                <View style={[styles.groupDivider, {backgroundColor: colors.border}]} />
+                <TouchableOpacity
+                  style={styles.groupRow}
+                  onPress={() => navigation.navigate('HardwareAdmin')}>
+                  <View style={styles.linkLeft}>
+                    <Award size={20} color={colors.primary} />
+                    <Text style={[styles.linkText, {color: colors.textPrimary}]}>Hardware Admin</Text>
+                  </View>
+                  <ChevronRight size={18} color={colors.textSecondary} />
+                </TouchableOpacity>
+                <View style={[styles.groupDivider, {backgroundColor: colors.border}]} />
+                <TouchableOpacity
+                  style={styles.groupRow}
+                  onPress={() => {
                 const isSim = activeSport?.competition === 'nfl_2025_sim';
                 const target = isSim ? nflSeason : nflSeasonSim;
                 Alert.alert(
@@ -696,6 +669,29 @@ export function SettingsScreen({route}: any) {
               </View>
               <ChevronRight size={18} color={colors.textSecondary} />
             </TouchableOpacity>
+              </>
+            )}
+            {/* Club Admin — gated on managing a Club, so a Club manager who
+                isn't a super-admin still sees just this row. */}
+            {userProfile?.is_super_admin && managedClub !== null && (
+              <View style={[styles.groupDivider, {backgroundColor: colors.border}]} />
+            )}
+            {managedClub !== null && (
+              <TouchableOpacity
+                style={styles.groupRow}
+                onPress={() => navigation.navigate('ClubAdmin')}>
+                <View style={styles.linkLeft}>
+                  <Settings size={20} color={colors.primary} />
+                  <View>
+                    <Text style={[styles.linkText, {color: colors.textPrimary}]}>Club Admin</Text>
+                    <Text style={{fontSize: 12, color: colors.textSecondary, marginTop: 2}}>
+                      Managing: {managedClub.name}
+                    </Text>
+                  </View>
+                </View>
+                <ChevronRight size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            )}
           </View>
         </>
       )}
