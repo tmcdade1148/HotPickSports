@@ -265,8 +265,12 @@ export function SeasonPicksScreen() {
     // at the bottom, so as the week progresses each newly-kicked-off game lands
     // at the top of the list (regardless of HotPick rank). OPEN stays rank-
     // ordered since those games are still pickable and rank helps prioritize.
-    const byKickoffDesc = (a: DbSeasonGame, b: DbSeasonGame) =>
-      new Date(b.kickoff_at).getTime() - new Date(a.kickoff_at).getTime();
+    // Newest kickoff first; within the same wave (e.g. all the 1pm games),
+    // fall back to HotPick rank so the block reads 1→16 like it did at open.
+    const byKickoffDesc = (a: DbSeasonGame, b: DbSeasonGame) => {
+      const diff = new Date(b.kickoff_at).getTime() - new Date(a.kickoff_at).getTime();
+      return diff !== 0 ? diff : effectiveRank(a) - effectiveRank(b);
+    };
     locked.sort(byKickoffDesc);
     open.sort(byRank);
     const isFinalGame = (g: DbSeasonGame) => {
