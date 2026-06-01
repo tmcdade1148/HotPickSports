@@ -21,7 +21,7 @@ export function Insight({text}: InsightProps) {
       const pct = Math.round((hitRate.hits / hitRate.total) * 100);
       return `Your HotPick hit rate this season: ${pct}%.`;
     }
-    return "Your HotPick hit rate this season: locks in after Week 1.";
+    return "Your HotPick hit rate this season: updates after Week 1.";
   })();
 
   return (
