@@ -17,11 +17,12 @@ import {supabase} from '@shared/config/supabase';
 import {DemoIntroModal, DemoScoreModal} from '@shell/components/home/DemoModals';
 
 // ---------------------------------------------------------------------------
-// Game ordering — games are arranged by HotPick rank (1 at top → 16 at bottom).
-// Once a game locks (kicks off) it jumps to a "LOCKED" group at the top, while
-// games that haven't kicked off stay in an "OPEN" group below — each group
-// independently ranked 1→16. Replaces the older kickoff-time ("wave") grouping;
-// the per-game kickoff time still shows on each card.
+// Game ordering — two groups. Once a game locks (kicks off) it jumps to a
+// "LOCKED" group at the top, ordered by kickoff time with the most recent
+// kickoff at the top → oldest at the bottom, so the list tracks the week's
+// progress as games start (regardless of HotPick rank). Games that haven't
+// kicked off stay in an "OPEN" group below, ranked by HotPick value (1 → 16)
+// since those are still pickable. The per-game kickoff time shows on each card.
 // ---------------------------------------------------------------------------
 
 /** Effective HotPick rank for ordering: frozen_rank (locked at deadline) ?? live rank. */
@@ -260,7 +261,13 @@ export function SeasonPicksScreen() {
       (!picksAreOpen || hasKickedOff(g) ? locked : open).push(g);
     }
     const byRank = (a: DbSeasonGame, b: DbSeasonGame) => effectiveRank(a) - effectiveRank(b);
-    locked.sort(byRank);
+    // LOCKED group is ordered by kickoff time, most recent at the top → oldest
+    // at the bottom, so as the week progresses each newly-kicked-off game lands
+    // at the top of the list (regardless of HotPick rank). OPEN stays rank-
+    // ordered since those games are still pickable and rank helps prioritize.
+    const byKickoffDesc = (a: DbSeasonGame, b: DbSeasonGame) =>
+      new Date(b.kickoff_at).getTime() - new Date(a.kickoff_at).getTime();
+    locked.sort(byKickoffDesc);
     open.sort(byRank);
     const isFinalGame = (g: DbSeasonGame) => {
       const s = (g.status ?? '').toUpperCase();
