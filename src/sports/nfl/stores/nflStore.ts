@@ -108,6 +108,7 @@ interface NFLState {
   setCurrentWeek: (week: number) => void;
   setLiveScore: (gameId: string, score: GameScore) => void;
   setWeekResult: (result: WeekResult | null) => void;
+  fetchWeekResult: (userId: string, week: number) => Promise<void>;
   setPoolStandings: (standings: Standing[]) => void;
   fetchCompetitionConfig: () => Promise<void>;
   fetchUserHotPick: (userId: string, week: number) => Promise<void>;
@@ -215,6 +216,34 @@ export const useNFLStore = create<NFLState>((set, get) => ({
     })),
 
   setWeekResult: result => set({weekResult: result}),
+  fetchWeekResult: async (userId: string, week: number) => {
+    const {competition} = get();
+    const {data} = await supabase
+      .from('season_user_totals')
+      .select('week_points, correct_picks, total_picks, is_hotpick_correct')
+      .eq('user_id', userId)
+      .eq('competition', competition)
+      .eq('week', week)
+      .maybeSingle();
+    // Stale-guard: bail if the viewed week/competition moved on mid-flight.
+    if (get().competition !== competition || get().currentWeek !== week) return;
+    if (!data) {
+      set({weekResult: null});
+      return;
+    }
+    set({
+      weekResult: {
+        weekPoints: data.week_points ?? 0,
+        correctPicks: data.correct_picks ?? 0,
+        totalPicks: data.total_picks ?? 0,
+        hotPickCorrect: data.is_hotpick_correct ?? null,
+        // rankDelta / newRank aren't surfaced in the settling/complete heroes;
+        // leaderboard rank is read separately. Kept 0 to satisfy the type.
+        rankDelta: 0,
+        newRank: 0,
+      },
+    });
+  },
 
   setPoolStandings: standings => set({poolStandings: standings}),
 

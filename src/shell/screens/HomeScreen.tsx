@@ -54,6 +54,7 @@ export function HomeScreen() {
   const loadPartnerIndicators = useGlobalStore(s => s.loadPartnerIndicators);
   const fetchUserPickStatus    = useNFLStore(s => s.fetchUserPickStatus);
   const fetchUserHotPick       = useNFLStore(s => s.fetchUserHotPick);
+  const fetchWeekResult        = useNFLStore(s => s.fetchWeekResult);
   const fetchLiveScores        = useNFLStore(s => s.fetchLiveScores);
   const subscribeToLiveScores  = useNFLStore(s => s.subscribeToLiveScores);
   const fetchHighestRankedGame = useNFLStore(s => s.fetchHighestRankedGame);
@@ -291,6 +292,15 @@ export function HomeScreen() {
     fetchSeasonLeaderboard().catch(() => {});
   }, [seasonConfig, currentWeek, homeState, fetchSeasonLeaderboard]);
 
+  // Populate this week's result for the settling/complete heroes ("This week
+  // +N pts"). Reads the user's season_user_totals row; without this weekResult
+  // stays null and the hero shows +0.
+  useEffect(() => {
+    if (!userId || !competition || currentWeek <= 0) return;
+    if (homeState !== 'settling' && homeState !== 'complete') return;
+    fetchWeekResult(userId, currentWeek).catch(() => {});
+  }, [userId, competition, currentWeek, homeState, configLoaded, fetchWeekResult]);
+
   // While the backend is computing final scores, season_user_totals
   // updates aren't pushed via Realtime — poll the season aggregates so
   // SEASON PTS / recent weeks / hit rate roll forward.
@@ -301,6 +311,7 @@ export function HomeScreen() {
       fetchSeasonLeaderboard().catch(() => {});
       loadRecentWeeks(userId, competition).catch(() => {});
       loadHotPickHitRate(userId, competition).catch(() => {});
+      fetchWeekResult(userId, currentWeek).catch(() => {});
     };
     tick();
     const id = setInterval(tick, 10_000);
@@ -309,9 +320,11 @@ export function HomeScreen() {
     homeState,
     userId,
     competition,
+    currentWeek,
     fetchSeasonLeaderboard,
     loadRecentWeeks,
     loadHotPickHitRate,
+    fetchWeekResult,
   ]);
 
   // Off-cycle (off-season / pre-season): a returning user who already has
