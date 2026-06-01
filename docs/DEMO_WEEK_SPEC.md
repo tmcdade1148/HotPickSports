@@ -118,21 +118,25 @@ Every key inserted with a `description` (CLAUDE.md).
 - `frozen_rank` 1–16 set (so the HotPick ranking UX is real).
 - Kickoffs spread across the usual waves (Thu/Sun1/Sun4/SNF/MNF) so `groupGamesByWave`
   renders familiar section headers.
-- **Predetermined result** stored in result columns that `enforce_pick_lock` does NOT
-  read. Reuse existing finalize columns if present (`home_score`, `away_score`,
-  `winning_team`); the trigger keys off `status`, so populated scores on a `scheduled` row
-  are inert to it. **Open item O-1** confirms the exact column the scoring path reads as
-  "winner" vs. what the lock trigger reads — verify against `enforce_pick_lock` and
-  `nfl-calculate-scores` before seeding so we don't trip the lock or mis-score.
+- **Predetermined result (Resolved, O-1):** the outcome lives in `season_games.winner_team`
+  (the column the scorer reads; it selects games via `status ILIKE '%FINAL%'`).
+  `enforce_pick_lock` blocks only when `status != 'scheduled'` OR `lock_at <= NOW()`, so
+  demo games sit at `status='scheduled'`, `lock_at = NULL`, with `winner_team` populated —
+  picks always allowed, outcome inert to the trigger. `demo-settle` reads demo games
+  **without** the FINAL filter (it reuses the scorer's *math*, not its query). Seeded and
+  verified live (16 games, all pickable, all with winners).
+- **Outcome (O-6):** favorite (home, negative moneyline) wins ranks 4–16; the 3 upsets are
+  ranks 1–3 only, so a sensible pick set is clearly net-positive and a HotPick on any
+  high-rank favorite pays off, while the swing stays visible.
 
-### 5.3 Demo Players (the Ladder)
+### 5.3 Demo Players (the Ladder) — static client data, NOT seeded
 
-- ~8–10 seeded `profiles` rows flagged `is_demo = true` (new nullable column, or a reserved
-  email domain like `@demo.hotpick.local` — **Open item O-2**). Realistic `poolie_name`s +
-  system avatars.
-- Pre-baked `season_picks` (so their HotPick shows on the Week Ladder) **and** pre-baked
-  `season_user_totals` (week_points spread so the live user lands mid-pack, ~5th of ~10).
-  These are static — never re-scored.
+**Resolved (O-2):** demo Ladder opponents are **static client data** rendered in the
+bespoke Demo Result screen (§7.3) — not DB rows. Seeding `profiles` would require
+`auth.users` rows (or risk FK breakage) for pure set-dressing; the Result screen is bespoke
+anyway, so ~8–10 hardcoded personas (poolie name, system avatar, fixed week_points spread
+that lands the user ~5th of ~10) are sufficient and far simpler. Only the **user's own**
+pick→score path is real (server-side). No demo opponent rows in any table.
 
 ### 5.4 Demo pool
 
@@ -287,16 +291,18 @@ Separate workstream, summarized so Phase 1 doesn't foreclose it.
 
 ## 12. Open items (resolve before/early in build)
 
-- **O-1** Exact `season_games` column the scoring path treats as the winner vs. what
-  `enforce_pick_lock` reads — confirm a `scheduled` row with a populated result scores
-  correctly without tripping the lock.
-- **O-2** How to flag demo Players: `profiles.is_demo` column vs. reserved email domain.
-- **O-3** Is `nfl-calculate-scores` scoring already an importable pure function? If not,
-  extract to `_shared/scoring.ts` so `demo-settle` and the cron scorer share one impl.
 - **O-4** Where the demo submit branch lives — submit hook vs. a demo wrapper screen.
+  (Resolved during build — see commit.)
 
-_Resolved: O-5 (not in registry) and O-6 (clearly-positive outcome, swing still visible)
-are now decisions — see §2._
+_Resolved:_
+- **O-1** winner in `season_games.winner_team`; `scheduled` + `lock_at NULL` keeps the lock
+  trigger happy; `demo-settle` queries demo games without the FINAL filter. Seeded live.
+- **O-2** demo opponents are static client data, not DB rows (§5.3).
+- **O-3** scoring is inline in `nfl-calculate-scores`, not importable → the per-pick math is
+  extracted to `supabase/functions/_shared/scoring.ts` for `demo-settle`. Migrating the prod
+  scorer onto the shared module is a separate, deferred follow-up (no prod-scorer redeploy
+  in Phase 1 to avoid destabilizing live scoring).
+- **O-5** not in the registry. **O-6** clearly-positive outcome, swing visible. (See §2.)
 
 ---
 
