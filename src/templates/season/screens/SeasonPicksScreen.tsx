@@ -15,52 +15,27 @@ import {useGlobalStore} from '@shell/stores/globalStore';
 import {supabase} from '@shared/config/supabase';
 
 // ---------------------------------------------------------------------------
-// Wave grouping — classify games by kickoff window for section headers
+// Game ordering — games are arranged by HotPick rank (1 at top → 16 at bottom).
+// Once a game locks (kicks off) it jumps to a "LOCKED" group at the top, while
+// games that haven't kicked off stay in an "OPEN" group below — each group
+// independently ranked 1→16. Replaces the older kickoff-time ("wave") grouping;
+// the per-game kickoff time still shows on each card.
 // ---------------------------------------------------------------------------
 
-type Wave = 'thursday' | 'saturday' | 'sunday1' | 'sunday4' | 'snf' | 'mnf';
-
-const WAVE_LABELS: Record<Wave, string> = {
-  thursday: 'Thursday Night',
-  saturday: 'Saturday',
-  sunday1: 'Sunday 1:00 PM',
-  sunday4: 'Sunday 4:00 PM',
-  snf: 'Sunday Night',
-  mnf: 'Monday Night',
-};
-
-const WAVE_ORDER: Wave[] = ['thursday', 'saturday', 'sunday1', 'sunday4', 'snf', 'mnf'];
-
-function detectWave(kickoffAt: string): Wave {
-  const d = new Date(kickoffAt);
-  const day = d.getUTCDay(); // 0=Sun 4=Thu
-  const hour = d.getUTCHours();
-
-  if (day === 4) return 'thursday';
-  if (day === 5 && hour < 8) return 'thursday';
-  if (day === 6) return 'saturday';
-  if (day === 0) {
-    if (hour >= 17 && hour < 20) return 'sunday1';
-    if (hour >= 20 && hour < 23) return 'sunday4';
-    return 'snf';
-  }
-  if (day === 1 && hour < 4) return 'snf';
-  if (day === 1 && hour >= 17) return 'mnf';
-  if (day === 2 && hour < 4) return 'mnf';
-  if (day === 5) return 'sunday1';
-  return 'sunday1';
+/** Effective HotPick rank for ordering: frozen_rank (locked at deadline) ?? live rank. */
+function effectiveRank(g: DbSeasonGame): number {
+  return g.frozen_rank ?? g.rank ?? 999;
 }
 
-function groupGamesByWave(games: DbSeasonGame[]): {title: string; data: DbSeasonGame[]}[] {
-  const groups: Record<string, DbSeasonGame[]> = {};
-  for (const game of games) {
-    const wave = detectWave(game.kickoff_at);
-    if (!groups[wave]) groups[wave] = [];
-    groups[wave].push(game);
+/** Has this game kicked off / locked? (live, final, lock_at passed, or kickoff passed) */
+function hasKickedOff(g: DbSeasonGame): boolean {
+  const s = (g.status ?? '').toUpperCase();
+  if (s === 'FINAL' || s === 'STATUS_FINAL' || s === 'COMPLETED' || s === 'IN_PROGRESS' || s === 'LIVE') {
+    return true;
   }
-  return WAVE_ORDER
-    .filter(w => groups[w]?.length)
-    .map(w => ({title: WAVE_LABELS[w], data: groups[w]}));
+  if (g.lock_at && new Date(g.lock_at).getTime() <= Date.now()) return true;
+  if (new Date(g.kickoff_at).getTime() <= Date.now()) return true;
+  return false;
 }
 
 /**
@@ -259,7 +234,27 @@ export function SeasonPicksScreen() {
     return liveOrFinalKickoffs.length > 0 ? Math.min(...liveOrFinalKickoffs) : null;
   }, [weekState, games]);
 
-  const sections = useMemo(() => groupGamesByWave(games), [games]);
+  // Picks remain interactive through 'live'; individual cards lock per kickoff.
+  // 'locked' state and beyond are fully locked (all games sit in the LOCKED group).
+  const picksAreOpen =
+    (weekState === 'picks_open' || weekState === 'live') && currentWeek === dbCurrentWeek;
+
+  // Two rank-ordered groups: LOCKED (kicked off, or whole week locked) on top,
+  // OPEN (still pickable) below — each sorted by HotPick rank 1→16.
+  const sections = useMemo(() => {
+    const locked: DbSeasonGame[] = [];
+    const open: DbSeasonGame[] = [];
+    for (const g of games) {
+      (!picksAreOpen || hasKickedOff(g) ? locked : open).push(g);
+    }
+    const byRank = (a: DbSeasonGame, b: DbSeasonGame) => effectiveRank(a) - effectiveRank(b);
+    locked.sort(byRank);
+    open.sort(byRank);
+    const out: {title: string; data: DbSeasonGame[]}[] = [];
+    if (locked.length) out.push({title: 'LOCKED', data: locked});
+    if (open.length) out.push({title: 'OPEN', data: open});
+    return out;
+  }, [games, picksAreOpen]);
 
   if (!config) {
     return (
@@ -285,10 +280,6 @@ export function SeasonPicksScreen() {
       </View>
     );
   }
-
-  // Picks remain interactive through 'live' — individual games lock per-card via
-  // status, lock_at, or wave inference. 'locked' state and beyond are fully locked.
-  const picksAreOpen = (weekState === 'picks_open' || weekState === 'live') && currentWeek === dbCurrentWeek;
 
   const renderGame = ({item}: {item: DbSeasonGame}) => (
     <View style={styles.cardWrapper}>
