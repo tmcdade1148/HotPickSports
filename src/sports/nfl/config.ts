@@ -29,7 +29,7 @@ export const nflSeason: SeasonConfig = {
     accentColor: '#013369',
     // Copy block per the OffseasonPreseasonHome spec (May 29, 2026).
     // Lexicon-locked strings — match exactly, no rewording.
-    offseasonHeadline:       "FOOTBALL'S ON ITS WAY BACK.",
+    offseasonHeadline:       "YEP, WE'RE COUNTING THE DAYS TOO.",
     offseasonHeroSub:        'Plenty of time to set up your Contest and get everyone in before kickoff.',
     offseasonCountdownLabel: 'DAYS UNTIL NFL 2026 KICKS OFF',
     preseasonHeadline:       "IT'S STARTING TO GET REAL.",
