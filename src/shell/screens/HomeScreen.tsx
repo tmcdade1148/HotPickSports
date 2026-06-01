@@ -271,6 +271,22 @@ export function HomeScreen() {
     loadRecentWeeks,
     loadHotPickHitRate,
   ]);
+
+  // Off-cycle (off-season / pre-season): a returning user who already has
+  // Contests set up for the upcoming season should see them, not just the
+  // Create/Join action stack. visiblePools is already scoped to the active
+  // competition (e.g. nfl_2026), so these ARE the upcoming-season Contests.
+  const offCycleContests = visiblePools.length > 0 ? (
+    <View style={styles.section}>
+      <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textTertiary}]}>
+        YOUR {LEXICON.contest.plural.toUpperCase()}
+      </Text>
+      {sortedVisiblePools.map(p => (
+        <PoolModule key={p.id} pool={p} />
+      ))}
+    </View>
+  ) : null;
+
   return (
     <View style={[styles.wrap, {backgroundColor: colors.background}]}>
       <ScrollView
@@ -290,6 +306,7 @@ export function HomeScreen() {
             so we drop it from these states. */}
         {homeState === 'off_season_idle' && (
           <>
+            {offCycleContests}
             <OffSeasonActions />
             <CrossContestStrip />
             <ClubsTeaser />
@@ -297,6 +314,7 @@ export function HomeScreen() {
         )}
         {homeState === 'pre_season_games' && (
           <>
+            {offCycleContests}
             <PreSeasonActions />
             <PreseasonCountdownLine />
             <CrossContestStrip />
