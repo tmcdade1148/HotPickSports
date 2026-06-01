@@ -608,9 +608,10 @@ export function PicksOpenHero() {
 /**
  * Pick the right copy for the picks-open hero based on the user's state.
  *
- * The string ends with a colon when it's introducing the countdown below
- * it (most cases). It stands alone (no trailing colon) when the moment
- * is urgent and we want the user's attention on action, not the clock.
+ * When no HotPick is designated the standalone big timer still renders, so
+ * those strings end with a colon introducing the countdown below. Once a
+ * HotPick is designated the countdown moves inline into the HotPick card, so
+ * those strings stand alone with no "kicks off in:" lead-in.
  */
 function buildContextualMessage(opts: {
   picksSet: number;
@@ -637,18 +638,21 @@ function buildContextualMessage(opts: {
     return `${picksSet} of ${totalPicks} picks in — you still need a HotPick. First kickoff in:`;
   }
 
+  // HotPick designated → the countdown rides inline next to the kickoff time
+  // in the HotPick card below, so these messages stand alone (no "kicks off
+  // in:" lead-in).
   if (hotPickIsFirstGame) {
     return urgent
-      ? 'Bold HotPick. It kicks off in:'
-      : 'Bold call — your HotPick is the first game. It kicks off in:';
+      ? 'Bold HotPick.'
+      : 'Bold call — your HotPick is the first game.';
   }
   if (allPicks) {
-    if (urgent) return 'Locked & loaded. HotPick kicks off in:';
-    if (tight)  return 'Picks are set. HotPick kicks off in:';
-    return 'Feeling good about your HotPick? It kicks off in:';
+    if (urgent) return 'Locked & loaded.';
+    if (tight)  return 'Picks are set.';
+    return 'Feeling good about your HotPick?';
   }
-  if (urgent) return `${picksSet}/${totalPicks} done. Finish up — HotPick kicks off in:`;
-  return `${picksSet} of ${totalPicks} in — HotPick kicks off in:`;
+  if (urgent) return `${picksSet}/${totalPicks} done. Finish up.`;
+  return `${picksSet} of ${totalPicks} in.`;
 }
 
 function useCountdownParts(
