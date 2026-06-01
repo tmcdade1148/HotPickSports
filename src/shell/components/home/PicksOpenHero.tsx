@@ -117,6 +117,17 @@ export function PicksOpenHero() {
     ? timer.days * 24 * 60 + timer.hours * 60 + timer.minutes
     : null;
 
+  // Compact countdown label (single largest meaningful unit — app-wide rule:
+  // days → hours → minutes). Shown inline next to the HotPick kickoff time
+  // when the HotPick card is present, otherwise as the standalone big timer.
+  const countdownLabel = timer
+    ? (() => {
+        const su = singleUnit(timer.days, timer.hours, timer.minutes);
+        const u = su.unit === 'day' ? 'd' : su.unit === 'hour' ? 'h' : 'm';
+        return `${su.value}${u}`;
+      })()
+    : null;
+
   const message = buildContextualMessage({
     picksSet,
     totalPicks: picksTotal,
@@ -211,6 +222,13 @@ export function PicksOpenHero() {
       : hotPickImpact.points;
   }, [hotPickImpact]);
 
+  // The HotPick card hosts the inline countdown. When it's on screen we drop
+  // the standalone big timer (the countdown lives next to "Thu 8:20 PM"); when
+  // there's no card yet (no HotPick designated), the big timer still carries
+  // the countdown so the contextual message isn't left dangling.
+  const hotPickCardShown =
+    hotPickDesignated && !!userHotPickGame && !hotPickIsLive && !hotPickIsFinal;
+
   const pulse = useRef(new Animated.Value(0.4)).current;
   useEffect(() => {
     if (!hotPickIsLive) {
@@ -272,8 +290,10 @@ export function PicksOpenHero() {
       {/* timer — digits at full size, unit letters at 0.4×, colons between.
           No adjustsFontSizeToFit: combined with nested-Text children of
           different fontSize, iOS shrinks the whole string to a tiny size.
-          The string is short enough that a fixed size always fits. */}
-      {!hotPickIsLive && !hotPickIsFinal && (
+          The string is short enough that a fixed size always fits.
+          Suppressed when the HotPick card is shown — there the countdown
+          rides inline next to the kickoff time instead. */}
+      {!hotPickIsLive && !hotPickIsFinal && !hotPickCardShown && (
         timer ? (
           (() => {
             // Single largest meaningful unit (app-wide rule): days → hours → minutes.
@@ -455,10 +475,18 @@ export function PicksOpenHero() {
               );
             })()}
             {/* Drop the kickoff line once the game is live or final —
-                "Thu 8:20 PM" is only useful as pre-game context. */}
+                "Thu 8:20 PM" is only useful as pre-game context. The
+                countdown rides inline to the right of the day/time
+                (e.g. "Thu 8:20 PM · 2h") so the contextual message's
+                "…kicks off in:" lead-in resolves here. */}
             {hotPickKickoffPretty && !hotPickIsLive && !hotPickIsFinal && (
               <Text style={[bodyType.regular, styles.hotPickKickoff, {color: colors.textSecondary}]}>
                 {hotPickKickoffPretty}
+                {countdownLabel && (
+                  <Text style={{color: colors.textPrimary, fontWeight: '700'}}>
+                    {'  ·  '}{countdownLabel}
+                  </Text>
+                )}
               </Text>
             )}
           </View>
