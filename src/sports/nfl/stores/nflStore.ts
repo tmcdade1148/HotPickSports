@@ -792,27 +792,35 @@ export const useNFLStore = create<NFLState>((set, get) => ({
           filter: `competition=eq.${competition}`,
         },
         async () => {
-          // Gate all useEffects behind configLoaded = false so they don't
-          // fire with stale currentWeek while config is being fetched.
-          set({configLoaded: false, userHotPick: null, userHotPickGame: null});
+          const prevWeek = get().currentWeek;
+          // Refetch config — updates week_state / current_phase / current_week,
+          // which is all a same-week transition (picks_open → live → settling →
+          // complete) needs. fetchCompetitionConfig bails if the competition
+          // changed mid-flight.
           await get().fetchCompetitionConfig();
-          set({
-            configLoaded: true,
-            userPickCount: 0,
-            weekResult: null,
-            poolStandings: [],
-            weekFirstKickoff: null,
-          });
-          // Repopulate live scores + highest-ranked game after the config
-          // change. We must NOT leave liveScores empty: the Home live-scores
-          // effect only re-runs on competition/currentWeek change, so within a
-          // week it would stay {} until the next Realtime tick — and an empty
-          // map makes getHotPickImpact return 'unavailable', dropping the
-          // HotPick win/loss state (e.g. a Thursday final losing its result
-          // when Sunday's games kick off). fetchLiveScores REPLACES the map, so
-          // it's correct on week rollover too (new week → only its games).
+
+          // Only do the heavy clear on an actual WEEK ROLLOVER, so stale week-N
+          // data doesn't bleed into week N+1. Doing it on every config update
+          // (the simulator writes several keys per checkpoint) blanked the
+          // HotPick / week score / live scores on each write, making the heroes
+          // flash back to an empty "picks open" look between every stage.
+          if (get().currentWeek !== prevWeek) {
+            set({
+              userHotPick: null,
+              userHotPickGame: null,
+              userPickCount: 0,
+              weekResult: null,
+              poolStandings: [],
+              weekFirstKickoff: null,
+              highestRankedGame: null,
+            });
+            await get().fetchHighestRankedGame().catch(() => {});
+          }
+
+          // Keep live scores fresh on every config change (cheap REPLACE) so the
+          // HotPick win/loss state survives mid-week transitions — fetchLiveScores
+          // only re-runs from the Home effect on week change otherwise.
           await get().fetchLiveScores().catch(() => {});
-          await get().fetchHighestRankedGame().catch(() => {});
         },
       )
       .subscribe();

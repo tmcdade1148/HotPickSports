@@ -248,11 +248,11 @@ export function HomeScreen() {
     loadPartnerIndicators(userId, partnerIds).catch(() => {});
   }, [userId, partnerIds, loadPartnerIndicators]);
 
-  // Re-runs on every config update, not just week rollover: the config
-  // subscription nulls userHotPick + flips configLoaded false→true on each
-  // week_state transition (picks_open → locked → live …). Gating on
-  // configLoaded re-fetches the HotPick after each transition so it doesn't
-  // vanish mid-week once the subscription clears it.
+  // Fetch the user's pick status + HotPick once config has loaded and on each
+  // week change. The config subscription only clears the HotPick on an actual
+  // week rollover (not on same-week transitions), and currentWeek changing then
+  // re-runs this to load the new week's HotPick. configLoaded gates the initial
+  // load so it doesn't fire with a stale currentWeek before config resolves.
   useEffect(() => {
     if (!configLoaded) return;
     if (!userId || !competition || currentWeek <= 0) return;
