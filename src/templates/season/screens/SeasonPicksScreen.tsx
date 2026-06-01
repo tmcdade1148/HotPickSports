@@ -1,4 +1,4 @@
-import React, {useEffect, useCallback, useMemo, useState} from 'react';
+import React, {useEffect, useCallback, useMemo, useRef, useState} from 'react';
 import {View, Text, SectionList, ActivityIndicator, Alert, StyleSheet, TouchableOpacity} from 'react-native';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import {BarChart3} from 'lucide-react-native';
@@ -204,14 +204,26 @@ export function SeasonPicksScreen() {
     return total;
   })();
 
-  // When the DB advances to a new week (week transition), auto-advance the
-  // viewing week so seasonStore.currentWeek stays in sync with nflStore.currentWeek.
-  // Without this, picksAreOpen = (weekState_open && currentWeek === dbCurrentWeek)
-  // evaluates to false for the new week — locking all games after every transition.
-  // Only fire when dbCurrentWeek changes (not when user manually navigates back).
+  // Keep the viewing week in sync with the league's current week, but DON'T
+  // yank the user off a week they've navigated back to. On first mount we land
+  // on the live week. After that we only follow the league forward when the
+  // user is still on the (previously) live week — if they've lingered on an
+  // earlier, completed week (e.g. to read its FINAL SCORE banner), we leave
+  // them there until they move themselves.
+  // (picksAreOpen needs currentWeek === dbCurrentWeek, so the live week must
+  // stay in sync for the new week not to read as locked.)
+  const prevDbWeekRef = useRef<number | null>(null);
   useEffect(() => {
+    const prev = prevDbWeekRef.current;
+    prevDbWeekRef.current = dbCurrentWeek;
     const viewingWeek = useSeasonStore.getState().currentWeek;
-    if (dbCurrentWeek > viewingWeek) {
+    if (prev === null) {
+      // First sync — land on the live week.
+      if (dbCurrentWeek > viewingWeek) setCurrentWeek(dbCurrentWeek);
+      return;
+    }
+    // Follow forward only if the user was on the previously-live week.
+    if (dbCurrentWeek > prev && viewingWeek === prev) {
       setCurrentWeek(dbCurrentWeek);
     }
   }, [dbCurrentWeek, setCurrentWeek]);
