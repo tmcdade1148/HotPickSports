@@ -39,6 +39,7 @@ export function HomeScreen() {
   const weekState    = useNFLStore(s => s.weekState);
   const currentWeek  = useNFLStore(s => s.currentWeek);
   const competition  = useNFLStore(s => s.competition);
+  const configLoaded = useNFLStore(s => s.configLoaded);
 
   const loadLastWeekHotPick   = useGlobalStore(s => s.loadLastWeekHotPick);
   const loadRecentWeeks       = useGlobalStore(s => s.loadRecentWeeks);
@@ -160,10 +161,17 @@ export function HomeScreen() {
     homeState === 'settling'     ||
     homeState === 'complete';
 
+  // Re-subscribe whenever the active competition changes. The channel filters
+  // competition_config UPDATEs by `competition=eq.<id>`, captured at call time
+  // from the store. Without `competition` in the deps, a home screen that
+  // mounts on the default nfl_2026 before the beta force-land flips the store
+  // to nfl_2025_sim stays bound to the wrong competition forever — so live
+  // week_state / current_phase changes (e.g. from the season simulator) never
+  // arrive and the CTA hero + HotPick never advance.
   useEffect(() => {
     const unsub = subscribeToCompetitionConfig();
     return unsub;
-  }, [subscribeToCompetitionConfig]);
+  }, [subscribeToCompetitionConfig, competition]);
 
   useEffect(() => {
     if (!userId || !competition) return;
@@ -210,11 +218,17 @@ export function HomeScreen() {
     loadPartnerIndicators(userId, partnerIds).catch(() => {});
   }, [userId, partnerIds, loadPartnerIndicators]);
 
+  // Re-runs on every config update, not just week rollover: the config
+  // subscription nulls userHotPick + flips configLoaded false→true on each
+  // week_state transition (picks_open → locked → live …). Gating on
+  // configLoaded re-fetches the HotPick after each transition so it doesn't
+  // vanish mid-week once the subscription clears it.
   useEffect(() => {
+    if (!configLoaded) return;
     if (!userId || !competition || currentWeek <= 0) return;
     fetchUserPickStatus(userId).catch(() => {});
     fetchUserHotPick(userId, currentWeek).catch(() => {});
-  }, [userId, competition, currentWeek, fetchUserPickStatus, fetchUserHotPick]);
+  }, [userId, competition, currentWeek, configLoaded, fetchUserPickStatus, fetchUserHotPick]);
 
   // Live scores re-fetch on currentWeek change — fetchLiveScores REPLACES
   // (not merges) so last week's final entries are wiped, preventing
