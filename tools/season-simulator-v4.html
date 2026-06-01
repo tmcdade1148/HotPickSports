@@ -201,6 +201,18 @@
           there. Prefilled: ElbowSoup. (Reviewer/Mel = 55ed62e4-9fe3-45d6-b9a0-a1819d81387b.)
         </div>
 
+        <label style="display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 12px; color: #E6EDF3; cursor: pointer;">
+          <input type="checkbox" id="chk-wait-app" checked />
+          Wait for the app to catch up between steps
+        </label>
+        <div style="font-size: 11px; color: #8A97AA; margin-top: 4px;">
+          Instead of a fixed pause, each step waits until the app confirms it has
+          ingested the change (via a sandbox heartbeat) before moving on &mdash; no
+          more races where the simulator gets ahead of the app. Auto-falls back to
+          fixed pacing if no live app is detected when a run starts. App must be
+          open on <code>nfl_2025_sim</code>.
+        </div>
+
         <button class="btn btn-warning btn-full" id="btn-run-season" onclick="runFullSeason()" disabled style="margin-top: 12px;">
           &#9654; Run full season (every step)
         </button>
@@ -1334,6 +1346,7 @@ async function runEntireWeek() {
     `Skips individual confirm prompts.`
   )) return;
 
+  await probeAppHeartbeat();
   const steps = CHECKPOINTS.filter(c => c.id !== 'next-week');
   for (const cp of steps) {
     checkpointStatus[cp.id] = 'current';
@@ -1348,7 +1361,7 @@ async function runEntireWeek() {
     }
     await refreshState();
     await loadWeekGames();
-    await sleep(3000);
+    await settleStep(3000);
   }
   log('▶ Week auto-run complete. Click "Next Week Opens" when ready to advance.', 'success');
 }
@@ -1360,6 +1373,77 @@ async function runEntireWeek() {
 // it runs. Fakes auto-pick; the test account does too if the box is checked.
 const SEASON_STEP_PAUSE_MS = 3500;
 let seasonRun = {active: false, paused: false, stop: false};
+
+// ── App catch-up heartbeat ────────────────────────────────────────────────
+// Instead of a blind fixed delay between steps, bump a step token in
+// competition_config and wait for the app to echo that token back into
+// sim_app_heartbeat (the app writes it after it finishes ingesting each config
+// step on nfl_2025_sim). The run advances as soon as the app is actually caught
+// up — no more "simulator moved on before the app was ready" races. If no live
+// app heartbeat is detected at run start, we fall back to the fixed pause.
+const APP_ACK_TIMEOUT_MS = 12000; // stop waiting after this and proceed anyway
+const APP_ACK_POLL_MS    = 400;   // heartbeat poll interval
+const APP_SETTLE_MS      = 700;   // small buffer after ack for downstream effects
+const HEARTBEAT_FRESH_MS = 120000;// heartbeat older than this ⇒ no live app
+let appAck = {available: false};
+let stepTokenSeq = 0;
+
+async function bumpStepToken() {
+  // Monotonic, unique per call (ms × 1000 + small seq) so a second step within
+  // the same millisecond still strictly increases the token.
+  const token = Date.now() * 1000 + (stepTokenSeq++ % 1000);
+  await api(`competition_config?competition=eq.${COMPETITION}&key=eq.sim_step_token`,
+    'PATCH', { value: token });
+  return token;
+}
+
+async function readHeartbeat() {
+  try {
+    const rows = await api(`sim_app_heartbeat?competition=eq.${COMPETITION}&select=last_token,observed_at`);
+    return rows && rows[0] ? rows[0] : null;
+  } catch { return null; }
+}
+
+// Probe once at run start: is there a fresh app heartbeat to wait on?
+async function probeAppHeartbeat() {
+  const hb = await readHeartbeat();
+  appAck.available = !!(hb && (Date.now() - new Date(hb.observed_at).getTime() < HEARTBEAT_FRESH_MS));
+  if (appAck.available) {
+    log('🤝 App heartbeat detected — steps will wait for the app to catch up.', 'success');
+  } else {
+    log('⏱ No live app heartbeat — using fixed pacing. (Open the app on nfl_2025_sim as your test user for app-synced stepping.)', 'warn');
+  }
+  return appAck.available;
+}
+
+// Bump the token and wait for the app to ack it. Returns true if acked, false
+// on timeout (we proceed anyway so the run never hangs on a closed app).
+async function waitForAppCatchUp() {
+  const token = await bumpStepToken();
+  const deadline = Date.now() + APP_ACK_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    if (seasonRun.stop) return false;
+    const hb = await readHeartbeat();
+    if (hb && Number(hb.last_token) >= token) {
+      await sleep(APP_SETTLE_MS);
+      return true;
+    }
+    await sleep(APP_ACK_POLL_MS);
+  }
+  log('⏳ App didn’t ack in time — proceeding. (Is the app open on nfl_2025_sim as the right user?)', 'warn');
+  return false;
+}
+
+// Unified between-step settle: wait for the app when heartbeat mode is on AND a
+// live app was detected at run start; otherwise fall back to the fixed pause.
+async function settleStep(fixedMs) {
+  const wantAck = document.getElementById('chk-wait-app')?.checked !== false;
+  if (wantAck && appAck.available) {
+    await waitForAppCatchUp();
+  } else {
+    await sleep(fixedMs);
+  }
+}
 
 function updateRunControls() {
   const pause = document.getElementById('btn-pause-season');
@@ -1403,6 +1487,7 @@ async function runFullSeason() {
 
   seasonRun = {active: true, paused: false, stop: false};
   updateRunControls();
+  await probeAppHeartbeat();
   const steps = CHECKPOINTS.filter(c => c.id !== 'next-week');
 
   try {
@@ -1420,7 +1505,7 @@ async function runFullSeason() {
         await window[cp.fn](cp.arg);
         await refreshState();
         await loadWeekGames();
-        await sleep(SEASON_STEP_PAUSE_MS);
+        await settleStep(SEASON_STEP_PAUSE_MS);
       }
 
       await waitWhilePaused();
@@ -1428,7 +1513,7 @@ async function runFullSeason() {
       if (wk >= 22) { log('=== Season complete — Week 22 done. ===', 'success'); break; }
       await cpNextWeek();      // advance week + carry phase
       await refreshState();
-      await sleep(1500);       // brief gap so the app shows the new week opening
+      await settleStep(1500);  // wait for the app to show the new week opening
     }
   } catch (e) {
     if (e.message === '__STOP__') log('⏹ Season run stopped.', 'warn');

@@ -287,6 +287,27 @@ export const useNFLStore = create<NFLState>((set, get) => ({
       typeof cfg.current_phase === 'string' ? cfg.current_phase : 'REGULAR';
 
     set({currentWeek, seasonYear, weekState, picksDeadline, picksOpenAt, seasonOpenerAt, sundayLockAnchor, currentPhase});
+
+    // Sandbox-only heartbeat. After ingesting a config step on nfl_2025_sim,
+    // echo the simulator's step token back into sim_app_heartbeat so the
+    // season simulator can wait for this app instance to catch up before
+    // advancing (instead of a blind fixed timer). Gated to the sandbox
+    // competition so it never touches live data; fire-and-forget so an RLS
+    // miss or offline state just falls the simulator back to its own timer.
+    if (competition === 'nfl_2025_sim') {
+      const simToken =
+        typeof cfg.sim_step_token === 'number' ? cfg.sim_step_token : 0;
+      void supabase
+        .from('sim_app_heartbeat')
+        .upsert(
+          {competition, last_token: simToken, observed_at: new Date().toISOString()},
+          {onConflict: 'competition'},
+        )
+        .then(
+          () => {},
+          () => {},
+        );
+    }
   },
 
   fetchUserHotPick: async (userId: string, week: number) => {
