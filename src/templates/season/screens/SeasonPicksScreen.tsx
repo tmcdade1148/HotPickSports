@@ -30,13 +30,18 @@ function effectiveRank(g: DbSeasonGame): number {
   return g.frozen_rank ?? g.rank ?? 999;
 }
 
-/** Has this game kicked off / locked? (live, final, lock_at passed, or kickoff passed) */
-function hasKickedOff(g: DbSeasonGame): boolean {
+/**
+ * Has this game actually STARTED? (live, final, or its real kickoff time has
+ * passed). Deliberately NOT based on lock_at: picks can lock for a game well
+ * before it starts — the "Sunday seal" locks the 4pm / SNF / MNF games at the
+ * first Sunday 1pm kickoff — but those games haven't kicked off yet, so they
+ * must stay in the lower group (not float to the top) until they actually play.
+ */
+function hasStarted(g: DbSeasonGame): boolean {
   const s = (g.status ?? '').toUpperCase();
   if (s === 'FINAL' || s === 'STATUS_FINAL' || s === 'COMPLETED' || s === 'IN_PROGRESS' || s === 'LIVE') {
     return true;
   }
-  if (g.lock_at && new Date(g.lock_at).getTime() <= Date.now()) return true;
   if (new Date(g.kickoff_at).getTime() <= Date.now()) return true;
   return false;
 }
@@ -252,13 +257,15 @@ export function SeasonPicksScreen() {
   const picksAreOpen =
     (weekState === 'picks_open' || weekState === 'live') && currentWeek === dbCurrentWeek;
 
-  // Two rank-ordered groups: LOCKED (kicked off, or whole week locked) on top,
-  // OPEN (still pickable) below — each sorted by HotPick rank 1→16.
+  // Two groups: LOCKED (games that have actually STARTED, or the whole week is
+  // locked) on top, ordered by kickoff recency (newest first); OPEN (not yet
+  // started) below, ordered by HotPick rank 1→16. A game only lifts to the top
+  // once it kicks off — not when its picks merely lock (Sunday seal).
   const sections = useMemo(() => {
     const locked: DbSeasonGame[] = [];
     const open: DbSeasonGame[] = [];
     for (const g of games) {
-      (!picksAreOpen || hasKickedOff(g) ? locked : open).push(g);
+      (!picksAreOpen || hasStarted(g) ? locked : open).push(g);
     }
     const byRank = (a: DbSeasonGame, b: DbSeasonGame) => effectiveRank(a) - effectiveRank(b);
     // LOCKED group is ordered by kickoff time, most recent at the top → oldest
