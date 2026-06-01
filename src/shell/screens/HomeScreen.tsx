@@ -20,7 +20,7 @@ import {IdentityBar} from '@shell/components/home/IdentityBar';
 import {StateHero} from '@shell/components/home/StateHero';
 import {CrossContestStrip} from '@shell/components/home/CrossContestStrip';
 import {OffSeasonActions, PreSeasonActions, ReturningOffCycleActions} from '@shell/components/home/OffCycleActions';
-import {usePreseasonDays} from '@shell/components/home/PreSeasonGamesHero';
+import {usePreseasonCountdown} from '@shell/components/home/PreSeasonGamesHero';
 import {CalendarDays} from 'lucide-react-native';
 import {Insight} from '@shell/components/home/Insight';
 import {HomeInbox} from '@shell/components/home/HomeInbox';
@@ -435,7 +435,7 @@ export function HomeScreen() {
  *  the shared usePreseasonDays hook. */
 function PreseasonCountdownLine() {
   const {colors} = useTheme();
-  const days = usePreseasonDays();
+  const countdown = usePreseasonCountdown();
   const activeSport = useGlobalStore(s => s.activeSport);
   const label = activeSport?.sportIdentity?.preseasonCountdownLabel
     ?? 'Regular season picks open in';
@@ -444,7 +444,7 @@ function PreseasonCountdownLine() {
       <CalendarDays size={16} color={colors.textTertiary} strokeWidth={2} />
       <Text style={[bodyType.regular, offCycleStyles.countdownText, {color: colors.textPrimary}]}>
         {label}{' '}
-        <Text style={bodyType.bold}>{days} days</Text>
+        <Text style={bodyType.bold}>{countdown}</Text>
       </Text>
     </View>
   );

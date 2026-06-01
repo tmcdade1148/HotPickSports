@@ -20,7 +20,8 @@ export function SuperBowlIntroHero() {
 
   const picksOpenAt  = useNFLStore(s => s.picksOpenAt);
   const currentPhase = useNFLStore(s => s.currentPhase);
-  const {days, hours, minutes, isExpired} = useCountdown(picksOpenAt);
+  const {unitValue, unit, isExpired} = useCountdown(picksOpenAt);
+  const unitWord = unit === 'day' ? 'days' : unit === 'hour' ? 'hours' : 'min';
   const greeting = getContextGreeting(currentPhase, 'idle', 0, null);
 
   return (
@@ -47,17 +48,9 @@ export function SuperBowlIntroHero() {
           </Text>
           <View style={styles.countdownRow}>
             <Text style={[displayType.display, monoType.regular, styles.countNum, {color: colors.textPrimary}]}>
-              {days}
+              {unitValue}
             </Text>
-            <Text style={[bodyType.bold, styles.countSep, {color: colors.textTertiary}]}>d</Text>
-            <Text style={[displayType.display, monoType.regular, styles.countNum, {color: colors.textPrimary}]}>
-              {hours}
-            </Text>
-            <Text style={[bodyType.bold, styles.countSep, {color: colors.textTertiary}]}>h</Text>
-            <Text style={[displayType.display, monoType.regular, styles.countNum, {color: colors.textPrimary}]}>
-              {minutes}
-            </Text>
-            <Text style={[bodyType.bold, styles.countSep, {color: colors.textTertiary}]}>m</Text>
+            <Text style={[bodyType.bold, styles.countSep, {color: colors.textTertiary}]}>{unitWord}</Text>
           </View>
         </View>
       )}

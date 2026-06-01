@@ -59,16 +59,16 @@ export function PreSeasonGamesHero() {
   );
 }
 
-// Export the days counter for the HomeScreen's demoted countdown row.
-// Targets the regular-season KICKOFF (seasonOpenerAt, ~Sept 9) — the line now
-// reads "Regular season games kickoff in N days". Falls back to picks-open if
-// the opener date isn't loaded.
-export function usePreseasonDays(): string {
+// Export the countdown text for the HomeScreen's demoted countdown row.
+// Targets the regular-season KICKOFF (seasonOpenerAt, ~Sept 9); the line reads
+// "Regular season games kickoff in <N days|N hours|N minutes>" per the
+// single-unit rule. Falls back to picks-open if the opener date isn't loaded.
+export function usePreseasonCountdown(): string {
   const picksOpenAt    = useNFLStore(s => s.picksOpenAt);
   const seasonOpenerAt = useNFLStore(s => s.seasonOpenerAt);
   const target = seasonOpenerAt ?? picksOpenAt;
-  const {days} = useCountdown(target);
-  return days;
+  const {unitText} = useCountdown(target);
+  return unitText;
 }
 
 const styles = StyleSheet.create({

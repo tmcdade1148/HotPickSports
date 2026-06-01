@@ -14,6 +14,7 @@ import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
 import {getHotPickImpact} from '@sports/nfl/utils/hotPickImpact';
 import {isFinalStatus, isLiveStatus, isScheduledStatus} from '@sports/nfl/utils/gameStatus';
 import {hexToRgba} from '@shared/utils/color';
+import {singleUnit} from './useCountdown';
 import {fullTeamName} from './teamColors';
 import {buildWeekRecap} from './weekRecap';
 import {WeeklyTrend} from './WeeklyTrend';
@@ -274,26 +275,27 @@ export function PicksOpenHero() {
           The string is short enough that a fixed size always fits. */}
       {!hotPickIsLive && !hotPickIsFinal && (
         timer ? (
-          <Text
-            style={[
-              displayType.display,
-              styles.timer,
-              {
-                color: colors.textPrimary,
-                fontSize: timerSize,
-                lineHeight: Math.round(timerSize * 1.15),
-              },
-            ]}
-            numberOfLines={1}>
-            {timer.days}
-            <Text style={{fontSize: timerSize * 0.4}}>D</Text>
-            {' : '}
-            {timer.hours}
-            <Text style={{fontSize: timerSize * 0.4}}>H</Text>
-            {' : '}
-            {timer.minutes}
-            <Text style={{fontSize: timerSize * 0.4}}>M</Text>
-          </Text>
+          (() => {
+            // Single largest meaningful unit (app-wide rule): days → hours → minutes.
+            const su = singleUnit(timer.days, timer.hours, timer.minutes);
+            const unitLetter = su.unit === 'day' ? 'D' : su.unit === 'hour' ? 'H' : 'M';
+            return (
+              <Text
+                style={[
+                  displayType.display,
+                  styles.timer,
+                  {
+                    color: colors.textPrimary,
+                    fontSize: timerSize,
+                    lineHeight: Math.round(timerSize * 1.15),
+                  },
+                ]}
+                numberOfLines={1}>
+                {su.value}
+                <Text style={{fontSize: timerSize * 0.4}}>{unitLetter}</Text>
+              </Text>
+            );
+          })()
         ) : (
           <Text
             style={[bodyType.regular, styles.timerPlaceholder, {color: colors.textTertiary}]}>

@@ -2,9 +2,9 @@
 // Off-season home variant per the OffseasonPreseasonHome spec
 // (May 29, 2026). Regular-season picks are not yet open; this is
 // the long preparation window where new users sign up and Gaffers
-// set up Contests. The countdown is the visual hero — a single
-// big number with a small sub-line that switches to
-// hours/minutes only when ≤ 14 days remain.
+// set up Contests. The countdown is the visual hero — a single big number
+// showing the largest meaningful unit (days → hours inside the last day →
+// minutes inside the last hour), per the app-wide single-unit rule.
 //
 // All sport-specific copy reads from activeSport.sportIdentity so
 // "FOOTBALL'S ON ITS WAY BACK." becomes "HOCKEY'S ON ITS WAY BACK."
@@ -24,8 +24,6 @@ import {useGlobalStore} from '@shell/stores/globalStore';
 import {displayType, bodyType, monoType, spacing} from '@shared/theme';
 import {useCountdown} from './useCountdown';
 
-const HOURS_MINS_THRESHOLD_DAYS = 14;
-
 export function OffSeasonHero() {
   const {colors} = useTheme();
 
@@ -36,21 +34,19 @@ export function OffSeasonHero() {
 
   const headline = identity?.offseasonHeadline       ?? 'THE SEASON IS ON ITS WAY BACK.';
   const heroSub  = identity?.offseasonHeroSub        ?? 'Plenty of time to set up your Contest and get everyone in before kickoff.';
-  const cdLabel  = identity?.offseasonCountdownLabel ?? 'DAYS UNTIL KICKOFF';
 
   // Off-season target = regular-season kickoff (seasonOpenerAt /
-  // 'season_opener_date'). Spec §6 says "target = picks open" but
-  // the label reads "DAYS UNTIL THE REGULAR SEASON" — Tom locked
-  // the off-season countdown to kickoff so the label and target
-  // line up. Pre-season hero keeps the picks-open target since its
-  // label reads "Regular season picks open in".
+  // 'season_opener_date'). Single-unit rule: big number = the largest
+  // meaningful unit (days, then hours inside the last day, then minutes).
   const target = seasonOpenerAt ?? picksOpenAt;
-  const {days, hours, minutes} = useCountdown(target);
-  const daysNum = parseInt(days, 10);
-  // Compliance rule (spec §6): days-only above 14 days, add
-  // hours+minutes at 14 or fewer. No urgency styling. The countdown
-  // is a calendar marker, not a betting timer.
-  const showHoursMinutes = Number.isFinite(daysNum) && daysNum <= HOURS_MINS_THRESHOLD_DAYS;
+  const {unitValue, unit} = useCountdown(target);
+
+  // The config label normally reads "DAYS UNTIL …"; swap its leading unit word
+  // so it matches the unit being shown (e.g. "HOURS UNTIL …" inside the last
+  // day). No-op when it's days, or when the label doesn't start with a unit.
+  const unitWord = unit === 'day' ? 'DAYS' : unit === 'hour' ? 'HOURS' : 'MINUTES';
+  const cdLabel = (identity?.offseasonCountdownLabel ?? 'DAYS UNTIL KICKOFF')
+    .replace(/^(DAYS|HOURS|MINUTES)\b/i, unitWord);
 
   return (
     <View style={styles.wrap}>
@@ -66,9 +62,8 @@ export function OffSeasonHero() {
         {heroSub}
       </Text>
 
-      {/* Countdown — single big number anchored center; days-only
-          by default, hours/minutes appear inside the final two
-          weeks. Number is plain text, no animation. */}
+      {/* Countdown — single big number anchored center, showing the largest
+          meaningful unit (days → hours → minutes). Plain text, no animation. */}
       <View style={styles.countdownBlock}>
         <Text
           style={[
@@ -77,16 +72,11 @@ export function OffSeasonHero() {
             styles.bigNumber,
             {color: colors.textPrimary},
           ]}>
-          {days}
+          {unitValue}
         </Text>
         <Text style={[bodyType.bold, styles.countdownLabel, {color: colors.primary}]}>
           {cdLabel}
         </Text>
-        {showHoursMinutes && (
-          <Text style={[bodyType.regular, styles.countdownSub, {color: colors.textSecondary}]}>
-            {hours} hours, {minutes} minutes to go
-          </Text>
-        )}
       </View>
     </View>
   );
