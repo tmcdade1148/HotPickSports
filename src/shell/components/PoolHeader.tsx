@@ -12,11 +12,10 @@ import {Pressable, StyleSheet, Text, View} from 'react-native';
 import {Settings} from 'lucide-react-native';
 import {useNavigation} from '@react-navigation/native';
 import {useTheme} from '@shell/theme/hooks';
-import {useNFLStore} from '@sports/nfl/stores/nflStore';
-import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
-import {shortPeriod, COMPACT_PERIOD_LENGTH, yearFromCompetition} from './home/shortPeriod';
+import {COMPACT_PERIOD_LENGTH} from './home/shortPeriod';
+import {usePeriodLabel} from './home/usePeriodLabel';
 
 const NAME_MAX_FONT  = 40;
 const NAME_MIN_FONT  = 12;
@@ -26,22 +25,11 @@ const NAME_RIGHT_PAD = 6;
 export function PoolHeader() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
-  const currentPhase     = useNFLStore(s => s.currentPhase);
-  const currentWeek      = useNFLStore(s => s.currentWeek);
-  const competition      = useNFLStore(s => s.competition);
-  const playoffStartWeek = useSeasonStore(s => s.config?.playoffStartWeek);
-  // Year from the active competition (same store as the phase) — not the
-  // sometimes-stale seasonStore.seasonYear.
-  const seasonYear       = yearFromCompetition(competition);
-
   const visiblePools = useGlobalStore(s => s.visiblePools);
   const activePoolId = useGlobalStore(s => s.activePoolId);
   const activePool   = visiblePools.find(p => p.id === activePoolId);
 
-  const isDemoActive = useGlobalStore(s => s.isDemoActive);
-  const period = isDemoActive
-    ? 'PRACTICE'
-    : shortPeriod(currentPhase, currentWeek, playoffStartWeek, seasonYear);
+  const period = usePeriodLabel();
   const display = (activePool?.name ?? 'JOIN A CONTEST').toUpperCase();
 
   // Same auto-fit as IdentityBar: measure rendered width at NAME_MAX_FONT

@@ -57,29 +57,30 @@ Deno.serve(async (req) => {
       auth: {persistSession: false},
     });
 
+    // These three reads are independent — fetch them in parallel.
+    // Demo games are read WITHOUT a FINAL-status filter (they stay 'scheduled';
+    // the outcome is in winner_team), which is why demo-settle can't reuse the
+    // production scorer's query, only its math.
+    const [cfgRes, gamesRes, picksRes] = await Promise.all([
+      admin.from('competition_config').select('key, value').eq('competition', COMPETITION),
+      admin.from('season_games')
+        .select('game_id, winner_team, rank, frozen_rank')
+        .eq('competition', COMPETITION).eq('season_year', SEASON_YEAR).eq('week', WEEK),
+      admin.from('season_picks')
+        .select('user_id, game_id, picked_team, is_hotpick, power_up')
+        .eq('competition', COMPETITION).eq('season_year', SEASON_YEAR).eq('week', WEEK)
+        .eq('user_id', userId),
+    ]);
+
     // Guard on competition_config (parity with nfl-calculate-scores).
-    const {data: cfgRows} = await admin
-      .from('competition_config').select('key, value').eq('competition', COMPETITION);
-    const cfg = Object.fromEntries((cfgRows ?? []).map((r) => [r.key, r.value]));
+    const cfg = Object.fromEntries((cfgRes.data ?? []).map((r) => [r.key, r.value]));
     if (!cfg.is_active) return json({success: false, error: 'demo_inactive'}, 409);
     if (cfg.scoring_locked) return json({success: false, error: 'scoring_locked'}, 409);
 
-    // Demo games — read WITHOUT a FINAL-status filter (they stay 'scheduled';
-    // the outcome is in winner_team). This is why demo-settle can't reuse the
-    // production scorer's query, only its math.
-    const {data: games, error: gamesErr} = await admin
-      .from('season_games')
-      .select('game_id, winner_team, rank, frozen_rank')
-      .eq('competition', COMPETITION).eq('season_year', SEASON_YEAR).eq('week', WEEK);
-    if (gamesErr) return json({success: false, error: gamesErr.message}, 500);
-
-    // The caller's saved demo picks.
-    const {data: picks, error: picksErr} = await admin
-      .from('season_picks')
-      .select('user_id, game_id, picked_team, is_hotpick, power_up')
-      .eq('competition', COMPETITION).eq('season_year', SEASON_YEAR).eq('week', WEEK)
-      .eq('user_id', userId);
-    if (picksErr) return json({success: false, error: picksErr.message}, 500);
+    if (gamesRes.error) return json({success: false, error: gamesRes.error.message}, 500);
+    if (picksRes.error) return json({success: false, error: picksRes.error.message}, 500);
+    const games = gamesRes.data;
+    const picks = picksRes.data;
     if (!picks || picks.length === 0) {
       return json({success: false, error: 'no_picks'}, 400);
     }

@@ -79,7 +79,8 @@ interface GlobalState {
   // score-breakdown modal + revealed-results state after settling.
   demoIntroOpen: boolean;
   demoScoreOpen: boolean;
-  demoRevealed: boolean;
+  // demoRevealed (results shown) is derived as `demoResult != null` at the
+  // read site — no separate flag.
   demoResult: {
     weekPoints: number;
     correctPicks: number;
@@ -732,7 +733,6 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   isDemoActive: false,
   demoIntroOpen: false,
   demoScoreOpen: false,
-  demoRevealed: false,
   demoResult: null,
   enterDemo: async () => {
     const {isDemoActive, activeSport, activePoolId} = get();
@@ -759,7 +759,6 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       userPools: [],
       demoIntroOpen: true,
       demoScoreOpen: false,
-      demoRevealed: false,
       demoResult: null,
     });
   },
@@ -772,7 +771,6 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       isDemoActive: false,
       demoIntroOpen: false,
       demoScoreOpen: false,
-      demoRevealed: false,
       demoResult: null,
     };
     if (prevSport) {
@@ -790,9 +788,8 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   },
   dismissDemoIntro: () => set({demoIntroOpen: false}),
   dismissDemoScore: () => set({demoScoreOpen: false}),
-  setDemoResult: r => set({demoResult: r, demoRevealed: true, demoScoreOpen: true}),
-  clearDemoReveal: () =>
-    set({demoRevealed: false, demoResult: null, demoScoreOpen: false}),
+  setDemoResult: r => set({demoResult: r, demoScoreOpen: true}),
+  clearDemoReveal: () => set({demoResult: null, demoScoreOpen: false}),
 
   // ---------------------------------------------------------------------------
   // Pool state

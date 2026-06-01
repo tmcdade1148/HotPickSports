@@ -27,16 +27,11 @@ import {useCountdown} from './useCountdown';
 export function PreSeasonGamesHero() {
   const {colors} = useTheme();
 
-  const picksOpenAt    = useNFLStore(s => s.picksOpenAt);
-  const seasonOpenerAt = useNFLStore(s => s.seasonOpenerAt);
   const activeSport    = useGlobalStore(s => s.activeSport);
   const identity       = activeSport?.sportIdentity;
 
   const headline = identity?.preseasonHeadline       ?? "THE FIELD'S OPEN.";
   const heroSub  = identity?.preseasonHeroSub        ?? 'Practice picks all month. Scores reset for the regular season.';
-
-  const target = picksOpenAt ?? seasonOpenerAt;
-  const {days} = useCountdown(target);
 
   return (
     <View style={styles.wrap}>

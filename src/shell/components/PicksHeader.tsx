@@ -13,11 +13,10 @@ import {Pressable, StyleSheet, Text, View} from 'react-native';
 import {Settings} from 'lucide-react-native';
 import {useNavigation} from '@react-navigation/native';
 import {useTheme} from '@shell/theme/hooks';
-import {useNFLStore} from '@sports/nfl/stores/nflStore';
-import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
-import {shortPeriod, COMPACT_PERIOD_LENGTH, yearFromCompetition} from './home/shortPeriod';
+import {COMPACT_PERIOD_LENGTH} from './home/shortPeriod';
+import {usePeriodLabel} from './home/usePeriodLabel';
 
 const NAME_MAX_FONT  = 36;
 const NAME_MIN_FONT  = 12;
@@ -27,23 +26,9 @@ const NAME_RIGHT_PAD = 6;
 export function PicksHeader() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
-  const currentPhase     = useNFLStore(s => s.currentPhase);
-  const currentWeek      = useNFLStore(s => s.currentWeek);
-  const competition      = useNFLStore(s => s.competition);
-  const playoffStartWeek = useSeasonStore(s => s.config?.playoffStartWeek);
-  // Year from the active competition (same store as the phase) — not the
-  // sometimes-stale seasonStore.seasonYear.
-  const seasonYear       = yearFromCompetition(competition);
-
   const userProfile = useGlobalStore(s => s.userProfile);
   const poolieName  = userProfile?.poolie_name ?? '';
-  const isDemoActive = useGlobalStore(s => s.isDemoActive);
-
-  // In the demo the active competition is nfl_demo (REGULAR/W01), which would
-  // read "NFL26 · W01" — present it as PRACTICE instead.
-  const period = isDemoActive
-    ? 'PRACTICE'
-    : shortPeriod(currentPhase, currentWeek, playoffStartWeek, seasonYear);
+  const period = usePeriodLabel();
   const display = (poolieName || '—').toUpperCase();
 
   const [leftWidth, setLeftWidth] = useState(0);

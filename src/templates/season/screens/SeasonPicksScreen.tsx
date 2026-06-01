@@ -71,8 +71,8 @@ export function SeasonPicksScreen() {
   const isDemoActive = useGlobalStore(s => s.isDemoActive);
   const demoIntroOpen = useGlobalStore(s => s.demoIntroOpen);
   const demoScoreOpen = useGlobalStore(s => s.demoScoreOpen);
-  const demoRevealed = useGlobalStore(s => s.demoRevealed);
   const demoResult = useGlobalStore(s => s.demoResult);
+  const demoRevealed = demoResult != null; // results shown once a result exists
   const dismissDemoIntro = useGlobalStore(s => s.dismissDemoIntro);
   const dismissDemoScore = useGlobalStore(s => s.dismissDemoScore);
 

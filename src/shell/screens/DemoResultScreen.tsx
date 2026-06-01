@@ -19,6 +19,7 @@ import {useGlobalStore} from '@shell/stores/globalStore';
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {DEMO_COMPETITION} from '@sports/registry';
 import {LEXICON} from '@shared/lexicon';
+import {ordinal} from '@shared/utils/format';
 import {bodyType, displayType, spacing, borderRadius} from '@shared/theme';
 
 // Static demo opponents — fixed names + week scores that bracket a typical
@@ -122,12 +123,6 @@ export function DemoResultScreen() {
     );
   }
 
-  const ord = (n: number) => {
-    const s = ['th', 'st', 'nd', 'rd'];
-    const v = n % 100;
-    return n + (s[(v - 20) % 10] || s[v] || s[0]);
-  };
-
   return (
     <SafeAreaView style={styles.shell} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll}>
@@ -137,7 +132,7 @@ export function DemoResultScreen() {
           <Text style={styles.scorePts}> pts</Text>
         </Text>
         <Text style={styles.subhead}>
-          You finished {ord(myRank)} of {ladder.length} on {LEXICON.ladder.long}.
+          You finished {ordinal(myRank)} of {ladder.length} on {LEXICON.ladder.long}.
         </Text>
 
         {total && (

@@ -31,8 +31,9 @@ function useLaunchDemo() {
   const enterDemo = useGlobalStore(s => s.enterDemo);
   const resetDemoGames = useSeasonStore(s => s.resetDemoGames);
   return async () => {
-    await enterDemo();
-    await resetDemoGames();
+    // Independent: enterDemo resets DB picks + swaps active competition;
+    // resetDemoGames reloads the (self-contained) demo games. Run together.
+    await Promise.all([enterDemo(), resetDemoGames()]);
     navigation.navigate('PicksTab');
   };
 }
@@ -103,7 +104,11 @@ function ActionBtn({title, subtitle, variant, icon, onPress, accessibilityLabel}
   );
 }
 
-export function OffSeasonActions() {
+// Off-season and pre-season action stacks are identical except for the Join
+// subtitle. (Public users get the demo here in both states, not live preseason
+// picks — spec §1: new users never write preseason picks on nfl_2026, so
+// there's nothing to purge before the REGULAR flip.)
+function OffCycleActionStack({joinSubtitle}: {joinSubtitle: string}) {
   const navigation = useNavigation<any>();
   const {colors} = useTheme();
   const launchDemo = useLaunchDemo();
@@ -129,7 +134,7 @@ export function OffSeasonActions() {
       <ActionBtn
         variant="neutralOutline"
         title="Join a Contest"
-        subtitle="with a code, any time"
+        subtitle={joinSubtitle}
         icon={<KeyRound size={20} color={colors.textPrimary} strokeWidth={2.25} />}
         onPress={() => navigation.navigate('JoinPool')}
         accessibilityLabel="Join a Contest with an invite code"
@@ -138,43 +143,12 @@ export function OffSeasonActions() {
   );
 }
 
-export function PreSeasonActions() {
-  const navigation = useNavigation<any>();
-  const {colors} = useTheme();
-  const launchDemo = useLaunchDemo();
+export function OffSeasonActions() {
+  return <OffCycleActionStack joinSubtitle="with a code, any time" />;
+}
 
-  return (
-    <View style={styles.stack}>
-      <ActionBtn
-        variant="primary"
-        title="Create a Contest"
-        subtitle="and invite your friends"
-        icon={<Plus size={20} color={colors.onPrimary} strokeWidth={2.25} />}
-        onPress={() => navigation.navigate('CreatePool')}
-        accessibilityLabel="Create a new Contest and invite friends"
-      />
-      {/* Public users play the demo here, not live preseason picks (spec §1):
-          new users never write preseason picks on nfl_2026, so there is
-          nothing to purge before the REGULAR flip. The gated internal
-          preseason path is the separate §10 workstream. */}
-      <ActionBtn
-        variant="orangeOutline"
-        title="See how it works"
-        subtitle="play a quick demo week"
-        icon={<Play size={20} color={colors.primary} strokeWidth={2.25} fill={colors.primary} />}
-        onPress={launchDemo}
-        accessibilityLabel="Play a quick demo week to see how it works"
-      />
-      <ActionBtn
-        variant="neutralOutline"
-        title="Join a Contest"
-        subtitle="with a code, any time, even mid-season"
-        icon={<KeyRound size={20} color={colors.textPrimary} strokeWidth={2.25} />}
-        onPress={() => navigation.navigate('JoinPool')}
-        accessibilityLabel="Join a Contest with an invite code"
-      />
-    </View>
-  );
+export function PreSeasonActions() {
+  return <OffCycleActionStack joinSubtitle="with a code, any time, even mid-season" />;
 }
 
 const styles = StyleSheet.create({
