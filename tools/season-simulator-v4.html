@@ -188,7 +188,7 @@
         </div>
 
         <label style="display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 12px; color: #E6EDF3; cursor: pointer;">
-          <input type="checkbox" id="chk-autopick-reviewer" />
+          <input type="checkbox" id="chk-autopick-reviewer" checked />
           Auto-pick my test account too
         </label>
         <input id="autopick-user-id" type="text" value="7b4f41c8-008d-4319-98e7-8c80ec6edf69"
@@ -811,6 +811,8 @@ async function cpOpenPicks() {
   // its own season arc builds + the HotPick module shows on its home screen.
   if (document.getElementById('chk-autopick-reviewer')?.checked) {
     await seedTesterWeekPicks(wk);
+  } else {
+    log(`Test-account auto-pick is OFF (tick "Auto-pick my test account too" to seed picks for ${(document.getElementById('autopick-user-id')?.value || '').trim().slice(0, 8) || 'your account'}…).`, 'warn');
   }
 
   log(`✓ Week ${wk} picks open.`, 'success');
