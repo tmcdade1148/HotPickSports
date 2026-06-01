@@ -34,8 +34,13 @@ export function PicksHeader() {
 
   const userProfile = useGlobalStore(s => s.userProfile);
   const poolieName  = userProfile?.poolie_name ?? '';
+  const isDemoActive = useGlobalStore(s => s.isDemoActive);
 
-  const period = shortPeriod(currentPhase, currentWeek, playoffStartWeek, seasonYear);
+  // In the demo the active competition is nfl_demo (REGULAR/W01), which would
+  // read "NFL26 · W01" — present it as PRACTICE instead.
+  const period = isDemoActive
+    ? 'PRACTICE'
+    : shortPeriod(currentPhase, currentWeek, playoffStartWeek, seasonYear);
   const display = (poolieName || '—').toUpperCase();
 
   const [leftWidth, setLeftWidth] = useState(0);

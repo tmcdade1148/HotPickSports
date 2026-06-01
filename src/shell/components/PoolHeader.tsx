@@ -35,7 +35,10 @@ export function PoolHeader() {
   const activePoolId = useGlobalStore(s => s.activePoolId);
   const activePool   = visiblePools.find(p => p.id === activePoolId);
 
-  const period = shortPeriod(currentPhase, currentWeek, playoffStartWeek, seasonYear);
+  const isDemoActive = useGlobalStore(s => s.isDemoActive);
+  const period = isDemoActive
+    ? 'PRACTICE'
+    : shortPeriod(currentPhase, currentWeek, playoffStartWeek, seasonYear);
   const display = (activePool?.name ?? 'JOIN A CONTEST').toUpperCase();
 
   // Same auto-fit as IdentityBar: measure rendered width at NAME_MAX_FONT

@@ -18,6 +18,7 @@ import {useNavigation} from '@react-navigation/native';
 import {useTheme} from '@shell/theme/hooks';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
+import {useGlobalStore} from '@shell/stores/globalStore';
 import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
 import {shortPeriod, COMPACT_PERIOD_LENGTH} from './shortPeriod';
 
@@ -29,7 +30,10 @@ export function HomeHeader() {
   const playoffStartWeek = useSeasonStore(s => s.config?.playoffStartWeek);
   const seasonYear       = useSeasonStore(s => s.seasonYear);
 
-  const period = shortPeriod(currentPhase, currentWeek, playoffStartWeek, seasonYear);
+  const isDemoActive = useGlobalStore(s => s.isDemoActive);
+  const period = isDemoActive
+    ? 'PRACTICE'
+    : shortPeriod(currentPhase, currentWeek, playoffStartWeek, seasonYear);
 
   return (
     <View style={styles.row}>
