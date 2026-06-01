@@ -19,6 +19,19 @@ import {useNavigation} from '@react-navigation/native';
 import {ArrowRight, KeyRound, Play, Plus} from 'lucide-react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {bodyType, spacing, borderRadius} from '@shared/theme';
+import {useGlobalStore} from '@shell/stores/globalStore';
+
+// Shared demo launcher — enters the nfl_demo sandbox (snapshotting the prior
+// active selection) then lands the user on the Picks tab. Spec:
+// docs/DEMO_WEEK_SPEC.md §7.1.
+function useLaunchDemo() {
+  const navigation = useNavigation<any>();
+  const enterDemo = useGlobalStore(s => s.enterDemo);
+  return async () => {
+    await enterDemo();
+    navigation.navigate('PicksTab');
+  };
+}
 
 type Variant = 'primary' | 'orangeOutline' | 'neutralOutline';
 
@@ -89,6 +102,7 @@ function ActionBtn({title, subtitle, variant, icon, onPress, accessibilityLabel}
 export function OffSeasonActions() {
   const navigation = useNavigation<any>();
   const {colors} = useTheme();
+  const launchDemo = useLaunchDemo();
 
   return (
     <View style={styles.stack}>
@@ -99,6 +113,14 @@ export function OffSeasonActions() {
         icon={<Plus size={20} color={colors.onPrimary} strokeWidth={2.25} />}
         onPress={() => navigation.navigate('CreatePool')}
         accessibilityLabel="Create a new Contest and invite friends"
+      />
+      <ActionBtn
+        variant="orangeOutline"
+        title="See how it works"
+        subtitle="play a quick demo week"
+        icon={<Play size={20} color={colors.primary} strokeWidth={2.25} fill={colors.primary} />}
+        onPress={launchDemo}
+        accessibilityLabel="Play a quick demo week to see how it works"
       />
       <ActionBtn
         variant="neutralOutline"
@@ -115,6 +137,7 @@ export function OffSeasonActions() {
 export function PreSeasonActions() {
   const navigation = useNavigation<any>();
   const {colors} = useTheme();
+  const launchDemo = useLaunchDemo();
 
   return (
     <View style={styles.stack}>
@@ -126,13 +149,17 @@ export function PreSeasonActions() {
         onPress={() => navigation.navigate('CreatePool')}
         accessibilityLabel="Create a new Contest and invite friends"
       />
+      {/* Public users play the demo here, not live preseason picks (spec §1):
+          new users never write preseason picks on nfl_2026, so there is
+          nothing to purge before the REGULAR flip. The gated internal
+          preseason path is the separate §10 workstream. */}
       <ActionBtn
         variant="orangeOutline"
-        title="Make your picks"
-        subtitle="preseason games are live"
+        title="See how it works"
+        subtitle="play a quick demo week"
         icon={<Play size={20} color={colors.primary} strokeWidth={2.25} fill={colors.primary} />}
-        onPress={() => navigation.navigate('PicksTab')}
-        accessibilityLabel="Make your preseason picks"
+        onPress={launchDemo}
+        accessibilityLabel="Play a quick demo week to see how it works"
       />
       <ActionBtn
         variant="neutralOutline"

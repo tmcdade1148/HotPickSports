@@ -5,10 +5,13 @@
 // surface (e.g. a deep-link confirmation modal) share one source
 // of truth instead of recomputing state from store reads.
 
-import {useCallback} from 'react';
+import {useCallback, useState} from 'react';
 import {Alert} from 'react-native';
+import {useNavigation} from '@react-navigation/native';
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
+import {supabase} from '@shared/config/supabase';
+import {DEMO_COMPETITION} from '@sports/registry';
 
 export type PicksSubmitState =
   | 'locked'
@@ -36,6 +39,10 @@ export function useSeasonSubmitState(): SeasonSubmitState {
   const pickCount      = useSeasonStore(s => s.getPickCount());
   const currentWeek    = useNFLStore(s => s.currentWeek);
 
+  const navigation = useNavigation<any>();
+  const isDemo = config?.competition === DEMO_COMPETITION;
+  const [demoSubmitting, setDemoSubmitting] = useState(false);
+
   const visible = !isLoading && games.length > 0 && !!config;
 
   const allGamesFinal = games.length > 0 && games.every(g => {
@@ -53,6 +60,7 @@ export function useSeasonSubmitState(): SeasonSubmitState {
 
   const state: PicksSubmitState = (() => {
     if (allGamesLocked) return 'locked';
+    if (demoSubmitting) return 'submitted';
     if (isWeekComplete) return 'submitted';
     if (pickCount === 0) return 'no_picks';
     if (hotPickCount < (config?.hotPicksPerWeek ?? 1)) return 'needs_hotpick';
@@ -60,6 +68,7 @@ export function useSeasonSubmitState(): SeasonSubmitState {
   })();
 
   const label = (() => {
+    if (demoSubmitting) return 'Scoring your week…';
     switch (state) {
       case 'locked':
         return allGamesFinal
@@ -67,12 +76,12 @@ export function useSeasonSubmitState(): SeasonSubmitState {
           : "PICKS ARE LOCKED";
       case 'no_picks':      return 'Start picking your winners';
       case 'needs_hotpick': return 'Select your HotPick';
-      case 'in_progress':   return 'Submit your picks';
+      case 'in_progress':   return isDemo ? 'See your result' : 'Submit your picks';
       case 'submitted':     return 'Submitted';
     }
   })();
 
-  const enabled = state === 'needs_hotpick' || state === 'in_progress';
+  const enabled = !demoSubmitting && (state === 'needs_hotpick' || state === 'in_progress');
 
   const onPress = useCallback(() => {
     if (state === 'needs_hotpick') {
@@ -83,10 +92,38 @@ export function useSeasonSubmitState(): SeasonSubmitState {
       );
       return;
     }
-    if (state === 'in_progress') {
-      setWeekComplete(true);
+    if (state !== 'in_progress') return;
+
+    // Demo: settle server-side (demo-settle scores the already-saved picks),
+    // then reveal the bespoke result screen. Picks are pool-independent and
+    // saved per-tap, so there's nothing to batch-write here.
+    if (isDemo) {
+      setDemoSubmitting(true);
+      supabase.functions
+        .invoke('demo-settle', {body: {}})
+        .then(({data, error}) => {
+          setDemoSubmitting(false);
+          if (error || (data && data.success === false)) {
+            Alert.alert(
+              'Could not score your demo week',
+              'Something went wrong settling the demo. Please try again.',
+            );
+            return;
+          }
+          navigation.navigate('DemoResult');
+        })
+        .catch(() => {
+          setDemoSubmitting(false);
+          Alert.alert(
+            'Could not score your demo week',
+            'Something went wrong settling the demo. Please try again.',
+          );
+        });
+      return;
     }
-  }, [state, setWeekComplete]);
+
+    setWeekComplete(true);
+  }, [state, isDemo, navigation, setWeekComplete]);
 
   return {
     visible,

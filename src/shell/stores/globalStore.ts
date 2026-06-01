@@ -5,7 +5,7 @@ import type {DbPool, DbProfile, DbPoolMember} from '@shared/types/database';
 import type {BrandConfig} from '@shell/theme/types';
 import {supabase} from '@shared/config/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {getAllEventsUnfiltered, getEventsByPriority} from '@sports/registry';
+import {getAllEventsUnfiltered, getEventsByPriority, getDemoEvent, DEMO_POOL_ID} from '@sports/registry';
 import {deactivateDeviceTokens} from '@shell/services/pushNotifications';
 import {nflSeason} from '@sports/nfl/config';
 
@@ -17,6 +17,12 @@ const DEFAULT_POOL_PREFIX = 'hotpick_default_pool_';
 // writes to the store if its tag still matches — preventing a slow
 // response from clobbering newer state when the user advances weeks.
 let weekRankLatestTag = '';
+
+// Snapshot of the user's active selection before entering the onboarding demo,
+// restored by exitDemo(). Module-scoped (the store is a singleton) to avoid
+// widening the typed store interface with internal-only fields.
+let _preDemoSport: AnyEventConfig | null = null;
+let _preDemoPoolId: string | null = null;
 
 /**
  * DEV-only: AsyncStorage key for the active competition so Metro hot reloads
@@ -61,6 +67,14 @@ interface GlobalState {
   // Active event context
   activeSport: AnyEventConfig | null;
   setActiveSport: (sport: AnyEventConfig) => void;
+
+  // New-user onboarding demo (spec: docs/DEMO_WEEK_SPEC.md). enterDemo swaps
+  // the active competition/pool to the nfl_demo sandbox (snapshotting the
+  // prior selection); exitDemo restores it. Set directly — bypasses
+  // setActiveSport's persistence + async loadPersistedPoolId to avoid a race.
+  isDemoActive: boolean;
+  enterDemo: () => Promise<void>;
+  exitDemo: () => void;
 
   // Profile — full profile object
   userProfile: DbProfile | null;
@@ -693,6 +707,53 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       AsyncStorage.setItem(DEV_ACTIVE_COMPETITION_KEY, sport.competition).catch(
         () => {},
       );
+    }
+  },
+
+  // ---------------------------------------------------------------------------
+  // New-user onboarding demo (spec: docs/DEMO_WEEK_SPEC.md)
+  // ---------------------------------------------------------------------------
+  isDemoActive: false,
+  enterDemo: async () => {
+    const {isDemoActive, activeSport, activePoolId} = get();
+    // Snapshot the prior selection once (so re-entry doesn't clobber it).
+    if (!isDemoActive) {
+      _preDemoSport = activeSport;
+      _preDemoPoolId = activePoolId;
+    }
+    // Best-effort server reset + demo-pool membership. The picks loop is
+    // pool-independent, so a failure here doesn't block the demo render.
+    try {
+      await supabase.rpc('enter_demo');
+    } catch {
+      // ignore — non-critical to rendering the demo picks screen
+    }
+    // Set state directly (not via setActiveSport) to avoid its async
+    // loadPersistedPoolId racing our activePoolId write.
+    set({
+      isDemoActive: true,
+      activeSport: getDemoEvent(),
+      activePoolId: DEMO_POOL_ID,
+      activeBrandConfig: null,
+      userPools: [],
+    });
+  },
+  exitDemo: () => {
+    const prevSport = _preDemoSport;
+    const prevPool = _preDemoPoolId;
+    _preDemoSport = null;
+    _preDemoPoolId = null;
+    if (prevSport) {
+      const cached = get().poolsByCompetition[prevSport.competition] ?? [];
+      set({
+        isDemoActive: false,
+        activeSport: prevSport,
+        activePoolId: prevPool,
+        userPools: cached,
+        activeBrandConfig: null,
+      });
+    } else {
+      set({isDemoActive: false});
     }
   },
 

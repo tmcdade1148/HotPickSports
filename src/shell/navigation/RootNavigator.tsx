@@ -11,6 +11,7 @@ import {PoolWelcomeScreen} from '@shell/screens/PoolWelcomeScreen';
 import {PoolSelectionScreen} from '@shell/screens/PoolSelectionScreen';
 import {CreatePoolScreen} from '@shell/screens/CreatePoolScreen';
 import {JoinPoolScreen} from '@shell/screens/JoinPoolScreen';
+import {DemoResultScreen} from '@shell/screens/DemoResultScreen';
 import {MainTabNavigator} from './MainTabNavigator';
 import {EventDetailScreen} from '@shell/screens/EventDetailScreen';
 import {ProfileScreen} from '@shell/screens/ProfileScreen';
@@ -207,6 +208,7 @@ export function RootNavigator() {
         <Stack.Screen name="PoolSelection" component={PoolSelectionScreen} />
         <Stack.Screen name="CreatePool" component={CreatePoolScreen} />
         <Stack.Screen name="JoinPool" component={JoinPoolScreen} />
+        <Stack.Screen name="DemoResult" component={DemoResultScreen} />
 
         {/* Main app */}
         <Stack.Screen name="Home" component={MainTabNavigator} />

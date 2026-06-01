@@ -2,8 +2,19 @@ import type {AnyEventConfig} from '@shared/types/templates';
 import {worldCup2026} from './worldcup/config';
 import {nflSeason, nflSeasonSim} from './nfl/config';
 import {nhlPlayoffs2027} from './nhl/config';
+import {nflDemo, DEMO_COMPETITION, DEMO_POOL_ID} from './nfl/demoConfig';
 
 const ALL_EVENTS: AnyEventConfig[] = [nflSeason, nflSeasonSim, worldCup2026, nhlPlayoffs2027];
+
+// Onboarding demo (spec: docs/DEMO_WEEK_SPEC.md). Deliberately kept OUT of
+// ALL_EVENTS so it never surfaces in the switcher or as a Home event card —
+// it is reached only via globalStore.enterDemo(). Exposed here (rather than
+// imported from the sport module directly) so the app shell honors Hard
+// Rule #4 (shell → SportRegistry → sport module).
+export {DEMO_COMPETITION, DEMO_POOL_ID};
+export function getDemoEvent(): AnyEventConfig {
+  return nflDemo;
+}
 
 // Competitions hidden from the public app — only surface for users in
 // the server-side beta allowlist (competition_access table). The client

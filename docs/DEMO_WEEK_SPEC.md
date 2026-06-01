@@ -291,17 +291,18 @@ Separate workstream, summarized so Phase 1 doesn't foreclose it.
 
 ## 12. Open items (resolve before/early in build)
 
-- **O-4** Where the demo submit branch lives — submit hook vs. a demo wrapper screen.
-  (Resolved during build — see commit.)
-
-_Resolved:_
+_All resolved:_
 - **O-1** winner in `season_games.winner_team`; `scheduled` + `lock_at NULL` keeps the lock
   trigger happy; `demo-settle` queries demo games without the FINAL filter. Seeded live.
-- **O-2** demo opponents are static client data, not DB rows (§5.3).
-- **O-3** scoring is inline in `nfl-calculate-scores`, not importable → the per-pick math is
-  extracted to `supabase/functions/_shared/scoring.ts` for `demo-settle`. Migrating the prod
-  scorer onto the shared module is a separate, deferred follow-up (no prod-scorer redeploy
-  in Phase 1 to avoid destabilizing live scoring).
+- **O-2** demo opponents are static client data, not DB rows (§5.3, `DemoResultScreen`).
+- **O-3** scoring extracted to a pure module (`supabase/functions/demo-settle/scoring.ts`)
+  rather than inlined in the handler. Co-located with the function (per-function MCP deploys
+  can't reach a `functions/_shared` dir); promote to `_shared` when the production scorer
+  (`nfl-calculate-scores`) adopts it — a deferred follow-up, no prod-scorer redeploy in
+  Phase 1.
+- **O-4** the demo submit branch lives in `useSeasonSubmitState` (the single submit source):
+  on `in_progress` press with `competition==='nfl_demo'` it invokes `demo-settle` and
+  navigates to `DemoResult`.
 - **O-5** not in the registry. **O-6** clearly-positive outcome, swing visible. (See §2.)
 
 ---
