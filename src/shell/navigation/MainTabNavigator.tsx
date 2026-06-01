@@ -534,6 +534,21 @@ export function MainTabNavigator() {
   return (
     <Tab.Navigator
       initialRouteName="HomeTab"
+      screenListeners={{
+        // The onboarding demo reuses the season/picks machinery by swapping the
+        // global active competition. It lives on the Picks tab (the Ladder is a
+        // root-stack screen above it, so the focused tab stays PicksTab there).
+        // Focusing any OTHER tab means the user is leaving the demo, so exit it
+        // — one rule covers Home/Leaders/Chirps/Settings, no per-screen guards.
+        state: (e: any) => {
+          if (!useGlobalStore.getState().isDemoActive) return;
+          const st = e?.data?.state;
+          const focused = st?.routes?.[st.index]?.name;
+          if (focused && focused !== 'PicksTab') {
+            useGlobalStore.getState().exitDemo();
+          }
+        },
+      }}
       tabBar={(props) => {
         // Brief (redesign-v3): hide the entire bottom-nav region on Home —
         // PoweredByHotPick included. Home owns the full screen; other tabs

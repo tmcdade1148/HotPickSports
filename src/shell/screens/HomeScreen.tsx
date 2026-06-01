@@ -2,10 +2,10 @@
 // StateHero → Insight → Pool/Partner stacks). All Supabase reads live
 // in store loaders fired here so child modules can stay presentational.
 
-import React, {useEffect, useMemo, useCallback} from 'react';
+import React, {useEffect, useMemo} from 'react';
 import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {KeyRound, Plus} from 'lucide-react-native';
-import {useNavigation, useFocusEffect} from '@react-navigation/native';
+import {useNavigation} from '@react-navigation/native';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {isScheduledStatus} from '@sports/nfl/utils/gameStatus';
@@ -32,19 +32,6 @@ import {LEXICON} from '@shared/lexicon';
 export function HomeScreen() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
-
-  // The onboarding demo hijacks the global active competition (to reuse the
-  // picks machinery). Tapping the Home tab is the user leaving the demo, so
-  // exit it on focus — Home must always reflect the real competition's state
-  // (e.g. PRE_SEASON), never the demo's REGULAR/picks_open state.
-  const exitDemo = useGlobalStore(s => s.exitDemo);
-  useFocusEffect(
-    useCallback(() => {
-      if (useGlobalStore.getState().isDemoActive) {
-        exitDemo();
-      }
-    }, [exitDemo]),
-  );
 
   const userId       = useGlobalStore(s => s.user?.id);
   const visiblePools = useGlobalStore(s => s.visiblePools);

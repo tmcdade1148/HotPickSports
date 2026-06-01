@@ -58,6 +58,9 @@ export interface GamePickStats {
 
 interface NFLState {
   competition: string;
+  /** Season year from competition_config (authoritative; current per the
+   *  active competition — e.g. 2026 for nfl_2026, 2025 for nfl_2025_sim). */
+  seasonYear: number;
   currentWeek: number;
   currentPhase: string;
   weekState: WeekState;
@@ -124,6 +127,7 @@ interface NFLState {
 
 export const useNFLStore = create<NFLState>((set, get) => ({
   competition: 'nfl_2026',
+  seasonYear: 2026,
   currentWeek: 1,
   currentPhase: 'REGULAR',
   weekState: 'picks_open',
@@ -247,6 +251,8 @@ export const useNFLStore = create<NFLState>((set, get) => ({
 
     const currentWeek =
       typeof cfg.current_week === 'number' ? cfg.current_week : 1;
+    const seasonYear =
+      typeof cfg.season_year === 'number' ? cfg.season_year : get().seasonYear;
 
     // Derive weekState from config values
     let weekState: WeekState = 'picks_open';
@@ -280,7 +286,7 @@ export const useNFLStore = create<NFLState>((set, get) => ({
     const currentPhase =
       typeof cfg.current_phase === 'string' ? cfg.current_phase : 'REGULAR';
 
-    set({currentWeek, weekState, picksDeadline, picksOpenAt, seasonOpenerAt, sundayLockAnchor, currentPhase});
+    set({currentWeek, seasonYear, weekState, picksDeadline, picksOpenAt, seasonOpenerAt, sundayLockAnchor, currentPhase});
   },
 
   fetchUserHotPick: async (userId: string, week: number) => {
