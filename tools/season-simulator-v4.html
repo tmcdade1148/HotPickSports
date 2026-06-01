@@ -184,7 +184,22 @@
           &#9654; Run entire week (auto)
         </button>
         <div style="font-size: 11px; color: #8A97AA; margin-top: 6px;">
-          Steps through all checkpoints with a 3s pause between each. Stops before "Next Week Opens" so you can verify the complete state.
+          Steps through all checkpoints with a 3s pause between each. Stops before "Next Week Opens" so you can verify the complete state. The app follows along live via Realtime.
+        </div>
+
+        <label style="display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 12px; color: #E6EDF3; cursor: pointer;">
+          <input type="checkbox" id="chk-autopick-reviewer" />
+          Auto-pick the reviewer (Mel) too
+        </label>
+        <div style="font-size: 11px; color: #8A97AA; margin-top: 4px;">
+          The 8 fake members always auto-pick. Tick this to also seed the reviewer&rsquo;s picks each week (so your own season arc builds). Leave it off to pick manually in the app.
+        </div>
+
+        <button class="btn btn-warning btn-full" id="btn-run-season" onclick="runFullSeason()" disabled style="margin-top: 12px;">
+          &#9193; Run full season (fast)
+        </button>
+        <div style="font-size: 11px; color: #8A97AA; margin-top: 6px;">
+          Fast-forwards from the current week through Week 22: each week opens picks (everyone auto-picks), finalizes all games, scores, completes, and advances &mdash; no live-score ticks, ~1s/week. Watch the standings build on the app.
         </div>
       </div>
 
@@ -507,6 +522,7 @@ function updateButtons() {
   const ready = state.currentWeek != null && !state.scoringLocked;
   const connected = state.currentWeek != null;
   document.getElementById('btn-run-week').disabled = !ready;
+  document.getElementById('btn-run-season').disabled = !ready;
   document.getElementById('btn-reset-reviewer').disabled = !ready;
   document.getElementById('btn-reset-to-week8').disabled = !ready;
   document.getElementById('btn-reset-to-week1').disabled = !ready;
@@ -778,6 +794,11 @@ async function cpOpenPicks() {
   // Auto-seed fake member picks for the current week (skip if any fake
   // already has picks — idempotent re-runs).
   await seedFakeWeekPicks(wk);
+  // Optionally auto-pick the reviewer too (checkbox in Run Week), so the
+  // reviewer's own season arc builds without manual picking.
+  if (document.getElementById('chk-autopick-reviewer')?.checked) {
+    await seedReviewerWeekPicks(wk);
+  }
 
   log(`✓ Week ${wk} picks open.`, 'success');
 }
@@ -856,6 +877,43 @@ async function seedFakeWeekPicks(wk) {
   // Bulk insert — games are scheduled so pick-lock trigger allows this
   await api('season_picks', 'POST', rows);
   log(`✓ Seeded ${rows.length} fake picks for ${toSeed.length} members (Week ${wk}).`, 'success');
+}
+
+// Seed the reviewer's (Mel's) picks for the week — 1 per game, HotPick on the
+// highest-ranked game that week (always exists, so it works in playoff weeks
+// with fewer games too). Idempotent: skips if the reviewer already has picks.
+async function seedReviewerWeekPicks(wk) {
+  const existing = await api(
+    `season_picks?competition=eq.${COMPETITION}&week=eq.${wk}&user_id=eq.${REVIEWER_USER_ID}&select=user_id`,
+    'GET'
+  );
+  if (existing && existing.length > 0) {
+    log(`Reviewer already has Week ${wk} picks — skipping.`, 'info');
+    return;
+  }
+  if (simGames.length === 0) await loadWeekGames();
+  const weekGames = simGames.filter(g => g.game_id && g.frozen_rank != null);
+  if (weekGames.length === 0) {
+    log(`No Week ${wk} games with frozen_rank — cannot seed reviewer picks.`, 'warn');
+    return;
+  }
+  const hpRank = Math.max(...weekGames.map(g => g.frozen_rank));
+  const rows = weekGames.map(g => {
+    const isHp = g.frozen_rank === hpRank;
+    const parity = (wk + g.frozen_rank) % 2;
+    const pickedTeam = isHp ? g.home_team : (parity === 0 ? g.home_team : g.away_team);
+    return {
+      user_id: REVIEWER_USER_ID,
+      game_id: g.game_id,
+      competition: COMPETITION,
+      season_year: SEASON_YEAR,
+      week: wk,
+      picked_team: pickedTeam,
+      is_hotpick: isHp,
+    };
+  });
+  await api('season_picks', 'POST', rows);
+  log(`✓ Seeded reviewer (Mel) Week ${wk} picks (HotPick rank ${hpRank}).`, 'success');
 }
 
 // Kickoff a wave — sets games IN_PROGRESS, locks this wave's picks + all
@@ -1275,6 +1333,43 @@ async function runEntireWeek() {
     await sleep(3000);
   }
   log('▶ Week auto-run complete. Click "Next Week Opens" when ready to advance.', 'success');
+}
+
+// Fast-forward the whole season from the current week through Week 22. Each
+// week: open picks (everyone auto-picks) → all games FINAL → full scoring →
+// complete → advance. No live-score ticks, ~1s/week, so the standings build up
+// quickly and the app follows along live via Realtime. Honors the
+// 'Auto-pick reviewer' checkbox (via cpOpenPicks) for the reviewer's own arc.
+async function runFullSeason() {
+  if (!getServiceKey()) return;
+  const withReviewer = document.getElementById('chk-autopick-reviewer')?.checked;
+  if (!confirm(
+    `⏩ Run the full season fast from Week ${state.currentWeek} through 22?\n\n` +
+    `Each week: open picks (8 fakes${withReviewer ? ' + reviewer' : ''} auto-pick) → all games FINAL → score → complete → next.\n` +
+    `No live-score ticks (~1s/week). The app updates live via Realtime.\n\n` +
+    `Skips individual confirm prompts.`
+  )) return;
+
+  try {
+    let guard = 0;
+    while ((state.currentWeek ?? 99) <= 22 && guard < 30) {
+      guard++;
+      await refreshState();
+      const wk = state.currentWeek;
+      log(`=== Fast-running Week ${wk} ===`, 'info');
+      await loadWeekGames();   // load this week's sim + source games
+      await cpOpenPicks();     // phase + picks_open + seed fakes (+reviewer if checked)
+      await cpEndWeek();       // all games FINAL + full scoring + settling
+      await cpCompleteWeek();  // complete
+      await refreshState();
+      await loadWeekGames();
+      if (wk >= 22) { log('=== Season complete — Week 22 scored. ===', 'success'); break; }
+      await cpNextWeek();      // advance week + carry phase
+      await sleep(1000);       // let the app catch up via Realtime
+    }
+  } catch (e) {
+    log(`Run full season stopped: ${e.message}`, 'error');
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
