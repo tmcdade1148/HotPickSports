@@ -226,6 +226,15 @@
       <div class="sidebar-section">
         <h2 style="padding: 0;">Phase &amp; Jump</h2>
 
+        <button class="btn btn-warning btn-full" id="btn-start-cycle"
+          onclick="startWeeklyCycle()" disabled>&#9654; Open current week (enter weekly cycle)</button>
+        <div style="font-size: 11px; color: #8A97AA; margin: 6px 0 12px;">
+          The fast way out of <code>idle</code>/off-cycle: bumps the phase into the
+          weekly cycle (<code>REGULAR</code> &le;18 / <code>PLAYOFFS</code> /
+          <code>SUPERBOWL</code>) and opens picks for the current week. Same as
+          clicking the &ldquo;Picks Open&rdquo; checkpoint.
+        </div>
+
         <div style="font-size: 11px; color: #8A97AA; margin-bottom: 8px;">
           Set phase only (no data wipe) &mdash; preview the off-cycle home screens.
         </div>
@@ -508,7 +517,7 @@ function updateButtons() {
    'btn-phase-sbintro', 'btn-phase-seasoncomplete', 'btn-toggle-scoring-lock']
     .forEach(id => { const el = document.getElementById(id); if (el) el.disabled = !connected; });
   // Jumps clean + reseed a week, so gate them like the resets.
-  ['btn-jump-week', 'btn-jump-playoffs', 'btn-jump-superbowl']
+  ['btn-start-cycle', 'btn-jump-week', 'btn-jump-playoffs', 'btn-jump-superbowl']
     .forEach(id => { const el = document.getElementById(id); if (el) el.disabled = !ready; });
 }
 
@@ -1205,6 +1214,22 @@ async function jumpToWeek(n) {
     await loadWeekGames();
   } catch (e) {
     log(`Jump to week failed: ${e.message}`, 'error');
+  }
+}
+
+// Enter the weekly cycle from an idle / off-cycle phase. Thin wrapper around
+// cpOpenPicks (which bumps current_phase to match the week and opens picks),
+// so there's an obvious one-click way to leave PRE_SEASON / OFF_SEASON / idle.
+async function startWeeklyCycle() {
+  if (!getServiceKey()) return;
+  try {
+    if (simGames.length === 0) await loadWeekGames();
+    await cpOpenPicks();
+    await refreshState();
+    await loadWeekGames();
+    log(`✓ Week ${state.currentWeek} is now in the weekly cycle (${state.phase}, picks open).`, 'success');
+  } catch (e) {
+    log(`Open current week failed: ${e.message}`, 'error');
   }
 }
 
