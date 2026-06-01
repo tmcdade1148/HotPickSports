@@ -189,10 +189,16 @@
 
         <label style="display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 12px; color: #E6EDF3; cursor: pointer;">
           <input type="checkbox" id="chk-autopick-reviewer" />
-          Auto-pick the reviewer (Mel) too
+          Auto-pick my test account too
         </label>
+        <input id="autopick-user-id" type="text" value="7b4f41c8-008d-4319-98e7-8c80ec6edf69"
+          placeholder="user_id to auto-pick"
+          style="width: 100%; margin-top: 6px; padding: 7px 9px; border-radius: 6px; border: 1px solid #2C3A52; background: #0D1117; color: #E6EDF3; font-size: 11px; font-family: monospace;" />
         <div style="font-size: 11px; color: #8A97AA; margin-top: 4px;">
-          The 8 fake members always auto-pick. Tick this to also seed the reviewer&rsquo;s picks each week (so your own season arc builds). Leave it off to pick manually in the app.
+          The 8 fakes always auto-pick. Tick the box to also seed picks (incl. a
+          HotPick on the week&rsquo;s top game) for the account above &mdash; set it to
+          the user_id you&rsquo;re viewing the app as so the HotPick module appears
+          there. Prefilled: ElbowSoup. (Reviewer/Mel = 55ed62e4-9fe3-45d6-b9a0-a1819d81387b.)
         </div>
 
         <button class="btn btn-warning btn-full" id="btn-run-season" onclick="runFullSeason()" disabled style="margin-top: 12px;">
@@ -794,10 +800,10 @@ async function cpOpenPicks() {
   // Auto-seed fake member picks for the current week (skip if any fake
   // already has picks — idempotent re-runs).
   await seedFakeWeekPicks(wk);
-  // Optionally auto-pick the reviewer too (checkbox in Run Week), so the
-  // reviewer's own season arc builds without manual picking.
+  // Optionally auto-pick the human test account too (checkbox in Run Week), so
+  // its own season arc builds + the HotPick module shows on its home screen.
   if (document.getElementById('chk-autopick-reviewer')?.checked) {
-    await seedReviewerWeekPicks(wk);
+    await seedTesterWeekPicks(wk);
   }
 
   log(`✓ Week ${wk} picks open.`, 'success');
@@ -879,22 +885,25 @@ async function seedFakeWeekPicks(wk) {
   log(`✓ Seeded ${rows.length} fake picks for ${toSeed.length} members (Week ${wk}).`, 'success');
 }
 
-// Seed the reviewer's (Mel's) picks for the week — 1 per game, HotPick on the
-// highest-ranked game that week (always exists, so it works in playoff weeks
-// with fewer games too). Idempotent: skips if the reviewer already has picks.
-async function seedReviewerWeekPicks(wk) {
+// Seed the human test account's picks for the week — 1 per game, HotPick on
+// the highest-ranked game that week (always exists, so it works in playoff
+// weeks with fewer games too). The account comes from the 'autopick-user-id'
+// input (default ElbowSoup), so the HotPick module shows for whoever you're
+// viewing the app as. Idempotent: skips if that user already has picks.
+async function seedTesterWeekPicks(wk) {
+  const uid = (document.getElementById('autopick-user-id')?.value || '').trim() || REVIEWER_USER_ID;
   const existing = await api(
-    `season_picks?competition=eq.${COMPETITION}&week=eq.${wk}&user_id=eq.${REVIEWER_USER_ID}&select=user_id`,
+    `season_picks?competition=eq.${COMPETITION}&week=eq.${wk}&user_id=eq.${uid}&select=user_id`,
     'GET'
   );
   if (existing && existing.length > 0) {
-    log(`Reviewer already has Week ${wk} picks — skipping.`, 'info');
+    log(`Test account already has Week ${wk} picks — skipping.`, 'info');
     return;
   }
   if (simGames.length === 0) await loadWeekGames();
   const weekGames = simGames.filter(g => g.game_id && g.frozen_rank != null);
   if (weekGames.length === 0) {
-    log(`No Week ${wk} games with frozen_rank — cannot seed reviewer picks.`, 'warn');
+    log(`No Week ${wk} games with frozen_rank — cannot seed test-account picks.`, 'warn');
     return;
   }
   const hpRank = Math.max(...weekGames.map(g => g.frozen_rank));
@@ -903,7 +912,7 @@ async function seedReviewerWeekPicks(wk) {
     const parity = (wk + g.frozen_rank) % 2;
     const pickedTeam = isHp ? g.home_team : (parity === 0 ? g.home_team : g.away_team);
     return {
-      user_id: REVIEWER_USER_ID,
+      user_id: uid,
       game_id: g.game_id,
       competition: COMPETITION,
       season_year: SEASON_YEAR,
@@ -913,7 +922,7 @@ async function seedReviewerWeekPicks(wk) {
     };
   });
   await api('season_picks', 'POST', rows);
-  log(`✓ Seeded reviewer (Mel) Week ${wk} picks (HotPick rank ${hpRank}).`, 'success');
+  log(`✓ Seeded test account (${uid.slice(0, 8)}…) Week ${wk} picks (HotPick rank ${hpRank}).`, 'success');
 }
 
 // Kickoff a wave — sets games IN_PROGRESS, locks this wave's picks + all
@@ -1358,7 +1367,10 @@ async function runFullSeason() {
       const wk = state.currentWeek;
       log(`=== Fast-running Week ${wk} ===`, 'info');
       await loadWeekGames();   // load this week's sim + source games
-      await cpOpenPicks();     // phase + picks_open + seed fakes (+reviewer if checked)
+      await cpResetWeek();     // games → scheduled (so seeding doesn't hit the
+                               // pick-lock trigger if this week was already FINAL)
+      await loadWeekGames();   // reload after reset so simGames reflect 'scheduled'
+      await cpOpenPicks();     // phase + picks_open + seed fakes (+test account if checked)
       await cpEndWeek();       // all games FINAL + full scoring + settling
       await cpCompleteWeek();  // complete
       await refreshState();
