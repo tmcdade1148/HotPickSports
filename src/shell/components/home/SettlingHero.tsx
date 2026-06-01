@@ -72,13 +72,13 @@ export function SettlingHero() {
       </View>
 
       <Pressable
-        onPress={() => navigation.navigate('LeaderboardTab')}
+        onPress={() => navigation.navigate('PicksTab')}
         style={({pressed}) => [
           styles.cta,
           {borderColor: colors.border, opacity: pressed ? 0.7 : 1},
         ]}
         accessibilityRole="button"
-        accessibilityLabel="View this week's recap">
+        accessibilityLabel="View this week's completed picks">
         <Text style={[bodyType.bold, styles.ctaText, {color: colors.textPrimary}]}>
           View week recap
         </Text>
