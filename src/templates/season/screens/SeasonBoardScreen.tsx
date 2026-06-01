@@ -209,7 +209,7 @@ export function SeasonBoardScreen() {
       <View style={styles.loading}>
         <Text style={{fontSize: 18, fontWeight: '600', color: colors.textPrimary, marginBottom: 8}}>The Ladder</Text>
         <Text style={{fontSize: 14, color: colors.textSecondary, textAlign: 'center', paddingHorizontal: 32}}>
-          The Ladder will come alive once the season kicks off. Check back when picks open.
+          The Ladder will come alive once the season kicks of and we have some scores.
         </Text>
       </View>
     );
