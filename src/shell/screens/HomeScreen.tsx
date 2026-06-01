@@ -21,8 +21,6 @@ import {IdentityBar} from '@shell/components/home/IdentityBar';
 import {StateHero} from '@shell/components/home/StateHero';
 import {CrossContestStrip} from '@shell/components/home/CrossContestStrip';
 import {OffSeasonActions, PreSeasonActions, ReturningOffCycleActions} from '@shell/components/home/OffCycleActions';
-import {usePreseasonCountdown} from '@shell/components/home/PreSeasonGamesHero';
-import {CalendarDays} from 'lucide-react-native';
 import {Insight} from '@shell/components/home/Insight';
 import {HomeInbox} from '@shell/components/home/HomeInbox';
 import {PoolModule} from '@shell/components/home/PoolModule';
@@ -331,7 +329,6 @@ export function HomeScreen() {
           <>
             {offCycleContests}
             {visiblePools.length > 0 ? <ReturningOffCycleActions /> : <PreSeasonActions />}
-            <PreseasonCountdownLine />
             <PreseasonPicksOpenLine />
             <CrossContestStrip />
             {offCycleClubs ?? <ClubsTeaser />}
@@ -446,25 +443,6 @@ export function HomeScreen() {
 // Off-cycle inline helpers per the OffseasonPreseasonHome spec.
 // ----------------------------------------------------------------------
 
-/** Demoted preseason countdown — small calendar-icon row that
- *  replaces the big offseason countdown anchor. Reads days from
- *  the shared usePreseasonDays hook. */
-function PreseasonCountdownLine() {
-  const {colors} = useTheme();
-  const countdown = usePreseasonCountdown();
-  const activeSport = useGlobalStore(s => s.activeSport);
-  const label = activeSport?.sportIdentity?.preseasonCountdownLabel
-    ?? 'Regular season picks open in';
-  return (
-    <View style={[offCycleStyles.countdownRow, {borderColor: colors.border}]}>
-      <CalendarDays size={16} color={colors.textTertiary} strokeWidth={2} />
-      <Text style={[bodyType.regular, offCycleStyles.countdownText, {color: colors.textPrimary}]}>
-        {label}{' '}
-        <Text style={bodyType.bold}>{countdown}</Text>
-      </Text>
-    </View>
-  );
-}
 
 /** Pre-season line stating when Week 1 picks open (from season_picks_open_at).
  *  Sits under the kickoff countdown. Hidden until the date is loaded. */
