@@ -36,7 +36,7 @@ export function OffSeasonHero() {
 
   const headline = identity?.offseasonHeadline       ?? 'THE SEASON IS ON ITS WAY BACK.';
   const heroSub  = identity?.offseasonHeroSub        ?? 'Plenty of time to set up your Contest and get everyone in before kickoff.';
-  const cdLabel  = identity?.offseasonCountdownLabel ?? 'DAYS UNTIL PICKS OPEN';
+  const cdLabel  = identity?.offseasonCountdownLabel ?? 'DAYS UNTIL KICKOFF';
 
   // Off-season target = regular-season kickoff (seasonOpenerAt /
   // 'season_opener_date'). Spec §6 says "target = picks open" but
