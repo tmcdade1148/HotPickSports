@@ -20,15 +20,19 @@ import {ArrowRight, KeyRound, Play, Plus} from 'lucide-react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {bodyType, spacing, borderRadius} from '@shared/theme';
 import {useGlobalStore} from '@shell/stores/globalStore';
+import {useSeasonStore} from '@templates/season/stores/seasonStore';
 
 // Shared demo launcher — enters the nfl_demo sandbox (snapshotting the prior
-// active selection) then lands the user on the Picks tab. Spec:
+// active selection), resets to a clean slate (fresh games + no picks, even if a
+// prior run left completed games cached), then lands on the Picks tab. Spec:
 // docs/DEMO_WEEK_SPEC.md §7.1.
 function useLaunchDemo() {
   const navigation = useNavigation<any>();
   const enterDemo = useGlobalStore(s => s.enterDemo);
+  const resetDemoGames = useSeasonStore(s => s.resetDemoGames);
   return async () => {
     await enterDemo();
+    await resetDemoGames();
     navigation.navigate('PicksTab');
   };
 }

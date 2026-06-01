@@ -813,10 +813,19 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
   },
 
   resetDemoGames: async () => {
-    const week = get().currentWeek;
-    // Drop cache + picks so fetchWeekGames hits the DB and restores the
-    // scheduled (pickable) games rather than returning the FINAL-patched cache.
-    set({allWeekGames: {}, weekPicks: [], isWeekComplete: false});
-    await get().fetchWeekGames(week);
+    // Self-contained clean reload of the demo week. Hardcodes the competition
+    // so it works even when called on demo entry before the store has
+    // re-initialized for the demo, and so it never returns a FINAL-patched
+    // cache from a prior run. Restores the scheduled (pickable) games and
+    // clears picks — a clean slate for a fresh demo run.
+    set({allWeekGames: {}, weekPicks: [], isWeekComplete: false, currentWeek: 1});
+    const {data} = await supabase
+      .from('season_games')
+      .select('*')
+      .eq('competition', 'nfl_demo')
+      .eq('week', 1)
+      .order('frozen_rank', {ascending: true});
+    const games = (data as DbSeasonGame[]) ?? [];
+    set({games, allWeekGames: {1: games}});
   },
 }));

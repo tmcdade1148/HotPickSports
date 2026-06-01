@@ -89,7 +89,13 @@ export function DemoResultScreen() {
     exitDemo();
     navigation.navigate('CreatePool');
   };
-  const handleDone = () => {
+  const handleDone = async () => {
+    // Wipe the run server-side so the demo is a clean slate, then leave.
+    try {
+      await supabase.rpc('reset_demo');
+    } catch {
+      // non-critical
+    }
     exitDemo();
     navigation.navigate('Home');
   };
