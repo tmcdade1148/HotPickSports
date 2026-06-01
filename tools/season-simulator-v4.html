@@ -202,10 +202,17 @@
         </div>
 
         <button class="btn btn-warning btn-full" id="btn-run-season" onclick="runFullSeason()" disabled style="margin-top: 12px;">
-          &#9193; Run full season (fast)
+          &#9654; Run full season (every step)
         </button>
         <div style="font-size: 11px; color: #8A97AA; margin-top: 6px;">
-          Fast-forwards from the current week through Week 22: each week opens picks (everyone auto-picks), finalizes all games, scores, completes, and advances &mdash; no live-score ticks, ~1s/week. Watch the standings build on the app.
+          Plays from the current week through Week 22, stepping through every
+          checkpoint of each week (open &rarr; kickoffs &rarr; finals &rarr; score &rarr; settle
+          &rarr; complete) &mdash; about a minute per week so you can watch what each
+          step triggers. The app follows along live via Realtime.
+        </div>
+        <div style="display: flex; gap: 8px; margin-top: 8px;">
+          <button class="btn btn-secondary" style="flex: 1;" id="btn-pause-season" onclick="pauseSeasonRun()" disabled>⏸ Pause</button>
+          <button class="btn btn-danger" style="flex: 1;" id="btn-stop-season" onclick="stopSeasonRun()" disabled>⏹ Stop</button>
         </div>
       </div>
 
@@ -1344,43 +1351,89 @@ async function runEntireWeek() {
   log('▶ Week auto-run complete. Click "Next Week Opens" when ready to advance.', 'success');
 }
 
-// Fast-forward the whole season from the current week through Week 22. Each
-// week: open picks (everyone auto-picks) → all games FINAL → full scoring →
-// complete → advance. No live-score ticks, ~1s/week, so the standings build up
-// quickly and the app follows along live via Realtime. Honors the
-// 'Auto-pick reviewer' checkbox (via cpOpenPicks) for the reviewer's own arc.
+// Run the whole season from the current week through Week 22, stepping through
+// EVERY checkpoint of each week (open picks → wave kickoffs → finals → score →
+// settle → complete) with a pause between steps so you can watch what each one
+// triggers — roughly a minute per week. Pause/Resume + Stop are available while
+// it runs. Fakes auto-pick; the test account does too if the box is checked.
+const SEASON_STEP_PAUSE_MS = 3500;
+let seasonRun = {active: false, paused: false, stop: false};
+
+function updateRunControls() {
+  const pause = document.getElementById('btn-pause-season');
+  const stop  = document.getElementById('btn-stop-season');
+  if (pause) {
+    pause.disabled = !seasonRun.active;
+    pause.textContent = seasonRun.paused ? '▶ Resume' : '⏸ Pause';
+  }
+  if (stop) stop.disabled = !seasonRun.active;
+}
+
+async function waitWhilePaused() {
+  while (seasonRun.paused && !seasonRun.stop) await sleep(250);
+}
+
+function pauseSeasonRun() {
+  if (!seasonRun.active) return;
+  seasonRun.paused = !seasonRun.paused;
+  log(seasonRun.paused ? '⏸ Paused — finishing the current step, then waiting.' : '▶ Resumed.', 'info');
+  updateRunControls();
+}
+
+function stopSeasonRun() {
+  if (!seasonRun.active) return;
+  seasonRun.stop = true;
+  seasonRun.paused = false; // wake the loop so it can exit
+  updateRunControls();
+}
+
 async function runFullSeason() {
   if (!getServiceKey()) return;
-  const withReviewer = document.getElementById('chk-autopick-reviewer')?.checked;
+  if (seasonRun.active) return; // already running
+  const withTester = document.getElementById('chk-autopick-reviewer')?.checked;
   if (!confirm(
-    `⏩ Run the full season fast from Week ${state.currentWeek} through 22?\n\n` +
-    `Each week: open picks (8 fakes${withReviewer ? ' + reviewer' : ''} auto-pick) → all games FINAL → score → complete → next.\n` +
-    `No live-score ticks (~1s/week). The app updates live via Realtime.\n\n` +
+    `▶ Run the full season from Week ${state.currentWeek} through 22?\n\n` +
+    `Steps through every checkpoint of each week (open → kickoffs → finals → ` +
+    `score → settle → complete), ~1 minute per week. Fakes${withTester ? ' + your test account' : ''} auto-pick.\n` +
+    `Use Pause / Stop while it runs. The app follows along live via Realtime.\n\n` +
     `Skips individual confirm prompts.`
   )) return;
 
+  seasonRun = {active: true, paused: false, stop: false};
+  updateRunControls();
+  const steps = CHECKPOINTS.filter(c => c.id !== 'next-week');
+
   try {
-    let guard = 0;
-    while ((state.currentWeek ?? 99) <= 22 && guard < 30) {
-      guard++;
+    while ((state.currentWeek ?? 99) <= 22) {
       await refreshState();
       const wk = state.currentWeek;
-      log(`=== Fast-running Week ${wk} ===`, 'info');
-      await loadWeekGames();   // load this week's sim + source games
-      await cpResetWeek();     // games → scheduled (so seeding doesn't hit the
-                               // pick-lock trigger if this week was already FINAL)
-      await loadWeekGames();   // reload after reset so simGames reflect 'scheduled'
-      await cpOpenPicks();     // phase + picks_open + seed fakes (+test account if checked)
-      await cpEndWeek();       // all games FINAL + full scoring + settling
-      await cpCompleteWeek();  // complete
-      await refreshState();
       await loadWeekGames();
-      if (wk >= 22) { log('=== Season complete — Week 22 scored. ===', 'success'); break; }
+      log(`=== Week ${wk}: stepping through all checkpoints ===`, 'info');
+
+      for (const cp of steps) {
+        await waitWhilePaused();
+        if (seasonRun.stop) throw new Error('__STOP__');
+        checkpointStatus[cp.id] = 'current';
+        renderCheckpoints();
+        await window[cp.fn](cp.arg);
+        await refreshState();
+        await loadWeekGames();
+        await sleep(SEASON_STEP_PAUSE_MS);
+      }
+
+      await waitWhilePaused();
+      if (seasonRun.stop) throw new Error('__STOP__');
+      if (wk >= 22) { log('=== Season complete — Week 22 done. ===', 'success'); break; }
       await cpNextWeek();      // advance week + carry phase
-      await sleep(1000);       // let the app catch up via Realtime
+      await refreshState();
+      await sleep(1500);       // brief gap so the app shows the new week opening
     }
   } catch (e) {
-    log(`Run full season stopped: ${e.message}`, 'error');
+    if (e.message === '__STOP__') log('⏹ Season run stopped.', 'warn');
+    else log(`Run full season stopped: ${e.message}`, 'error');
+  } finally {
+    seasonRun = {active: false, paused: false, stop: false};
+    updateRunControls();
   }
 }
 
