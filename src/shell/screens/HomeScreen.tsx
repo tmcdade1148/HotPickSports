@@ -455,7 +455,7 @@ function PreseasonPicksOpenLine() {
     `${picksOpenAt.toLocaleDateString('en-US', {month: 'long'})} ${day}${ordinalSuffix(day)}`;
   return (
     <Text style={[bodyType.regular, offCycleStyles.picksOpenLine, {color: colors.textSecondary}]}>
-      Week 1 picks open{' '}
+      Week 1 picks go LIVE on{' '}
       <Text style={[bodyType.bold, {color: colors.textPrimary}]}>{dateLabel}</Text>
     </Text>
   );
