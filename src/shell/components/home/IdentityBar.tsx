@@ -175,7 +175,10 @@ const styles = StyleSheet.create({
   nameProbe: {
     position: 'absolute',
     top: 0,
-    left: 0,
+    // Off-screen (not overlapping the visible name): an opacity:0 copy sitting
+    // directly over the name composites into a grey box on Android. onTextLayout
+    // still reports the natural width from off-screen.
+    left: -100000,
     opacity: 0,
     // A huge implicit max width so wrapping doesn't kick in.
     width: 10000,

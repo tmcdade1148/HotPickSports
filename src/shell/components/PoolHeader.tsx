@@ -186,7 +186,9 @@ const styles = StyleSheet.create({
   nameProbe: {
     position: 'absolute',
     top: 0,
-    left: 0,
+    // Off-screen so the opacity:0 measurement copy doesn't composite into a
+    // grey box on Android (see IdentityBar). Width is still measured.
+    left: -100000,
     opacity: 0,
     width: 10000,
   },
