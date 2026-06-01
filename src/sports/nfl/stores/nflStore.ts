@@ -118,9 +118,7 @@ interface NFLState {
   computePathBackNarrative: (userId: string) => void;
   fetchLiveScores: () => Promise<void>;
   fetchNextKickoff: () => Promise<void>;
-  subscribeToGamePickStats: (poolId: string) => () => void;
   subscribeToLiveScores: () => () => void;
-  subscribeToWeekEarned: (userId: string) => () => void;
   subscribeToCompetitionConfig: () => () => void;
 }
 
@@ -651,51 +649,6 @@ export const useNFLStore = create<NFLState>((set, get) => ({
   },
 
   /**
-   * Subscribe to real-time updates on game_pick_stats for a pool.
-   * Returns an unsubscribe function. Only call when weekState === 'live'.
-   */
-  subscribeToGamePickStats: (poolId: string) => {
-    const channel = supabase
-      .channel(`game-pick-stats-${poolId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'game_pick_stats',
-          filter: `pool_id=eq.${poolId}`,
-        },
-        (payload: any) => {
-          const row = payload.new;
-          if (!row) return;
-          set(state => ({
-            gamePickStats: {
-              ...state.gamePickStats,
-              [row.game_id]: {
-                gameId: row.game_id,
-                teamA: row.team_a,
-                teamB: row.team_b,
-                teamAPickCount: row.team_a_pick_count,
-                teamBPickCount: row.team_b_pick_count,
-                totalPicks: row.total_picks,
-                hotpickTeamACount: row.hotpick_team_a_count,
-                hotpickTeamBCount: row.hotpick_team_b_count,
-                hotpickTotal: row.hotpick_total,
-                computedAt: row.computed_at,
-              },
-            },
-          }));
-        },
-      )
-      .subscribe();
-
-    // Return unsubscribe function
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  },
-
-  /**
    * Subscribe to real-time score updates on season_games for the current week.
    * Maps home_score/away_score/current_period/game_clock into liveScores.
    * Returns an unsubscribe function. Only call when weekState === 'live'.
@@ -762,47 +715,6 @@ export const useNFLStore = create<NFLState>((set, get) => ({
           );
           if (wasAnyLive && !isAnyLive) {
             get().fetchNextKickoff();
-          }
-        },
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  },
-
-  /**
-   * Subscribe to season_user_totals for the current user+week so
-   * currentWeekPoints updates live as the scoring Edge Function writes results.
-   * Returns an unsubscribe function.
-   */
-  subscribeToWeekEarned: (userId: string) => {
-    const {competition, currentWeek} = get();
-    if (!userId) return () => {};
-
-    const channel = supabase
-      .channel(`week_earned_${userId}_${competition}_${currentWeek}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'season_user_totals',
-          filter: `user_id=eq.${userId}`,
-        },
-        (payload: any) => {
-          const row = payload.new;
-          if (row?.competition === competition && row?.week === currentWeek) {
-            const pts = row.week_points ?? 0;
-            set(state => ({
-              currentWeekPoints: pts,
-              weekPointsMap: {...state.weekPointsMap, [currentWeek]: pts},
-              weekRecordMap: {...state.weekRecordMap, [currentWeek]: {
-                correct: row.correct_picks ?? 0,
-                total: row.total_picks ?? 0,
-              }},
-            }));
           }
         },
       )

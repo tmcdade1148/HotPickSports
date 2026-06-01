@@ -1260,18 +1260,14 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   smackRealtimeChannel: null,
 
   subscribeSmackUnread: () => {
-    // Truly idempotent: bail if we already have a live channel.
-    // Tearing it down here and recreating races with Supabase's
-    // internal channel cache — removeChannel() is async, and
-    // .channel('smack-unread-global') called before it resolves
-    // returns the still-subscribed channel from the cache. Calling
-    // .on('postgres_changes', …) on an already-subscribed channel
-    // throws "cannot add callbacks after subscribe()".
+    // Idempotent singleton: bail if we already have a live channel. Three boot
+    // paths (LoadingScreen, postAuthFlow, PoolWelcomeScreen) all call this on
+    // session start; only the first wires the channel up. signOut tears it down
+    // via unsubscribeSmackUnread.
     //
-    // Three boot paths (LoadingScreen, postAuthFlow,
-    // PoolWelcomeScreen) all call this on session start; only the
-    // first should actually wire the channel up. signOut handles
-    // the teardown via unsubscribeSmackUnread.
+    // (The channel() wrapper in config/supabase.ts now gives every topic a
+    // unique suffix, so this guard is no longer also working around Supabase's
+    // dedup-by-name cache — it's purely a single-instance guard.)
     if (get().smackRealtimeChannel) return;
 
     const channel = supabase
