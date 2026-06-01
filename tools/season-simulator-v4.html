@@ -1224,6 +1224,16 @@ async function setPhaseOnly(phase, weekState, picksOpen) {
     // SEASON_COMPLETE also flips is_season_complete so the app reads it correctly.
     await api(`competition_config?competition=eq.${COMPETITION}&key=eq.is_season_complete`, 'PATCH', { value: phase === 'SEASON_COMPLETE' });
     log(`✓ Phase set to ${phase}. No data wiped.`, 'success');
+    // Closing the regular season → announce each pool's winner in the Chirps
+    // feed (idempotent server-side, safe to re-run).
+    if (phase === 'REGULAR_COMPLETE') {
+      try {
+        const r = await callEdgeFunction('nfl-announce-regular-winners', { competition: COMPETITION });
+        log(`🏆 Regular-season winners announced: ${r.announced ?? 0} pool(s) (${r.skipped ?? 0} skipped).`, 'success');
+      } catch (e) {
+        log(`Winner announcement failed: ${e.message}`, 'warn');
+      }
+    }
     await refreshState();
   } catch (e) {
     log(`Set phase failed: ${e.message}`, 'error');
