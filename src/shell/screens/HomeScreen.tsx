@@ -327,9 +327,10 @@ export function HomeScreen() {
         )}
         {homeState === 'pre_season_games' && (
           <>
+            {/* Directly under the hero's kickoff countdown. */}
+            <PreseasonPicksOpenLine />
             {offCycleContests}
             {visiblePools.length > 0 ? <ReturningOffCycleActions /> : <PreSeasonActions />}
-            <PreseasonPicksOpenLine />
             <CrossContestStrip />
             {offCycleClubs ?? <ClubsTeaser />}
           </>
