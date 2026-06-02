@@ -120,3 +120,27 @@ export const nflSeasonSim: SeasonConfig = {
   shortName: 'NFL SIM',
   status: 'active',
 };
+
+/**
+ * Dedicated frozen App Review sandboxes — one per store, so an Apple and a
+ * Google reviewer testing concurrently never share a Ladder/Chirps feed or
+ * collide on picks. Each is whitelisted (competition_access) to that store's
+ * reviewer account only; the owner's free-test walkthrough stays on
+ * `nfl_2025_sim`. Same 2025 source data; differ only by competition id.
+ * See docs/REVIEWER_SIM_RUNBOOK.md.
+ */
+export const nflSeasonSimA: SeasonConfig = {
+  ...nflSeason,
+  competition: 'nfl_2025_simA',
+  name: 'NFL 2025 SIM A',
+  shortName: 'NFL SIM A',
+  status: 'active',
+};
+
+export const nflSeasonSimG: SeasonConfig = {
+  ...nflSeason,
+  competition: 'nfl_2025_simG',
+  name: 'NFL 2025 SIM G',
+  shortName: 'NFL SIM G',
+  status: 'active',
+};

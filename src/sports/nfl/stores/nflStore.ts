@@ -1,5 +1,6 @@
 import {create} from 'zustand';
 import {supabase} from '@shared/config/supabase';
+import {isSandboxCompetition} from '@shared/utils/competition';
 import type {DbSeasonPick, DbSeasonGame} from '@shared/types/database';
 
 // ---------------------------------------------------------------------------
@@ -308,13 +309,14 @@ export const useNFLStore = create<NFLState>((set, get) => ({
 
     set({currentWeek, seasonYear, weekState, picksDeadline, picksOpenAt, seasonOpenerAt, currentPhase});
 
-    // Sandbox-only heartbeat. After ingesting a config step on nfl_2025_sim,
-    // echo the simulator's step token back into sim_app_heartbeat so the
-    // season simulator can wait for this app instance to catch up before
-    // advancing (instead of a blind fixed timer). Gated to the sandbox
-    // competition so it never touches live data; fire-and-forget so an RLS
-    // miss or offline state just falls the simulator back to its own timer.
-    if (competition === 'nfl_2025_sim') {
+    // Sandbox-only heartbeat. After ingesting a config step on a sim
+    // competition, echo the simulator's step token back into
+    // sim_app_heartbeat so the season simulator can wait for this app
+    // instance to catch up before advancing (instead of a blind fixed timer).
+    // Gated to sandbox competitions so it never touches live data;
+    // fire-and-forget so an RLS miss or offline state just falls the
+    // simulator back to its own timer.
+    if (isSandboxCompetition(competition)) {
       const simToken =
         typeof cfg.sim_step_token === 'number' ? cfg.sim_step_token : 0;
       void supabase

@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {getAllEventsUnfiltered, getEventsByPriority, getDemoEvent, DEMO_POOL_ID} from '@sports/registry';
 import {deactivateDeviceTokens} from '@shell/services/pushNotifications';
 import {nflSeason} from '@sports/nfl/config';
+import {isSandboxCompetition} from '@shared/utils/competition';
 
 const POOL_STORAGE_PREFIX = 'hotpick_active_pool_';
 const DEFAULT_POOL_PREFIX = 'hotpick_default_pool_';
@@ -511,12 +512,14 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     const visible = rows.map(r => r.competition);
     set({visibleCompetitions: visible, visibleCompetitionsLoaded: true});
 
-    // Beta-tester force-land — on the FIRST resolve of a session, if
-    // the user has access to nfl_2025_sim, drop them onto sim so
-    // they're testing against the live simulator state. After the
-    // initial sync we leave activeSport alone so a super-admin can
-    // still switch to nfl_2026 manually via Settings → Competition
-    // and stay there for the rest of the session.
+    // Beta-tester force-land — on the FIRST resolve of a session, if the
+    // user has access to a sandbox/sim competition, drop them onto it so
+    // they're testing against the right simulator state. Each beta user is
+    // whitelisted (competition_access) for exactly one sim — testers →
+    // nfl_2025_sim, Apple reviewer → nfl_2025_simA, Google → nfl_2025_simG —
+    // so they land on theirs. After the initial sync we leave activeSport
+    // alone so a super-admin can still switch to nfl_2026 manually via
+    // Settings → Competition and stay there for the rest of the session.
     //
     // Note: this fires in DEV too. Earlier versions skipped DEV to
     // preserve the LoadingScreen DEV_ACTIVE_COMPETITION_KEY
@@ -544,9 +547,13 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       return;
     }
 
-    if (!visible.includes('nfl_2025_sim')) return;
-    if (current?.competition === 'nfl_2025_sim') return;
-    const sim = getAllEventsUnfiltered().find(e => e.competition === 'nfl_2025_sim');
+    // Land on whichever sandbox/sim the user can see (each beta user is
+    // whitelisted for exactly one). If they can see more than one (e.g. a
+    // super-admin), the first in the visible list wins; they can switch.
+    const sandbox = visible.find(c => isSandboxCompetition(c));
+    if (!sandbox) return;
+    if (current?.competition === sandbox) return;
+    const sim = getAllEventsUnfiltered().find(e => e.competition === sandbox);
     if (sim) {
       get().setActiveSport(sim);
       // Clear sticky pool so the user lands on the sim pool list

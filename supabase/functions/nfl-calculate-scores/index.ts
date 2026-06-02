@@ -185,10 +185,12 @@ async function scoreWeek(competition: string, seasonYear: number, week: number) 
   if (upsertError) return { users_scored: 0, final_games: games.length, error: upsertError.message };
 
   // ── SmackTalk: post per-user HotPick results to each pool they belong to ──
-  // Suppressed for sim competitions — the Proving Grounds reviewer pool and
-  // Testing NFL2 should show a clean human-authored feed. Production (nfl_2026)
-  // still gets the auto-posts.
-  if (competition.endsWith("_sim")) {
+  // Suppressed for sandbox/sim competitions — the App Review sandboxes
+  // (nfl_2025_sim, nfl_2025_simA, nfl_2025_simG) and Testing NFL2 should show a
+  // clean human-authored feed. Production (nfl_2026) still gets the auto-posts.
+  // Matches `_sim` optionally + a single suffix letter (mirrors
+  // isSandboxCompetition in src/shared/utils/competition.ts).
+  if (/_sim[a-z]?$/i.test(competition)) {
     return { users_scored: scoredUserIds.size, final_games: games.length };
   }
   try {

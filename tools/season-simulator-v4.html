@@ -340,11 +340,26 @@
 <script>
 const SUPABASE_URL = 'https://mzqtrpdiqhopjmxjccwy.supabase.co';
 const ANON_KEY     = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im16cXRycGRpcWhvcGpteGpjY3d5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDIwMDQsImV4cCI6MjA3MjA3ODAwNH0.017SoJAJLh4UKRYm4jVVCWDf1gCN2wjkpcUTHJJOsU4';
-const COMPETITION  = 'nfl_2025_sim';
-const SOURCE_COMP  = 'nfl_2025';
-const SEASON_YEAR  = 2025;
-const PROVING_GROUNDS_POOL_ID = '1178a95d-7689-4348-a472-1852cb8c89b8';
-const REVIEWER_USER_ID = '55ed62e4-9fe3-45d6-b9a0-a1819d81387b';
+
+// Parameterized so this one tool can drive any sim competition. Defaults =
+// the original nfl_2025_sim target, so opening the file with no query string
+// behaves exactly as before. To drive a reviewer sandbox, pass query params:
+//   ?competition=nfl_2025_simA&pool=<APPLE_POOL_ID>&reviewer=<APPLE_REVIEWER_ID>
+//   ?competition=nfl_2025_simG&pool=<GOOGLE_POOL_ID>&reviewer=<GOOGLE_REVIEWER_ID>
+// SOURCE_COMP stays nfl_2025 for every sim (shared source data).
+const _qp = new URLSearchParams(location.search);
+const COMPETITION  = _qp.get('competition') || 'nfl_2025_sim';
+const SOURCE_COMP  = _qp.get('source') || 'nfl_2025';
+const SEASON_YEAR  = Number(_qp.get('season') || 2025);
+const PROVING_GROUNDS_POOL_ID = _qp.get('pool') || '1178a95d-7689-4348-a472-1852cb8c89b8';
+const REVIEWER_USER_ID = _qp.get('reviewer') || '55ed62e4-9fe3-45d6-b9a0-a1819d81387b';
+
+// Make the active target unmistakable in the UI/title so you never drive the
+// wrong sim. Badges with class "badge" are updated to show COMPETITION.
+document.title = `Season Sim — ${COMPETITION}`;
+window.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.badge').forEach(el => { el.textContent = COMPETITION; });
+});
 
 // ─────────────────────────────────────────────────────────────
 // State
