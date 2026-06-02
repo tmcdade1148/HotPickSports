@@ -8,6 +8,7 @@
 
 import React, {useEffect, useRef} from 'react';
 import {Animated, StyleSheet, View} from 'react-native';
+import type {DimensionValue} from 'react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {spacing, borderRadius} from '@shared/theme';
 
@@ -27,12 +28,14 @@ export function HeroSkeleton() {
     return () => loop.stop();
   }, [pulse]);
 
-  // A shimmering block. `w` accepts a number (px) or a percent string.
-  const Block = ({w, h, mb}: {w: number | string; h: number; mb?: number}) => (
+  // A shimmering bar. A plain function (not a JSX component) so its views
+  // aren't re-mounted on every render. `w` is px or a percent string.
+  const bar = (key: string, w: DimensionValue, h: number, mb = 0) => (
     <Animated.View
+      key={key}
       style={[
         styles.block,
-        {width: w as any, height: h, borderRadius: h > 40 ? borderRadius.md : h / 2, marginBottom: mb ?? 0, opacity: pulse},
+        {width: w, height: h, borderRadius: h > 40 ? borderRadius.md : h / 2, marginBottom: mb, opacity: pulse},
       ]}
     />
   );
@@ -43,21 +46,16 @@ export function HeroSkeleton() {
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants">
       {/* Week strip — a short row of small chips. */}
-      <View style={styles.stripRow}>
-        <Block w={26} h={12} />
-        <Block w={26} h={12} />
-        <Block w={26} h={12} />
-        <Block w={26} h={12} />
-      </View>
+      <View style={styles.stripRow}>{[0, 1, 2, 3].map(i => bar(`strip-${i}`, 26, 12))}</View>
 
       {/* Context message line. */}
-      <Block w="62%" h={12} mb={spacing.md} />
+      {bar('message', '62%', 12, spacing.md)}
 
       {/* Module block (timer / HotPick card area). */}
-      <Block w="100%" h={72} mb={spacing.md} />
+      {bar('module', '100%', 72, spacing.md)}
 
       {/* CTA bar. */}
-      <Block w="100%" h={46} />
+      {bar('cta', '100%', 46)}
     </View>
   );
 }
