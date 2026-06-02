@@ -55,6 +55,8 @@ const PREF_LABELS: Record<string, {label: string; description: string}> = {
   },
 };
 
+// Every column on the wide notification_preferences row. Used for the SELECT
+// so a user's full preference row is fetched regardless of what we render.
 const PREF_ORDER = [
   'picks_deadline',
   'score_posted',
@@ -64,6 +66,16 @@ const PREF_ORDER = [
   'organizer_broadcast',
   'streak_milestone',
   'new_member_joined',
+];
+
+// Only the types that actually have a server-side generator today get a toggle.
+// The rest (picks_deadline, score_posted, leaderboard_change, streak_milestone,
+// new_member_joined) are enqueued by nothing yet, so showing a switch for them
+// would be a dead control. Add a type back here the moment its generator ships.
+const VISIBLE_PREF_ORDER = [
+  'smacktalk_mention',
+  'smacktalk_reply',
+  'organizer_broadcast',
 ];
 
 export function NotificationPreferencesScreen() {
@@ -145,7 +157,7 @@ export function NotificationPreferencesScreen() {
           </Text>
 
           <View style={[styles.card, {backgroundColor: colors.surface}]}>
-            {PREF_ORDER.map((type, index) => {
+            {VISIBLE_PREF_ORDER.map((type, index) => {
               const info = PREF_LABELS[type];
               if (!info) return null;
 
