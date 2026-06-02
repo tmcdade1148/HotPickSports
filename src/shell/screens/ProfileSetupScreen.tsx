@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -25,20 +25,17 @@ import {
  * ProfileSetupScreen — Welcome screen shown when profiles.poolie_name is
  * missing (OAuth Onboarding Spec §4).
  *
- * Shape per spec §4.2:
- *   - Greeting: "Welcome, {first_name}." — read from profile. The user
- *     does not type their name here. For OAuth users, first_name has
- *     already been written to profiles by socialAuth.ts.
- *   - Poolie Name field (required) with live availability check.
+ * Collects the same identity fields as Settings → Profile so every account
+ * (email signup or OAuth) has a complete profile from the start:
+ *   - First name + Last name (both required). Pre-filled from the profile when
+ *     the OAuth provider supplied them (socialAuth.ts writes Apple's first-auth
+ *     name / Google's name); empty for email signups. The user confirms/edits.
+ *   - Player Name field (required) with live availability check.
  *   - Avatar selection (required, system avatar pre-selected).
- *   - CTA: "Let's Go" — writes poolie_name and avatar to profiles.
+ *   - CTA: "Let's Go" — writes first/last name, poolie_name, and avatar.
  *
- * Edge case (spec §2.3 red flag): if Apple returned nil fullName on
- * first auth AND no first_name exists on profile (rare — user dismissed
- * the share-name prompt), we fall back to asking for first name here.
- * We never prompt for email.
- *
- * First / last name editing lives in Settings → Account, not here.
+ * We never prompt for email here. Last name is stored but only the initial is
+ * shown publicly (matches the note in Settings → Profile).
  */
 export function ProfileSetupScreen({navigation}: any) {
   const {colors} = useTheme();
@@ -47,27 +44,33 @@ export function ProfileSetupScreen({navigation}: any) {
   const userProfile = useGlobalStore(s => s.userProfile);
   const updateProfile = useGlobalStore(s => s.updateProfile);
 
-  const profileFirstName = userProfile?.first_name?.trim() ?? '';
-  const needsFirstNameFallback = profileFirstName.length === 0;
-
-  const [firstNameFallback, setFirstNameFallback] = useState('');
+  // Pre-fill from the profile — OAuth (Apple first-auth / Google) writes
+  // first/last name via socialAuth.ts before this screen; email signups arrive
+  // empty. Either way the user confirms/edits here. Both are required.
+  const [firstName, setFirstName] = useState(userProfile?.first_name?.trim() ?? '');
+  const [lastName, setLastName] = useState(userProfile?.last_name?.trim() ?? '');
   const [poolieName, setPoolieName] = useState('');
   const [selectedAvatar, setSelectedAvatar] = useState<string>(
     SYSTEM_AVATARS[0].key,
   );
   const [saving, setSaving] = useState(false);
 
+  // Profile may resolve after first render; backfill empty fields without
+  // clobbering anything the user has already typed.
+  useEffect(() => {
+    if (userProfile?.first_name && !firstName) setFirstName(userProfile.first_name.trim());
+    if (userProfile?.last_name && !lastName) setLastName(userProfile.last_name.trim());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userProfile?.first_name, userProfile?.last_name]);
+
   const validation = usePoolieNameValidator(poolieName);
   const poolieError = poolieNameErrorMessage(validation);
-
-  const effectiveFirstName = needsFirstNameFallback
-    ? firstNameFallback.trim()
-    : profileFirstName;
 
   const canSubmit =
     !saving &&
     validation.state === 'available' &&
-    effectiveFirstName.length > 0;
+    firstName.trim().length > 0 &&
+    lastName.trim().length > 0;
 
   const handleSubmit = async () => {
     if (!user?.id || !canSubmit) return;
@@ -76,9 +79,8 @@ export function ProfileSetupScreen({navigation}: any) {
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
     const ok = await updateProfile(user.id, {
-      // Only write first_name when we collected it here (fallback path).
-      // Otherwise preserve what socialAuth.ts wrote.
-      ...(needsFirstNameFallback ? {first_name: effectiveFirstName} : {}),
+      first_name: firstName.trim(),
+      last_name: lastName.trim(),
       poolie_name: poolieName.trim(),
       avatar_key: selectedAvatar,
       avatar_type: 'system' as const,
@@ -108,31 +110,47 @@ export function ProfileSetupScreen({navigation}: any) {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled">
           {/* Greeting */}
-          <Text style={styles.greeting}>
-            {needsFirstNameFallback ? 'Welcome.' : `Welcome, ${profileFirstName}.`}
-          </Text>
+          <Text style={styles.greeting}>Welcome!</Text>
           <Text style={styles.subtext}>
-            Choose your Player Name and pick an avatar to get started.
+            Tell us your name, choose a Player Name, and pick an avatar to get started.
           </Text>
 
-          {/* First-name fallback — only shown when Apple returned nil fullName */}
-          {needsFirstNameFallback ? (
-            <View style={styles.section}>
-              <Text style={styles.label}>
-                What should we call you? <Text style={styles.required}>*</Text>
-              </Text>
-              <TextInput
-                style={styles.input}
-                placeholder="First name"
-                placeholderTextColor={colors.textSecondary}
-                value={firstNameFallback}
-                onChangeText={setFirstNameFallback}
-                autoCapitalize="words"
-                autoCorrect={false}
-                editable={!saving}
-              />
-            </View>
-          ) : null}
+          {/* First name (required) — pre-filled from the OAuth provider when available */}
+          <View style={styles.section}>
+            <Text style={styles.label}>
+              First name <Text style={styles.required}>*</Text>
+            </Text>
+            <TextInput
+              style={styles.input}
+              placeholder="First name"
+              placeholderTextColor={colors.textSecondary}
+              value={firstName}
+              onChangeText={setFirstName}
+              autoCapitalize="words"
+              autoCorrect={false}
+              editable={!saving}
+            />
+          </View>
+
+          {/* Last name (required) — stored, but only the initial is shown publicly */}
+          <View style={styles.section}>
+            <Text style={styles.label}>
+              Last name <Text style={styles.required}>*</Text>
+            </Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Last name"
+              placeholderTextColor={colors.textSecondary}
+              value={lastName}
+              onChangeText={setLastName}
+              autoCapitalize="words"
+              autoCorrect={false}
+              editable={!saving}
+            />
+            <Text style={styles.hint}>
+              Full surnames are never displayed publicly. We'll only use the initial.
+            </Text>
+          </View>
 
           {/* Poolie name (required) */}
           <View style={styles.section}>
