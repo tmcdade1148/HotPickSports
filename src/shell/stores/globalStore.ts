@@ -1364,27 +1364,45 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   recentBroadcasts: [],
 
   fetchRecentBroadcasts: async () => {
-    const {userPools} = get();
+    const {userPools, user} = get();
     if (userPools.length === 0) {
       set({recentBroadcasts: []});
       return;
     }
 
     const poolIds = userPools.map(p => p.id);
-    const twentyFourHoursAgo = new Date(
-      Date.now() - 24 * 60 * 60 * 1000,
+    // 30-day window to match the HomeInbox unread badge (was 24h, which made
+    // the badge count messages the list couldn't show).
+    const windowStart = new Date(
+      Date.now() - 30 * 24 * 60 * 60 * 1000,
     ).toISOString();
 
-    const {data} = await supabase
+    // Join times — a broadcast sent before the user joined a pool isn't theirs,
+    // so it's excluded here too (mirrors the HomeInbox badge logic).
+    const {data: memberRows} = await supabase
+      .from('pool_members')
+      .select('pool_id, joined_at')
+      .eq('user_id', user?.id ?? '')
+      .in('pool_id', poolIds);
+    const joinedByPool = new Map(
+      (memberRows ?? []).map((r: any) => [r.pool_id, r.joined_at]),
+    );
+
+    const {data: rawBroadcasts} = await supabase
       .from('organizer_notifications')
       .select('pool_id, message, sent_at, organizer_id, notification_type')
       .in('pool_id', poolIds)
       .eq('notification_type', 'broadcast')
-      .gte('sent_at', twentyFourHoursAgo)
+      .gte('sent_at', windowStart)
       .order('sent_at', {ascending: false})
-      .limit(10);
+      .limit(20);
 
-    if (!data || data.length === 0) {
+    const data = (rawBroadcasts ?? []).filter((r: any) => {
+      const joined = joinedByPool.get(r.pool_id);
+      return !joined || new Date(r.sent_at) > new Date(joined);
+    });
+
+    if (data.length === 0) {
       set({recentBroadcasts: []});
       return;
     }
