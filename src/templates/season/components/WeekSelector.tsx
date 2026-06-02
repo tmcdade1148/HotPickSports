@@ -75,9 +75,11 @@ export function WeekSelector({
         style={[
           styles.chip,
           realWeek === 0 && {opacity: 0.4},
-          isActiveWeek && {backgroundColor: colors.highlight, opacity: 1},
-          isViewedWeek && {backgroundColor: colors.highlight + '66'},
-          isPast && {backgroundColor: colors.highlight + '4D'},
+          // Active/live week: full HotPick blue. Past weeks: faded blue.
+          // The week the user has browsed to (viewed): faded orange.
+          isActiveWeek && {backgroundColor: colors.accentTeal, borderColor: colors.accentTeal, opacity: 1},
+          isViewedWeek && {backgroundColor: colors.secondary + '59', borderColor: colors.secondary},
+          isPast && {backgroundColor: colors.accentTeal + '40', borderColor: colors.accentTeal + '66'},
           isFuture && {backgroundColor: colors.surface, borderColor: colors.border + '80'},
         ]}
         disabled={realWeek === 0}
@@ -148,7 +150,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
   },
   chipTextSelected: {
-    color: colors.ink,
+    // Light text for contrast on the dark teal active-week fill.
+    color: colors.onPrimary,
   },
   separator: {
     width: SEPARATOR_WIDTH,
