@@ -312,8 +312,27 @@ Always filter with `.eq('status', 'active')` in leaderboard and member list quer
 
 ### Super Bowl Enhanced Scoring (Build November 2026)
 Do not build UI yet. Nullable columns already added to `season_picks`:
-- `super_bowl_q1_pick`, `super_bowl_q2_pick`, `super_bowl_q3_pick` (TEXT)
-- `super_bowl_margin_prediction` (INT — Price Is Right tiebreaker; rung 2 of the full-season playoff champion tie-breaker ladder in §3, and the primary tie-breaker for the planned Super Bowl-only competition)
+- `super_bowl_q1_pick`, `super_bowl_q2_pick`, `super_bowl_q3_pick` (TEXT — quarter-leader picks, team abbr)
+- `super_bowl_margin_prediction` (INT) — **see margin note below; the concept needs a decision**
+
+**Canonical scoring model (recovered from the Season 1 Xcode build `tmcdade1148/NFL2025`, Dec 2025 — `SuperBowlRowView.swift` is authoritative).** The Super Bowl is a single game with a **multi-part pick**:
+
+| Pick | Correct | Wrong |
+|---|---|---|
+| **Game Winner** (scored as a HotPick at rank 16) | **+16** | **−16** |
+| **Q1 Leader** (who leads at end of Q1) | **+1** | 0 (no penalty) |
+| **Q2 Leader** | **+2** | 0 |
+| **Q3 Leader** | **+3** | 0 |
+| **Margin Tier** — final winning margin bucket: `1–6` / `7–14` / `15+` | **+8** | **−4** |
+| **Score range** | **max +30** | **min −20** |
+
+Notes / decisions still open for the November build:
+- **No Q4 leader, no total-points pick.** The game winner covers the full game; quarters stop at Q3. Season 1 had no over/under or total-points element.
+- **Stale Season 1 copy to ignore:** the old `SuperBowlOnboardingBanner` advertised a "HotPick Quarter" pick and a **+36 / −26** range. Tom confirmed these are **not** in the real scoring — there is no separate HotPick-quarter swing. Canonical range is **+30 / −20**.
+- **Margin concept fork — DECIDE before building.** Season 1 scored margin as a **3-tier bucket** (`1–6` / `7–14` / `15+`, +8/−4) — a *scoring element*, not a tiebreaker. The deferred `super_bowl_margin_prediction` INT column was added for a **Price-Is-Right tiebreaker** (closest exact margin without going over), which is how the §3 tie-breaker ladder and `PlayoffRulesModal` describe it. These are two different mechanics. Resolve in November: keep the tier as a scoring element, use an exact INT for the tiebreaker, or both. Until decided, the §3 ladder copy (Price-Is-Right) is what players see.
+- The Season 1 winner pick reused the **HotPick ±rank** mechanic at rank 16. In Season 2 confirm how ranking applies when the SB week has a single game.
+- **New data requirement:** scoring needs **per-quarter scores** (Q1/Q2/Q3 home & away) from the provider. Regular-season scoring never needed this — Season 2's ESPN polling + `season_games` must capture quarter scores.
+- Each scoring dimension (quarter-leader accuracy, margin-tier correctness) is a candidate **tiebreaker variable** for the §3 ladder and the Super Bowl-only competition.
 
 **Also in scope for this November 2026 build (see §3 "Planned entry points & sub-competitions"):**
 - **Super Bowl-only competition + its own winner** — new users can sign up in the 2 weeks before the Super Bowl and compete on the Super Bowl week alone; distinct champion from the full-season and playoffs-only champions
