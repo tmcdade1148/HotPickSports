@@ -3,7 +3,7 @@
 // in store loaders fired here so child modules can stay presentational.
 
 import React, {useCallback, useEffect, useMemo} from 'react';
-import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {KeyRound, Plus} from 'lucide-react-native';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import {useGlobalStore} from '@shell/stores/globalStore';
@@ -72,10 +72,15 @@ export function HomeScreen() {
     [currentPhase, weekState],
   );
 
+  // Gate on configLoaded: until the real competition_config loads, the store
+  // holds its defaults (REGULAR / picks_open / week 1), which would briefly
+  // flash the Week 1 picks-open hero + CTA before the true phase (e.g.
+  // PRE_SEASON) resolves on a cold launch / reviewer reload.
   const isPicksFlow =
-    homeState === 'picks_open'   ||
-    homeState === 'picks_locked' ||
-    homeState === 'games_live';
+    configLoaded &&
+    (homeState === 'picks_open'   ||
+     homeState === 'picks_locked' ||
+     homeState === 'games_live');
   const showInsight      = isPicksFlow;
   // Everyone sees the hero + YOUR CONTESTS + YOUR CLUBS — the
   // off-cycle hero (OffSeasonHero etc.) plus the section headers and
@@ -364,7 +369,16 @@ export function HomeScreen() {
         <HomeHeader />
         <SystemMessageSlot />
         <IdentityBar />
-        {showHero && <StateHero state={homeState} />}
+        {showHero &&
+          (configLoaded ? (
+            <StateHero state={homeState} />
+          ) : (
+            // Hold the hero's space with a loader until config resolves, so we
+            // never flash the default-state (Week 1 picks-open) hero.
+            <View style={styles.heroPlaceholder}>
+              <ActivityIndicator color={colors.primary} />
+            </View>
+          ))}
 
         {/* Off-cycle layout per the OffseasonPreseasonHome spec
             (May 29, 2026): action stack → cross-Contest strip →
@@ -575,6 +589,7 @@ const offCycleStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   wrap:    {flex: 1},
   scroll:  {paddingBottom: spacing.xxl},
+  heroPlaceholder: {minHeight: 160, alignItems: 'center', justifyContent: 'center'},
   section: {marginTop: spacing.lg},
   sectionTitle: {
     fontSize: 11,
