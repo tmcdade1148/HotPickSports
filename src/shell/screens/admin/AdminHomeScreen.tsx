@@ -13,7 +13,7 @@ import React, {useEffect, useState} from 'react';
 import {ScrollView, StyleSheet, Text, View, Pressable} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
-import {ChevronLeft, AlertTriangle, Megaphone, Activity, Shield, Target, ChevronRight, Building, Users} from 'lucide-react-native';
+import {ChevronLeft, AlertTriangle, Megaphone, Activity, Shield, Target, ChevronRight, Building, Users, CalendarClock} from 'lucide-react-native';
 import {supabase} from '@shared/config/supabase';
 import {useTheme} from '@shell/theme/hooks';
 import {bodyType, displayType, spacing, borderRadius} from '@shared/theme';
@@ -111,6 +111,14 @@ function AdminHomeScreenImpl() {
               : `${clubCount} active Clubs · create / edit`
           }
           onPress={() => navigation.navigate('PartnerAdmin')}
+        />
+
+        <Card
+          color={colors}
+          icon={<CalendarClock size={22} color={colors.primary} strokeWidth={2.25} />}
+          title="Season Control"
+          subtitle="Advance the season phase (regular → playoffs → Super Bowl)."
+          onPress={() => navigation.navigate('AdminSeasonControl')}
         />
 
         <Card
