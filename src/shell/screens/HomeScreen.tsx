@@ -3,7 +3,7 @@
 // in store loaders fired here so child modules can stay presentational.
 
 import React, {useCallback, useEffect, useMemo} from 'react';
-import {ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {KeyRound, Plus} from 'lucide-react-native';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import {useGlobalStore} from '@shell/stores/globalStore';
@@ -19,6 +19,7 @@ import {SystemMessageSlot} from '@shell/components/home/SystemMessageSlot';
 import {HomeHeader} from '@shell/components/home/HomeHeader';
 import {IdentityBar} from '@shell/components/home/IdentityBar';
 import {StateHero} from '@shell/components/home/StateHero';
+import {HeroSkeleton} from '@shell/components/home/HeroSkeleton';
 import {CrossContestStrip} from '@shell/components/home/CrossContestStrip';
 import {OffSeasonActions, PreSeasonActions, ReturningOffCycleActions} from '@shell/components/home/OffCycleActions';
 import {Insight} from '@shell/components/home/Insight';
@@ -373,11 +374,9 @@ export function HomeScreen() {
           (configLoaded ? (
             <StateHero state={homeState} />
           ) : (
-            // Hold the hero's space with a loader until config resolves, so we
-            // never flash the default-state (Week 1 picks-open) hero.
-            <View style={styles.heroPlaceholder}>
-              <ActivityIndicator color={colors.primary} />
-            </View>
+            // Hero-shaped skeleton until config resolves, so we never flash
+            // the default-state (Week 1 picks-open) hero on a cold launch.
+            <HeroSkeleton />
           ))}
 
         {/* Off-cycle layout per the OffseasonPreseasonHome spec
@@ -589,7 +588,6 @@ const offCycleStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   wrap:    {flex: 1},
   scroll:  {paddingBottom: spacing.xxl},
-  heroPlaceholder: {minHeight: 160, alignItems: 'center', justifyContent: 'center'},
   section: {marginTop: spacing.lg},
   sectionTitle: {
     fontSize: 11,
