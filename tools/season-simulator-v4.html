@@ -242,6 +242,18 @@
           <code>current_week=8</code>, <code>picks_open</code>, Mel and all fakes have 0 Week 8+ picks, Week 8 games back to <code>scheduled</code>, no Week 8+ totals. Weeks 1&ndash;7 untouched.
         </div>
 
+        <button class="btn btn-danger btn-full" id="btn-refreeze-reviewer" onclick="refreezeReviewerSim()" disabled style="margin-top: 10px;">
+          &#129482; Re-freeze reviewer sim to Week 8
+        </button>
+        <div style="font-size: 11px; color: #8A97AA; margin-top: 6px;">
+          One-call <code>reset_reviewer_sim()</code> RPC for the App Review sandboxes
+          (<code>simA</code>/<code>simG</code> only). Clears the reviewer&rsquo;s Week 8 picks,
+          re-futures the Week 8 slate (live countdown, games pickable), archives chirps + flags
+          they left, archives any contest they created, re-confirms Proving Grounds membership,
+          and pins <code>Week 8 / REGULAR / picks_open</code>. Weeks 1&ndash;7 totals &amp; the
+          fakes&rsquo; Ladder stay intact.
+        </div>
+
         <button class="btn btn-danger btn-full" id="btn-reset-to-week1" onclick="resetToStartOfSeason()" disabled style="margin-top: 10px;">
           Reset sim to Week 1 (start of season)
         </button>
@@ -567,6 +579,10 @@ function updateButtons() {
   document.getElementById('btn-reset-to-week8').disabled = !ready;
   document.getElementById('btn-reset-to-week1').disabled = !ready;
   document.getElementById('btn-reset-to-preseason').disabled = !ready;
+  // One-call reviewer re-freeze only applies to the App Review sandboxes —
+  // the RPC itself rejects any other competition, so don't even offer it.
+  document.getElementById('btn-refreeze-reviewer').disabled =
+    !connected || (COMPETITION !== 'nfl_2025_simA' && COMPETITION !== 'nfl_2025_simG');
   // Phase setters + scoring-lock toggle work even while scoring is locked
   // (you need to be able to unlock from here).
   ['btn-phase-offseason', 'btn-phase-preseason', 'btn-phase-regcomplete',
@@ -1612,6 +1628,43 @@ async function resetReviewerCurrentWeek() {
 //   - Reset Week 9+ games that were advanced past scheduled (defensive)
 //
 // Weeks 1-7 historical picks + totals are UNTOUCHED.
+// One-call re-freeze for the App Review sandboxes (simA/simG). Thin wrapper
+// over the server-side reset_reviewer_sim() RPC — all the work (clear Week 8
+// picks, re-future the slate, archive chirps/flags + reviewer-created contests,
+// re-confirm Proving Grounds membership, pin Week 8/REGULAR/picks_open) happens
+// in Postgres so the logic lives in one place. Weeks 1-7 stay intact.
+async function refreezeReviewerSim() {
+  if (COMPETITION !== 'nfl_2025_simA' && COMPETITION !== 'nfl_2025_simG') {
+    log('Re-freeze only applies to nfl_2025_simA / nfl_2025_simG.', 'error');
+    return;
+  }
+  const who = COMPETITION === 'nfl_2025_simA' ? 'Apple reviewer' : 'Google reviewer';
+  if (!confirm(
+    `Re-freeze ${COMPETITION} (${who}) to Week 8 / picks_open?\n\n` +
+    'This calls reset_reviewer_sim() and will:\n' +
+    "  1. Clear the reviewer's Week 8 picks (open, empty slate)\n" +
+    '  2. Re-future the Week 8 games (live countdown, all pickable)\n' +
+    '  3. Archive chirps + clear flags the reviewer left in Proving Grounds\n' +
+    '  4. Archive any contest the reviewer created during testing\n' +
+    '  5. Re-confirm the reviewer as an active Proving Grounds member\n' +
+    '  6. Pin Week 8 / REGULAR / picks_open\n\n' +
+    "Weeks 1-7 totals and the fake players' Ladder are UNTOUCHED."
+  )) return;
+
+  try {
+    log(`=== Re-freezing ${COMPETITION} via reset_reviewer_sim() ===`, 'info');
+    const res = await api('rpc/reset_reviewer_sim', 'POST', { p_competition: COMPETITION });
+    // PostgREST returns the function's scalar text result.
+    const summary = Array.isArray(res) ? res[0] : res;
+    log(`✓ ${typeof summary === 'string' ? summary : JSON.stringify(summary)}`, 'success');
+    await refreshState();
+    await loadWeekGames();
+    log('Have the reviewer fully quit & relaunch (or Metro-reload) to re-pull.', 'info');
+  } catch (e) {
+    log(`Re-freeze failed: ${e.message}`, 'error');
+  }
+}
+
 async function resetToReviewerState() {
   if (!confirm(
     'Reset entire sim to App Review state (Week 8, picks_open)?\n\n' +
