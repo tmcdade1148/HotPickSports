@@ -2,9 +2,11 @@
 // Explains how the playoffs work, opened from the ⓘ on the PlayoffBanner.
 // Rules sourced from REFERENCE.md §3 (playoff reset) + scoring rules.
 //
-// NOTE: the exact tie-breaker mechanic is not fully specified in code yet —
-// only the (deferred) super_bowl_margin_prediction column exists. The
-// tie-breaker copy below is a placeholder to confirm with Tom.
+// Tie-breaker ladder (confirmed with Tom): playoff points → Super Bowl margin
+// (Price Is Right, closest without going over) → most correct playoff picks →
+// most correct playoff HotPicks → co-champions. The actual tie-break
+// computation ships with Super Bowl scoring (REFERENCE §3, Nov 2026); this
+// popup just states the rule.
 
 import React from 'react';
 import {Modal, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
@@ -51,12 +53,34 @@ export function PlayoffRulesModal({visible, onClose}: Props) {
               heading="Scoring"
               text="Each correct pick is worth +1. Your HotPick is worth its rank: + the rank if it wins, − the rank if it loses. Higher-ranked games are bigger swings."
             />
-            <Rule
-              colors={colors}
-              heading="Tie-breaker"
-              text="If players finish the playoffs level on points, the Super Bowl margin prediction breaks the tie — the closest prediction to the final winning margin wins."
-              highlight
-            />
+            {/* Tie-breaker ladder — applied in order until the tie is broken. */}
+            <View
+              style={[
+                styles.tieBlock,
+                {backgroundColor: colors.primary + '11', borderColor: colors.primary},
+              ]}>
+              <Text style={[bodyType.bold, styles.ruleHeading, {color: colors.primary}]}>
+                Tie-breaker
+              </Text>
+              <Text style={[bodyType.regular, styles.ruleText, {color: colors.textSecondary}]}>
+                If players finish the playoffs level on points, the tie breaks in this order:
+              </Text>
+              {[
+                'Super Bowl margin — closest to the final winning margin without going over (Price Is Right style).',
+                'Most correct picks in the playoffs (HotPick or not).',
+                'Most correct HotPicks in the playoffs.',
+              ].map((step, i) => (
+                <View key={i} style={styles.tieStep}>
+                  <Text style={[bodyType.bold, styles.tieNum, {color: colors.primary}]}>{i + 1}.</Text>
+                  <Text style={[bodyType.regular, styles.tieStepText, {color: colors.textSecondary}]}>
+                    {step}
+                  </Text>
+                </View>
+              ))}
+              <Text style={[bodyType.regular, styles.tieCochamp, {color: colors.textPrimary}]}>
+                Still even? Co-champions — the title is shared.
+              </Text>
+            </View>
           </ScrollView>
         </Pressable>
       </Pressable>
@@ -122,4 +146,14 @@ const styles = StyleSheet.create({
   rule: {gap: 4},
   ruleHeading: {fontSize: 13, letterSpacing: 0.3},
   ruleText: {fontSize: 14, lineHeight: 20},
+  tieBlock: {
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+  },
+  tieStep: {flexDirection: 'row', gap: 6, paddingRight: spacing.xs},
+  tieNum: {fontSize: 14, lineHeight: 20},
+  tieStepText: {flex: 1, fontSize: 14, lineHeight: 20},
+  tieCochamp: {fontSize: 14, lineHeight: 20, marginTop: 2},
 });
