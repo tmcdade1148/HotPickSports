@@ -1,8 +1,9 @@
 // Right-aligned strip of the last up-to-3 weeks. Current-week pill
 // pulses while the week is settling; past weeks render with a Lock glyph.
 
-import React, {useEffect, useMemo, useRef} from 'react';
-import {Animated, StyleSheet, Text, View} from 'react-native';
+import React, {useCallback, useEffect, useMemo, useRef} from 'react';
+import {Animated, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import {useNavigation} from '@react-navigation/native';
 import {Lock} from 'lucide-react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
@@ -38,8 +39,32 @@ function slotLabel(slot: WeekSlot): string {
   }
 }
 
+// Accessibility label for a pill.
+function slotA11yLabel(slot: WeekSlot): string {
+  const won =
+    slot.totalPicks != null && slot.correctPicks != null
+      ? `, ${slot.correctPicks} of ${slot.totalPicks} games won`
+      : '';
+  return slot.ceiling != null
+    ? `${slotLabel(slot)}: ${slot.earned} of ${slot.ceiling} ceiling points${won}`
+    : `${slotLabel(slot)}: ${slot.earned} points${won}`;
+}
+
 export function WeeklyTrend() {
   const {colors} = useTheme();
+  const navigation = useNavigation<any>();
+  const setCurrentWeek = useSeasonStore(s => s.setCurrentWeek);
+
+  // Tapping a real-week pill opens that week on the Picks page. The synthetic
+  // "REG SEASON" aggregate (week < 0) has no single week, so it isn't tappable.
+  const openWeek = useCallback(
+    (week: number) => {
+      if (week <= 0) return;
+      setCurrentWeek(week);
+      navigation.navigate('PicksTab');
+    },
+    [setCurrentWeek, navigation],
+  );
 
   const userId         = useGlobalStore(s => s.user?.id);
   const recentWeeks    = useGlobalStore(s => s.recentWeeks);
@@ -257,9 +282,10 @@ export function WeeklyTrend() {
         </View>
       )}
       <View style={styles.row}>
-      {slots.map(s => (
+      {slots.map(s => {
+        const tappable = s.week > 0;
+        const pill = (
         <Animated.View
-          key={s.week}
           style={[
             styles.slot,
             {
@@ -271,21 +297,7 @@ export function WeeklyTrend() {
                   ? colors.primary
                   : colors.border,
             },
-          ]}
-          accessible
-          accessibilityLabel={
-            s.ceiling != null
-              ? `${slotLabel(s)}: ${s.earned} of ${s.ceiling} ceiling points${
-                  s.totalPicks != null && s.correctPicks != null
-                    ? `, ${s.correctPicks} of ${s.totalPicks} games won`
-                    : ''
-                }`
-              : `${slotLabel(s)}: ${s.earned} points${
-                  s.totalPicks != null && s.correctPicks != null
-                    ? `, ${s.correctPicks} of ${s.totalPicks} games won`
-                    : ''
-                }`
-          }>
+          ]}>
           <View style={styles.weekLabelRow}>
             <Text
               style={[bodyType.bold, styles.weekLabel, {color: colors.textTertiary}]}
@@ -323,7 +335,27 @@ export function WeeklyTrend() {
             )}
           </View>
         </Animated.View>
-      ))}
+        );
+
+        if (!tappable) {
+          return (
+            <View key={s.week} accessible accessibilityLabel={slotA11yLabel(s)}>
+              {pill}
+            </View>
+          );
+        }
+        return (
+          <TouchableOpacity
+            key={s.week}
+            activeOpacity={0.7}
+            onPress={() => openWeek(s.week)}
+            accessibilityRole="button"
+            accessibilityLabel={slotA11yLabel(s)}
+            accessibilityHint="Opens this week on the Picks page">
+            {pill}
+          </TouchableOpacity>
+        );
+      })}
       </View>
     </View>
   );
