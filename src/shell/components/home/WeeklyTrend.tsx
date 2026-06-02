@@ -54,6 +54,9 @@ export function WeeklyTrend() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
   const setCurrentWeek = useSeasonStore(s => s.setCurrentWeek);
+  // The week currently being viewed on the Picks page (may differ from the
+  // live/active week) — gets the faded-orange highlight.
+  const viewedWeek = useSeasonStore(s => s.currentWeek);
 
   // Tapping a real-week pill opens that week on the Picks page. The synthetic
   // "REG SEASON" aggregate (week < 0) has no single week, so it isn't tappable.
@@ -284,17 +287,34 @@ export function WeeklyTrend() {
       <View style={styles.row}>
       {slots.map(s => {
         const tappable = s.week > 0;
+        // Pill fill by state: full HotPick blue for the live/active week,
+        // faded orange for the week currently selected on the Picks page,
+        // faded blue for other past weeks. (Active wins over selected.)
+        const isActive = s.isCurrent;
+        const isSelected = !isActive && tappable && s.week === viewedWeek;
+        const isPastWeek = !isActive && !isSelected && tappable;
+        const bg = isActive
+          ? colors.highlight
+          : isSelected
+          ? colors.primary + '33'
+          : isPastWeek
+          ? colors.highlight + '33'
+          : 'transparent';
         const pill = (
         <Animated.View
           style={[
             styles.slot,
             {
-              backgroundColor: s.isCurrent ? colors.surface : 'transparent',
+              backgroundColor: bg,
               borderColor:
-                s.isCurrent && weekComplete
+                isActive && weekComplete
                   ? pulsingBorder
-                  : s.isCurrent
+                  : isActive
                   ? colors.primary
+                  : isSelected
+                  ? colors.primary
+                  : isPastWeek
+                  ? colors.highlight + '80'
                   : colors.border,
             },
           ]}>
