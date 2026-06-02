@@ -1,10 +1,17 @@
 import type {AnyEventConfig} from '@shared/types/templates';
 import {worldCup2026} from './worldcup/config';
-import {nflSeason, nflSeasonSim} from './nfl/config';
+import {nflSeason, nflSeasonSim, nflSeasonSimA, nflSeasonSimG} from './nfl/config';
 import {nhlPlayoffs2027} from './nhl/config';
 import {nflDemo, DEMO_COMPETITION, DEMO_POOL_ID} from './nfl/demoConfig';
 
-const ALL_EVENTS: AnyEventConfig[] = [nflSeason, nflSeasonSim, worldCup2026, nhlPlayoffs2027];
+const ALL_EVENTS: AnyEventConfig[] = [
+  nflSeason,
+  nflSeasonSim,
+  nflSeasonSimA,
+  nflSeasonSimG,
+  worldCup2026,
+  nhlPlayoffs2027,
+];
 
 // Onboarding demo (spec: docs/DEMO_WEEK_SPEC.md). Deliberately kept OUT of
 // ALL_EVENTS so it never surfaces in the switcher or as a Home event card —
@@ -25,7 +32,11 @@ export function getDemoEvent(): AnyEventConfig {
 // RPC resolves, or if it errors): when we don't know what the user can
 // see, hide the gated events by default so a non-beta tester never
 // glimpses NFL SIM. Beta testers see them as soon as the RPC returns.
-const GATED_COMPETITIONS = new Set(['nfl_2025_sim']);
+const GATED_COMPETITIONS = new Set([
+  'nfl_2025_sim',
+  'nfl_2025_simA',
+  'nfl_2025_simG',
+]);
 
 function filterByVisibility(
   events: AnyEventConfig[],

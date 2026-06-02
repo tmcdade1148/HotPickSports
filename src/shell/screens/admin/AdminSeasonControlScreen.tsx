@@ -15,6 +15,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import {ChevronLeft, ChevronRight, Check} from 'lucide-react-native';
 import {supabase} from '@shared/config/supabase';
+import {isSandboxCompetition} from '@shared/utils/competition';
 import {useTheme} from '@shell/theme/hooks';
 import {bodyType, displayType, spacing, borderRadius} from '@shared/theme';
 import {RequireSuperAdmin} from '@shell/components/RequireSuperAdmin';
@@ -81,7 +82,7 @@ function AdminSeasonControlImpl() {
 
   const advance = (comp: CompRow) => {
     const next = nextPhaseOf(comp.phase);
-    const isSandbox = comp.competition === 'nfl_2025_sim';
+    const isSandbox = isSandboxCompetition(comp.competition);
     const winnerNote =
       next === 'REGULAR_COMPLETE'
         ? '\n\nThis posts each pool’s regular-season winner to its Chirps feed.'
