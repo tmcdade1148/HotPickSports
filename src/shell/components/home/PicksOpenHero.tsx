@@ -726,12 +726,14 @@ const styles = StyleSheet.create({
   timer: {
     letterSpacing: -0.5,
     marginBottom: 18,
+    textAlign: 'center',
   },
   timerPlaceholder: {
     fontSize: 14,
     fontStyle: 'italic',
     marginBottom: 14,
     marginTop: 4,
+    textAlign: 'center',
   },
   cta: {
     flexDirection: 'row',
