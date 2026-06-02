@@ -6,6 +6,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // (scoped to the pool's members + pool_start_date), ties broken alphabetically
 // to match the app's Ladder. Idempotent: a pool that already has a
 // 'regular_season_winner' message is skipped, so it's safe to re-run.
+//
+// NOTE: Production fires this automatically via the
+// announce_regular_winners_on_phase DB trigger when current_phase flips to
+// REGULAR_COMPLETE. This function is kept as a MANUAL backfill / re-run tool
+// (e.g. to announce for pools created after the flip, or if the trigger was
+// added after a competition had already advanced).
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL") ?? "",
