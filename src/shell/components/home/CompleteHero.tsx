@@ -211,7 +211,7 @@ export function CompleteHero() {
         ]}
         accessibilityRole="button"
         accessibilityLabel={`Go to games — Week ${currentWeek} complete, review your picks`}>
-        <View style={styles.gamesTag}>
+        <View style={[styles.gamesTag, {backgroundColor: colors.accentTeal}]}>
           <Flame size={22} color={colors.onPrimary} strokeWidth={2.5} />
         </View>
         <View style={styles.ctaBody}>
@@ -344,12 +344,11 @@ const styles = StyleSheet.create({
     shadowOffset: {width: 0, height: 6},
     elevation: 4,
   },
-  // Left 1/6 — solid HotPick-blue strip with a flame icon. Hardcoded
-  // brand blue (#34A4D1) per hotpickDefaults.ts — colors.highlight
-  // flips to amber in dark mode and would defeat the contrast.
+  // Left 1/6 — solid teal strip with a flame icon. Fill is colors.accentTeal
+  // (#45615E, applied inline) — dark enough for the white flame; the blue
+  // accent (#A5CCD9) is too light to carry white content.
   gamesTag: {
     flex: 1,
-    backgroundColor: '#34A4D1',
     alignItems: 'center',
     justifyContent: 'center',
   },

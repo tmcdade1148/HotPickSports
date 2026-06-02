@@ -145,7 +145,7 @@ export function SeasonMatchCard({
   const {colors} = useTheme();
   const brand = useBrand();
   const styles = createStyles(colors);
-  const rankColor = brand.isBranded ? colors.highlight : colors.primary;
+  const rankColor = brand.isBranded ? colors.accentTeal : colors.primary;
   const existingPick = useSeasonStore(s => s.getPickForGame(game.game_id));
   const savePick = useSeasonStore(s => s.savePick);
   const setHotPick = useSeasonStore(s => s.setHotPick);

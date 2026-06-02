@@ -538,7 +538,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   rankSame: {
     fontSize: 9,
-    color: colors.highlight,
+    color: colors.accentTeal,
   },
   userInfo: {
     flex: 1,
@@ -593,7 +593,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   hotpickPickedBox: {
     borderWidth: 1.5,
-    borderColor: colors.highlight,
+    borderColor: colors.accentTeal,
     borderRadius: 3,
     paddingHorizontal: 4,
     paddingVertical: 1,
@@ -601,7 +601,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   hotpickPickedText: {
     fontSize: 11,
     fontWeight: '700',
-    color: colors.highlight,
+    color: colors.accentTeal,
   },
   totalPoints: {
     fontSize: 16,

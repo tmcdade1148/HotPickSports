@@ -1,19 +1,21 @@
 import {Platform} from 'react-native';
 
+// NOTE: legacy/unused color map — components read colors via useTheme().
+// Kept aligned to the official HotPick palette to avoid drift if ever used.
 export const colors = {
-  primary: '#FF6B35',
-  secondary: '#004E89',
+  primary: '#F66321',
+  secondary: '#E39032',
   success: '#1DC24C',
   warning: '#FFD166',
   error: '#C21D1D',
 
   background: '#FFFFFF',
   surface: '#F7F7F7',
-  text: '#181818',
+  text: '#303030',
   textSecondary: '#6B6B6B',
   border: '#E0E0E0',
 
-  backgroundDark: '#181818',
+  backgroundDark: '#303030',
   surfaceDark: '#2A2A2A',
   textDark: '#F7F7F7',
 };

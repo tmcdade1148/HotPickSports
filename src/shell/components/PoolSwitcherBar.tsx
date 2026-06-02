@@ -118,11 +118,11 @@ export function PoolSwitcherBar({mode, onGoBack}: PoolSwitcherBarProps) {
               Current Contest:
             </Text>
             <Text
-              style={[styles.poolName, {color: colors.highlight, fontWeight: '900'}]}
+              style={[styles.poolName, {color: colors.accentTeal, fontWeight: '900'}]}
               numberOfLines={1}>
               {poolName}
             </Text>
-            <ChevronDown size={22} color={colors.highlight} />
+            <ChevronDown size={22} color={colors.accentTeal} />
           </TouchableOpacity>
         ) : (
           <TouchableOpacity style={styles.selector} onPress={goToSettings}>

@@ -105,7 +105,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
     fontStyle: 'italic',
-    color: colors.highlight,
+    color: colors.accentTeal,
   },
   rightRow: {
     flexDirection: 'row',

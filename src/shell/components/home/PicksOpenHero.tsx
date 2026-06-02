@@ -519,13 +519,11 @@ export function PicksOpenHero() {
         }}
         accessibilityRole="button"
         accessibilityLabel={`Go to games — ${ctaAccessibilityLabel}`}>
-        {/* HotPick blue (#34A4D1) destination tag with a flame icon —
-            the flame is the universal HotPick signal so this reads as
-            "go to the picks/games surface." Hardcoded brand blue
-            rather than colors.highlight because highlight flips to
-            amber in dark mode (see hooks.ts), defeating the contrast
-            purpose. */}
-        <View style={styles.gamesTag}>
+        {/* Teal destination tag (colors.accentTeal #45615E) with a flame
+            icon — the flame is the universal HotPick signal so this reads
+            as "go to the picks/games surface." Teal fill carries the white
+            flame; the light-blue accent (#A5CCD9) is too pale for that. */}
+        <View style={[styles.gamesTag, {backgroundColor: colors.accentTeal}]}>
           <Flame size={22} color={colors.onPrimary} strokeWidth={2.5} />
         </View>
 
@@ -747,12 +745,11 @@ const styles = StyleSheet.create({
     shadowOffset: {width: 0, height: 8},
     elevation: 6,
   },
-  // Left 1/6 of the button — solid HotPick-blue strip with the word
-  // GAMES so the destination is unmistakable. Hardcoded blue (#34A4D1)
-  // is the canonical brand blue from hotpickDefaults.ts.
+  // Left 1/6 of the button — solid teal strip (colors.accentTeal #45615E,
+  // applied inline) so the white destination content reads. The light-blue
+  // brand accent (#A5CCD9) is too pale to carry white content.
   gamesTag: {
     flex: 1,
-    backgroundColor: '#34A4D1',
     alignItems: 'center',
     justifyContent: 'center',
   },

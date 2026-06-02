@@ -109,7 +109,7 @@ export function deriveFullBrandColors(
   const isLightBg = isLightColor(background);
 
   // Auto-derive highlight if not provided: white on dark bg, dark on light bg
-  const derivedHighlight = highlight || (isLightBg ? '#181818' : '#FFFFFF');
+  const derivedHighlight = highlight || (isLightBg ? '#303030' : '#FFFFFF');
 
   return {
     primary_color: primary,
@@ -119,7 +119,7 @@ export function deriveFullBrandColors(
       ? darkenHex(background, 0.03) // slightly darker surface on light bg
       : lightenHex(background, 0.06), // slightly lighter surface on dark bg
     highlight_color: derivedHighlight,
-    text_primary: isLightBg ? '#181818' : '#F5F5F5',
+    text_primary: isLightBg ? '#303030' : '#F5F5F5',
     text_secondary: isLightBg ? '#6B6B6B' : '#A0A0A0',
   };
 }

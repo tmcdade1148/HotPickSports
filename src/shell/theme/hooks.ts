@@ -37,8 +37,8 @@ export function useTheme(): {colors: ThemeColors; isDark: boolean} {
   const semantic = isDark ? SEMANTIC_COLORS_DARK : SEMANTIC_COLORS;
   const extended = isDark ? HOTPICK_EXTENDED_TOKENS_DARK : HOTPICK_EXTENDED_TOKENS;
 
-  // HotPick uses blue (#34A4D1) in light mode and gold (#E39032) in dark mode.
-  const highlight = isDark ? '#E39032' : (config.highlight_color ?? '#FFFFFF');
+  // HotPick light-blue accent (#A5CCD9) — consistent in light and dark.
+  const highlight = config.highlight_color ?? '#A5CCD9';
 
   return {
     isDark,

@@ -24,16 +24,19 @@ import type {BrandConfig, BrandLogoSet} from './types';
  *
  * | Token      | Hex       | Usage                                          |
  * |------------|-----------|------------------------------------------------|
- * | primary    | #F66321   | Flame. CTAs, active buttons, highlights.       |
- * | secondary  | #E39032   | Amber. Secondary accents. (was #45615E teal)   |
- * | highlight  | #34A4D1   | Light-mode highlight (blue). Dark mode is gold.|
+ * | primary    | #F66321   | Flame orange. CTAs, active buttons, highlights.|
+ * | secondary  | #E39032   | Amber accent. (was #45615E teal)               |
+ * | highlight  | #A5CCD9   | Light-blue accent (fills). Same in light/dark. |
  * | background | #FCFCFC   | App bg (LIGHT mode). Dark mode value lives     |
  * |            |           | in HOTPICK_DARK_OVERRIDES (defaults.ts).       |
+ *
+ * Official HotPick Sports palette (2026-06): black #303030, orange #F66321,
+ * teal #45615E, plus two accents — amber #E39032 and light-blue #A5CCD9.
  */
 export const HOTPICK_BRAND_COLORS = {
   primary: '#F66321',
   secondary: '#E39032',
-  highlight: '#34A4D1',
+  highlight: '#A5CCD9',
   background: '#FCFCFC',
 } as const;
 
@@ -69,7 +72,7 @@ export const HOTPICK_BRAND: BrandConfig = {
   highlight_color: HOTPICK_BRAND_COLORS.highlight,
   background_color: HOTPICK_BRAND_COLORS.background,
   surface_color: '#EBEBEB',  // visible contrast against #FCFCFC background
-  text_primary: '#181818',   // dark text on light background
+  text_primary: '#303030',   // official black — dark text on light background
   text_secondary: '#6B6B6B', // muted dark text
   logo: HOTPICK_LOGOS,
   app_name: 'HotPick',

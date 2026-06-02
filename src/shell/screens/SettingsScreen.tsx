@@ -349,12 +349,12 @@ export function SettingsScreen({route}: any) {
             //                          only when active.
             const pillBg = isBranded && isActive ? poolBrand.primary : undefined;
             const pillTextColor = isBranded && isActive
-              ? (isLightColor(pillBg!) ? '#181818' : '#FFFFFF')
+              ? (isLightColor(pillBg!) ? '#303030' : '#FFFFFF')
               : isActive
                 ? hotpick.primary
                 : colors.textPrimary;
             const pillIconColor = isBranded && isActive
-              ? (isLightColor(pillBg!) ? '#181818' : '#FFFFFF')
+              ? (isLightColor(pillBg!) ? '#303030' : '#FFFFFF')
               : isActive
                 ? hotpick.primary
                 : colors.textSecondary;

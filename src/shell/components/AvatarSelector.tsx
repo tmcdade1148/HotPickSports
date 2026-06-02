@@ -24,7 +24,7 @@ function defaultUploadPress() {
 
 /** System avatars — colored abstract shapes with initials fallback */
 const SYSTEM_AVATARS = [
-  {key: 'avatar_flame', color: '#FF6B35', emoji: '\u{1F525}'},
+  {key: 'avatar_flame', color: '#F66321', emoji: '\u{1F525}'},
   {key: 'avatar_bolt', color: '#FFD166', emoji: '\u{26A1}'},
   {key: 'avatar_trophy', color: '#1DC24C', emoji: '\u{1F3C6}'},
   {key: 'avatar_star', color: '#004E89', emoji: '\u{2B50}'},
