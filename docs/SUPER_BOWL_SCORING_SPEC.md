@@ -155,10 +155,12 @@ In `tmcdade1148/NFL2025` (private, Swift — outside the default session scope; 
 - Data persists: `season_user_totals` rows with `phase = 'REGULAR'` are retained after the playoff reset.
 - `seasonStore.loadRegularSeasonPodium(userId)` computes the pool-scoped top 3 (respects `pool_start_date`).
 - The per-pool regular-season winner is announced to Chirps (DB trigger `announce_regular_winners_on_phase`; manual backfill via the `nfl-announce-regular-winners` Edge Function).
-- The only UI is the **temporary** `RegularCompleteHero` shown during the `REGULAR_COMPLETE` bridge; its "See final standings" CTA points at the live (playoff-scoped) Ladder — **not** a preserved regular-season snapshot.
+- **Award computation EXISTS and is live.** The `compute-hardware` Edge Function (deployed; source now in `supabase/functions/compute-hardware/` as of 2026-06) computes weekly awards (`weekly_settle`) and season-end awards (`season_settle`), including `pool_champion` + `podium_2nd`/`podium_3rd`, writing them idempotently to `user_hardware`. So the *champion award* is computed — it just isn't surfaced as a standings page.
+  - ⚠️ **Scope caveat:** `compute-hardware`'s `computePoolChampion`/`computePodiumAward` rank on `phase = 'REGULAR'` totals only. So today's `pool_champion` is the **regular-season points champion**, NOT a playoff/full-season/Super Bowl champion. A true SB/playoff champion award needs the Nov 2026 scoring work (§1–§4) + a champion computation scoped to playoff weeks (or the §3 tie-breaker ladder).
+- The only champion UI is the **temporary** `RegularCompleteHero` (REGULAR_COMPLETE bridge); its "See final standings" CTA points at the live (playoff-scoped) Ladder — **not** a preserved regular-season snapshot. `SeasonCompleteHero` shows a personal recap, not a pool champion.
 
 **What's missing:**
-- A persistent **per-contest historical standings** view (final regular-season Ladder for a given pool), reachable after the playoffs begin — e.g. from the `History` (Awards & Records) screen now surfaced in Settings, or from the contest itself.
-- (Related, see §"Season champion" work) no season-end champion archive either; that's downstream of the Super Bowl scoring build above.
+- A persistent **per-contest historical standings** view (final regular-season Ladder for a given pool), reachable after the playoffs begin — e.g. from the `History` (Awards & Records) screen now surfaced in Settings, or from the contest itself. (The champion *award* exists in `user_hardware`; the *standings archive* does not.)
+- A **playoff / Super Bowl champion** award + display — `compute-hardware` only crowns the regular-season champion today; the SB champion is downstream of the Super Bowl scoring build above.
 
 **Altitude note:** build this as a leaderboard *scope/snapshot* over the existing user-scoped `season_user_totals` (filter `phase = 'REGULAR'`, `pool_start_date`), consistent with Hard Rules #1–#2 — never a new per-pool results table.
