@@ -205,11 +205,16 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
   },
 
   setCurrentWeek: (week: number) => {
-    set({currentWeek: week, isWeekComplete: false});
     // Check cache first
     const cached = get().allWeekGames[week];
     if (cached) {
-      set({games: cached});
+      // Cached → swap to the clicked week's games immediately, no flicker.
+      set({currentWeek: week, isWeekComplete: false, games: cached});
+    } else {
+      // No cache yet → flag loading so the screen shows its spinner for the
+      // clicked week, rather than leaving the previously-viewed week's games
+      // on screen until fetchWeekGames resolves.
+      set({currentWeek: week, isWeekComplete: false, isLoading: true});
     }
   },
 

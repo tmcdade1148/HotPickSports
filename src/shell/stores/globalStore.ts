@@ -1601,8 +1601,8 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   // ---------------------------------------------------------------------------
   // Both queries respect Hard Rule #3 (client never computes scores). They
   // read pre-computed values: season_picks.is_correct for the last-week
-  // HotPick chip, and season_user_totals.{week_points, playoff_points} for
-  // the week strip. No SUM or AVG happens here.
+  // HotPick chip, and season_user_totals.week_points for the week strip.
+  // No SUM or AVG happens here.
   // ---------------------------------------------------------------------------
   lastWeekHotPick: null,
   recentWeeks: [],
@@ -1665,7 +1665,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     // Pre-computed per-week totals. Last 4 weeks descending; display ascending.
     const {data} = await supabase
       .from('season_user_totals')
-      .select('week, week_points, playoff_points, correct_picks, total_picks')
+      .select('week, week_points, correct_picks, total_picks')
       .eq('user_id', userId)
       .eq('competition', competition)
       .order('week', {ascending: false})
@@ -1674,13 +1674,16 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     const rows = (data ?? []) as Array<{
       week: number;
       week_points: number | null;
-      playoff_points: number | null;
       correct_picks: number | null;
       total_picks: number | null;
     }>;
+    // Per-week earned is `week_points`. `playoff_points` is NOT a separate
+    // bucket — the scoring fn sets it equal to week_points for weeks ≥ 19 so
+    // the playoff-scoped leaderboard can sum it. Adding both double-counts
+    // playoff weeks (a +12 week rendered as +24).
     const ascending = [...rows].reverse().map(r => ({
       week:         r.week,
-      total:        (r.week_points ?? 0) + (r.playoff_points ?? 0),
+      total:        r.week_points ?? 0,
       correctPicks: r.correct_picks ?? 0,
       totalPicks:   r.total_picks ?? 0,
     }));
