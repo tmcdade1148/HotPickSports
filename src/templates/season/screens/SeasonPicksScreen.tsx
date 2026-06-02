@@ -379,6 +379,7 @@ export function SeasonPicksScreen() {
         onSelectWeek={handleSelectWeek}
         accentColor={colors.secondary}
         playoffStartWeek={config.playoffStartWeek}
+        playoffWeekLabels={config.playoffWeekLabels}
       />
 
       {!isLoading && games.length > 0 && (

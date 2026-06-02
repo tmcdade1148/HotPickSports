@@ -46,6 +46,7 @@ export const nflSeason: SeasonConfig = {
   // Season structure
   totalWeeks: 18,
   playoffStartWeek: 19,
+  playoffWeekLabels: {19: 'WC', 20: 'DR', 21: 'CC', 22: 'SB'},
 
   // Scoring
   hotPicksPerWeek: 1,

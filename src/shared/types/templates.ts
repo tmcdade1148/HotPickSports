@@ -117,6 +117,8 @@ export interface SeasonConfig extends BaseEventConfig {
   // Season structure
   totalWeeks: number;
   playoffStartWeek?: number;
+  /** Short labels for playoff week chips, keyed by week number (e.g. {19: 'WC', 22: 'SB'}). */
+  playoffWeekLabels?: Record<number, string>;
 
   // Scoring
   hotPicksPerWeek: number;
