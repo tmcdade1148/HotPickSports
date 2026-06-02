@@ -189,13 +189,35 @@ Weekly cycle (`picks_open → locked → live → settling → complete`) only r
 4. **Most correct playoff HotPicks** — count of correct HotPick games across the playoffs
 5. **Co-champions** — if still level after all four, the title is shared
 
-This ladder is the *whole-playoff champion* tie-breaker. There is **no separate
-Super Bowl-only winner or Super Bowl-only tie-breaker** — the Super Bowl is the
-final week of the unified playoff competition, and the margin prediction is a
-rung in this single ladder, not a standalone contest. The tie-break computation
-ships with Super Bowl Enhanced Scoring (§ below, November 2026); until then the
-`super_bowl_margin_prediction` column is captured but unused. The
-`PlayoffRulesModal` popup states this ladder to players today.
+This ladder is the *whole-playoff (full-season) champion* tie-breaker. **Today**
+there is no separate Super Bowl-only winner — the Super Bowl is simply the final
+week of the unified playoff competition, and the margin prediction is a rung in
+this single ladder. The tie-break computation ships with Super Bowl Enhanced
+Scoring (§ below, November 2026); until then the `super_bowl_margin_prediction`
+column is captured but unused. The `PlayoffRulesModal` popup states this ladder
+to players today.
+
+**Planned entry points & sub-competitions (build November 2026 — not yet built):**
+Because scores are user-scoped and pools are lenses on user-level data
+(pool-independent architecture), late-joining sub-competitions are a leaderboard
+*scoping* problem, not a new data model. Tom's intent:
+
+- **Playoffs-only competition** — at *any* point, a new user can sign up and join
+  a pool intending to start fresh at **Week 19 (Wild Card weekend)** and run
+  through the Super Bowl. Their playoff total accumulates from `playoff_start_week`
+  forward, identical to how the mandatory playoff reset already scopes scores.
+  Needs its own champion + tie-breaker (reuse the ladder above, scoped to
+  playoff weeks).
+- **Super Bowl-only competition** — in the **2 weeks before the Super Bowl**, new
+  users can sign up to participate in a **Super Bowl-only** contest, scoped to the
+  Super Bowl week alone.
+- **Super Bowl-only winner** — a distinct winner/champion for the Super Bowl-only
+  competition, separate from the full-season and playoffs-only champions. Its
+  tie-breaker leans on `super_bowl_margin_prediction` (Price Is Right) first.
+
+All three coexist as different *scopes* over the same user picks; no `pool_id` on
+scores, no per-competition tables — the differentiator is the week range each
+leaderboard sums over.
 
 ---
 
@@ -291,7 +313,12 @@ Always filter with `.eq('status', 'active')` in leaderboard and member list quer
 ### Super Bowl Enhanced Scoring (Build November 2026)
 Do not build UI yet. Nullable columns already added to `season_picks`:
 - `super_bowl_q1_pick`, `super_bowl_q2_pick`, `super_bowl_q3_pick` (TEXT)
-- `super_bowl_margin_prediction` (INT — Price Is Right tiebreaker; rung 2 of the playoff champion tie-breaker ladder in §3, not a separate Super Bowl-only winner)
+- `super_bowl_margin_prediction` (INT — Price Is Right tiebreaker; rung 2 of the full-season playoff champion tie-breaker ladder in §3, and the primary tie-breaker for the planned Super Bowl-only competition)
+
+**Also in scope for this November 2026 build (see §3 "Planned entry points & sub-competitions"):**
+- **Super Bowl-only competition + its own winner** — new users can sign up in the 2 weeks before the Super Bowl and compete on the Super Bowl week alone; distinct champion from the full-season and playoffs-only champions
+- **Playoffs-only competition** — users can join at any point to start fresh at Week 19 (Wild Card) and run through the Super Bowl
+- Both are leaderboard *scopes* (week-range filters) over the same user-scoped picks — no new tables, no `pool_id` on scores
 
 ### Pick Lock Triggers (Server-Side Authoritative)
 - **`enforce_pick_lock`** — BEFORE INSERT OR UPDATE on `season_picks`: checks game status in `season_games`; raises exception if status != 'scheduled'
