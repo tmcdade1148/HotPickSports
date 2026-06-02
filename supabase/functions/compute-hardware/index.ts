@@ -74,10 +74,7 @@ async function computeSharpshooterWeek(competition: string, seasonYear: number, 
     .eq("week", week)
     .eq("is_hotpick", false);
 
-  const { data: members } = await supabase
-    .from("pool_members")
-    .select("user_id, pool_id")
-    .eq("status", "active");
+  const members = await activePoolMembers(competition);
 
   if (!picks || !members) return { awarded: 0 };
 
@@ -174,10 +171,7 @@ async function computeGunslingerWeek(competition: string, seasonYear: number, we
 
   if (qualified.length === 0) return { awarded: 0 };
 
-  const { data: members } = await supabase
-    .from("pool_members")
-    .select("user_id, pool_id")
-    .eq("status", "active");
+  const members = await activePoolMembers(competition);
 
   const userPools = new Map<string, string[]>();
   for (const m of members ?? []) {
@@ -245,10 +239,7 @@ async function computeContrarianWeek(competition: string, seasonYear: number, we
     .eq("competition", competition)
     .eq("week", week);
 
-  const { data: members } = await supabase
-    .from("pool_members")
-    .select("user_id, pool_id")
-    .eq("status", "active");
+  const members = await activePoolMembers(competition);
 
   if (!picks || !stats || !members) return { awarded: 0 };
 
@@ -880,8 +871,23 @@ async function computeSeasonTactician(competition: string, seasonYear: number) {
 }
 
 // ---------------------------------------------------------------------------
-// SHARED: Idempotent upsert
+// SHARED
 // ---------------------------------------------------------------------------
+
+// Active pool memberships scoped to ONE competition's (non-deleted) pools.
+// Weekly award functions use this so (a) picks in competition X never map an
+// award onto a user's pool in another competition, and (b) the member scan
+// stays competition-bounded instead of reading every active membership on the
+// platform. Mirrors the pool→member scoping the season-end functions already use.
+async function activePoolMembers(competition: string): Promise<{ user_id: string; pool_id: string }[]> {
+  const { data: pools } = await supabase
+    .from("pools").select("id").eq("competition", competition).is("deleted_at", null);
+  const poolIds = (pools ?? []).map((p: any) => p.id);
+  if (poolIds.length === 0) return [];
+  const { data: members } = await supabase
+    .from("pool_members").select("user_id, pool_id").eq("status", "active").in("pool_id", poolIds);
+  return members ?? [];
+}
 
 async function upsertAwards(rows: any[]) {
   if (rows.length === 0) return { awarded: 0 };
