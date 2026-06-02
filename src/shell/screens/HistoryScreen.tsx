@@ -8,7 +8,8 @@ import {
   ActivityIndicator,
   Modal,
 } from 'react-native';
-// SafeAreaView handled by HistoryTabWrapper in MainTabNavigator
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {useNavigation} from '@react-navigation/native';
 import {
   Trophy,
   Target,
@@ -18,6 +19,7 @@ import {
   Award,
   Lock,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
 } from 'lucide-react-native';
 // EyeOff, Eye, Users, ChevronUp removed — visibility toggle removed
@@ -662,4 +664,38 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+});
+
+// HistoryStackScreen — presentation wrapper for when History is pushed as a
+// stack screen (e.g. from Settings or the season-complete CTA). Adds the
+// top safe area + a back header; HistoryScreen itself stays presentation-free
+// so the (currently shelved) HistoryTab wrapper can supply its own chrome.
+export function HistoryStackScreen() {
+  const {colors} = useTheme();
+  const navigation = useNavigation<any>();
+  return (
+    <SafeAreaView style={{flex: 1, backgroundColor: colors.background}} edges={['top']}>
+      <View style={stackStyles.header}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+          <ChevronLeft size={24} color={colors.textPrimary} />
+        </TouchableOpacity>
+        <Text style={[stackStyles.title, {color: colors.textPrimary}]}>Awards & Records</Text>
+        <View style={{width: 24}} />
+      </View>
+      <HistoryScreen />
+    </SafeAreaView>
+  );
+}
+
+const stackStyles = StyleSheet.create({
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  title: {fontSize: 18, fontWeight: '700'},
 });

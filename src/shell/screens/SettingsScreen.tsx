@@ -281,6 +281,20 @@ export function SettingsScreen({route}: any) {
         </TouchableOpacity>
       </View>
 
+      {/* History section — awards + career record (HistoryScreen) */}
+      <Text style={[styles.groupLabel, {color: colors.textSecondary}]}>History</Text>
+      <View style={[styles.groupCard, {backgroundColor: colors.surface}]}>
+        <TouchableOpacity
+          style={styles.groupRow}
+          onPress={() => navigation.navigate('History')}>
+          <View style={styles.linkLeft}>
+            <Award size={20} color={colors.primary} />
+            <Text style={[styles.linkText, {color: colors.textPrimary}]}>Awards & Records</Text>
+          </View>
+          <ChevronRight size={18} color={colors.textSecondary} />
+        </TouchableOpacity>
+      </View>
+
       {/* Pools section — collapsible */}
       <TouchableOpacity
         style={[styles.poolsHeader, {backgroundColor: colors.surface}]}

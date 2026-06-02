@@ -40,6 +40,7 @@ import {CommunityGuidelinesScreen} from '@shell/screens/CommunityGuidelinesScree
 import {NotificationPreferencesScreen} from '@shell/screens/NotificationPreferencesScreen';
 import {ResetPasswordScreen} from '@shell/screens/ResetPasswordScreen';
 import {HardwareAdminScreen} from '@shell/screens/HardwareAdminScreen';
+import {HistoryStackScreen} from '@shell/screens/HistoryScreen';
 import {TosVersionGateScreen} from '@shell/screens/TosVersionGateScreen';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {supabase} from '@shared/config/supabase';
@@ -234,6 +235,7 @@ export function RootNavigator() {
         <Stack.Screen name="AdminBetaTesters" component={AdminBetaTestersScreen} />
         <Stack.Screen name="AdminSeasonControl" component={AdminSeasonControlScreen} />
         <Stack.Screen name="HardwareAdmin" component={HardwareAdminScreen} />
+        <Stack.Screen name="History" component={HistoryStackScreen} />
         <Stack.Screen name="About" component={AboutScreen} />
         <Stack.Screen name="Instructions" component={InstructionsScreen} />
         <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
