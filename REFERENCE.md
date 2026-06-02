@@ -182,6 +182,21 @@ Weekly cycle (`picks_open → locked → live → settling → complete`) only r
 - `playoff_start_week` set in competition_config at transition time
 - Players do not re-opt-in
 
+**Playoff champion tie-breaker ladder** (applied in order, top to bottom, until the tie is broken):
+1. **Playoff points** — highest accumulated playoff total wins outright
+2. **Super Bowl margin** — Price Is Right style: closest to the final winning margin *without going over* (`season_picks.super_bowl_margin_prediction`)
+3. **Most correct playoff picks** — raw count of correct picks across the playoffs, ignoring HotPick weighting
+4. **Most correct playoff HotPicks** — count of correct HotPick games across the playoffs
+5. **Co-champions** — if still level after all four, the title is shared
+
+This ladder is the *whole-playoff champion* tie-breaker. There is **no separate
+Super Bowl-only winner or Super Bowl-only tie-breaker** — the Super Bowl is the
+final week of the unified playoff competition, and the margin prediction is a
+rung in this single ladder, not a standalone contest. The tie-break computation
+ships with Super Bowl Enhanced Scoring (§ below, November 2026); until then the
+`super_bowl_margin_prediction` column is captured but unused. The
+`PlayoffRulesModal` popup states this ladder to players today.
+
 ---
 
 ## 4. Subscriptions & Tier Limits
@@ -276,7 +291,7 @@ Always filter with `.eq('status', 'active')` in leaderboard and member list quer
 ### Super Bowl Enhanced Scoring (Build November 2026)
 Do not build UI yet. Nullable columns already added to `season_picks`:
 - `super_bowl_q1_pick`, `super_bowl_q2_pick`, `super_bowl_q3_pick` (TEXT)
-- `super_bowl_margin_prediction` (INT — Price Is Right tiebreaker)
+- `super_bowl_margin_prediction` (INT — Price Is Right tiebreaker; rung 2 of the playoff champion tie-breaker ladder in §3, not a separate Super Bowl-only winner)
 
 ### Pick Lock Triggers (Server-Side Authoritative)
 - **`enforce_pick_lock`** — BEFORE INSERT OR UPDATE on `season_picks`: checks game status in `season_games`; raises exception if status != 'scheduled'
