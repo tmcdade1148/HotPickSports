@@ -484,7 +484,7 @@ export function HomeScreen() {
                 than one Contest; drop it once they've got several. */}
             {visiblePools.length <= 1 && (
               <Text style={[bodyType.regular, styles.sectionNote, {color: colors.textSecondary}]}>
-                Join as many Contests as you'd like — they all live right here so you can keep track of them in one place. Jump into one any time, or just start making your picks on your own when the season opens.
+                Be in as many Contests as you want. They'll all live right here. You can also make picks on your own and join a Contest later. It's just more fun with someone keeping score.
               </Text>
             )}
           </View>
@@ -505,7 +505,7 @@ export function HomeScreen() {
                 what Clubs are, so drop it and just show their Clubs. */}
             {partnerIds.length === 0 && (
               <Text style={[bodyType.regular, styles.sectionNote, {color: colors.textSecondary}]}>
-                Clubs are bars, organizations, or shops that host their own Contests or simply provide perks to all participants. Contest organizers (who we call the Gaffers) connect with Clubs that align with their Contest's players and everyone receives the perks.
+                These are bars, shops, and brands that back Contests with perks for everyone.
               </Text>
             )}
             {partnerIds.map(pid => (
@@ -551,7 +551,7 @@ function ClubsTeaser() {
         YOUR CLUBS
       </Text>
       <Text style={[bodyType.regular, offCycleStyles.clubsTeaser, {color: colors.textSecondary}]}>
-        Bars, shops, and brands that back Contests with perks. You'll meet them once you're in one.
+        These are bars, shops, and brands that back Contests with perks for everyone.
       </Text>
     </View>
   );
