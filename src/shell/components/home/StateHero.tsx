@@ -30,6 +30,7 @@ import {PreSeasonGamesHero} from './PreSeasonGamesHero';
 import {RegularCompleteHero} from './RegularCompleteHero';
 import {SuperBowlIntroHero} from './SuperBowlIntroHero';
 import {SeasonCompleteHero} from './SeasonCompleteHero';
+import {PlayoffBanner} from './PlayoffBanner';
 
 export type HomeState =
   | 'off_season_idle'
@@ -54,6 +55,29 @@ export function StateHero({state}: StateHeroProps) {
 
   const resolved: HomeState = state ?? resolveFromConfig(currentPhase, weekState);
 
+  const hero = heroFor(resolved);
+
+  // During the playoffs / Super Bowl, the in-cycle heroes render unchanged
+  // beneath a playoff banner (round identity + stakes, bracket progress,
+  // accent, fresh-slate reminder). Only the weekly in-cycle states get the
+  // banner — bridge/off-cycle states carry their own framing.
+  const isPlayoffPhase = currentPhase === 'PLAYOFFS' || currentPhase === 'SUPERBOWL';
+  const isInCycle =
+    resolved === 'picks_open' || resolved === 'picks_locked' ||
+    resolved === 'games_live' || resolved === 'settling' || resolved === 'complete';
+
+  if (isPlayoffPhase && isInCycle) {
+    return (
+      <>
+        <PlayoffBanner />
+        {hero}
+      </>
+    );
+  }
+  return hero;
+}
+
+function heroFor(resolved: HomeState): React.ReactElement {
   switch (resolved) {
     case 'picks_open':              return <PicksOpenHero />;
     case 'picks_locked':            return <PicksOpenHero />;
