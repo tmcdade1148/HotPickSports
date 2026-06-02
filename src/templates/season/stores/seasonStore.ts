@@ -223,6 +223,8 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
   fetchWeekGames: async (week: number) => {
     const {config} = get();
     if (!config) {
+      // No config yet → never leave the screen stuck on its spinner.
+      set({isLoading: false});
       return;
     }
 
@@ -233,31 +235,38 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       return s === 'IN_PROGRESS' || s === 'LIVE';
     });
     if (cached && !hasLiveGame) {
-      set({games: cached});
+      set({games: cached, isLoading: false});
       return;
     }
 
     set({isLoading: true});
-    const {data} = await supabase
-      .from('season_games')
-      .select('*')
-      .eq('competition', config.competition)
-      .eq('week', week)
-      .order('frozen_rank', {ascending: true});
+    try {
+      const {data} = await supabase
+        .from('season_games')
+        .select('*')
+        .eq('competition', config.competition)
+        .eq('week', week)
+        .order('frozen_rank', {ascending: true});
 
-    const games = (data as DbSeasonGame[]) ?? [];
+      const games = (data as DbSeasonGame[]) ?? [];
 
-    // Cache by week regardless; only swap `games` to this week's data
-    // if the user is still viewing it.
-    const after = get();
-    const weekMatches = after.currentWeek === week;
-    const compMatches = after.config?.competition === config.competition;
+      // Cache by week regardless; only swap `games` to this week's data
+      // if the user is still viewing it.
+      const after = get();
+      const weekMatches = after.currentWeek === week;
+      const compMatches = after.config?.competition === config.competition;
 
-    set(state => ({
-      games: weekMatches && compMatches ? games : state.games,
-      allWeekGames: {...state.allWeekGames, [week]: games},
-      isLoading: false,
-    }));
+      set(state => ({
+        games: weekMatches && compMatches ? games : state.games,
+        allWeekGames: {...state.allWeekGames, [week]: games},
+      }));
+    } catch (err) {
+      // A thrown/raced network fetch must never leave the spinner stuck —
+      // the screen will just show no games rather than spin forever.
+      console.warn('[seasonStore] fetchWeekGames failed', err);
+    } finally {
+      set({isLoading: false});
+    }
   },
 
   fetchUserPicks: async (userId: string, week: number) => {
