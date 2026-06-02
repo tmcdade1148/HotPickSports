@@ -123,8 +123,7 @@ export function PicksOpenHero() {
   const countdownLabel = timer
     ? (() => {
         const su = singleUnit(timer.days, timer.hours, timer.minutes);
-        const u = su.unit === 'day' ? 'd' : su.unit === 'hour' ? 'h' : 'm';
-        return `${su.value}${u}`;
+        return `${su.value} ${su.unit}${su.value === 1 ? '' : 's'}`;
       })()
     : null;
 
@@ -298,7 +297,8 @@ export function PicksOpenHero() {
           (() => {
             // Single largest meaningful unit (app-wide rule): days → hours → minutes.
             const su = singleUnit(timer.days, timer.hours, timer.minutes);
-            const unitLetter = su.unit === 'day' ? 'D' : su.unit === 'hour' ? 'H' : 'M';
+            // Spelled-out unit (e.g. "6 days") rather than a terse "6D".
+            const unitWord = `${su.unit}${su.value === 1 ? '' : 's'}`;
             return (
               <Text
                 style={[
@@ -312,7 +312,7 @@ export function PicksOpenHero() {
                 ]}
                 numberOfLines={1}>
                 {su.value}
-                <Text style={{fontSize: timerSize * 0.4}}>{unitLetter}</Text>
+                <Text style={{fontSize: timerSize * 0.4}}> {unitWord}</Text>
               </Text>
             );
           })()
