@@ -19,20 +19,53 @@ interface WeekSlot {
   correctPicks: number | null;
   totalPicks: number | null;
   isCurrent: boolean;
+  /** Synthetic "regular-season total" pill shown during early playoff rounds. */
+  isRegTotal?: boolean;
+}
+
+const PLAYOFF_START_WEEK = 19; // standard NFL mapping (matches periodLabel)
+
+// Pill label: playoff weeks (19–22) read as their round; the regular-season
+// total pill reads "REG SEASON"; everything else is "WEEK n".
+function slotLabel(slot: WeekSlot): string {
+  if (slot.isRegTotal) return 'REG SEASON';
+  switch (slot.week) {
+    case 19: return 'WILD CARD';
+    case 20: return 'DIVISIONAL';
+    case 21: return 'CONFERENCE';
+    case 22: return 'SUPER BOWL';
+    default: return `WEEK ${slot.week}`;
+  }
 }
 
 export function WeeklyTrend() {
   const {colors} = useTheme();
 
+  const userId         = useGlobalStore(s => s.user?.id);
   const recentWeeks    = useGlobalStore(s => s.recentWeeks);
   const currentWeek    = useNFLStore(s => s.currentWeek);
+  const currentPhase   = useNFLStore(s => s.currentPhase);
   const weekResult     = useNFLStore(s => s.weekResult);
+  const regSeasonTotal = useSeasonStore(s => s.regularSeasonUserPoints);
+  const loadRegPodium  = useSeasonStore(s => s.loadRegularSeasonPodium);
   const userPickCount  = useNFLStore(s => s.userPickCount);
   const userHotPick    = useNFLStore(s => s.userHotPick);
   const userHotPickGame = useNFLStore(s => s.userHotPickGame);
   const liveScores     = useNFLStore(s => s.liveScores);
   const weekPicks      = useSeasonStore(s => s.weekPicks);
   const games          = useSeasonStore(s => s.games);
+
+  // Load the user's regular-season total for the early-playoff "REG SEASON"
+  // pill (Wild Card + Divisional). The season leaderboard is playoff-scoped
+  // during the playoffs, so this is fetched separately (phase=REGULAR).
+  useEffect(() => {
+    const isEarlyPlayoff =
+      (currentPhase === 'PLAYOFFS') &&
+      (currentWeek === PLAYOFF_START_WEEK || currentWeek === PLAYOFF_START_WEEK + 1);
+    if (isEarlyPlayoff && userId) {
+      loadRegPodium(userId).catch(() => {});
+    }
+  }, [currentPhase, currentWeek, userId, loadRegPodium]);
 
   // Current-week ceiling — mirrors SeasonPicksScreen's potentialWeekScore.
   const currentCeiling = useMemo(() => {
@@ -146,10 +179,32 @@ export function WeeklyTrend() {
           }]
         : [];
 
-    return [...past, ...current]
-      .sort((a, b) => a.week - b.week)
-      .slice(-3); // keep the 3 most recent, oldest on the left
-  }, [recentWeeks, currentWeek, weekResult, userPickCount, currentCeiling, liveEarned]);
+    const all = [...past, ...current].sort((a, b) => a.week - b.week);
+
+    // Regular season → just the 3 most recent weeks.
+    const isPlayoffs = currentPhase === 'PLAYOFFS' || currentPhase === 'SUPERBOWL';
+    if (!isPlayoffs) return all.slice(-3);
+
+    // Playoffs: show only playoff weeks (≥19). At Wild Card + Divisional,
+    // prepend a single "regular-season total" pill instead of the old W17/W18
+    // weeks; it falls off by Conference week as playoff weeks accumulate.
+    const playoffOnly = all.filter(s => s.week >= PLAYOFF_START_WEEK);
+    const showRegTotal =
+      (currentWeek === PLAYOFF_START_WEEK || currentWeek === PLAYOFF_START_WEEK + 1) &&
+      regSeasonTotal != null;
+    const regSlot: WeekSlot[] = showRegTotal
+      ? [{
+          week: -1,
+          earned: regSeasonTotal as number,
+          ceiling: null,
+          correctPicks: null,
+          totalPicks: null,
+          isCurrent: false,
+          isRegTotal: true,
+        }]
+      : [];
+    return [...regSlot, ...playoffOnly].slice(-3);
+  }, [recentWeeks, currentWeek, currentPhase, regSeasonTotal, weekResult, userPickCount, currentCeiling, liveEarned]);
 
   // Single walk over liveScores — derives the live-game count and the
   // "every game final" flag in one pass.
@@ -220,20 +275,22 @@ export function WeeklyTrend() {
           accessible
           accessibilityLabel={
             s.ceiling != null
-              ? `Week ${s.week}: ${s.earned} of ${s.ceiling} ceiling points${
+              ? `${slotLabel(s)}: ${s.earned} of ${s.ceiling} ceiling points${
                   s.totalPicks != null && s.correctPicks != null
                     ? `, ${s.correctPicks} of ${s.totalPicks} games won`
                     : ''
                 }`
-              : `Week ${s.week}: ${s.earned} points${
+              : `${slotLabel(s)}: ${s.earned} points${
                   s.totalPicks != null && s.correctPicks != null
                     ? `, ${s.correctPicks} of ${s.totalPicks} games won`
                     : ''
                 }`
           }>
           <View style={styles.weekLabelRow}>
-            <Text style={[bodyType.bold, styles.weekLabel, {color: colors.textTertiary}]}>
-              WEEK {s.week}
+            <Text
+              style={[bodyType.bold, styles.weekLabel, {color: colors.textTertiary}]}
+              numberOfLines={1}>
+              {slotLabel(s)}
             </Text>
             {!s.isCurrent && (
               <Lock size={9} color={colors.loss} strokeWidth={2.5} />

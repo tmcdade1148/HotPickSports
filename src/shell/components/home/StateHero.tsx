@@ -58,15 +58,19 @@ export function StateHero({state}: StateHeroProps) {
   const hero = heroFor(resolved);
 
   // During the playoffs / Super Bowl, the in-cycle heroes render unchanged
-  // beneath a playoff banner (round identity + stakes, bracket progress,
-  // accent, fresh-slate reminder). Only the weekly in-cycle states get the
-  // banner — bridge/off-cycle states carry their own framing.
-  const isPlayoffPhase = currentPhase === 'PLAYOFFS' || currentPhase === 'SUPERBOWL';
-  const isInCycle =
+  // beneath a playoff banner (round identity, bracket progress, accent, rules
+  // ⓘ). The Super Bowl bridge (superbowl_intro_bridge) also gets the banner so
+  // the playoff framing carries through the 2-week gap before the game.
+  const isPlayoffPhase =
+    currentPhase === 'PLAYOFFS' ||
+    currentPhase === 'SUPERBOWL' ||
+    currentPhase === 'SUPERBOWL_INTRO';
+  const showsBanner =
     resolved === 'picks_open' || resolved === 'picks_locked' ||
-    resolved === 'games_live' || resolved === 'settling' || resolved === 'complete';
+    resolved === 'games_live' || resolved === 'settling' || resolved === 'complete' ||
+    resolved === 'superbowl_intro_bridge';
 
-  if (isPlayoffPhase && isInCycle) {
+  if (isPlayoffPhase && showsBanner) {
     return (
       <>
         <PlayoffBanner />
