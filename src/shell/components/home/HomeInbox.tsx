@@ -35,7 +35,10 @@ export function HomeInbox() {
   const navigation = useNavigation<any>();
   const user = useGlobalStore(s => s.user);
 
-  const [poolIds, setPoolIds] = useState<string[] | null>(null);
+  // Track join time per pool — a broadcast sent BEFORE the user joined a pool
+  // is not "unread" for them (otherwise every new signup inherits old pool
+  // broadcasts as a phantom badge that opens to nothing).
+  const [pools, setPools] = useState<{pool_id: string; joined_at: string | null}[] | null>(null);
   const [unread, setUnread] = useState(0);
   const [latestPreview, setLatestPreview] = useState<string | null>(null);
 
@@ -45,27 +48,29 @@ export function HomeInbox() {
   useEffect(() => {
     let cancelled = false;
     if (!user?.id) {
-      setPoolIds(null);
+      setPools(null);
       return;
     }
     (async () => {
       const {data} = await supabase
         .from('pool_members')
-        .select('pool_id')
+        .select('pool_id, joined_at')
         .eq('user_id', user.id)
         .eq('status', 'active');
       if (cancelled) return;
-      setPoolIds(((data ?? []) as {pool_id: string}[]).map(r => r.pool_id));
+      setPools((data ?? []) as {pool_id: string; joined_at: string | null}[]);
     })();
     return () => { cancelled = true; };
   }, [user?.id]);
 
   const recompute = useCallback(async () => {
-    if (!user?.id || !poolIds || poolIds.length === 0) {
+    if (!user?.id || !pools || pools.length === 0) {
       setUnread(0);
       setLatestPreview(null);
       return;
     }
+    const poolIds = pools.map(p => p.pool_id);
+    const joinedByPool = new Map(pools.map(p => [p.pool_id, p.joined_at]));
     const thirtyDaysAgo = new Date(Date.now() - THIRTY_DAYS_MS).toISOString();
     const [{data: msgs}, {data: readState}] = await Promise.all([
       supabase
@@ -99,15 +104,22 @@ export function HomeInbox() {
       if (m.notification_type === 'moderator_note') {
         if (!m.recipient_user_ids?.includes(user.id)) continue;
       }
+      // A message is unread only if it arrived after BOTH the last read AND
+      // the moment the user joined that pool — never count pre-join broadcasts.
       const lastRead = lastReadByPool.get(m.pool_id);
-      if (!lastRead || new Date(m.sent_at) > new Date(lastRead)) {
+      const joined = joinedByPool.get(m.pool_id);
+      const floor = Math.max(
+        lastRead ? new Date(lastRead).getTime() : 0,
+        joined ? new Date(joined).getTime() : 0,
+      );
+      if (new Date(m.sent_at).getTime() > floor) {
         unreadCount++;
         if (!mostRecentUnread) mostRecentUnread = {message: m.message};
       }
     }
     setUnread(unreadCount);
     setLatestPreview(mostRecentUnread?.message ?? null);
-  }, [user?.id, poolIds]);
+  }, [user?.id, pools]);
 
   useEffect(() => {
     recompute();
@@ -117,8 +129,8 @@ export function HomeInbox() {
   // postgres_changes filter must be a single comma-list inside
   // `pool_id=in.(...)`. Channel re-binds when poolIds changes.
   useEffect(() => {
-    if (!user?.id || !poolIds || poolIds.length === 0) return;
-    const inList = poolIds.join(',');
+    if (!user?.id || !pools || pools.length === 0) return;
+    const inList = pools.map(p => p.pool_id).join(',');
     const channel = supabase
       .channel(`home-inbox-${user.id}`)
       .on(
@@ -145,7 +157,7 @@ export function HomeInbox() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id, poolIds, recompute]);
+  }, [user?.id, pools, recompute]);
 
   if (unread === 0) return null;
 
