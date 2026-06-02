@@ -109,6 +109,8 @@ If you find yourself writing any of the following, stop and revise.
 Power-ups, career hardware awards, AI archetypes, tier system, pool discovery, Super Bowl enhanced scoring UI, playoff reset UI, global leaderboard, NHL/Tournament templates, white label billing, admin analytics dashboard.
 > "That feature is explicitly deferred until after NFL Season 2 launch. Let's stay on scope."
 
+**Deferred → November 2026 (Super Bowl Enhanced Scoring build, see REFERENCE.md §3 + §"Super Bowl Enhanced Scoring"):** Super Bowl-only competition with its own winner (sign-up opens 2 weeks before the SB), playoffs-only competition (join any time, start fresh at Week 19 / Wild Card through the SB), and the playoff-champion tie-breaker ladder computation (points → SB margin Price-Is-Right → most correct playoff picks → most correct playoff HotPicks → co-champions). All are leaderboard *scopes* over user-scoped picks — never new tables, never `pool_id` on scores.
+
 ---
 
 ## What To Say (Copy-Paste Responses)
