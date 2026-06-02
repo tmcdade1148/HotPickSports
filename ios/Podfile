@@ -36,6 +36,11 @@ target 'HotPickSports' do
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |config|
         config.build_settings['DEBUG_INFORMATION_FORMAT'] = 'dwarf-with-dsym'
+        # Xcode 16+ enables "Explicitly Built Modules" by default, which makes
+        # the Clang dependency scanner fail to resolve ExpoModulesCore headers
+        # ("could not build module 'Expo'"). Disable it to use implicit modules
+        # (pre-Xcode-16 behavior) — safe and what RN/Expo expect.
+        config.build_settings['CLANG_ENABLE_EXPLICIT_MODULES'] = 'NO'
         if target.name == 'React-RCTLinking'
           config.build_settings['DEFINES_MODULE'] = 'YES'
         end
