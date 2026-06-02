@@ -16,10 +16,9 @@ import {useGlobalStore} from '@shell/stores/globalStore';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 
-interface PrefRow {
-  notification_type: string;
-  enabled: boolean;
-}
+// The notification_preferences table is WIDE: one row per user, one boolean
+// column per type (all default true). These keys ARE the column names.
+type PrefMap = Record<string, boolean>;
 
 const PREF_LABELS: Record<string, {label: string; description: string}> = {
   picks_deadline: {
@@ -71,18 +70,26 @@ export function NotificationPreferencesScreen() {
   const navigation = useNavigation<any>();
   const {colors} = useTheme();
   const userId = useGlobalStore(s => s.user?.id);
-  const [prefs, setPrefs] = useState<PrefRow[]>([]);
+  const [prefs, setPrefs] = useState<PrefMap>({});
   const [loading, setLoading] = useState(true);
 
   const fetchPrefs = useCallback(async () => {
     if (!userId) return;
     const {data} = await supabase
       .from('notification_preferences')
-      .select('notification_type, enabled')
-      .eq('user_id', userId);
+      .select(PREF_ORDER.join(', '))
+      .eq('user_id', userId)
+      .maybeSingle();
 
     if (data) {
-      setPrefs(data);
+      setPrefs(data as PrefMap);
+    } else {
+      // No row yet (older accounts were never seeded) — create one with the
+      // all-true defaults so the toggles have something to write against.
+      await supabase
+        .from('notification_preferences')
+        .upsert({user_id: userId}, {onConflict: 'user_id', ignoreDuplicates: true});
+      setPrefs({});
     }
     setLoading(false);
   }, [userId]);
@@ -92,24 +99,28 @@ export function NotificationPreferencesScreen() {
   }, [fetchPrefs]);
 
   const togglePref = async (type: string, newValue: boolean) => {
+    const previous = prefs[type] ?? true;
     // Optimistic update
-    setPrefs(prev =>
-      prev.map(p =>
-        p.notification_type === type ? {...p, enabled: newValue} : p,
-      ),
-    );
+    setPrefs(prev => ({...prev, [type]: newValue}));
 
-    await supabase
+    // Upsert the single boolean column. .select().single() makes an
+    // RLS-filtered or failed write throw instead of silently succeeding.
+    const {error} = await supabase
       .from('notification_preferences')
-      .update({enabled: newValue, updated_at: new Date().toISOString()})
-      .eq('user_id', userId)
-      .eq('notification_type', type);
+      .upsert(
+        {user_id: userId, [type]: newValue, updated_at: new Date().toISOString()},
+        {onConflict: 'user_id'},
+      )
+      .select(`user_id, ${type}`)
+      .single();
+
+    if (error) {
+      // Revert so the UI never claims a change that didn't persist.
+      setPrefs(prev => ({...prev, [type]: previous}));
+    }
   };
 
-  const getPref = (type: string): boolean => {
-    const row = prefs.find(p => p.notification_type === type);
-    return row?.enabled ?? true;
-  };
+  const getPref = (type: string): boolean => prefs[type] ?? true;
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]} edges={['top']}>

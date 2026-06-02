@@ -190,26 +190,13 @@ export async function deactivateDeviceTokens(userId: string): Promise<void> {
 /**
  * Seed default notification preferences for a new user.
  * Called once after first sign-up. Idempotent via ON CONFLICT DO NOTHING.
+ *
+ * notification_preferences is WIDE: a single row per user with one boolean
+ * column per type, each defaulting to true. So seeding is just "ensure the
+ * row exists" — the column defaults supply the all-on starting state.
  */
 export async function seedNotificationPreferences(userId: string): Promise<void> {
-  const types = [
-    'picks_deadline',
-    'score_posted',
-    'leaderboard_change',
-    'smacktalk_mention',
-    'smacktalk_reply',
-    'organizer_broadcast',
-    'streak_milestone',
-    'new_member_joined',
-  ];
-
-  const rows = types.map(t => ({
-    user_id: userId,
-    notification_type: t,
-    enabled: true,
-  }));
-
   await supabase
     .from('notification_preferences')
-    .upsert(rows, {onConflict: 'user_id,notification_type'});
+    .upsert({user_id: userId}, {onConflict: 'user_id', ignoreDuplicates: true});
 }
