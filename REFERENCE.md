@@ -311,9 +311,15 @@ Always filter with `.eq('status', 'active')` in leaderboard and member list quer
 - Maximum total: 139 pts
 
 ### Super Bowl Enhanced Scoring (Build November 2026)
-Do not build UI yet. Nullable columns already added to `season_picks`:
-- `super_bowl_q1_pick`, `super_bowl_q2_pick`, `super_bowl_q3_pick` (TEXT — quarter-leader picks, team abbr)
-- `super_bowl_margin_prediction` (INT) — **see margin note below; the concept needs a decision**
+**Full build brief: `docs/SUPER_BOWL_SCORING_SPEC.md`** — read it before starting; it covers what already exists, the gaps, the open decisions, and a build sequence.
+
+Do not build UI yet. Nullable columns already exist on `season_picks` (verified in `database.ts`; **note these are the real names** — earlier docs wrongly said `super_bowl_q1_pick` / `super_bowl_margin_prediction INT`):
+- `sb_q1_leader`, `sb_q2_leader`, `sb_q3_leader` (TEXT — quarter-leader picks, team abbr)
+- `sb_margin_tier` (TEXT — bucket `"1-6"` / `"7-14"` / `"15+"`; a **tier**, not an exact INT)
+
+⚠️ **Margin concept fork (decide in November):** the schema stores a *tier* (`sb_margin_tier`), matching the Season 1 +8/−4 scoring element. But the §3 tie-breaker ladder and the `PlayoffRulesModal` popup describe margin as **Price-Is-Right (closest exact margin without going over)** — which needs an exact INT column that does not yet exist. Reconcile per `docs/SUPER_BOWL_SCORING_SPEC.md` §4A.
+
+⚠️ **Schema not in migrations:** these `sb_*` columns (and `season_user_totals.playoff_points`) live in the types but **no tracked migration creates them**. Formalize with `apply_migration` before building.
 
 **Canonical scoring model (recovered from the Season 1 Xcode build `tmcdade1148/NFL2025`, Dec 2025 — `SuperBowlRowView.swift` is authoritative).** The Super Bowl is a single game with a **multi-part pick**:
 
