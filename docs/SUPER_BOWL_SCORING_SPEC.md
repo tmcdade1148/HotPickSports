@@ -142,3 +142,23 @@ In `tmcdade1148/NFL2025` (private, Swift — outside the default session scope; 
 - **`SuperBowlMarginPicker.swift`** — standalone tier picker. ⚠️ Its caption ("Correct winner + margin = +32 / Wrong = −16") is an **older/abandoned** combined-scoring model — **ignore it**; `SuperBowlRowView` is canonical.
 - **`SuperBowlOnboardingBanner.swift`** — user-facing explainer. ⚠️ Advertises the **dropped** HotPick-Quarter pick and the **wrong** +36/−26 range. Useful only as a UI/tone reference, not for scoring.
 - The **server-side scoring engine** from Season 1 (not yet retrieved) would be the best reference for edge cases (ties in a quarter, OT, etc.). Pull it from `NFL2025` when building.
+
+---
+
+## 9. Known gap — regular-season contest results archive (NOT BUILT)
+
+*Logged 2026-06 during the playoff/winner-page review. Not blocking; queued for a future build.*
+
+**The gap:** there is no way to look back at a **completed regular-season contest's final standings / champion** once the playoffs start. The live Ladder (`LeaderboardTab`) becomes playoff-scoped at the reset, so the regular-season result is no longer viewable in-app after the bridge passes.
+
+**What already exists (don't re-investigate):**
+- Data persists: `season_user_totals` rows with `phase = 'REGULAR'` are retained after the playoff reset.
+- `seasonStore.loadRegularSeasonPodium(userId)` computes the pool-scoped top 3 (respects `pool_start_date`).
+- The per-pool regular-season winner is announced to Chirps (DB trigger `announce_regular_winners_on_phase`; manual backfill via the `nfl-announce-regular-winners` Edge Function).
+- The only UI is the **temporary** `RegularCompleteHero` shown during the `REGULAR_COMPLETE` bridge; its "See final standings" CTA points at the live (playoff-scoped) Ladder — **not** a preserved regular-season snapshot.
+
+**What's missing:**
+- A persistent **per-contest historical standings** view (final regular-season Ladder for a given pool), reachable after the playoffs begin — e.g. from the `History` (Awards & Records) screen now surfaced in Settings, or from the contest itself.
+- (Related, see §"Season champion" work) no season-end champion archive either; that's downstream of the Super Bowl scoring build above.
+
+**Altitude note:** build this as a leaderboard *scope/snapshot* over the existing user-scoped `season_user_totals` (filter `phase = 'REGULAR'`, `pool_start_date`), consistent with Hard Rules #1–#2 — never a new per-pool results table.
