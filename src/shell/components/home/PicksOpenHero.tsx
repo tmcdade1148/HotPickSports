@@ -14,6 +14,7 @@ import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
 import {getHotPickImpact} from '@sports/nfl/utils/hotPickImpact';
 import {isFinalStatus, isLiveStatus, isScheduledStatus} from '@sports/nfl/utils/gameStatus';
 import {hexToRgba} from '@shared/utils/color';
+import {isSandboxCompetition} from '@shared/utils/competition';
 import {singleUnit} from './useCountdown';
 import {fullTeamName} from './teamColors';
 import {buildWeekRecap} from './weekRecap';
@@ -117,10 +118,18 @@ export function PicksOpenHero() {
     ? timer.days * 24 * 60 + timer.hours * 60 + timer.minutes
     : null;
 
+  // Reviewer sandboxes (nfl_2025_simA / simG) show a fixed "3 DAYS" countdown
+  // rather than a live one — the sim is a frozen Week-8 demo, so the headline
+  // should always read 3 days regardless of when the games happen to be dated.
+  const competition = useSeasonStore(s => s.config?.competition);
+  const sandboxCountdown = isSandboxCompetition(competition);
+
   // Compact countdown label (single largest meaningful unit — app-wide rule:
   // days → hours → minutes). Shown inline next to the HotPick kickoff time
   // when the HotPick card is present, otherwise as the standalone big timer.
-  const countdownLabel = timer
+  const countdownLabel = sandboxCountdown
+    ? '3 DAYS'
+    : timer
     ? (() => {
         const su = singleUnit(timer.days, timer.hours, timer.minutes);
         return `${su.value} ${su.unit}${su.value === 1 ? '' : 's'}`.toUpperCase();
@@ -293,7 +302,23 @@ export function PicksOpenHero() {
           Suppressed when the HotPick card is shown — there the countdown
           rides inline next to the kickoff time instead. */}
       {!hotPickIsLive && !hotPickIsFinal && !hotPickCardShown && (
-        timer ? (
+        sandboxCountdown ? (
+          // Frozen reviewer sandbox — always read "3 DAYS".
+          <Text
+            style={[
+              displayType.display,
+              styles.timer,
+              {
+                color: colors.textPrimary,
+                fontSize: timerSize,
+                lineHeight: Math.round(timerSize * 1.15),
+              },
+            ]}
+            numberOfLines={1}>
+            3
+            <Text style={{fontSize: timerSize * 0.4}}> DAYS</Text>
+          </Text>
+        ) : timer ? (
           (() => {
             // Single largest meaningful unit (app-wide rule): days → hours → minutes.
             const su = singleUnit(timer.days, timer.hours, timer.minutes);
