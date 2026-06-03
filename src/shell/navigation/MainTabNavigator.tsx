@@ -459,6 +459,24 @@ export function MainTabNavigator() {
   const loadUserHardware = useGlobalStore(s => s.loadUserHardware);
   const userId = useGlobalStore(s => s.user?.id);
 
+  // --- Deep-link invite handler (single consumer for the authenticated app) ---
+  // A tapped invite link (https://hotpick.app/join/CODE) sets `pendingInviteCode`
+  // in globalStore. By the time this shell is mounted the user is authenticated
+  // and past onboarding, so we route them straight to the Join screen with the
+  // code prefilled — works on cold start (code already pending at mount) and warm
+  // start (code set while Home is open). Brand-new signups are handled earlier by
+  // PoolWelcomeScreen, which clears the code before Home mounts, so this never
+  // double-fires.
+  const navigation = useNavigation<any>();
+  const pendingInviteCode = useGlobalStore(s => s.pendingInviteCode);
+  const clearPendingInviteCode = useGlobalStore(s => s.clearPendingInviteCode);
+  useEffect(() => {
+    if (!pendingInviteCode || !userId) return;
+    const code = pendingInviteCode;
+    clearPendingInviteCode();
+    navigation.navigate('JoinPool', {code});
+  }, [pendingInviteCode, userId, navigation, clearPendingInviteCode]);
+
   const nflCurrentWeek = useNFLStore(s => s.currentWeek);
   // Direct check: does this user have any fully completed weeks?
   const [hasHistoryDirect, setHasHistoryDirect] = useState(false);

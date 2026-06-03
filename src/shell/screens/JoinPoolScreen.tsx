@@ -24,13 +24,18 @@ const INVITE_CODE_RE = /^[0-9A-Z]+$/;
 const INVITE_CODE_MIN = 6;
 const INVITE_CODE_MAX = 12;
 
-export function JoinPoolScreen({navigation}: any) {
+export function JoinPoolScreen({navigation, route}: any) {
   const {colors} = useTheme();
   const styles = createStyles(colors);
   const user = useGlobalStore(s => s.user);
   const joinPool = useGlobalStore(s => s.joinPool);
 
-  const [inviteCode, setInviteCode] = useState('');
+  // Prefill from a deep-link invite (`route.params.code`) so a tapped invite
+  // link lands here with the code already filled in. Normalized the same way
+  // typed input is, so a pasted "JOES-2026" arrives as "JOES2026".
+  const [inviteCode, setInviteCode] = useState(() =>
+    normalizeRosterPass(route?.params?.code ?? ''),
+  );
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
