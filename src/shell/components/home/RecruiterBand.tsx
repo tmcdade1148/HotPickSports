@@ -22,7 +22,9 @@ import {useTheme} from '@shell/theme/hooks';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {bodyType, spacing, borderRadius} from '@shared/theme';
 
-const SCHEME = 'hotpick';
+// Universal-link base — https so the invite linkifies in every messaging app
+// and opens the app directly when installed (custom hotpick:// does neither).
+const INVITE_BASE = 'https://hotpick.app/join';
 
 export function RecruiterBand() {
   const {colors} = useTheme();
@@ -46,7 +48,7 @@ export function RecruiterBand() {
   const memberCount = userRankByPool[pool.id]?.memberCount ?? 0;
   const isGaffer    = !!userId && pool.organizer_id === userId;
 
-  const inviteUrl = `${SCHEME}://join?code=${code}`;
+  const inviteUrl = `${INVITE_BASE}/${code}`;
 
   const handleShare = async () => {
     const message = [

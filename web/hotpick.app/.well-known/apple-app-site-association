@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["W88A7N6XW5.com.hotpicksports"],
+        "components": [
+          {
+            "/": "/join/*",
+            "comment": "Contest invite links open the app to the Join flow."
+          }
+        ]
+      }
+    ]
+  }
+}

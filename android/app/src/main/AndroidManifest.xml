@@ -12,6 +12,14 @@
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="hotpick"/>
       </intent-filter>
+      <!-- Android App Links: verified https links to hotpick.app open the app
+           directly (requires /.well-known/assetlinks.json hosted on the domain). -->
+      <intent-filter android:autoVerify="true">
+        <action android:name="android.intent.action.VIEW"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <category android:name="android.intent.category.BROWSABLE"/>
+        <data android:scheme="https" android:host="hotpick.app"/>
+      </intent-filter>
       <intent-filter>
         <action android:name="android.intent.action.VIEW"/>
         <category android:name="android.intent.category.DEFAULT"/>

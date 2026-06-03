@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Join a Contest · HotPick Sports</title>
+  <meta name="apple-itunes-app" content="app-id=REPLACE_WITH_APPSTORE_ID" />
+  <style>
+    :root {
+      --black: #303030; --orange: #F66321; --teal: #45615E;
+      --amber: #E39032; --lightblue: #A5CCD9;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--black); color: #fff; min-height: 100vh;
+      display: flex; align-items: center; justify-content: center; padding: 24px;
+    }
+    .card {
+      max-width: 420px; width: 100%; text-align: center;
+    }
+    h1 { font-size: 26px; margin: 0 0 8px; }
+    p { color: var(--lightblue); font-size: 16px; line-height: 1.5; margin: 0 0 24px; }
+    .code-label { font-size: 12px; letter-spacing: 2px; color: var(--amber); margin-bottom: 6px; }
+    .code {
+      font-size: 34px; font-weight: 800; letter-spacing: 6px; color: var(--orange);
+      background: rgba(246,99,33,0.1); border: 2px solid var(--orange);
+      border-radius: 14px; padding: 16px; margin-bottom: 28px; user-select: all;
+    }
+    .stores { display: flex; flex-direction: column; gap: 12px; }
+    a.store {
+      display: block; padding: 16px; border-radius: 12px; text-decoration: none;
+      font-weight: 700; font-size: 16px; color: #fff; background: var(--teal);
+    }
+    a.store.primary { background: var(--orange); }
+    .hint { margin-top: 22px; font-size: 13px; color: #8a97aa; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>You're invited to a Contest</h1>
+    <p>HotPick Sports — make your picks once and compete with your group all season.</p>
+    <div class="code-label">YOUR INVITE CODE</div>
+    <div class="code" id="code">······</div>
+    <div class="stores">
+      <a class="store primary" id="appstore" href="https://apps.apple.com/app/idREPLACE_WITH_APPSTORE_ID">Download on the App Store</a>
+      <a class="store" id="playstore" href="https://play.google.com/store/apps/details?id=com.hotpicksports">Get it on Google Play</a>
+    </div>
+    <div class="hint">Already have the app? Open it and enter the code above on the Join a Contest screen.</div>
+  </div>
+
+  <script>
+    // The path is /join/CODE — pull the code out and surface it. (When the app
+    // is installed, iOS/Android intercept this URL and open the app directly,
+    // so this page is only ever seen by people who still need to install.)
+    (function () {
+      var m = location.pathname.match(/\/join\/([A-Za-z0-9]+)/);
+      var code = m ? m[1].toUpperCase() : null;
+      if (code) {
+        document.getElementById('code').textContent = code;
+        document.title = 'Join with code ' + code + ' · HotPick Sports';
+        // Best-effort: nudge the app open via its custom scheme in case the
+        // universal/app link didn't fire (harmless no-op if not installed).
+        var t = setTimeout(function () {}, 0);
+        try { window.location.href = 'hotpick://join?code=' + code; } catch (e) {}
+      }
+    })();
+  </script>
+</body>
+</html>

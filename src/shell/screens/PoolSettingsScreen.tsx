@@ -424,8 +424,14 @@ export function PoolSettingsScreen() {
 
   const handleShareAnyCode = async (code: string) => {
     try {
+      // Universal link (https) so it linkifies in Messages and opens the app
+      // directly when installed; the code is included as a manual fallback.
+      const inviteUrl = `https://hotpick.app/join/${code}`;
       await Share.share({
-        message: `Join my Contest "${pool!.name}" on HotPick Sports! Use invite code: ${code}`,
+        message:
+          `Join my Contest "${pool!.name}" on HotPick Sports!\n\n` +
+          `Tap to join: ${inviteUrl}\n` +
+          `Or use invite code: ${code}`,
       });
     } catch {
       // user cancelled
