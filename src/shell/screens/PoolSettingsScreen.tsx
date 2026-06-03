@@ -26,13 +26,14 @@ import {
   AlertTriangle,
   Plus,
   Star,
-  Users,
+  Building2,
   X,
   XCircle,
 } from 'lucide-react-native';
 import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {normalizeRosterPass} from '@shared/utils/format';
+import {LEXICON} from '@shared/lexicon';
 import {BroadcastComposer} from '@shell/components/BroadcastComposer';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
@@ -286,7 +287,7 @@ export function PoolSettingsScreen() {
     }
   };
 
-  // Welcome message — auto-posted to SmackTalk as the Gaffer when a
+  // Welcome message — auto-posted to Chirps as the Gaffer when a
   // new member joins. Empty string clears a previously-set welcome.
   const currentWelcome   = pool?.welcome_message ?? '';
   const hasWelcomeChanged = welcomeMessage.trim() !== currentWelcome.trim();
@@ -301,7 +302,7 @@ export function PoolSettingsScreen() {
       Alert.alert(
         'Saved',
         welcomeMessage.trim()
-          ? 'New members will see your welcome message in SmackTalk.'
+          ? `New members will see your welcome message in ${LEXICON.chirps.plural}.`
           : 'Welcome message cleared.',
       );
     } else {
@@ -533,12 +534,12 @@ export function PoolSettingsScreen() {
           )}
         </View>
 
-        {/* Welcome Message — auto-posted to SmackTalk as the Gaffer
+        {/* Welcome Message — auto-posted to Chirps as the Gaffer
             when a new member joins. Sets Contest culture from the
             first message a recruit sees. */}
         <Text style={styles.sectionTitle}>Welcome Message</Text>
         <Text style={styles.welcomeHint}>
-          Posted in SmackTalk as you when a new player joins your Contest. Leave blank for no auto-welcome.
+          Posted in {LEXICON.chirps.plural} as you when a new player joins your Contest. Leave blank for no auto-welcome.
         </Text>
         <TextInput
           style={styles.welcomeInput}
@@ -617,7 +618,7 @@ export function PoolSettingsScreen() {
           <TouchableOpacity
             style={[styles.broadcastButton, {borderColor: colors.primary}]}
             onPress={() => navigation.navigate('PartnerDirectory', {poolId})}>
-            <Users size={18} color={colors.primary} />
+            <Building2 size={18} color={colors.primary} />
             <Text style={[styles.broadcastText, {color: colors.primary}]}>
               Add/Edit Clubs
             </Text>
