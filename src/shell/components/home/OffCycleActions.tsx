@@ -167,17 +167,17 @@ export function ReturningOffCycleActions() {
           onPress={() => navigation.navigate('CreatePool')}
           style={({pressed}) => [styles.lightBtn, {borderColor: colors.border, opacity: pressed ? 0.7 : 1}]}
           accessibilityRole="button"
-          accessibilityLabel="Create another Contest and invite friends">
+          accessibilityLabel="Create a Contest and invite friends">
           <Plus size={18} color={colors.primary} strokeWidth={2.25} />
-          <Text style={[bodyType.bold, styles.lightLabel, {color: colors.textPrimary}]}>Create another</Text>
+          <Text style={[bodyType.bold, styles.lightLabel, {color: colors.textPrimary}]}>Create a Contest</Text>
         </Pressable>
         <Pressable
           onPress={() => navigation.navigate('JoinPool')}
           style={({pressed}) => [styles.lightBtn, {borderColor: colors.border, opacity: pressed ? 0.7 : 1}]}
           accessibilityRole="button"
-          accessibilityLabel="Join another Contest with an invite code">
+          accessibilityLabel="Join a Contest with an invite code">
           <KeyRound size={18} color={colors.primary} strokeWidth={2.25} />
-          <Text style={[bodyType.bold, styles.lightLabel, {color: colors.textPrimary}]}>Join another</Text>
+          <Text style={[bodyType.bold, styles.lightLabel, {color: colors.textPrimary}]}>Join a Contest</Text>
         </Pressable>
       </View>
       <ActionBtn
