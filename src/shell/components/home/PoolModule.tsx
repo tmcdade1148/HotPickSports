@@ -34,6 +34,7 @@ import {
   BadgeCheck,
   MessageCircle,
   Megaphone,
+  Settings,
   ShieldCheck,
   Trophy,
 } from 'lucide-react-native';
@@ -171,6 +172,7 @@ export function PoolModule({pool}: PoolModuleProps) {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
   const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
+  const userId = useGlobalStore(s => s.user?.id);
   // Two independent unread streams — kept separate so each badge has a
   // clear meaning and a single tap target.
   const smackUnread = useGlobalStore(s => s.smackUnreadCounts[pool.id] ?? 0);
@@ -318,6 +320,14 @@ export function PoolModule({pool}: PoolModuleProps) {
     navigation.navigate('SmackTalkTab');
   };
 
+  // Gaffer (organizer) shortcut to Contest settings, shown next to the name
+  // only on Contests this user organizes.
+  const isGaffer = !!userId && pool.organizer_id === userId;
+  const goToSettings = () => {
+    setActivePoolId(pool.id);
+    navigation.navigate('PoolSettings', {poolId: pool.id});
+  };
+
   const goToPartnerRoster = (slug?: string | null) => {
     if (!slug) return;
     navigation.navigate('PartnerRoster', {slug});
@@ -410,11 +420,23 @@ export function PoolModule({pool}: PoolModuleProps) {
       <View style={styles.body}>
         <View style={styles.topRow}>
           <View style={styles.titleBlock}>
-            <Text
-              style={[displayType.display, styles.poolName, {color: colors.textPrimary}]}
-              numberOfLines={1}>
-              {(pool.name || '').toUpperCase()}
-            </Text>
+            <View style={styles.nameRow}>
+              <Text
+                style={[displayType.display, styles.poolName, {color: colors.textPrimary}]}
+                numberOfLines={1}>
+                {(pool.name || '').toUpperCase()}
+              </Text>
+              {isGaffer && (
+                <Pressable
+                  onPress={goToSettings}
+                  hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open ${pool.name} settings`}
+                  style={({pressed}) => [styles.gearBtn, {opacity: pressed ? 0.5 : 1}]}>
+                  <Settings size={16} color={colors.textSecondary} strokeWidth={2.25} />
+                </Pressable>
+              )}
+            </View>
             {scoresAvailable && rankData && (
               <>
                 <View style={styles.rankRow}>
@@ -751,10 +773,19 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
   poolName: {
     fontSize: 16.5,
     lineHeight: 16.5,
-    marginBottom: 6,
+    flexShrink: 1,
+  },
+  gearBtn: {
+    padding: 2,
   },
   rankRow: {
     flexDirection: 'row',
