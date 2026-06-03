@@ -65,7 +65,6 @@ export function PartnerRosterScreen() {
   const userId           = useGlobalStore(s => s.user?.id);
   const visiblePools     = useGlobalStore(s => s.visiblePools);
   const poolAffiliations = useGlobalStore(s => s.poolAffiliations);
-  const setActivePoolId  = useGlobalStore(s => s.setActivePoolId);
   const markRead         = useGlobalStore(s => s.markPartnerNotificationsRead);
 
   const [partner, setPartner]      = useState<PartnerRow | null>(null);
@@ -316,8 +315,7 @@ export function PartnerRosterScreen() {
             <Pressable
               key={pool.id}
               onPress={() => {
-                setActivePoolId(pool.id);
-                navigation.navigate('LeaderboardTab');
+                navigation.navigate('PoolMembers', {poolId: pool.id});
               }}
               style={({pressed}) => [
                 styles.poolRow,
