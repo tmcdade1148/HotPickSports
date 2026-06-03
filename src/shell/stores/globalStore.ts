@@ -1153,12 +1153,24 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     // immediately. Without the visiblePools update the pool stays on
     // screen, and a second archive attempt hits the RPC which (rightly)
     // reports it's already archived.
-    set(state => ({
-      userPools: state.userPools.filter(p => p.id !== poolId),
-      visiblePools: state.visiblePools.filter(p => p.id !== poolId),
-      activePoolId:
-        state.activePoolId === poolId ? null : state.activePoolId,
-    }));
+    //
+    // When the archived pool was the active one, fall back to a remaining
+    // visible pool rather than nulling activePoolId. Leaving it null forces
+    // the whole app shell into the "no active Contest" state mid-session,
+    // which downstream consumers don't all expect — selecting the next pool
+    // keeps the active selection valid (null only when none remain).
+    set(state => {
+      const userPools = state.userPools.filter(p => p.id !== poolId);
+      const visiblePools = state.visiblePools.filter(p => p.id !== poolId);
+      const wasActive = state.activePoolId === poolId;
+      const activePoolId = wasActive
+        ? visiblePools[0]?.id ?? null
+        : state.activePoolId;
+      const activeBrandConfig = wasActive
+        ? ((visiblePools[0]?.brand_config as unknown as BrandConfig) ?? null)
+        : state.activeBrandConfig;
+      return {userPools, visiblePools, activePoolId, activeBrandConfig};
+    });
 
     return {success: true};
   },
