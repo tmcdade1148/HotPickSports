@@ -69,6 +69,16 @@ export function getDefaultEvent(visibleCompetitions?: readonly string[]): AnyEve
   return getEventsByPriority(visibleCompetitions)[0] ?? worldCup2026;
 }
 
+// Resolve a registered event by its competition string, ignoring visibility
+// gating. Used when an action targets a specific competition the user already
+// has access to (e.g. joining a Contest by invite) and we need to switch the
+// active sport to it — RLS still governs what data they can read.
+export function getEventByCompetition(
+  competition: string,
+): AnyEventConfig | undefined {
+  return ALL_EVENTS.find(e => e.competition === competition);
+}
+
 // Unfiltered registry — DEV-only escape hatch used by LoadingScreen to
 // restore a persisted active competition across Metro hot reloads,
 // including gated competitions (nfl_2025_sim) that the production

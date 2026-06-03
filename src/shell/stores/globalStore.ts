@@ -5,7 +5,7 @@ import type {DbPool, DbProfile, DbPoolMember} from '@shared/types/database';
 import type {BrandConfig} from '@shell/theme/types';
 import {supabase} from '@shared/config/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {getAllEventsUnfiltered, getEventsByPriority, getDemoEvent, DEMO_POOL_ID} from '@sports/registry';
+import {getAllEventsUnfiltered, getEventsByPriority, getDemoEvent, getEventByCompetition, DEMO_POOL_ID} from '@sports/registry';
 import {deactivateDeviceTokens} from '@shell/services/pushNotifications';
 import {nflSeason} from '@sports/nfl/config';
 import {isSandboxCompetition} from '@shared/utils/competition';
@@ -970,9 +970,25 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     const typedPool = data.pool as DbPool;
     const competition = typedPool.competition;
 
+    // Persist the selection first so the active-sport switch below (which
+    // restores the persisted pool for the target competition) reads this value.
+    AsyncStorage.setItem(poolStorageKey(competition), typedPool.id);
+
+    // The Contest list is scoped to one active competition at a time. If the
+    // joined Contest belongs to a different competition than the one currently
+    // active, switch the active sport to it — otherwise the new Contest won't
+    // appear in the list and a reopen would default back to the old
+    // competition, hiding it permanently.
+    const current = get().activeSport;
+    if (current?.competition !== competition) {
+      const event = getEventByCompetition(competition);
+      if (event) {
+        get().setActiveSport(event);
+      }
+    }
+
     // Set active pool immediately for instant UI feedback
     set({activePoolId: typedPool.id});
-    AsyncStorage.setItem(poolStorageKey(competition), typedPool.id);
 
     // Re-fetch pools from DB — picks up invite_code_used, manualGlobalJoins, etc.
     await get().fetchUserPools(userId, competition);
