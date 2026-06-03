@@ -52,17 +52,15 @@
   <script>
     // The path is /join/CODE — pull the code out and surface it. (When the app
     // is installed, iOS/Android intercept this URL and open the app directly,
-    // so this page is only ever seen by people who still need to install.)
+    // so this page is only ever seen by people who still need to install — we
+    // deliberately do NOT try to launch the hotpick:// scheme here, since on a
+    // device without the app that just throws an "address is invalid" error.)
     (function () {
       var m = location.pathname.match(/\/join\/([A-Za-z0-9]+)/);
       var code = m ? m[1].toUpperCase() : null;
       if (code) {
         document.getElementById('code').textContent = code;
         document.title = 'Join with code ' + code + ' · HotPick Sports';
-        // Best-effort: nudge the app open via its custom scheme in case the
-        // universal/app link didn't fire (harmless no-op if not installed).
-        var t = setTimeout(function () {}, 0);
-        try { window.location.href = 'hotpick://join?code=' + code; } catch (e) {}
       }
     })();
   </script>
