@@ -1,0 +1,24 @@
+# Netlify config for the hotpick.app site (Universal Links + invite landing).
+# Publishes only the web/hotpick.app folder.
+
+[build]
+  publish = "web/hotpick.app"
+
+# Path-style invite codes (/join/CODE) all render the one landing page.
+# 200 = rewrite (URL stays /join/CODE), not a 301/302 redirect.
+[[redirects]]
+  from = "/join/*"
+  to = "/join/index.html"
+  status = 200
+
+# Apple requires the AASA file served as application/json, 200, no redirect.
+# It has no file extension, so set the type explicitly.
+[[headers]]
+  for = "/.well-known/apple-app-site-association"
+  [headers.values]
+    Content-Type = "application/json"
+
+[[headers]]
+  for = "/.well-known/assetlinks.json"
+  [headers.values]
+    Content-Type = "application/json"
