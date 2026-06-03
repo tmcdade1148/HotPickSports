@@ -29,15 +29,18 @@ join/index.html                          # fallback landing page for /join/CODE
    ```
    or Vercel/Cloudflare equivalent.
 
-## Placeholders to fill in before go-live
+## Identifiers (all filled in)
 
-| File | Placeholder | Where to get it |
-|------|-------------|-----------------|
-| `.well-known/assetlinks.json` | `REPLACE_WITH_PLAY_APP_SIGNING_SHA256` | Play Console → App integrity → App signing → **SHA-256 certificate fingerprint** (use the *App signing key*, not the upload key). Multiple entries allowed if you also want the upload key. |
-| `join/index.html` | `REPLACE_WITH_APPSTORE_ID` (×3: meta tag + two App Store URLs) | App Store Connect numeric app ID once the app record exists. |
+| What | Value |
+|------|-------|
+| Apple appID (AASA) | `W88A7N6XW5.com.hotpicksports` |
+| Android package (assetlinks) | `com.hotpicksports` |
+| Android Play app signing SHA-256 (assetlinks) | filled — from Play Console App signing key certificate |
+| Apple App Store ID (landing page) | `6761190235` |
 
-The Apple appID `W88A7N6XW5.com.hotpicksports` and Android package
-`com.hotpicksports` are already filled in.
+If the Android **app signing key** ever changes, or you want to also accept the
+upload key, add the new SHA-256 to the `sha256_cert_fingerprints` array in
+`.well-known/assetlinks.json` (it accepts multiple).
 
 ## App / native config (already done in the repo)
 
