@@ -30,6 +30,9 @@ interface Props {
   isLeagueTier: boolean;
   /** True when the viewer is the organizer (Chairman/Gaffer) of this pool. */
   canManage: boolean;
+  /** Render the component's own title + hint. Set false when the host
+   *  screen supplies a section header in its own style. Defaults true. */
+  showHeader?: boolean;
 }
 
 function mapError(code: string | undefined, label: string): string {
@@ -45,7 +48,7 @@ function mapError(code: string | undefined, label: string): string {
   }
 }
 
-export function DelegateManager({poolId, isLeagueTier, canManage}: Props) {
+export function DelegateManager({poolId, isLeagueTier, canManage, showHeader = true}: Props) {
   const {colors} = useTheme();
   const listPoolDelegates = useGlobalStore(s => s.listPoolDelegates);
   const grantPoolDelegate = useGlobalStore(s => s.grantPoolDelegate);
@@ -125,12 +128,16 @@ export function DelegateManager({poolId, isLeagueTier, canManage}: Props) {
 
   return (
     <View style={styles.wrap}>
-      <Text style={[bodyType.bold, styles.title, {color: colors.textPrimary}]}>
-        {label}s
-      </Text>
-      <Text style={[bodyType.regular, styles.hint, {color: colors.textSecondary}]}>
-        {label}s get the same tools you do, except adding other {label}s.
-      </Text>
+      {showHeader && (
+        <>
+          <Text style={[bodyType.bold, styles.title, {color: colors.textPrimary}]}>
+            {label}s
+          </Text>
+          <Text style={[bodyType.regular, styles.hint, {color: colors.textSecondary}]}>
+            {label}s get the same tools you do, except adding other {label}s.
+          </Text>
+        </>
+      )}
 
       {loading ? (
         <ActivityIndicator color={colors.primary} style={{marginVertical: spacing.md}} />

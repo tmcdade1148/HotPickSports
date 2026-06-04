@@ -33,7 +33,7 @@ import {
 import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {normalizeRosterPass} from '@shared/utils/format';
-import {LEXICON} from '@shared/lexicon';
+import {LEXICON, roleLabel} from '@shared/lexicon';
 import {BroadcastComposer} from '@shell/components/BroadcastComposer';
 import {DelegateManager} from '@shell/components/DelegateManager';
 import {spacing, borderRadius} from '@shared/theme';
@@ -69,6 +69,7 @@ export function PoolSettingsScreen() {
   // Director vs Assistant Gaffer vocabulary in the delegate manager.
   const managedClub = useGlobalStore(s => s.managedClub);
   const isLeagueTier = managedClub?.clubPoolId === poolId;
+  const delegateLabel = roleLabel('admin', isLeagueTier); // Assistant Gaffer | Director
 
   // One-time intro for a new Admin. Persisted per-Contest in AsyncStorage
   // so we don't pester returning Admins. Default true (shown) until we
@@ -574,13 +575,23 @@ export function PoolSettingsScreen() {
 
         {/* Assistant Gaffers (Directors on a Club Pool) — the Gaffer adds
             helpers by email; they get the same Gaffer Tools minus this
-            control. Assistant Gaffers see the list read-only. */}
+            control. Assistant Gaffers see the list read-only. Header is
+            rendered here so it matches the screen's other section styling. */}
         {(isOrganizer || isAdmin) && (
-          <DelegateManager
-            poolId={poolId}
-            isLeagueTier={isLeagueTier}
-            canManage={isOrganizer}
-          />
+          <>
+            <Text style={styles.sectionTitle}>Add {delegateLabel}s</Text>
+            <Text style={styles.welcomeHint}>
+              {delegateLabel}s get the same privileges you do, but can't add new {delegateLabel}s.
+            </Text>
+            <View style={{paddingHorizontal: spacing.lg}}>
+              <DelegateManager
+                poolId={poolId}
+                isLeagueTier={isLeagueTier}
+                canManage={isOrganizer}
+                showHeader={false}
+              />
+            </View>
+          </>
         )}
 
         {/* CLUB ROSTERS — moved here from below Communication so it
