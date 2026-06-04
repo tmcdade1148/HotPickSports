@@ -94,7 +94,7 @@ export function NotificationPreferencesScreen() {
       .maybeSingle();
 
     if (data) {
-      setPrefs(data as PrefMap);
+      setPrefs(data as unknown as PrefMap);
     } else {
       // No row yet (older accounts were never seeded) — create one with the
       // all-true defaults so the toggles have something to write against.
