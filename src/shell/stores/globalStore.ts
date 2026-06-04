@@ -204,6 +204,12 @@ interface GlobalState {
     partnerId: string,
     email: string,
   ) => Promise<{success: boolean; error?: string; pending?: boolean}>;
+  // Assign the Gaffer (organizer) of a partner's Club Pool by email — super
+  // admin only, partner must have a Club Pool. Separate from the Chairman.
+  setClubPoolGaffer: (
+    partnerId: string,
+    email: string,
+  ) => Promise<{success: boolean; error?: string; pending?: boolean}>;
   // Partner-level board (Chairman/Directors), independent of any Club Pool.
   // grant/revoke are chairman-only (or super-admin); list is viewable by the
   // board. Same pending-on-signup semantics.
@@ -1190,6 +1196,16 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
 
   setLeagueChairman: async (partnerId, email) => {
     const {data, error} = await supabase.rpc('admin_set_league_chairman', {
+      p_partner_id: partnerId,
+      p_email: email,
+    });
+    if (error) return {success: false, error: error.message};
+    if (data?.error) return {success: false, error: data.error};
+    return {success: true, pending: data?.assigned === 'pending'};
+  },
+
+  setClubPoolGaffer: async (partnerId, email) => {
+    const {data, error} = await supabase.rpc('admin_set_club_pool_gaffer', {
       p_partner_id: partnerId,
       p_email: email,
     });

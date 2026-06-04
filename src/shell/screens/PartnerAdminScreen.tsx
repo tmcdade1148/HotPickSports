@@ -345,10 +345,16 @@ export function PartnerAdminScreen() {
   const [editPartnerType, setEditPartnerType] = useState<PartnerType>('other');
   const [saving, setSaving] = useState(false);
   const [creatingPoolForPartnerId, setCreatingPoolForPartnerId] = useState<string | null>(null);
-  // Chairman assignment (Club Pool organizer) — staff-only on-ramp.
-  const [chairmanEmail, setChairmanEmail] = useState('');
+  // Chairman assignment (partner board) — staff-only on-ramp.
+  const [chairmanEmail, setChairmanEmail] = useState('');        // edit card
+  const [formChairmanEmail, setFormChairmanEmail] = useState(''); // create form
   const [assigningChairman, setAssigningChairman] = useState(false);
   const setLeagueChairman = useGlobalStore(s => s.setLeagueChairman);
+  // Gaffer assignment — the Club Pool's organizer. Only meaningful once the
+  // partner has a Club Pool. Separate from the Chairman (can be the same email).
+  const [gafferEmail, setGafferEmail] = useState('');
+  const [assigningGaffer, setAssigningGaffer] = useState(false);
+  const setClubPoolGaffer = useGlobalStore(s => s.setClubPoolGaffer);
   // partner_id → existing pool id+name, so we know whether to show
   // "Create Partner Pool" or "View Partner Pool" inside an edit card.
   const [partnerPoolByPartnerId, setPartnerPoolByPartnerId] = useState<
@@ -411,6 +417,7 @@ export function PartnerAdminScreen() {
     setFormBannerPick(null);
     setFormPartnerType('other');
     setFormCanRunPools(DEFAULT_CAN_RUN_POOLS_BY_TYPE.other);
+    setFormChairmanEmail('');
   }, []);
 
   const fetchPartners = useCallback(async () => {
@@ -623,6 +630,26 @@ export function PartnerAdminScreen() {
       }
     }
 
+    // Assign the Chairman if an email was provided at create time. Works for
+    // every partner (Contest-hosting or not) — the Chairman is partner-level.
+    const chairman = formChairmanEmail.trim();
+    if (chairman) {
+      const res = await setLeagueChairman(partnerId, chairman);
+      if (!res.success) {
+        Alert.alert(
+          'Partner Created — Chairman Not Set',
+          `${res.error ?? 'Something went wrong.'} You can assign the Chairman from the partner's edit form.`,
+        );
+      } else {
+        Alert.alert(
+          res.pending ? 'Chairman Invited' : 'Chairman Assigned',
+          res.pending
+            ? `${chairman} isn't on HotPick yet. They'll become Chairman when they create an account with that exact email.`
+            : `${chairman} is now the Chairman of ${name}.`,
+        );
+      }
+    }
+
     resetCreateForm();
     setShowForm(false);
     fetchPartners();
@@ -706,6 +733,32 @@ export function PartnerAdminScreen() {
       res.pending
         ? `${email} isn't on HotPick yet. They'll become Chairman automatically when they create an account with that exact email.`
         : `${email} is now the Chairman of ${partner.name}.`,
+    );
+  };
+
+  const handleAssignGaffer = async (partner: Partner) => {
+    const email = gafferEmail.trim();
+    if (!email) return;
+    setAssigningGaffer(true);
+    const res = await setClubPoolGaffer(partner.id, email);
+    setAssigningGaffer(false);
+    if (!res.success) {
+      Alert.alert(
+        'Could Not Assign Gaffer',
+        res.error === 'NO_CLUB_POOL'
+          ? 'Create the Club Pool first, then assign its Gaffer.'
+          : res.error === 'FORBIDDEN'
+            ? 'Super-admin only.'
+            : res.error ?? 'Something went wrong.',
+      );
+      return;
+    }
+    setGafferEmail('');
+    Alert.alert(
+      res.pending ? 'Gaffer Invited' : 'Gaffer Assigned',
+      res.pending
+        ? `${email} isn't on HotPick yet. They'll run ${partner.name}'s Contest when they create an account with that exact email.`
+        : `${email} now runs ${partner.name}'s Contest as Gaffer.`,
     );
   };
 
@@ -1227,6 +1280,33 @@ export function PartnerAdminScreen() {
               )}
             </View>
 
+            {/* Chairman (optional) — assigned right after creation. Works for
+                any partner, Contest-hosting or not. */}
+            <Text style={[styles.colorsHeading, {marginTop: spacing.md}]}>Chairman (optional)</Text>
+            <Text style={styles.colorsDerivedNote}>
+              Email of the person who'll oversee this partner — perk, broadcasts,
+              Directors. Leave blank to assign later.
+            </Text>
+            <TextInput
+              style={{
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: borderRadius.md,
+                paddingHorizontal: spacing.md,
+                paddingVertical: spacing.sm,
+                color: colors.textPrimary,
+                marginTop: spacing.sm,
+                marginBottom: spacing.md,
+              }}
+              value={formChairmanEmail}
+              onChangeText={setFormChairmanEmail}
+              placeholder="chairman@email.com"
+              placeholderTextColor={colors.textSecondary}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              autoCorrect={false}
+            />
+
             <TouchableOpacity
               style={[
                 styles.createButton,
@@ -1443,6 +1523,49 @@ export function PartnerAdminScreen() {
                               </Text>
                               .
                             </Text>
+
+                            {/* Gaffer — runs this Club Pool (the Contest).
+                                Separate from the Chairman; can be the same
+                                email. Pending until they sign up with it. */}
+                            <Text style={[styles.colorsHeading, {marginTop: spacing.md}]}>Gaffer</Text>
+                            <Text style={styles.colorsDerivedNote}>
+                              Runs this Contest (picks, members, weekly cycle). May
+                              be the Chairman's email or a different person.
+                            </Text>
+                            <TextInput
+                              style={{
+                                borderWidth: 1,
+                                borderColor: colors.border,
+                                borderRadius: borderRadius.md,
+                                paddingHorizontal: spacing.md,
+                                paddingVertical: spacing.sm,
+                                color: colors.textPrimary,
+                                marginTop: spacing.sm,
+                              }}
+                              value={gafferEmail}
+                              onChangeText={setGafferEmail}
+                              placeholder="gaffer@email.com"
+                              placeholderTextColor={colors.textSecondary}
+                              autoCapitalize="none"
+                              keyboardType="email-address"
+                              autoCorrect={false}
+                            />
+                            <TouchableOpacity
+                              style={[
+                                styles.createButton,
+                                {marginTop: spacing.sm},
+                                (assigningGaffer || !gafferEmail.trim()) && styles.buttonDisabled,
+                              ]}
+                              onPress={() => handleAssignGaffer(partner)}
+                              disabled={assigningGaffer || !gafferEmail.trim()}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Assign Gaffer for ${partner.name}`}>
+                              {assigningGaffer ? (
+                                <ActivityIndicator size="small" color={colors.onPrimary} />
+                              ) : (
+                                <Text style={styles.createButtonText}>Assign Gaffer</Text>
+                              )}
+                            </TouchableOpacity>
                           </View>
                         );
                       }
