@@ -585,8 +585,9 @@ export function PoolSettingsScreen() {
             </Text>
             <View style={{paddingHorizontal: spacing.lg}}>
               <DelegateManager
-                poolId={poolId}
-                isLeagueTier={isLeagueTier}
+                target={{kind: 'pool', poolId}}
+                roleNoun={delegateLabel}
+                delegateRole="admin"
                 canManage={isOrganizer}
                 showHeader={false}
               />

@@ -81,19 +81,16 @@ Deno.serve(async (req) => {
     if (!partner.perk_text) return json({ error: "Partner must have a perk configured before broadcasting." }, 409);
 
     if (!isSuperAdmin) {
-      if (!partner.club_pool_id) {
-        return json({ error: "Only super-admin can broadcast for a sponsor-only partner." }, 403);
-      }
-      const { data: orgMembership } = await supabase
-        .from("pool_members")
-        .select("pool_id")
+      // The partner's Chairman or Directors (partner_members) may broadcast —
+      // no Club Pool required, so sponsor-only partners work too.
+      const { data: membership } = await supabase
+        .from("partner_members")
+        .select("role")
+        .eq("partner_id", partnerId)
         .eq("user_id", caller.id)
-        .eq("pool_id", partner.club_pool_id)
-        .in("role", ["organizer", "admin"])
-        .eq("status", "active")
         .limit(1);
-      if (!orgMembership || orgMembership.length === 0) {
-        return json({ error: "Only this partner's Club Pool organizer can broadcast." }, 403);
+      if (!membership || membership.length === 0) {
+        return json({ error: "Only this partner's Chairman or Directors can broadcast." }, 403);
       }
     }
 

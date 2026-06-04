@@ -694,11 +694,9 @@ export function PartnerAdminScreen() {
     if (!res.success) {
       Alert.alert(
         'Could Not Assign Chairman',
-        res.error === 'NO_CLUB_POOL'
-          ? 'Create the Club Pool first, then assign the Chairman.'
-          : res.error === 'FORBIDDEN'
-            ? 'Super-admin only.'
-            : res.error ?? 'Something went wrong.',
+        res.error === 'FORBIDDEN'
+          ? 'Super-admin only.'
+          : res.error ?? 'Something went wrong.',
       );
       return;
     }
@@ -1438,65 +1436,21 @@ export function PartnerAdminScreen() {
                               Club Pool: {existing.name}
                             </Text>
                             <Text style={styles.colorsDerivedNote}>
-                              Members join with invite code{' '}
+                              {partner.name}'s own Contest. Members join with invite
+                              code{' '}
                               <Text style={{fontWeight: '700'}}>
                                 {existing.invite_code ?? '—'}
                               </Text>
-                              . The organizer of this pool edits {partner.name}'s
-                              perk and sends partner broadcasts from Pool Settings.
+                              .
                             </Text>
-
-                            {/* Chairman assignment — sets the Club Pool's
-                                organizer. If the email isn't a user yet, the
-                                role attaches when they sign up with it. */}
-                            <Text style={[styles.colorsHeading, {marginTop: spacing.md}]}>Chairman</Text>
-                            <Text style={styles.colorsDerivedNote}>
-                              Runs this League and can add Directors. Enter the
-                              email they'll use to sign in.
-                            </Text>
-                            <TextInput
-                              style={{
-                                borderWidth: 1,
-                                borderColor: colors.border,
-                                borderRadius: borderRadius.md,
-                                paddingHorizontal: spacing.md,
-                                paddingVertical: spacing.sm,
-                                color: colors.textPrimary,
-                                marginTop: spacing.sm,
-                              }}
-                              value={chairmanEmail}
-                              onChangeText={setChairmanEmail}
-                              placeholder="chairman@email.com"
-                              placeholderTextColor={colors.textSecondary}
-                              autoCapitalize="none"
-                              keyboardType="email-address"
-                              autoCorrect={false}
-                            />
-                            <TouchableOpacity
-                              style={[
-                                styles.createButton,
-                                {marginTop: spacing.sm},
-                                (assigningChairman || !chairmanEmail.trim()) && styles.buttonDisabled,
-                              ]}
-                              onPress={() => handleAssignChairman(partner)}
-                              disabled={assigningChairman || !chairmanEmail.trim()}
-                              accessibilityRole="button"
-                              accessibilityLabel={`Assign Chairman for ${partner.name}`}>
-                              {assigningChairman ? (
-                                <ActivityIndicator size="small" color={colors.onPrimary} />
-                              ) : (
-                                <Text style={styles.createButtonText}>Assign Chairman</Text>
-                              )}
-                            </TouchableOpacity>
                           </View>
                         );
                       }
                       return (
                         <>
                           <Text style={styles.colorsDerivedNote}>
-                            Create the Club Pool first — then you can assign its
-                            Chairman here. (Save the partner if you just switched
-                            this on.)
+                            This partner runs its own Contest. (Save the partner if
+                            you just switched this on.)
                           </Text>
                           <TouchableOpacity
                             style={[
@@ -1518,6 +1472,50 @@ export function PartnerAdminScreen() {
                         </>
                       );
                     })()}
+
+                    {/* Chairman — partner-level overseer, available for EVERY
+                        partner (sponsor-only included). Seeds the partner's
+                        board; the Chairman then manages perk/broadcasts and adds
+                        Directors. Pending until they sign up with this email. */}
+                    <Text style={[styles.colorsHeading, {marginTop: spacing.lg}]}>Chairman</Text>
+                    <Text style={styles.colorsDerivedNote}>
+                      Watches over {partner.name}'s presence — perk, broadcasts,
+                      Directors. Enter the email they'll sign in with.
+                    </Text>
+                    <TextInput
+                      style={{
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        borderRadius: borderRadius.md,
+                        paddingHorizontal: spacing.md,
+                        paddingVertical: spacing.sm,
+                        color: colors.textPrimary,
+                        marginTop: spacing.sm,
+                      }}
+                      value={chairmanEmail}
+                      onChangeText={setChairmanEmail}
+                      placeholder="chairman@email.com"
+                      placeholderTextColor={colors.textSecondary}
+                      autoCapitalize="none"
+                      keyboardType="email-address"
+                      autoCorrect={false}
+                    />
+                    <TouchableOpacity
+                      style={[
+                        styles.createButton,
+                        {marginTop: spacing.sm, marginBottom: spacing.md},
+                        (assigningChairman || !chairmanEmail.trim()) && styles.buttonDisabled,
+                      ]}
+                      onPress={() => handleAssignChairman(partner)}
+                      disabled={assigningChairman || !chairmanEmail.trim()}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Assign Chairman for ${partner.name}`}>
+                      {assigningChairman ? (
+                        <ActivityIndicator size="small" color={colors.onPrimary} />
+                      ) : (
+                        <Text style={styles.createButtonText}>Assign Chairman</Text>
+                      )}
+                    </TouchableOpacity>
 
                     {/* Participation perk — partner-managed; max 120 chars. */}
                     <Text style={styles.colorsHeading}>Participation Perk</Text>

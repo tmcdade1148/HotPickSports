@@ -114,7 +114,6 @@ export function ClubAdminScreen() {
   // partner's full row by id here so we get brand_config + roster
   // pass + public_info that the slice doesn't carry.
   const managedClub = useGlobalStore(s => s.managedClub);
-  const poolRoles = useGlobalStore(s => s.poolRoles);
   const loadPartner = useCallback(async () => {
     if (!user?.id || !managedClub) {
       setLoading(false);
@@ -640,9 +639,10 @@ export function ClubAdminScreen() {
                 {LEXICON.director.plural} get the same privileges you do, but can't add new {LEXICON.director.plural}.
               </Text>
               <DelegateManager
-                poolId={managedClub.clubPoolId}
-                isLeagueTier
-                canManage={poolRoles[managedClub.clubPoolId] === 'organizer'}
+                target={{kind: 'partner', partnerId: managedClub.id}}
+                roleNoun={LEXICON.director.short}
+                delegateRole="director"
+                canManage={managedClub.role === 'chairman'}
                 showHeader={false}
               />
             </View>
