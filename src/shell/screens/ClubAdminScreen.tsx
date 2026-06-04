@@ -44,6 +44,7 @@ import {useTheme} from '@shell/theme/hooks';
 import {bodyType, displayType, spacing, borderRadius} from '@shared/theme';
 import {formatRosterPass} from '@shared/utils/format';
 import {LEXICON} from '@shared/lexicon';
+import {DelegateManager} from '@shell/components/DelegateManager';
 
 type PartnerRow = {
   id: string;
@@ -113,6 +114,7 @@ export function ClubAdminScreen() {
   // partner's full row by id here so we get brand_config + roster
   // pass + public_info that the slice doesn't carry.
   const managedClub = useGlobalStore(s => s.managedClub);
+  const poolRoles = useGlobalStore(s => s.poolRoles);
   const loadPartner = useCallback(async () => {
     if (!user?.id || !managedClub) {
       setLoading(false);
@@ -625,6 +627,19 @@ export function ClubAdminScreen() {
                 <Text style={[bodyType.bold, {color: colors.onPrimary}]}>Save Message</Text>}
             </Pressable>
           </View>
+
+          {/* Directors — the Chairman (Club Pool organizer) adds people who
+              help run the League. They get the same League Tools minus this
+              control. Directors (admins) see the list read-only. */}
+          {managedClub && (
+            <View style={[styles.cardBlock, {backgroundColor: colors.surface, borderColor: colors.border, marginTop: spacing.lg}]}>
+              <DelegateManager
+                poolId={managedClub.clubPoolId}
+                isLeagueTier
+                canManage={poolRoles[managedClub.clubPoolId] === 'organizer'}
+              />
+            </View>
+          )}
 
           {/* Identity (read-only) + Analytics placeholder */}
           <View style={[styles.cardBlock, {backgroundColor: colors.surface, borderColor: colors.border, marginTop: spacing.lg}]}>

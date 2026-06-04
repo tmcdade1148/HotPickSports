@@ -35,6 +35,7 @@ import {useGlobalStore} from '@shell/stores/globalStore';
 import {normalizeRosterPass} from '@shared/utils/format';
 import {LEXICON} from '@shared/lexicon';
 import {BroadcastComposer} from '@shell/components/BroadcastComposer';
+import {DelegateManager} from '@shell/components/DelegateManager';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 
@@ -64,6 +65,10 @@ export function PoolSettingsScreen() {
   const myRole = useGlobalStore(s => s.poolRoles[poolId]);
   const isOrganizer = myRole === 'organizer';
   const isAdmin = myRole === 'admin';
+  // League tier when this pool is a League's own Club Pool — drives
+  // Director vs Assistant Gaffer vocabulary in the delegate manager.
+  const managedClub = useGlobalStore(s => s.managedClub);
+  const isLeagueTier = managedClub?.clubPoolId === poolId;
 
   // One-time intro for a new Admin. Persisted per-Contest in AsyncStorage
   // so we don't pester returning Admins. Default true (shown) until we
@@ -566,6 +571,17 @@ export function PoolSettingsScreen() {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Assistant Gaffers (Directors on a Club Pool) — the Gaffer adds
+            helpers by email; they get the same Gaffer Tools minus this
+            control. Assistant Gaffers see the list read-only. */}
+        {(isOrganizer || isAdmin) && (
+          <DelegateManager
+            poolId={poolId}
+            isLeagueTier={isLeagueTier}
+            canManage={isOrganizer}
+          />
+        )}
 
         {/* CLUB ROSTERS — moved here from below Communication so it
             sits with the other Contest identity controls (name lives

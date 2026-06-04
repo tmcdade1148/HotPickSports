@@ -61,6 +61,11 @@ describe('LEXICON constants', () => {
     expect(LEXICON.chirps.plural).toBe('Chirps');
   });
 
+  it('Tool-surface names', () => {
+    expect(LEXICON.gafferTools).toBe('Gaffer Tools');
+    expect(LEXICON.leagueTools).toBe('League Tools');
+  });
+
   it('Roster, Perks, Picks unchanged from prior lexicon', () => {
     expect(LEXICON.roster).toBe('Roster');
     expect(LEXICON.perks).toBe('Perks');

@@ -636,7 +636,7 @@ export function SettingsScreen({route}: any) {
             {/* Access level for the logged-in user, in red. The section only
                 shows for super-admins or Club managers, so it's one of those. */}
             <Text style={[styles.accessBadge, {color: colors.error}]}>
-              {userProfile?.is_super_admin ? 'Super Admin' : 'League Admin'}
+              {userProfile?.is_super_admin ? 'Super Admin' : LEXICON.leagueTools}
             </Text>
           </View>
           <View style={[styles.groupCard, {backgroundColor: colors.surface}]}>
@@ -704,7 +704,7 @@ export function SettingsScreen({route}: any) {
                 <View style={styles.linkLeft}>
                   <Settings size={20} color={colors.primary} />
                   <View>
-                    <Text style={[styles.linkText, {color: colors.textPrimary}]}>League Admin</Text>
+                    <Text style={[styles.linkText, {color: colors.textPrimary}]}>{LEXICON.leagueTools}</Text>
                     <Text style={{fontSize: 12, color: colors.textSecondary, marginTop: 2}}>
                       Managing: {managedClub.name}
                     </Text>

@@ -184,6 +184,25 @@ interface GlobalState {
     newRole: string,
   ) => Promise<{success: boolean; error?: string}>;
 
+  // Email-based role delegation (Gaffer Tools / League Tools / Partner Admin).
+  // grantPoolDelegate + revokePoolDelegate are organizer-only (enforced
+  // server-side); listPoolDelegates is viewable by the board; setLeagueChairman
+  // is super-admin only. `pending: true` means the email isn't a user yet and
+  // the role attaches when they sign up with that exact email.
+  grantPoolDelegate: (
+    poolId: string,
+    email: string,
+  ) => Promise<{success: boolean; error?: string; pending?: boolean}>;
+  revokePoolDelegate: (
+    poolId: string,
+    target: {userId?: string; email?: string},
+  ) => Promise<{success: boolean; error?: string}>;
+  listPoolDelegates: (poolId: string) => Promise<PoolDelegate[]>;
+  setLeagueChairman: (
+    partnerId: string,
+    email: string,
+  ) => Promise<{success: boolean; error?: string; pending?: boolean}>;
+
   // Pool settings management
   updatePoolSettings: (
     poolId: string,
@@ -368,6 +387,16 @@ export interface PoolAffiliation {
   };
   logoUrl:      string | null;
   isPrimary:    boolean;
+}
+
+/** A row in a pool's board, from list_pool_delegates(). `userId` is null for
+ *  pending (not-yet-signed-up) grants; `email` is null for active rows whose
+ *  auth email the viewer isn't entitled to (it's populated server-side). */
+export interface PoolDelegate {
+  userId: string | null;
+  email:  string | null;
+  role:   'organizer' | 'admin';
+  status: 'active' | 'pending';
 }
 
 export interface UserHardwareItem {
@@ -1101,6 +1130,51 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     }));
 
     return {success: true};
+  },
+
+  grantPoolDelegate: async (poolId, email) => {
+    const {data, error} = await supabase.rpc('grant_pool_delegate_by_email', {
+      p_pool_id: poolId,
+      p_email: email,
+    });
+    if (error) return {success: false, error: error.message};
+    if (data?.error) return {success: false, error: data.error};
+    return {success: true, pending: data?.assigned === 'pending'};
+  },
+
+  revokePoolDelegate: async (poolId, target) => {
+    const {data, error} = await supabase.rpc('revoke_pool_delegate', {
+      p_pool_id: poolId,
+      p_user_id: target.userId ?? null,
+      p_email: target.email ?? null,
+    });
+    if (error) return {success: false, error: error.message};
+    if (data?.error) return {success: false, error: data.error};
+    return {success: true};
+  },
+
+  listPoolDelegates: async poolId => {
+    const {data, error} = await supabase.rpc('list_pool_delegates', {
+      p_pool_id: poolId,
+    });
+    if (error || !Array.isArray(data)) return [];
+    return (data as {user_id: string | null; email: string | null; role: string; status: string}[])
+      .map(r => ({
+        userId: r.user_id,
+        email: r.email,
+        role: r.role as PoolDelegate['role'],
+        status: r.status as PoolDelegate['status'],
+      }));
+  },
+
+  setLeagueChairman: async (partnerId, email) => {
+    const {data, error} = await supabase.rpc('admin_set_league_chairman', {
+      p_partner_id: partnerId,
+      p_email: email,
+    });
+    if (error) return {success: false, error: error.message};
+    if (data?.error) return {success: false, error: data.error};
+    return {success: true, pending: data?.assigned === 'pending'};
   },
 
   // ---------------------------------------------------------------------------

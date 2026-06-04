@@ -88,6 +88,13 @@ export const LEXICON = {
     plural:   'Chirps',
   },
 
+  /** Management-surface names. "Tools" = what a user operates to run their
+   *  own Contest/League; contrast with "Admin" = HotPick behind-the-scenes
+   *  (PartnerAdminScreen, AdminHome). The Gaffer/Chairman and their
+   *  delegates (Assistant Gaffer/Director) use these. */
+  gafferTools: 'Gaffer Tools',
+  leagueTools: 'League Tools',
+
   /** Unchanged from the original lexicon (spec lock). */
   roster: 'Roster',
   perks:  'Perks',
