@@ -7,6 +7,7 @@ import {
   LEXICON,
   affiliatedWith,
   gafferOf,
+  roleLabel,
   leaguesContest,
   leagueContestTagline,
   independentContestLabel,
@@ -27,6 +28,21 @@ describe('LEXICON constants', () => {
   it('Gaffer short and long', () => {
     expect(LEXICON.gaffer.short).toBe('Gaffer');
     expect(LEXICON.gaffer.long).toBe('the Gaffer');
+  });
+
+  it('Assistant Gaffer short and long', () => {
+    expect(LEXICON.assistantGaffer.short).toBe('AG');
+    expect(LEXICON.assistantGaffer.long).toBe('Assistant Gaffer');
+  });
+
+  it('Chairman short and long', () => {
+    expect(LEXICON.chairman.short).toBe('Chairman');
+    expect(LEXICON.chairman.long).toBe('the Chairman');
+  });
+
+  it('Director short and plural', () => {
+    expect(LEXICON.director.short).toBe('Director');
+    expect(LEXICON.director.plural).toBe('Directors');
   });
 
   it('League short, long and plural', () => {
@@ -55,6 +71,19 @@ describe('LEXICON constants', () => {
 describe('gafferOf()', () => {
   it('keeps the definite article in long copy', () => {
     expect(gafferOf("Stella's Gang")).toBe("the Gaffer of Stella's Gang");
+  });
+});
+
+describe('roleLabel()', () => {
+  it('Contest tier maps to Gaffer / Assistant Gaffer / Player', () => {
+    expect(roleLabel('organizer')).toBe('Gaffer');
+    expect(roleLabel('admin')).toBe('Assistant Gaffer');
+    expect(roleLabel('member')).toBe('Player');
+  });
+  it('League tier maps to Chairman / Director / Player', () => {
+    expect(roleLabel('organizer', true)).toBe('Chairman');
+    expect(roleLabel('admin', true)).toBe('Director');
+    expect(roleLabel('member', true)).toBe('Player');
   });
 });
 

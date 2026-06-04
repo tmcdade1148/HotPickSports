@@ -97,11 +97,14 @@ interface GlobalState {
   // Profile — full profile object
   userProfile: DbProfile | null;
   fetchProfile: (userId: string) => Promise<DbProfile | null>;
-  // The Club this user manages (de facto Partner Admin = organizer of
-  // a partners.club_pool_id pool). Null when the user isn't a Club
-  // manager. Settings shows a "Club Admin" entry + ClubAdminScreen
-  // gates on this. v1: at most one Club per user.
-  managedClub: {id: string; name: string} | null;
+  // The League this user manages (Chairman = organizer, or Director =
+  // admin, of a partners.club_pool_id pool). Null when the user is neither.
+  // Settings shows a "League Admin" entry + ClubAdminScreen gates on this.
+  // `clubPoolId` is the partner's Club Pool — used to render League-tier
+  // role labels (Chairman/Director) in that pool's member list. v1: at most
+  // one League per user. (`managedClub` / `club_pool_id` are frozen legacy
+  // identifiers for the partner/League concept — see REFERENCE §22.)
+  managedClub: {id: string; name: string; clubPoolId: string} | null;
   loadManagedClub: (userId: string) => Promise<void>;
 
   // the get_visible_competitions RPC on session init. Used by the sport
@@ -563,11 +566,14 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   },
 
   loadManagedClub: async userId => {
+    // Chairman (organizer) OR Director (admin) of a Club Pool both manage
+    // the League. Server-side League Tools auth (_caller_can_manage_partner)
+    // admits the same two roles.
     const {data: memberRows} = await supabase
       .from('pool_members')
       .select('pool_id')
       .eq('user_id', userId)
-      .eq('role', 'organizer')
+      .in('role', ['organizer', 'admin'])
       .eq('status', 'active');
     const orgPoolIds = ((memberRows ?? []) as {pool_id: string}[]).map(r => r.pool_id);
     if (orgPoolIds.length === 0) {
@@ -576,12 +582,18 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     }
     const {data: clubRows} = await supabase
       .from('partners')
-      .select('id, name')
+      .select('id, name, club_pool_id')
       .in('club_pool_id', orgPoolIds)
       .eq('is_active', true)
       .limit(1);
-    const row = (clubRows ?? [])[0] as {id: string; name: string} | undefined;
-    set({managedClub: row ? {id: row.id, name: row.name} : null});
+    const row = (clubRows ?? [])[0] as
+      | {id: string; name: string; club_pool_id: string}
+      | undefined;
+    set({
+      managedClub: row
+        ? {id: row.id, name: row.name, clubPoolId: row.club_pool_id}
+        : null,
+    });
   },
 
   fetchProfile: async userId => {

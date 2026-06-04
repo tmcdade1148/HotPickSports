@@ -25,7 +25,7 @@ import {AvatarBadge} from '@shared/components/AvatarBadge';
 import {spacing, borderRadius} from '@shared/theme';
 import type {DbPoolMember, DbProfile} from '@shared/types/database';
 import {useTheme} from '@shell/theme';
-import {LEXICON} from '@shared/lexicon';
+import {roleLabel} from '@shared/lexicon';
 
 type MemberWithProfile = DbPoolMember & {profile?: DbProfile};
 
@@ -82,6 +82,14 @@ export function PoolMembersScreen() {
   const isOrganizer = myRole === 'organizer';
   const isAdmin = myRole === 'admin';
   const canManage = isOrganizer || isAdmin;
+
+  // League tier: this pool is a League's own Club Pool, so roles read as
+  // Chairman/Director rather than Gaffer/Assistant Gaffer. (The internal
+  // roles are identical; only the labels differ — see roleLabel().)
+  const managedClub = useGlobalStore(s => s.managedClub);
+  const isLeagueTier = managedClub?.clubPoolId === poolId;
+  const assistantLabel = roleLabel('admin', isLeagueTier);   // Assistant Gaffer | Director
+  const memberLabel = roleLabel('member', isLeagueTier);     // Player
 
   // Member notes — shared across all Gaffers/Admins of the Contest.
   // RLS gates SELECT to managers, so non-managers get an empty map and
@@ -236,20 +244,20 @@ export function PoolMembersScreen() {
       if (isOrganizer) {
         if (member.role === 'member') {
           buttons.push({
-            text: 'Promote to Admin',
+            text: `Promote to ${assistantLabel}`,
             onPress: () => {
               Alert.alert(
-                `Promote ${memberName} to Admin?`,
-                "Admins of this Contest can:\n" +
+                `Promote ${memberName} to ${assistantLabel}?`,
+                `${assistantLabel}s of this Contest can:\n` +
                 "   • Send broadcasts to all members\n" +
                 "   • Review and action flagged messages\n" +
                 "   • Warn or remove members\n" +
                 "   • Edit Contest settings and invite codes\n" +
                 "   • Affiliate the Contest with Leagues\n\n" +
                 "They CAN'T:\n" +
-                "   • Name other Admins\n" +
+                `   • Name other ${assistantLabel}s\n` +
                 "   • Archive this Contest\n\n" +
-                "You can demote them back to Player any time.",
+                `You can demote them back to ${memberLabel} any time.`,
                 [
                   {text: 'Cancel', style: 'cancel'},
                   {
@@ -267,10 +275,10 @@ export function PoolMembersScreen() {
           });
         } else if (member.role === 'admin') {
           buttons.push({
-            text: 'Demote to Member',
+            text: `Demote to ${memberLabel}`,
             onPress: () => {
               Alert.alert(
-                `Demote ${memberName} to Player?`,
+                `Demote ${memberName} to ${memberLabel}?`,
                 "They'll lose access to:\n" +
                 "   • Broadcasts\n" +
                 "   • Flagged-message review\n" +
@@ -324,9 +332,20 @@ export function PoolMembersScreen() {
 
       buttons.push({text: 'Cancel', style: 'cancel', onPress: () => {}});
 
-      Alert.alert(memberName, `Role: ${member.role}`, buttons);
+      Alert.alert(memberName, `Role: ${roleLabel(member.role, isLeagueTier)}`, buttons);
     },
-    [poolId, user?.id, isOrganizer, isAdmin, updateMemberRole, removePoolMember, notesByUser],
+    [
+      poolId,
+      user?.id,
+      isOrganizer,
+      isAdmin,
+      isLeagueTier,
+      assistantLabel,
+      memberLabel,
+      updateMemberRole,
+      removePoolMember,
+      notesByUser,
+    ],
   );
 
   const renderMember = ({item}: {item: MemberWithProfile}) => {
@@ -392,9 +411,7 @@ export function PoolMembersScreen() {
               item.role === 'organizer' && styles.roleTextOrganizer,
               item.role === 'admin' && styles.roleTextAdmin,
             ]}>
-            {item.role === 'organizer'
-              ? LEXICON.gaffer.short
-              : item.role.charAt(0).toUpperCase() + item.role.slice(1)}
+            {roleLabel(item.role, isLeagueTier)}
           </Text>
         </View>
       </TouchableOpacity>

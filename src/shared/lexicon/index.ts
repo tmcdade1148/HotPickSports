@@ -40,6 +40,28 @@ export const LEXICON = {
     long:  'the Gaffer',
   },
 
+  /** "admin" pool_members role in a regular Contest → "Assistant Gaffer".
+   *  The Gaffer's delegated helper (the "No. 2"). Short form "AG". Same
+   *  internal role as a League-tier Director — see roleLabel(). */
+  assistantGaffer: {
+    short: 'AG',
+    long:  'Assistant Gaffer',
+  },
+
+  /** "organizer" of a League's own Club Pool → "the Chairman". One per
+   *  League (a pool has exactly one organizer). */
+  chairman: {
+    short: 'Chairman',
+    long:  'the Chairman',
+  },
+
+  /** "admin" of a League's own Club Pool → "Director". Multiple allowed;
+   *  same League Tools access as the Chairman today. */
+  director: {
+    short:  'Director',
+    plural: 'Directors',
+  },
+
   /** "Partner" in the codebase / business-internal language → "the League"
    *  in user-facing copy. `partner` stays the single canonical INTERNAL name;
    *  the legacy `club_*` columns (`partners.club_pool_id`,
@@ -84,6 +106,27 @@ export const LEXICON = {
  */
 export function gafferOf(contestName: string): string {
   return `${LEXICON.gaffer.long} of ${contestName}`;
+}
+
+/**
+ * Badge label for a `pool_members.role`, resolved per tier. The same three
+ * internal roles (member / admin / organizer — these NEVER change) render
+ * with Contest-tier or League-tier vocabulary:
+ *   organizer → Gaffer            (Chairman in a League's Club Pool)
+ *   admin     → Assistant Gaffer  (Director in a League's Club Pool)
+ *   member    → Player
+ * Pass isLeagueTier=true when the pool is the League's own Club Pool
+ * (partners.club_pool_id === pool.id).
+ */
+export function roleLabel(role: string, isLeagueTier = false): string {
+  switch (role) {
+    case 'organizer':
+      return isLeagueTier ? LEXICON.chairman.short : LEXICON.gaffer.short;
+    case 'admin':
+      return isLeagueTier ? LEXICON.director.short : LEXICON.assistantGaffer.long;
+    default:
+      return LEXICON.player.singular;
+  }
 }
 
 /**
