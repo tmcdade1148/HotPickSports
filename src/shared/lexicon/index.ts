@@ -7,7 +7,7 @@
 //
 // Usage:
 //   import {LEXICON, affiliatedWith, gafferOf,
-//           clubsContest, clubContestTagline,
+//           leaguesContest, leagueContestTagline,
 //           independentContestLabel} from '@shared/lexicon';
 //   <Text>YOUR {LEXICON.contest.plural.toUpperCase()}</Text>   // "YOUR CONTESTS"
 //   <Text>{affiliatedWith([partner.name])}</Text>              // "Affiliated with Mes Que NFL"
@@ -40,12 +40,17 @@ export const LEXICON = {
     long:  'the Gaffer',
   },
 
-  /** "Partner" in the codebase / business-internal language → "the Club" in
-   *  user-facing copy. PartnerAdminScreen (super-admin internal tool) keeps
-   *  "Partner" labels per spec. */
-  club: {
-    short: 'Club',
-    long:  'the Club',
+  /** "Partner" in the codebase / business-internal language → "the League"
+   *  in user-facing copy. `partner` stays the single canonical INTERNAL name;
+   *  the legacy `club_*` columns (`partners.club_pool_id`,
+   *  `pools.owning_club_id`) are the SAME concept under an older prefix and
+   *  remain frozen internal identifiers — never shown to the user.
+   *  PartnerAdminScreen (super-admin internal tool) keeps "Partner" labels
+   *  per spec. */
+  league: {
+    short:  'League',
+    long:   'the League',
+    plural: 'Leagues',
   },
 
   /** "Leaderboard" / "Standings" → "the Ladder". */
@@ -82,28 +87,29 @@ export function gafferOf(contestName: string): string {
 }
 
 /**
- * The Club's own Contest. Replaces the older "Club Pool" term used in
- * code/comments/docs (the column stays partners.club_pool_id).
- * When a Club name is provided, returns "[Club Name]'s Contest" (e.g.,
- * "Mes Que NFL's Contest"). Otherwise returns "the Club's Contest".
+ * The League's own Contest. Replaces the older "Club Pool" term used in
+ * code/comments/docs (the column stays partners.club_pool_id — a frozen
+ * legacy identifier for the partner/League concept).
+ * When a League name is provided, returns "[League Name]'s Contest" (e.g.,
+ * "Mes Que NFL's Contest"). Otherwise returns "the League's Contest".
  */
-export function clubsContest(clubName?: string | null): string {
-  if (clubName && clubName.length > 0) return `${clubName}'s ${LEXICON.contest.singular}`;
-  return `${LEXICON.club.long}'s ${LEXICON.contest.singular}`;
+export function leaguesContest(leagueName?: string | null): string {
+  if (leagueName && leagueName.length > 0) return `${leagueName}'s ${LEXICON.contest.singular}`;
+  return `${LEXICON.league.long}'s ${LEXICON.contest.singular}`;
 }
 
 /**
- * Tagline for an Official Club Contest. A Club can run more than one
+ * Tagline for an Official League Contest. A League can run more than one
  * (e.g. ESPN Northeast, ESPN West), so the article is "An", not "The".
- *   clubContestTagline('ESPN') → "An Official ESPN Contest"
+ *   leagueContestTagline('ESPN') → "An Official ESPN Contest"
  * Rendered inside the branded header band — small caps, body text.
  */
-export function clubContestTagline(clubName: string): string {
-  return `An Official ${clubName} ${LEXICON.contest.singular}`;
+export function leagueContestTagline(leagueName: string): string {
+  return `An Official ${leagueName} ${LEXICON.contest.singular}`;
 }
 
 /**
- * Affiliation line for a Contest affiliated with one or more Clubs. Scales
+ * Affiliation line for a Contest affiliated with one or more Leagues. Scales
  * from 1 affiliation up — the visual footer truncates to a logo cluster
  * for 4+, this helper keeps the text variant readable:
  *   1   → "Affiliated with Hammer's Tavern"
@@ -115,10 +121,10 @@ export function clubContestTagline(clubName: string): string {
  *
  * Note: an earlier draft used "Endorsed by" / `endorsedBy(name)`. The
  * Gaffer self-submits via PartnerDirectoryScreen, so "Affiliated with" is
- * the accurate vocabulary — the Club isn't actively vouching.
+ * the accurate vocabulary — the League isn't actively vouching.
  */
-export function affiliatedWith(clubNames: readonly string[]): string {
-  const names = clubNames.filter(n => n && n.length > 0);
+export function affiliatedWith(leagueNames: readonly string[]): string {
+  const names = leagueNames.filter(n => n && n.length > 0);
   if (names.length === 0) return '';
   if (names.length === 1) return `Affiliated with ${names[0]}`;
   if (names.length === 2) return `Affiliated with ${names[0]} & ${names[1]}`;

@@ -129,7 +129,7 @@ export function PartnerModule({partnerId}: PartnerModuleProps) {
           {partner.perk_text}
         </Text>
         <Text style={[bodyType.bold, styles.perkEyebrow, {color: colors.textTertiary}]}>
-          {LEXICON.club.short.toUpperCase()} {LEXICON.perks.toUpperCase()}
+          {LEXICON.league.short.toUpperCase()} {LEXICON.perks.toUpperCase()}
         </Text>
       </View>
       )}

@@ -342,7 +342,7 @@ export function ClubAdminScreen() {
           <View style={{width: 24}} />
         </View>
         <Text style={[bodyType.regular, {color: colors.textTertiary, padding: spacing.lg}]}>
-          You're not currently managing a {LEXICON.club.short}.
+          You're not currently managing a {LEXICON.league.short}.
         </Text>
       </SafeAreaView>
     );
@@ -394,7 +394,7 @@ export function ClubAdminScreen() {
             </View>
             <Text style={[bodyType.regular, styles.passHint, {color: colors.textSecondary}]}>
               Share with a Gaffer to add their Contest to {partner.name}'s roster.
-              They paste it in their Contest's Settings → Add/Edit Clubs.
+              They paste it in their Contest's Settings → Add/Edit Leagues.
             </Text>
             <View style={styles.passActions}>
               <Pressable
@@ -411,7 +411,7 @@ export function ClubAdminScreen() {
                   Share.share({
                     message:
                       `Add your HotPick Contest to ${partner.name}'s roster. ` +
-                      `Open Contest Settings → Add/Edit Clubs and enter pass: ` +
+                      `Open Contest Settings → Add/Edit Leagues and enter pass: ` +
                       `${formatRosterPass(partner.roster_pass)}`,
                   }).catch(() => {});
                 }}
@@ -519,7 +519,7 @@ export function ClubAdminScreen() {
           </Text>
           <View style={[styles.cardBlock, {backgroundColor: colors.surface, borderColor: colors.border}]}>
             <Text style={[bodyType.regular, styles.helper, {color: colors.textSecondary}]}>
-              When are you open? Free-text — shows on your Club page.
+              When are you open? Free-text — shows on your League page.
             </Text>
             <TextInput
               style={[styles.bigTextInput, {color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.background}]}
@@ -599,7 +599,7 @@ export function ClubAdminScreen() {
           </Text>
           <View style={[styles.cardBlock, {backgroundColor: colors.surface, borderColor: colors.border}]}>
             <Text style={[bodyType.regular, styles.helper, {color: colors.textSecondary}]}>
-              Shows on your Club's roster page — what Gaffers see when they're considering affiliating.
+              Shows on your League's roster page — what Gaffers see when they're considering affiliating.
             </Text>
             <TextInput
               style={[styles.bigTextInput, {color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.background}]}

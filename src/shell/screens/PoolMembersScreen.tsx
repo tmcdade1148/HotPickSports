@@ -245,7 +245,7 @@ export function PoolMembersScreen() {
                 "   • Review and action flagged messages\n" +
                 "   • Warn or remove members\n" +
                 "   • Edit Contest settings and invite codes\n" +
-                "   • Affiliate the Contest with Clubs\n\n" +
+                "   • Affiliate the Contest with Leagues\n\n" +
                 "They CAN'T:\n" +
                 "   • Name other Admins\n" +
                 "   • Archive this Contest\n\n" +

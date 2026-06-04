@@ -1,14 +1,14 @@
 // Locks the user-facing lexicon to the spec's locked decisions
 // (260520_HotPick_LexiconImplementation_Spec.docx §2). Any accidental drift
-// from "Contest" / "Player" / "Gaffer" / "Club" / "Ladder" / "Chirp" /
+// from "Contest" / "Player" / "Gaffer" / "League" / "Ladder" / "Chirp" /
 // "Affiliated with X" trips this test before users see it.
 
 import {
   LEXICON,
   affiliatedWith,
   gafferOf,
-  clubsContest,
-  clubContestTagline,
+  leaguesContest,
+  leagueContestTagline,
   independentContestLabel,
   countLabel,
 } from '../src/shared/lexicon';
@@ -29,9 +29,10 @@ describe('LEXICON constants', () => {
     expect(LEXICON.gaffer.long).toBe('the Gaffer');
   });
 
-  it('Club short and long', () => {
-    expect(LEXICON.club.short).toBe('Club');
-    expect(LEXICON.club.long).toBe('the Club');
+  it('League short, long and plural', () => {
+    expect(LEXICON.league.short).toBe('League');
+    expect(LEXICON.league.long).toBe('the League');
+    expect(LEXICON.league.plural).toBe('Leagues');
   });
 
   it('Ladder short and long', () => {
@@ -57,28 +58,28 @@ describe('gafferOf()', () => {
   });
 });
 
-describe('clubsContest()', () => {
-  it('with a club name', () => {
-    expect(clubsContest('Mes Que NFL')).toBe("Mes Que NFL's Contest");
+describe('leaguesContest()', () => {
+  it('with a league name', () => {
+    expect(leaguesContest('Mes Que NFL')).toBe("Mes Que NFL's Contest");
   });
-  it('without a club name falls back to generic', () => {
-    expect(clubsContest()).toBe("the Club's Contest");
-    expect(clubsContest(null)).toBe("the Club's Contest");
-    expect(clubsContest('')).toBe("the Club's Contest");
+  it('without a league name falls back to generic', () => {
+    expect(leaguesContest()).toBe("the League's Contest");
+    expect(leaguesContest(null)).toBe("the League's Contest");
+    expect(leaguesContest('')).toBe("the League's Contest");
   });
 });
 
-describe('clubContestTagline()', () => {
-  it('uses "An Official" so multiple official Contests per Club read naturally', () => {
-    expect(clubContestTagline('ESPN')).toBe('An Official ESPN Contest');
-    expect(clubContestTagline("Hammer's Tavern")).toBe(
+describe('leagueContestTagline()', () => {
+  it('uses "An Official" so multiple official Contests per League read naturally', () => {
+    expect(leagueContestTagline('ESPN')).toBe('An Official ESPN Contest');
+    expect(leagueContestTagline("Hammer's Tavern")).toBe(
       "An Official Hammer's Tavern Contest",
     );
   });
 });
 
 describe('affiliatedWith()', () => {
-  it('returns empty string when no clubs', () => {
+  it('returns empty string when no leagues', () => {
     expect(affiliatedWith([])).toBe('');
     expect(affiliatedWith(['', ''])).toBe('');
   });

@@ -571,7 +571,7 @@ export function PoolSettingsScreen() {
             sits with the other Contest identity controls (name lives
             in the row above; "which Clubs does this Contest belong to"
             is conceptually the next thing). */}
-        <Text style={styles.sectionTitle}>Club Rosters</Text>
+        <Text style={styles.sectionTitle}>League Rosters</Text>
         {/* Official Club Contest: the owning Club is non-removable;
             shown as a pinned pill at the top of the list. Additional
             affiliations are blocked at the RPC level (POOL_IS_OFFICIAL),
@@ -620,7 +620,7 @@ export function PoolSettingsScreen() {
             onPress={() => navigation.navigate('PartnerDirectory', {poolId})}>
             <Building2 size={18} color={colors.primary} />
             <Text style={[styles.broadcastText, {color: colors.primary}]}>
-              Add/Edit Clubs
+              Add/Edit Leagues
             </Text>
           </TouchableOpacity>
         )}
@@ -827,10 +827,10 @@ export function PoolSettingsScreen() {
               /* swallow taps inside the card so backdrop dismiss doesn't fire */
             }}>
             <Text style={styles.modalTitle}>
-              Broadcast from {partnerRow?.name ?? 'Club'}
+              Broadcast from {partnerRow?.name ?? 'League'}
             </Text>
             <Text style={styles.modalHint}>
-              Sends to every member of every Contest on this Club's roster.
+              Sends to every member of every Contest on this League's roster.
               Max 280 chars. Rate limit: 3 per 24h.
             </Text>
             <TextInput

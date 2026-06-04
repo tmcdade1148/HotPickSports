@@ -441,7 +441,7 @@ export function SettingsScreen({route}: any) {
                         <Text style={[styles.roleBadge, {color: pillTextColor + 'CC', fontWeight: '700'}]}>
                           {(() => {
                             const bc = pool.brand_config as Record<string, unknown> | null;
-                            return typeof bc?.partner_name === 'string' ? bc.partner_name : LEXICON.club.short;
+                            return typeof bc?.partner_name === 'string' ? bc.partner_name : LEXICON.league.short;
                           })()}
                           {(pool.is_global || poolRoles[pool.id]) ? ' · ' : ''}
                         </Text>
@@ -636,7 +636,7 @@ export function SettingsScreen({route}: any) {
             {/* Access level for the logged-in user, in red. The section only
                 shows for super-admins or Club managers, so it's one of those. */}
             <Text style={[styles.accessBadge, {color: colors.error}]}>
-              {userProfile?.is_super_admin ? 'Super Admin' : 'Club Admin'}
+              {userProfile?.is_super_admin ? 'Super Admin' : 'League Admin'}
             </Text>
           </View>
           <View style={[styles.groupCard, {backgroundColor: colors.surface}]}>
@@ -704,7 +704,7 @@ export function SettingsScreen({route}: any) {
                 <View style={styles.linkLeft}>
                   <Settings size={20} color={colors.primary} />
                   <View>
-                    <Text style={[styles.linkText, {color: colors.textPrimary}]}>Club Admin</Text>
+                    <Text style={[styles.linkText, {color: colors.textPrimary}]}>League Admin</Text>
                     <Text style={{fontSize: 12, color: colors.textSecondary, marginTop: 2}}>
                       Managing: {managedClub.name}
                     </Text>

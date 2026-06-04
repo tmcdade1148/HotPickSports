@@ -46,7 +46,7 @@ import {hexToRgba, pickReadableBrandColor, readableTextOn} from '@shared/utils/c
 import {
   LEXICON,
   affiliatedWith,
-  clubContestTagline,
+  leagueContestTagline,
 } from '@shared/lexicon';
 import {ordinalSuffix} from '@shared/utils/format';
 import type {DbPool} from '@shared/types/database';
@@ -268,7 +268,7 @@ export function PoolModule({pool}: PoolModuleProps) {
         name:
           resolvePartnerName(bc) ??
           legacyPartner?.name ??
-          'Club',
+          LEXICON.league.short,
         displayColor: pickReadableBrandColor(
           [legacyPrimary, legacyHighlight, legacySecondary, legacyBackground],
           surfaceBg,
@@ -359,8 +359,8 @@ export function PoolModule({pool}: PoolModuleProps) {
           accessible
           accessibilityLabel={
             officialBrand.name
-              ? clubContestTagline(officialBrand.name)
-              : `An Official ${LEXICON.club.short} ${LEXICON.contest.singular}`
+              ? leagueContestTagline(officialBrand.name)
+              : `An Official ${LEXICON.league.short} ${LEXICON.contest.singular}`
           }>
           {officialBrand.logoUrl ? (
             <Image
@@ -389,8 +389,8 @@ export function PoolModule({pool}: PoolModuleProps) {
               ]}
               numberOfLines={1}>
               {officialBrand.name
-                ? clubContestTagline(officialBrand.name).toUpperCase()
-                : `AN OFFICIAL ${LEXICON.club.short.toUpperCase()} ${LEXICON.contest.singular.toUpperCase()}`}
+                ? leagueContestTagline(officialBrand.name).toUpperCase()
+                : `AN OFFICIAL ${LEXICON.league.short.toUpperCase()} ${LEXICON.contest.singular.toUpperCase()}`}
             </Text>
           </View>
         </View>
@@ -695,7 +695,7 @@ export function PoolModule({pool}: PoolModuleProps) {
                     },
                   ]}
                   accessible
-                  accessibilityLabel={`${legacyPartnerUnread} new ${LEXICON.club.short} ${
+                  accessibilityLabel={`${legacyPartnerUnread} new ${LEXICON.league.short} ${
                     legacyPartnerUnread === 1 ? 'message' : 'messages'
                   }`}>
                   <Megaphone size={11} color={colors.primary} strokeWidth={2} />

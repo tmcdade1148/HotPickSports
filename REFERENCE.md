@@ -923,15 +923,17 @@ Spec: `260520_HotPick_LexiconImplementation_Spec.docx` (May 2026).
 | pool / pools | **Contest** / **Contests** |
 | poolie | **Player** |
 | organizer | **the Gaffer** (long) / **Gaffer** (short) |
-| partner | **the Club** (long) / **Club** (short) |
+| partner | **the League** (long) / **League** (short) / **Leagues** (plural) |
 | leaderboard / standings | **the Ladder** (long) / **Ladder** (short) |
 | smacktalk | **Chirp** / **Chirps** |
 | roster | Roster (unchanged) |
 | perks | Perks (unchanged) |
 | picks | Picks (unchanged) |
 
+> **Legacy naming note:** `partner` is the single canonical *internal* name for this concept. The older `club_*` identifiers — `partners.club_pool_id`, `pools.owning_club_id`, the "Club Pool" concept, the `ClubAdmin` route and `managedClub` store slice — are the **same concept under a frozen legacy prefix**. They are internal-only and never shown to the user. User-facing copy renamed "Club" → "League" (June 2026); a `club_*` → `partner_*` schema cleanup is an off-season backlog item, not a live-season change.
+
 ### Affiliation copy
-A Contest's affiliations render on its card as **"Affiliated with [Club]"** (or `affiliatedWith([names])` for multi-Club: "Affiliated with X & Y", "Affiliated with X, Y & 2 more"). Single-Club affiliation gets a `BadgeCheck` icon tinted with the Club's primary color; multi-Club gets an overlapping logo cluster instead. Replaces the older "On [X]'s Roster" and the "Endorsed by [X]" interim phrasings. Backing schema: `pool_partner_affiliations` (many-to-many), with `pools.owning_club_id` distinguishing the Club's own Official Contest from a roster member (see `260526_pool_affiliations_and_owning_club.sql`).
+A Contest's affiliations render on its card as **"Affiliated with [League]"** (or `affiliatedWith([names])` for multi-League: "Affiliated with X & Y", "Affiliated with X, Y & 2 more"). Single-League affiliation gets a `BadgeCheck` icon tinted with the League's primary color; multi-League gets an overlapping logo cluster instead. Replaces the older "On [X]'s Roster" and the "Endorsed by [X]" interim phrasings. Backing schema: `pool_partner_affiliations` (many-to-many), with `pools.owning_club_id` (legacy-prefixed) distinguishing the League's own Official Contest from a roster member (see `260526_pool_affiliations_and_owning_club.sql`).
 
 ### Carve-outs (intentional — do not "fix")
 - **`PartnerAdminScreen`** — super-admin internal tool; keeps "Partner" labels per spec §2.

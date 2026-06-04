@@ -2174,7 +2174,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       const partnerName =
         typeof bc.partner_name === 'string' && bc.partner_name.length > 0
           ? bc.partner_name
-          : 'Club';
+          : 'League';
 
       byPool[row.pool_id]?.push({
         partnerId:    row.partner_id,

@@ -354,7 +354,7 @@ export function HomeScreen() {
   const offCycleClubs = partnerIds.length > 0 ? (
     <View style={styles.section}>
       <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textTertiary}]}>
-        YOUR CLUBS
+        YOUR {LEXICON.league.plural.toUpperCase()}
       </Text>
       {partnerIds.map(pid => (
         <PartnerModule key={pid} partnerId={pid} />
@@ -498,7 +498,7 @@ export function HomeScreen() {
           // ClubsTeaser per spec.
           <View style={styles.section}>
             <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textTertiary}]}>
-              YOUR CLUBS
+              YOUR {LEXICON.league.plural.toUpperCase()}
             </Text>
             {/* "What is a Club" explainer — onboarding only. Once the player is
                 in a Club-affiliated Contest (partnerIds populated) they know
@@ -548,7 +548,7 @@ function ClubsTeaser() {
   return (
     <View style={offCycleStyles.clubsBlock}>
       <Text style={[bodyType.bold, offCycleStyles.clubsLabel, {color: colors.textTertiary}]}>
-        YOUR CLUBS
+        YOUR {LEXICON.league.plural.toUpperCase()}
       </Text>
       <Text style={[bodyType.regular, offCycleStyles.clubsTeaser, {color: colors.textSecondary}]}>
         These are bars, shops, and brands that back Contests with perks for everyone.
