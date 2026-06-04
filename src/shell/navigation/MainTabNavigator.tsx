@@ -6,8 +6,8 @@ import type {BottomTabBarProps} from '@react-navigation/bottom-tabs';
 import {useNavigation} from '@react-navigation/native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {
-  CheckCircle,
-  BarChart2,
+  ListChecks,
+  ListOrdered,
   MessageCircle,
   Settings,
   Trophy,
@@ -608,9 +608,9 @@ export function MainTabNavigator() {
         name="PicksTab"
         component={PicksTab}
         options={{
-          tabBarLabel: 'Games',
+          tabBarLabel: 'Games/Picks',
           tabBarIcon: ({color, size}) => (
-            <CheckCircle size={size} color={color} />
+            <ListChecks size={size} color={color} />
           ),
         }}
       />
@@ -620,7 +620,7 @@ export function MainTabNavigator() {
         options={{
           tabBarLabel: LEXICON.ladder.short,
           tabBarIcon: ({color, size}) => (
-            <BarChart2 size={size} color={color} />
+            <ListOrdered size={size} color={color} />
           ),
         }}
       />
@@ -628,7 +628,7 @@ export function MainTabNavigator() {
         name="SmackTalkTab"
         component={SmackTalkTab}
         options={{
-          tabBarLabel: LEXICON.chirps.plural,
+          tabBarLabel: LEXICON.chirps.singular,
           tabBarIcon: ({color, size}) => (
             <MessageCircle size={size} color={color} />
           ),
