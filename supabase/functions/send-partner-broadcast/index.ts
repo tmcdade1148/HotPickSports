@@ -1,12 +1,10 @@
 // supabase/functions/send-partner-broadcast/index.ts
-// v4 (2026-05-27): Recipient resolution now reads BOTH the legacy
-// pools.partner_id column AND the new pool_partner_affiliations table.
-// Previously only the legacy path was consulted, which silently dropped
-// every multi-Club affiliation created via the redesigned Add/Edit Clubs
-// flow.
+// v5 (2026-06-04): Broadcast auth now gates on partner_members (Chairman /
+// Directors) instead of the Club Pool organizer, so sponsor-only partners can
+// broadcast through their board. Recipient resolution still unions the legacy
+// pools.partner_id column AND the pool_partner_affiliations table.
 //
-// Spec: 260513_HotPick_HomeRedesign_Spec.docx §5.1
-// Auth: super-admin OR organizer/admin of the partner's Club Pool.
+// Auth: super-admin OR a partner_members row (Chairman / Director).
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -187,9 +185,7 @@ Deno.serve(async (req) => {
     }
 
     // Mirror into organizer_notifications (Message Center) attached to
-    // the Club Pool. Every recipient is at minimum a member of one
-    // pool in poolIds; the Club Pool is shared visibility for all of
-    // them, so attaching there is sufficient.
+    // the Club Pool when the partner runs one.
     if (partner.club_pool_id) {
       const { data: clubPool } = await supabase
         .from("pools")
