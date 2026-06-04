@@ -1088,7 +1088,7 @@ export function PartnerAdminScreen() {
             accessibilityLabel="Go back">
             <ChevronLeft size={24} color={colors.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Partner Admin</Text>
+          <Text style={styles.headerTitle}>Partner Management</Text>
           <TouchableOpacity
             onPress={() => {
               if (showForm) resetCreateForm();

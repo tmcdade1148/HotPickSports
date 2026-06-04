@@ -1,6 +1,6 @@
 // AdminHomeScreen — landing screen for super_admin (Settings → HotPick Admin).
 //
-// Six nav cards: Moderation Queue, Pool Management, Club Management,
+// Six nav cards: Moderation Queue, Pool Management, Partner Management,
 // Broadcast, Score Corrections (placeholder), Platform Health (placeholder).
 // Each card shows a live count where applicable so the super admin can
 // scan for "what needs me right now."
@@ -104,11 +104,11 @@ function AdminHomeScreenImpl() {
         <Card
           color={colors}
           icon={<Building size={22} color={colors.primary} strokeWidth={2.25} />}
-          title="Club Management"
+          title="Partner Management"
           subtitle={
             clubCount === null
-              ? 'Create / configure Clubs.'
-              : `${clubCount} active Clubs · create / edit`
+              ? 'Create / configure Partners.'
+              : `${clubCount} active Partners · create / edit`
           }
           onPress={() => navigation.navigate('PartnerAdmin')}
         />
