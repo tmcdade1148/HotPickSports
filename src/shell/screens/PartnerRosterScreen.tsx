@@ -147,7 +147,7 @@ export function PartnerRosterScreen() {
   if (!partner) {
     return (
       <DenialState
-        title="Club not found"
+        title="League not found"
         body="This roster doesn't exist or has been removed."
         onHome={() => navigation.navigate('Home')}
       />
@@ -158,7 +158,7 @@ export function PartnerRosterScreen() {
   if (alignedPools.length === 0) {
     return (
       <DenialState
-        title="You're not on this Club's roster"
+        title="You're not on this League's roster"
         body="Join a Contest on their roster to see it again."
         onHome={() => navigation.navigate('Home')}
       />
@@ -218,7 +218,7 @@ export function PartnerRosterScreen() {
         {showTombstone && (
           <View style={[styles.notice, {backgroundColor: colors.surface, borderColor: colors.border}]}>
             <Text style={[bodyType.bold, {color: colors.textPrimary}]}>
-              This Club is no longer active.
+              This League is no longer active.
             </Text>
             <Text style={[bodyType.regular, styles.noticeBody, {color: colors.textSecondary}]}>
               Your Contest remains. Broadcasts and perks are paused.
@@ -229,7 +229,7 @@ export function PartnerRosterScreen() {
         {showSetupNotice && (
           <View style={[styles.notice, {backgroundColor: colors.surface, borderColor: colors.border}]}>
             <Text style={[bodyType.bold, {color: colors.textPrimary}]}>
-              This Club is being set up.
+              This League is being set up.
             </Text>
             <Text style={[bodyType.regular, styles.noticeBody, {color: colors.textSecondary}]}>
               Check back soon.

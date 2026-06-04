@@ -117,8 +117,8 @@ export function JoinPoolScreen({navigation, route}: any) {
               <Text style={styles.rescueText}>
                 That looks like a <Text style={styles.rescueBold}>Roster Pass</Text>,
                 not an invite code. Roster Passes connect a Contest you organize
-                to a Club's roster. If you organize a Contest, open it in{' '}
-                <Text style={styles.rescueBold}>Settings → Add/Edit Clubs</Text>{' '}
+                to a League's roster. If you organize a Contest, open it in{' '}
+                <Text style={styles.rescueBold}>Settings → Add/Edit Leagues</Text>{' '}
                 and paste the pass there.
               </Text>
             </View>

@@ -44,6 +44,7 @@ import {useTheme} from '@shell/theme/hooks';
 import {bodyType, displayType, spacing, borderRadius} from '@shared/theme';
 import {formatRosterPass} from '@shared/utils/format';
 import {LEXICON} from '@shared/lexicon';
+import {DelegateManager} from '@shell/components/DelegateManager';
 
 type PartnerRow = {
   id: string;
@@ -113,6 +114,7 @@ export function ClubAdminScreen() {
   // partner's full row by id here so we get brand_config + roster
   // pass + public_info that the slice doesn't carry.
   const managedClub = useGlobalStore(s => s.managedClub);
+  const poolRoles = useGlobalStore(s => s.poolRoles);
   const loadPartner = useCallback(async () => {
     if (!user?.id || !managedClub) {
       setLoading(false);
@@ -342,7 +344,7 @@ export function ClubAdminScreen() {
           <View style={{width: 24}} />
         </View>
         <Text style={[bodyType.regular, {color: colors.textTertiary, padding: spacing.lg}]}>
-          You're not currently managing a {LEXICON.club.short}.
+          You're not currently managing a {LEXICON.league.short}.
         </Text>
       </SafeAreaView>
     );
@@ -394,7 +396,7 @@ export function ClubAdminScreen() {
             </View>
             <Text style={[bodyType.regular, styles.passHint, {color: colors.textSecondary}]}>
               Share with a Gaffer to add their Contest to {partner.name}'s roster.
-              They paste it in their Contest's Settings → Add/Edit Clubs.
+              They paste it in their Contest's Settings → Add/Edit Leagues.
             </Text>
             <View style={styles.passActions}>
               <Pressable
@@ -411,7 +413,7 @@ export function ClubAdminScreen() {
                   Share.share({
                     message:
                       `Add your HotPick Contest to ${partner.name}'s roster. ` +
-                      `Open Contest Settings → Add/Edit Clubs and enter pass: ` +
+                      `Open Contest Settings → Add/Edit Leagues and enter pass: ` +
                       `${formatRosterPass(partner.roster_pass)}`,
                   }).catch(() => {});
                 }}
@@ -519,7 +521,7 @@ export function ClubAdminScreen() {
           </Text>
           <View style={[styles.cardBlock, {backgroundColor: colors.surface, borderColor: colors.border}]}>
             <Text style={[bodyType.regular, styles.helper, {color: colors.textSecondary}]}>
-              When are you open? Free-text — shows on your Club page.
+              When are you open? Free-text — shows on your League page.
             </Text>
             <TextInput
               style={[styles.bigTextInput, {color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.background}]}
@@ -599,7 +601,7 @@ export function ClubAdminScreen() {
           </Text>
           <View style={[styles.cardBlock, {backgroundColor: colors.surface, borderColor: colors.border}]}>
             <Text style={[bodyType.regular, styles.helper, {color: colors.textSecondary}]}>
-              Shows on your Club's roster page — what Gaffers see when they're considering affiliating.
+              Shows on your League's roster page — what Gaffers see when they're considering affiliating.
             </Text>
             <TextInput
               style={[styles.bigTextInput, {color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.background}]}
@@ -625,6 +627,26 @@ export function ClubAdminScreen() {
                 <Text style={[bodyType.bold, {color: colors.onPrimary}]}>Save Message</Text>}
             </Pressable>
           </View>
+
+          {/* Directors — the Chairman (Club Pool organizer) adds people who
+              help run the League. They get the same League Tools minus this
+              control. Directors (admins) see the list read-only. */}
+          {managedClub && (
+            <View style={[styles.cardBlock, {backgroundColor: colors.surface, borderColor: colors.border, marginTop: spacing.lg}]}>
+              <Text style={[bodyType.bold, {color: colors.textPrimary, marginBottom: 4}]}>
+                Add {LEXICON.director.plural}
+              </Text>
+              <Text style={[bodyType.regular, {color: colors.textSecondary, fontSize: 12, lineHeight: 17, marginBottom: spacing.sm}]}>
+                {LEXICON.director.plural} get the same privileges you do, but can't add new {LEXICON.director.plural}.
+              </Text>
+              <DelegateManager
+                poolId={managedClub.clubPoolId}
+                isLeagueTier
+                canManage={poolRoles[managedClub.clubPoolId] === 'organizer'}
+                showHeader={false}
+              />
+            </View>
+          )}
 
           {/* Identity (read-only) + Analytics placeholder */}
           <View style={[styles.cardBlock, {backgroundColor: colors.surface, borderColor: colors.border, marginTop: spacing.lg}]}>

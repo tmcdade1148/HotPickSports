@@ -12,6 +12,8 @@ import {
   CheckCircle,
   BarChart2,
   MessageCircle,
+  ListOrdered,
+  ListChecks,
   ChevronDown,
   ChevronLeft,
   Settings,
@@ -34,6 +36,10 @@ const ICON_MAP: Record<string, React.ComponentType<any>> = {
   'check-circle': CheckCircle,
   'bar-chart-2': BarChart2,
   'message-circle': MessageCircle,
+  // No literal "ladder" glyph in this Lucide version; ListOrdered (numbered
+  // ranking) is the on-theme standings/ladder icon.
+  'ladder': ListOrdered,
+  'list-checks': ListChecks,
 };
 
 // ---------------------------------------------------------------------------

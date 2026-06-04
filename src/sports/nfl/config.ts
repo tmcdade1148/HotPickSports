@@ -38,9 +38,9 @@ export const nflSeason: SeasonConfig = {
   },
 
   tabs: [
-    {key: 'picks', label: 'Picks', icon: 'check-circle'},
-    {key: 'board', label: 'Ladder', icon: 'bar-chart-2'},
-    {key: 'smacktalk', label: 'Chirps', icon: 'message-circle'},
+    {key: 'picks', label: 'Games/Picks', icon: 'list-checks'},
+    {key: 'board', label: 'Ladder', icon: 'ladder'},
+    {key: 'smacktalk', label: 'Chirp', icon: 'message-circle'},
   ],
 
   // Season structure

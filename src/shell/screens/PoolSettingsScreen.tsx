@@ -33,8 +33,9 @@ import {
 import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {normalizeRosterPass} from '@shared/utils/format';
-import {LEXICON} from '@shared/lexicon';
+import {LEXICON, roleLabel} from '@shared/lexicon';
 import {BroadcastComposer} from '@shell/components/BroadcastComposer';
+import {DelegateManager} from '@shell/components/DelegateManager';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 
@@ -64,6 +65,11 @@ export function PoolSettingsScreen() {
   const myRole = useGlobalStore(s => s.poolRoles[poolId]);
   const isOrganizer = myRole === 'organizer';
   const isAdmin = myRole === 'admin';
+  // League tier when this pool is a League's own Club Pool — drives
+  // Director vs Assistant Gaffer vocabulary in the delegate manager.
+  const managedClub = useGlobalStore(s => s.managedClub);
+  const isLeagueTier = managedClub?.clubPoolId === poolId;
+  const delegateLabel = roleLabel('admin', isLeagueTier); // Assistant Gaffer | Director
 
   // One-time intro for a new Admin. Persisted per-Contest in AsyncStorage
   // so we don't pester returning Admins. Default true (shown) until we
@@ -567,11 +573,32 @@ export function PoolSettingsScreen() {
           )}
         </View>
 
+        {/* Assistant Gaffers (Directors on a Club Pool) — the Gaffer adds
+            helpers by email; they get the same Gaffer Tools minus this
+            control. Assistant Gaffers see the list read-only. Header is
+            rendered here so it matches the screen's other section styling. */}
+        {(isOrganizer || isAdmin) && (
+          <>
+            <Text style={styles.sectionTitle}>Add {delegateLabel}s</Text>
+            <Text style={styles.welcomeHint}>
+              {delegateLabel}s get the same privileges you do, but can't add new {delegateLabel}s.
+            </Text>
+            <View style={{paddingHorizontal: spacing.lg}}>
+              <DelegateManager
+                poolId={poolId}
+                isLeagueTier={isLeagueTier}
+                canManage={isOrganizer}
+                showHeader={false}
+              />
+            </View>
+          </>
+        )}
+
         {/* CLUB ROSTERS — moved here from below Communication so it
             sits with the other Contest identity controls (name lives
             in the row above; "which Clubs does this Contest belong to"
             is conceptually the next thing). */}
-        <Text style={styles.sectionTitle}>Club Rosters</Text>
+        <Text style={styles.sectionTitle}>League Rosters</Text>
         {/* Official Club Contest: the owning Club is non-removable;
             shown as a pinned pill at the top of the list. Additional
             affiliations are blocked at the RPC level (POOL_IS_OFFICIAL),
@@ -620,7 +647,7 @@ export function PoolSettingsScreen() {
             onPress={() => navigation.navigate('PartnerDirectory', {poolId})}>
             <Building2 size={18} color={colors.primary} />
             <Text style={[styles.broadcastText, {color: colors.primary}]}>
-              Add/Edit Clubs
+              Add/Edit Leagues
             </Text>
           </TouchableOpacity>
         )}
@@ -827,10 +854,10 @@ export function PoolSettingsScreen() {
               /* swallow taps inside the card so backdrop dismiss doesn't fire */
             }}>
             <Text style={styles.modalTitle}>
-              Broadcast from {partnerRow?.name ?? 'Club'}
+              Broadcast from {partnerRow?.name ?? 'League'}
             </Text>
             <Text style={styles.modalHint}>
-              Sends to every member of every Contest on this Club's roster.
+              Sends to every member of every Contest on this League's roster.
               Max 280 chars. Rate limit: 3 per 24h.
             </Text>
             <TextInput

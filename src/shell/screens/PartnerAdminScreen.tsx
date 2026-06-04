@@ -341,6 +341,10 @@ export function PartnerAdminScreen() {
   const [editPartnerType, setEditPartnerType] = useState<PartnerType>('other');
   const [saving, setSaving] = useState(false);
   const [creatingPoolForPartnerId, setCreatingPoolForPartnerId] = useState<string | null>(null);
+  // Chairman assignment (Club Pool organizer) — staff-only on-ramp.
+  const [chairmanEmail, setChairmanEmail] = useState('');
+  const [assigningChairman, setAssigningChairman] = useState(false);
+  const setLeagueChairman = useGlobalStore(s => s.setLeagueChairman);
   // partner_id → existing pool id+name, so we know whether to show
   // "Create Partner Pool" or "View Partner Pool" inside an edit card.
   const [partnerPoolByPartnerId, setPartnerPoolByPartnerId] = useState<
@@ -662,6 +666,32 @@ export function PartnerAdminScreen() {
         `${partner.name}'s Club Pool is live. Invite code: ${row.invite_code ?? '—'} · Signage slug: ${row.invite_slug ?? partner.slug}`,
       );
     }
+  };
+
+  const handleAssignChairman = async (partner: Partner) => {
+    const email = chairmanEmail.trim();
+    if (!email) return;
+    setAssigningChairman(true);
+    const res = await setLeagueChairman(partner.id, email);
+    setAssigningChairman(false);
+    if (!res.success) {
+      Alert.alert(
+        'Could Not Assign Chairman',
+        res.error === 'NO_CLUB_POOL'
+          ? 'Create the Club Pool first, then assign the Chairman.'
+          : res.error === 'FORBIDDEN'
+            ? 'Super-admin only.'
+            : res.error ?? 'Something went wrong.',
+      );
+      return;
+    }
+    setChairmanEmail('');
+    Alert.alert(
+      res.pending ? 'Chairman Invited' : 'Chairman Assigned',
+      res.pending
+        ? `${email} isn't on HotPick yet. They'll become Chairman automatically when they create an account with that exact email.`
+        : `${email} is now the Chairman of ${partner.name}.`,
+    );
   };
 
   const handleSaveEdit = async (partner: Partner) => {
@@ -1398,6 +1428,49 @@ export function PartnerAdminScreen() {
                               . The organizer of this pool edits {partner.name}'s
                               perk and sends partner broadcasts from Pool Settings.
                             </Text>
+
+                            {/* Chairman assignment — sets the Club Pool's
+                                organizer. If the email isn't a user yet, the
+                                role attaches when they sign up with it. */}
+                            <Text style={[styles.colorsHeading, {marginTop: spacing.md}]}>Chairman</Text>
+                            <Text style={styles.colorsDerivedNote}>
+                              Runs this League and can add Directors. Enter the
+                              email they'll use to sign in.
+                            </Text>
+                            <TextInput
+                              style={{
+                                borderWidth: 1,
+                                borderColor: colors.border,
+                                borderRadius: borderRadius.md,
+                                paddingHorizontal: spacing.md,
+                                paddingVertical: spacing.sm,
+                                color: colors.textPrimary,
+                                marginTop: spacing.sm,
+                              }}
+                              value={chairmanEmail}
+                              onChangeText={setChairmanEmail}
+                              placeholder="chairman@email.com"
+                              placeholderTextColor={colors.textSecondary}
+                              autoCapitalize="none"
+                              keyboardType="email-address"
+                              autoCorrect={false}
+                            />
+                            <TouchableOpacity
+                              style={[
+                                styles.createButton,
+                                {marginTop: spacing.sm},
+                                (assigningChairman || !chairmanEmail.trim()) && styles.buttonDisabled,
+                              ]}
+                              onPress={() => handleAssignChairman(partner)}
+                              disabled={assigningChairman || !chairmanEmail.trim()}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Assign Chairman for ${partner.name}`}>
+                              {assigningChairman ? (
+                                <ActivityIndicator size="small" color={colors.onPrimary} />
+                              ) : (
+                                <Text style={styles.createButtonText}>Assign Chairman</Text>
+                              )}
+                            </TouchableOpacity>
                           </View>
                         );
                       }
