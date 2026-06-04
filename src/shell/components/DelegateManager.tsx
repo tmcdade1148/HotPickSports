@@ -22,13 +22,18 @@ import {Clock, UserPlus, X} from 'lucide-react-native';
 import {useGlobalStore, PoolDelegate} from '@shell/stores/globalStore';
 import {useTheme} from '@shell/theme/hooks';
 import {bodyType, spacing, borderRadius} from '@shared/theme';
-import {roleLabel} from '@shared/lexicon';
+type DelegateTarget =
+  | {kind: 'pool'; poolId: string}
+  | {kind: 'partner'; partnerId: string};
 
 interface Props {
-  poolId: string;
-  /** League tier → Director vocabulary; otherwise Assistant Gaffer. */
-  isLeagueTier: boolean;
-  /** True when the viewer is the organizer (Chairman/Gaffer) of this pool. */
+  /** What the delegates attach to: a Contest (pool) or a League (partner). */
+  target: DelegateTarget;
+  /** Singular delegate-role label, e.g. "Assistant Gaffer" | "Director". */
+  roleNoun: string;
+  /** Which role value counts as a delegate row in the list. */
+  delegateRole: 'admin' | 'director';
+  /** True when the viewer may add/remove (Gaffer for a Contest, Chairman for a League). */
   canManage: boolean;
   /** Render the component's own title + hint. Set false when the host
    *  screen supplies a section header in its own style. Defaults true. */
@@ -38,6 +43,7 @@ interface Props {
 function mapError(code: string | undefined, label: string): string {
   switch (code) {
     case 'NOT_ORGANIZER':
+    case 'NOT_CHAIRMAN':
       return `Only the owner can add ${label}s.`;
     case 'EMPTY_EMAIL':
       return 'Enter an email address.';
@@ -48,25 +54,33 @@ function mapError(code: string | undefined, label: string): string {
   }
 }
 
-export function DelegateManager({poolId, isLeagueTier, canManage, showHeader = true}: Props) {
+export function DelegateManager({target, roleNoun, delegateRole, canManage, showHeader = true}: Props) {
   const {colors} = useTheme();
   const listPoolDelegates = useGlobalStore(s => s.listPoolDelegates);
   const grantPoolDelegate = useGlobalStore(s => s.grantPoolDelegate);
   const revokePoolDelegate = useGlobalStore(s => s.revokePoolDelegate);
+  const listPartnerMembers = useGlobalStore(s => s.listPartnerMembers);
+  const grantPartnerDirector = useGlobalStore(s => s.grantPartnerDirector);
+  const revokePartnerMember = useGlobalStore(s => s.revokePartnerMember);
 
   const [rows, setRows] = useState<PoolDelegate[]>([]);
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const label = roleLabel('admin', isLeagueTier); // Director | Assistant Gaffer
+  const label = roleNoun;
+  const targetId = target.kind === 'pool' ? target.poolId : target.partnerId;
 
   const load = useCallback(async () => {
     setLoading(true);
-    const data = await listPoolDelegates(poolId);
+    const data =
+      target.kind === 'pool'
+        ? await listPoolDelegates(target.poolId)
+        : await listPartnerMembers(target.partnerId);
     setRows(data);
     setLoading(false);
-  }, [poolId, listPoolDelegates]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target.kind, targetId, listPoolDelegates, listPartnerMembers]);
 
   useEffect(() => {
     load();
@@ -76,7 +90,10 @@ export function DelegateManager({poolId, isLeagueTier, canManage, showHeader = t
     const trimmed = email.trim();
     if (!trimmed) return;
     setSubmitting(true);
-    const res = await grantPoolDelegate(poolId, trimmed);
+    const res =
+      target.kind === 'pool'
+        ? await grantPoolDelegate(target.poolId, trimmed)
+        : await grantPartnerDirector(target.partnerId, trimmed);
     setSubmitting(false);
     if (!res.success) {
       Alert.alert('Could Not Add', mapError(res.error, label));
@@ -98,19 +115,21 @@ export function DelegateManager({poolId, isLeagueTier, canManage, showHeader = t
       `Remove ${label}?`,
       row.status === 'pending'
         ? `Cancel the pending ${label} invite for ${who}?`
-        : `${who} will lose ${label} access. They keep their picks and standings.`,
+        : `${who} will lose ${label} access.`,
       [
         {text: 'Cancel', style: 'cancel'},
         {
           text: 'Remove',
           style: 'destructive',
           onPress: async () => {
-            const res = await revokePoolDelegate(
-              poolId,
+            const arg =
               row.status === 'pending'
                 ? {email: row.email ?? undefined}
-                : {userId: row.userId ?? undefined},
-            );
+                : {userId: row.userId ?? undefined};
+            const res =
+              target.kind === 'pool'
+                ? await revokePoolDelegate(target.poolId, arg)
+                : await revokePartnerMember(target.partnerId, arg);
             if (!res.success) {
               Alert.alert('Error', res.error ?? 'Failed to remove.');
               return;
@@ -122,9 +141,9 @@ export function DelegateManager({poolId, isLeagueTier, canManage, showHeader = t
     );
   };
 
-  // The organizer (Chairman/Gaffer) themselves is shown by the host screen;
-  // this manager lists the delegates (admins + pending).
-  const delegates = rows.filter(r => r.role === 'admin');
+  // The owner (Chairman/Gaffer) is shown by the host screen; this manager
+  // lists the delegates (Directors / Assistant Gaffers + pending).
+  const delegates = rows.filter(r => r.role === delegateRole);
 
   return (
     <View style={styles.wrap}>

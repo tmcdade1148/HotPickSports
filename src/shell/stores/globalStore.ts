@@ -97,14 +97,16 @@ interface GlobalState {
   // Profile — full profile object
   userProfile: DbProfile | null;
   fetchProfile: (userId: string) => Promise<DbProfile | null>;
-  // The League this user manages (Chairman = organizer, or Director =
-  // admin, of a partners.club_pool_id pool). Null when the user is neither.
-  // Settings shows a "League Admin" entry + ClubAdminScreen gates on this.
-  // `clubPoolId` is the partner's Club Pool — used to render League-tier
-  // role labels (Chairman/Director) in that pool's member list. v1: at most
-  // one League per user. (`managedClub` / `club_pool_id` are frozen legacy
-  // identifiers for the partner/League concept — see REFERENCE §22.)
-  managedClub: {id: string; name: string; clubPoolId: string} | null;
+  // The League (partner) this user is on the board of — a partner_members row
+  // (Chairman or Director), independent of any Club Pool. Null when neither.
+  // Settings shows a "League Tools" entry + ClubAdminScreen gates on this.
+  // `role` drives who can add Directors (chairman only). `clubPoolId` is the
+  // partner's Club Pool if it runs one (null for sponsor-only). v1: at most
+  // one League per user. (`managedClub` is a frozen legacy identifier for the
+  // partner/League concept — see REFERENCE §22.)
+  managedClub:
+    | {id: string; name: string; clubPoolId: string | null; role: 'chairman' | 'director'}
+    | null;
   loadManagedClub: (userId: string) => Promise<void>;
 
   // the get_visible_competitions RPC on session init. Used by the sport
@@ -202,6 +204,18 @@ interface GlobalState {
     partnerId: string,
     email: string,
   ) => Promise<{success: boolean; error?: string; pending?: boolean}>;
+  // Partner-level board (Chairman/Directors), independent of any Club Pool.
+  // grant/revoke are chairman-only (or super-admin); list is viewable by the
+  // board. Same pending-on-signup semantics.
+  grantPartnerDirector: (
+    partnerId: string,
+    email: string,
+  ) => Promise<{success: boolean; error?: string; pending?: boolean}>;
+  revokePartnerMember: (
+    partnerId: string,
+    target: {userId?: string; email?: string},
+  ) => Promise<{success: boolean; error?: string}>;
+  listPartnerMembers: (partnerId: string) => Promise<PoolDelegate[]>;
 
   // Pool settings management
   updatePoolSettings: (
@@ -395,7 +409,8 @@ export interface PoolAffiliation {
 export interface PoolDelegate {
   userId: string | null;
   email:  string | null;
-  role:   'organizer' | 'admin';
+  // Pool board: organizer | admin. Partner board: chairman | director.
+  role:   'organizer' | 'admin' | 'chairman' | 'director';
   status: 'active' | 'pending';
 }
 
@@ -595,32 +610,38 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   },
 
   loadManagedClub: async userId => {
-    // Chairman (organizer) OR Director (admin) of a Club Pool both manage
-    // the League. Server-side League Tools auth (_caller_can_manage_partner)
-    // admits the same two roles.
+    // The League (partner) this user is on the board of — a partner_members
+    // row (chairman/director), independent of any Club Pool. Server-side
+    // League Tools auth (_caller_can_manage_partner) admits both roles.
     const {data: memberRows} = await supabase
-      .from('pool_members')
-      .select('pool_id')
+      .from('partner_members')
+      .select('partner_id, role')
       .eq('user_id', userId)
-      .in('role', ['organizer', 'admin'])
-      .eq('status', 'active');
-    const orgPoolIds = ((memberRows ?? []) as {pool_id: string}[]).map(r => r.pool_id);
-    if (orgPoolIds.length === 0) {
+      .limit(1);
+    const membership = (memberRows ?? [])[0] as
+      | {partner_id: string; role: 'chairman' | 'director'}
+      | undefined;
+    if (!membership) {
       set({managedClub: null});
       return;
     }
-    const {data: clubRows} = await supabase
+    const {data: partnerRows} = await supabase
       .from('partners')
       .select('id, name, club_pool_id')
-      .in('club_pool_id', orgPoolIds)
+      .eq('id', membership.partner_id)
       .eq('is_active', true)
       .limit(1);
-    const row = (clubRows ?? [])[0] as
-      | {id: string; name: string; club_pool_id: string}
+    const row = (partnerRows ?? [])[0] as
+      | {id: string; name: string; club_pool_id: string | null}
       | undefined;
     set({
       managedClub: row
-        ? {id: row.id, name: row.name, clubPoolId: row.club_pool_id}
+        ? {
+            id: row.id,
+            name: row.name,
+            clubPoolId: row.club_pool_id,
+            role: membership.role,
+          }
         : null,
     });
   },
@@ -1175,6 +1196,41 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     if (error) return {success: false, error: error.message};
     if (data?.error) return {success: false, error: data.error};
     return {success: true, pending: data?.assigned === 'pending'};
+  },
+
+  grantPartnerDirector: async (partnerId, email) => {
+    const {data, error} = await supabase.rpc('grant_partner_director_by_email', {
+      p_partner_id: partnerId,
+      p_email: email,
+    });
+    if (error) return {success: false, error: error.message};
+    if (data?.error) return {success: false, error: data.error};
+    return {success: true, pending: data?.assigned === 'pending'};
+  },
+
+  revokePartnerMember: async (partnerId, target) => {
+    const {data, error} = await supabase.rpc('revoke_partner_member', {
+      p_partner_id: partnerId,
+      p_user_id: target.userId ?? null,
+      p_email: target.email ?? null,
+    });
+    if (error) return {success: false, error: error.message};
+    if (data?.error) return {success: false, error: data.error};
+    return {success: true};
+  },
+
+  listPartnerMembers: async partnerId => {
+    const {data, error} = await supabase.rpc('list_partner_members', {
+      p_partner_id: partnerId,
+    });
+    if (error || !Array.isArray(data)) return [];
+    return (data as {user_id: string | null; email: string | null; role: string; status: string}[])
+      .map(r => ({
+        userId: r.user_id,
+        email: r.email,
+        role: r.role as PoolDelegate['role'],
+        status: r.status as PoolDelegate['status'],
+      }));
   },
 
   // ---------------------------------------------------------------------------

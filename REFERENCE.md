@@ -265,10 +265,12 @@ Free organizers: can create up to 1 pool per competition, max 10 members (no sub
 
 **Users join pools. Organizers join rosters.** A partner has a roster — the set of pools aligned with them. Two ways a pool ends up on a roster:
 
-1. **Club Pool** — the partner's own pool. Created via `create_partner_pool(partner_id)` RPC (super-admin only). `partners.club_pool_id` points at this pool; the pool's organizer is the de facto Partner Admin (edits perk, sends partner broadcasts). Exactly one Club Pool per partner.
+1. **Club Pool** — the partner's own pool. Created via `create_partner_pool(partner_id)` RPC (super-admin only). `partners.club_pool_id` points at this pool. Exactly one Club Pool per partner. It's just a Contest the partner's board also runs — it is **no longer** what confers Partner Admin rights (see below).
 2. **Roster member** — any other pool that aligns with the partner via PartnerDirectoryScreen. Surfaces the partner's brand + perk to its members but has no admin rights over the partner.
 
-`pools.partner_id` is the alignment edge (set for *both* shapes). `partners.club_pool_id` distinguishes the Club Pool from roster members. Auth checks (perk edits, partner broadcasts) gate on `partners.club_pool_id = <this pool>`.
+`pools.partner_id` is the alignment edge (set for *both* shapes). `partners.club_pool_id` distinguishes the Club Pool from roster members.
+
+**Partner Admin = `partner_members`, not the Club Pool.** A partner's board is a **Chairman** (one) + **Directors** (`partner_members(partner_id, user_id, role)`), independent of whether the partner runs a Club Pool — so **sponsor-only partners have admins too**. HotPick staff seed the Chairman by email (`admin_set_league_chairman`); the Chairman adds Directors (`grant_partner_director_by_email`). Perk/public-info/roster-pass edits (`_caller_can_manage_partner`) and `send-partner-broadcast` gate on `partner_members`. Email invites to people without an account yet park in `pending_role_grants` (partner-scoped) and attach on signup. (Migration `20260604150000` backfilled existing Club Pool organizers→Chairman, admins→Directors.)
 
 - `invite_slug` doubles as invite code (e.g., "MESQUE")
 - `join_pool_by_invite` RPC checks BOTH `invite_code` AND `UPPER(invite_slug)`
