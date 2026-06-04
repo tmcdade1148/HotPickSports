@@ -633,10 +633,17 @@ export function ClubAdminScreen() {
               control. Directors (admins) see the list read-only. */}
           {managedClub && (
             <View style={[styles.cardBlock, {backgroundColor: colors.surface, borderColor: colors.border, marginTop: spacing.lg}]}>
+              <Text style={[bodyType.bold, {color: colors.textPrimary, marginBottom: 4}]}>
+                Add {LEXICON.director.plural}
+              </Text>
+              <Text style={[bodyType.regular, {color: colors.textSecondary, fontSize: 12, lineHeight: 17, marginBottom: spacing.sm}]}>
+                {LEXICON.director.plural} get the same privileges you do, but can't add new {LEXICON.director.plural}.
+              </Text>
               <DelegateManager
                 poolId={managedClub.clubPoolId}
                 isLeagueTier
                 canManage={poolRoles[managedClub.clubPoolId] === 'organizer'}
+                showHeader={false}
               />
             </View>
           )}
