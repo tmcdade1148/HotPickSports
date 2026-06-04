@@ -79,6 +79,10 @@ interface Partner {
   // (default), the partner is sponsor-only — brand surfaces via perk /
   // broadcasts / roster, but cannot run pools. Migration 260515.
   can_run_pools: boolean;
+  // The partner's own Club Pool (NULL = none yet). Authoritative source for
+  // "does this partner have a Club Pool?" — never infer it from pools.partner_id,
+  // which is the roster-affiliation edge (many roster members share it).
+  club_pool_id: string | null;
   // Stored as text in the DB; the app constrains to the PartnerType union.
   partner_type: PartnerType | null;
   // 8-char alphanumeric. Distinct from pools.invite_code; shared with
@@ -416,20 +420,33 @@ export function PartnerAdminScreen() {
       .from('partners')
       .select('*')
       .order('created_at', {ascending: false});
-    setPartners((data as Partner[]) ?? []);
+    const partnerRows = (data as Partner[]) ?? [];
+    setPartners(partnerRows);
 
-    // Pool count per partner — drives the create-vs-view CTA in each card.
-    const {data: pools} = await supabase
-      .from('pools')
-      .select('id, name, invite_code, partner_id')
-      .not('partner_id', 'is', null)
-      .eq('is_archived', false);
+    // Club Pool per partner — drives the create-vs-view CTA + the Chairman
+    // field in each card. Keyed off the authoritative partners.club_pool_id,
+    // NOT pools.partner_id (that's the roster-affiliation edge, which many
+    // roster members share — using it falsely reports a Club Pool for any
+    // partner that merely has affiliated Contests).
+    const clubPoolIds = partnerRows
+      .map(p => p.club_pool_id)
+      .filter((id): id is string => Boolean(id));
     const byPartner: Record<string, {id: string; name: string; invite_code: string | null}> = {};
-    (pools ?? []).forEach((p: any) => {
-      if (p.partner_id && !byPartner[p.partner_id]) {
-        byPartner[p.partner_id] = {id: p.id, name: p.name, invite_code: p.invite_code};
-      }
-    });
+    if (clubPoolIds.length > 0) {
+      const {data: clubPools} = await supabase
+        .from('pools')
+        .select('id, name, invite_code')
+        .in('id', clubPoolIds);
+      const poolById = new Map(
+        (clubPools ?? []).map((p: any) => [p.id as string, p]),
+      );
+      partnerRows.forEach(pt => {
+        const cp = pt.club_pool_id ? poolById.get(pt.club_pool_id) : undefined;
+        if (cp) {
+          byPartner[pt.id] = {id: cp.id, name: cp.name, invite_code: cp.invite_code};
+        }
+      });
+    }
     setPartnerPoolByPartnerId(byPartner);
 
     setLoading(false);
@@ -1475,23 +1492,30 @@ export function PartnerAdminScreen() {
                         );
                       }
                       return (
-                        <TouchableOpacity
-                          style={[
-                            styles.createButton,
-                            creatingPoolForPartnerId === partner.id && styles.buttonDisabled,
-                            {marginBottom: spacing.md},
-                          ]}
-                          onPress={() => handleCreatePartnerPool(partner)}
-                          disabled={creatingPoolForPartnerId === partner.id}
-                          accessibilityRole="button"
-                          accessibilityLabel={`Create Club Pool for ${partner.name}`}
-                          accessibilityState={{disabled: creatingPoolForPartnerId === partner.id}}>
-                          {creatingPoolForPartnerId === partner.id ? (
-                            <ActivityIndicator size="small" color={colors.onPrimary} />
-                          ) : (
-                            <Text style={styles.createButtonText}>Create Club Pool</Text>
-                          )}
-                        </TouchableOpacity>
+                        <>
+                          <Text style={styles.colorsDerivedNote}>
+                            Create the Club Pool first — then you can assign its
+                            Chairman here. (Save the partner if you just switched
+                            this on.)
+                          </Text>
+                          <TouchableOpacity
+                            style={[
+                              styles.createButton,
+                              creatingPoolForPartnerId === partner.id && styles.buttonDisabled,
+                              {marginBottom: spacing.md, marginTop: spacing.sm},
+                            ]}
+                            onPress={() => handleCreatePartnerPool(partner)}
+                            disabled={creatingPoolForPartnerId === partner.id}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Create Club Pool for ${partner.name}`}
+                            accessibilityState={{disabled: creatingPoolForPartnerId === partner.id}}>
+                            {creatingPoolForPartnerId === partner.id ? (
+                              <ActivityIndicator size="small" color={colors.onPrimary} />
+                            ) : (
+                              <Text style={styles.createButtonText}>Create Club Pool</Text>
+                            )}
+                          </TouchableOpacity>
+                        </>
                       );
                     })()}
 
