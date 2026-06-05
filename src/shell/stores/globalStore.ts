@@ -13,6 +13,8 @@ import {createDelegateSlice} from './slices/delegateSlice';
 import {createHistoryHardwareSlice} from './slices/historyHardwareSlice';
 import {createBroadcastsSlice} from './slices/broadcastsSlice';
 import {createAffiliationsSlice} from './slices/affiliationsSlice';
+import {createHomeRecapSlice} from './slices/homeRecapSlice';
+import {createPoolIndicatorsSlice} from './slices/poolIndicatorsSlice';
 import type {GlobalState} from './globalStore.types';
 // Re-exported so existing consumers keep importing these from globalStore.
 export type {
@@ -24,12 +26,6 @@ export type {
 
 const POOL_STORAGE_PREFIX = 'hotpick_active_pool_';
 const DEFAULT_POOL_PREFIX = 'hotpick_default_pool_';
-
-// Race-condition guard for loadWeekRankByPool. Each call stamps this
-// with its (competition, week) tag at start; the resolved response only
-// writes to the store if its tag still matches — preventing a slow
-// response from clobbering newer state when the user advances weeks.
-let weekRankLatestTag = '';
 
 // Snapshot of the user's active selection before entering the onboarding demo,
 // restored by exitDemo(). Module-scoped (the store is a singleton) to avoid
@@ -1002,272 +998,16 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   ...createHistoryHardwareSlice(set, get),
 
   // ---------------------------------------------------------------------------
-  // Home Redesign §6.6 — Last-week HotPick recap + Week Mini-Strip
+  // Last-week HotPick recap + Week Mini-Strip (Home Redesign §6.6)
+  // (extracted into slices/homeRecapSlice.ts — same set, same behaviour)
   // ---------------------------------------------------------------------------
-  // Both queries respect Hard Rule #3 (client never computes scores). They
-  // read pre-computed values: season_picks.is_correct for the last-week
-  // HotPick chip, and season_user_totals.week_points for the week strip.
-  // No SUM or AVG happens here.
-  // ---------------------------------------------------------------------------
-  lastWeekHotPick: null,
-  recentWeeks: [],
-  hotPickHitRate: null,
-  loadHotPickHitRate: async (userId, competition) => {
-    // Weeks with is_hotpick_correct = null had no HotPick attempt and
-    // don't count toward numerator or denominator.
-    const {data} = await supabase
-      .from('season_user_totals')
-      .select('is_hotpick_correct')
-      .eq('user_id', userId)
-      .eq('competition', competition);
-    if (!data) {
-      set({hotPickHitRate: null});
-      return;
-    }
-    let hits = 0;
-    let total = 0;
-    for (const row of data as Array<{is_hotpick_correct: boolean | null}>) {
-      if (row.is_hotpick_correct == null) continue;
-      total += 1;
-      if (row.is_hotpick_correct) hits += 1;
-    }
-    set({hotPickHitRate: total > 0 ? {hits, total} : null});
-  },
-
-  loadLastWeekHotPick: async (userId, competition, currentWeek) => {
-    if (currentWeek <= 1) {
-      set({lastWeekHotPick: null});
-      return;
-    }
-    const targetWeek = currentWeek - 1;
-
-    // Read the user's HotPick row for the prior week. is_correct + points
-    // are server-computed by the scoring Edge Function; we only display.
-    const {data: pick} = await supabase
-      .from('season_picks')
-      .select('picked_team, is_correct, points')
-      .eq('user_id', userId)
-      .eq('competition', competition)
-      .eq('week', targetWeek)
-      .eq('is_hotpick', true)
-      .maybeSingle();
-
-    if (!pick || pick.is_correct == null) {
-      set({lastWeekHotPick: null});
-      return;
-    }
-
-    set({
-      lastWeekHotPick: {
-        team:      pick.picked_team,
-        isCorrect: pick.is_correct,
-        points:    pick.points ?? 0,
-      },
-    });
-  },
-
-  loadRecentWeeks: async (userId, competition) => {
-    // Pre-computed per-week totals. Last 4 weeks descending; display ascending.
-    const {data} = await supabase
-      .from('season_user_totals')
-      .select('week, week_points, correct_picks, total_picks')
-      .eq('user_id', userId)
-      .eq('competition', competition)
-      .order('week', {ascending: false})
-      .limit(4);
-
-    const rows = (data ?? []) as Array<{
-      week: number;
-      week_points: number | null;
-      correct_picks: number | null;
-      total_picks: number | null;
-    }>;
-    // Per-week earned is `week_points`. `playoff_points` is NOT a separate
-    // bucket — the scoring fn sets it equal to week_points for weeks ≥ 19 so
-    // the playoff-scoped leaderboard can sum it. Adding both double-counts
-    // playoff weeks (a +12 week rendered as +24).
-    const ascending = [...rows].reverse().map(r => ({
-      week:         r.week,
-      total:        r.week_points ?? 0,
-      correctPicks: r.correct_picks ?? 0,
-      totalPicks:   r.total_picks ?? 0,
-    }));
-    set({recentWeeks: ascending});
-  },
+  ...createHomeRecapSlice(set),
 
   // ---------------------------------------------------------------------------
-  // Home Redesign §6.4.6 — Pool Module indicators + rank batch
+  // Pool Module indicators + per-pool rank batch (Home Redesign §6.4.6)
+  // (extracted into slices/poolIndicatorsSlice.ts — same set, same behaviour)
   // ---------------------------------------------------------------------------
-  poolIndicators: {},
-
-  loadPoolIndicators: async (userId, poolIds) => {
-    if (poolIds.length === 0) {
-      set({poolIndicators: {}});
-      return;
-    }
-
-    // One aggregated query across all pools — never N+1 per Module.
-    // Counts organizer_notifications.sent_at > notification_read_state.last_read_at.
-    const [unreadResult, readStateResult] = await Promise.all([
-      supabase
-        .from('organizer_notifications')
-        .select('pool_id, sent_at')
-        .in('pool_id', poolIds)
-        .order('sent_at', {ascending: false}),
-      supabase
-        .from('notification_read_state')
-        .select('pool_id, last_read_at')
-        .in('pool_id', poolIds)
-        .eq('user_id', userId),
-    ]);
-
-    const lastReadByPool = new Map<string, string>();
-    for (const row of (readStateResult.data ?? []) as Array<{
-      pool_id: string;
-      last_read_at: string;
-    }>) {
-      lastReadByPool.set(row.pool_id, row.last_read_at);
-    }
-
-    const indicators: Record<string, {orgUnread: number; mostRecentAt: string | null}> = {};
-    for (const pid of poolIds) {
-      indicators[pid] = {orgUnread: 0, mostRecentAt: null};
-    }
-
-    for (const row of (unreadResult.data ?? []) as Array<{
-      pool_id: string;
-      sent_at: string;
-    }>) {
-      const cell = indicators[row.pool_id];
-      if (!cell) continue;
-      const lastRead = lastReadByPool.get(row.pool_id);
-      // If we've never visited the pool's notifications, EVERYTHING is unread.
-      if (!lastRead || row.sent_at > lastRead) {
-        cell.orgUnread += 1;
-      }
-      // mostRecentAt = the newest sent_at we've seen for this pool (any read state).
-      if (!cell.mostRecentAt || row.sent_at > cell.mostRecentAt) {
-        cell.mostRecentAt = row.sent_at;
-      }
-    }
-
-    set({poolIndicators: indicators});
-  },
-
-  markOrgNotificationsRead: async (userId, poolId) => {
-    const now = new Date().toISOString();
-    // Upsert by (user_id, pool_id) — primary key composite. RLS allows
-    // user to insert/update their own rows only.
-    await supabase
-      .from('notification_read_state')
-      .upsert(
-        {user_id: userId, pool_id: poolId, last_read_at: now},
-        {onConflict: 'user_id,pool_id'},
-      );
-    set(state => ({
-      poolIndicators: {
-        ...state.poolIndicators,
-        [poolId]: {...(state.poolIndicators[poolId] ?? {mostRecentAt: null}), orgUnread: 0},
-      },
-    }));
-  },
-
-  userRankByPool: {},
-
-  weekRankByPool: {},
-  loadWeekRankByPool: async (userId, poolIds, competition, week) => {
-    if (poolIds.length === 0 || week <= 0) {
-      weekRankLatestTag = '';
-      set({weekRankByPool: {}});
-      return;
-    }
-    weekRankLatestTag = `${competition}::${week}`;
-    const {data: members} = await supabase
-      .from('pool_members')
-      .select('pool_id, user_id')
-      .in('pool_id', poolIds)
-      .eq('status', 'active');
-    if (!members) {
-      set({weekRankByPool: {}});
-      return;
-    }
-    const memberIds = [...new Set(members.map((r: any) => r.user_id))];
-    if (memberIds.length === 0) {
-      set({weekRankByPool: {}});
-      return;
-    }
-    const {data: totals} = await supabase
-      .from('season_user_totals')
-      .select('user_id, week_points')
-      .eq('competition', competition)
-      .eq('week', week)
-      .in('user_id', memberIds);
-    const pointsByUser: Record<string, number> = {};
-    for (const r of totals ?? []) {
-      pointsByUser[(r as any).user_id] =
-        (pointsByUser[(r as any).user_id] ?? 0) + ((r as any).week_points ?? 0);
-    }
-    const membersByPool: Record<string, string[]> = {};
-    for (const row of members) {
-      const pid = (row as any).pool_id as string;
-      const uid = (row as any).user_id as string;
-      if (!membersByPool[pid]) membersByPool[pid] = [];
-      membersByPool[pid].push(uid);
-    }
-    const map: Record<string, {rank: number; memberCount: number; weekPoints: number}> = {};
-    for (const pid of Object.keys(membersByPool)) {
-      const ids = membersByPool[pid];
-      const ranked = ids
-        .map(uid => ({uid, pts: pointsByUser[uid] ?? 0}))
-        .sort((a, b) => b.pts - a.pts);
-      const idx = ranked.findIndex(r => r.uid === userId);
-      if (idx === -1) continue;
-      map[pid] = {
-        rank: idx + 1,
-        memberCount: ids.length,
-        weekPoints: ranked[idx].pts,
-      };
-    }
-    // Race-condition guard — discard if a newer call has already been
-    // issued for a different (week, competition) tuple. Avoids the
-    // late-response-overwrite bug without a cross-store import.
-    const tag = `${competition}::${week}`;
-    if (weekRankLatestTag !== tag) return;
-    set({weekRankByPool: map});
-  },
-
-  loadUserRankByPool: async (userId, poolIds) => {
-    if (poolIds.length === 0) {
-      set({userRankByPool: {}});
-      return;
-    }
-
-    // One RPC round trip for all pools at once.
-    const {data, error} = await supabase.rpc('get_user_ranks_in_pools', {
-      p_user_id:  userId,
-      p_pool_ids: poolIds,
-    });
-
-    if (error || !data) {
-      set({userRankByPool: {}});
-      return;
-    }
-
-    const map: Record<string, {rank: number; memberCount: number; total: number}> = {};
-    for (const row of data as Array<{
-      pool_id: string;
-      user_rank: number;
-      member_count: number;
-      user_total: number;
-    }>) {
-      map[row.pool_id] = {
-        rank:        row.user_rank,
-        memberCount: row.member_count,
-        total:       row.user_total,
-      };
-    }
-    set({userRankByPool: map});
-  },
+  ...createPoolIndicatorsSlice(set),
 
   // ---------------------------------------------------------------------------
   // Home Redesign §6.4.7 — Partner Module data + indicators
