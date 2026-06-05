@@ -11,9 +11,9 @@ import {useBrand, useTheme} from '@shell/theme';
  *
  * Uses "Powered by" text + HotPick wordmark image.
  */
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+ 
 const wordmarkLight = require('../../assets/hotpick-wordmark-lt.png');
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+ 
 const wordmarkDark = require('../../assets/hotpick-wordmark-dk.png');
 
 /**

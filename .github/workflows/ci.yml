@@ -33,8 +33,9 @@ jobs:
       - name: Tests (full jest suite)
         run: npx jest --ci
 
-      # Non-blocking for now: the repo has ~73 pre-existing eslint errors.
-      # Surfaced here so the count is visible and can be driven down; flip
-      # to a hard gate (remove `|| true`) once src/ is clean.
-      - name: Lint (non-blocking)
-        run: npx eslint . || true
+      # Hard gate: blocks on eslint ERRORS (e.g. react-hooks/rules-of-hooks,
+      # no-undef). Hygiene/advisory rules (no-unused-vars, exhaustive-deps) are
+      # configured as warnings, so they're visible but don't fail the build.
+      # Deno edge functions are excluded via .eslintignore.
+      - name: Lint
+        run: npx eslint .
