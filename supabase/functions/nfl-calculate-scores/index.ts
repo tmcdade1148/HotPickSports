@@ -1,12 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { effectiveRank, scorePicks, weekPhase } from "../_shared/scoring.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL") ?? "",
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
   { auth: { persistSession: false } }
 );
-
-const BASE_WIN_POINTS = 1;
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -60,11 +59,7 @@ Deno.serve(async (req) => {
 });
 
 async function scoreWeek(competition: string, seasonYear: number, week: number) {
-  let phase = "REGULAR";
-  if (week === 19) phase = "WILDCARD";
-  else if (week === 20) phase = "DIVISIONAL";
-  else if (week === 21) phase = "CONFERENCE";
-  else if (week === 22) phase = "SUPERBOWL";
+  const phase = weekPhase(week);
 
   const { data: games, error: gamesError } = await supabase
     .from("season_games")
@@ -75,7 +70,7 @@ async function scoreWeek(competition: string, seasonYear: number, week: number) 
   if (gamesError) return { users_scored: 0, final_games: 0, error: gamesError.message };
   if (!games || games.length === 0) return { users_scored: 0, final_games: 0 };
 
-  const gameMap = new Map(games.map((g) => [g.game_id, { ...g, effectiveRank: g.frozen_rank ?? g.rank ?? 1 }]));
+  const gameMap = new Map(games.map((g) => [g.game_id, { ...g, effectiveRank: effectiveRank(g) }]));
 
   const { data: picks, error: picksError } = await supabase
     .from("season_picks")
@@ -84,50 +79,13 @@ async function scoreWeek(competition: string, seasonYear: number, week: number) 
 
   if (picksError) return { users_scored: 0, final_games: games.length, error: picksError.message };
 
-  const aggByUser = new Map<string, any>();
-  // Track per-pick results to write back to season_picks
-  const pickResults: { user_id: string; game_id: string; is_correct: boolean; points: number }[] = [];
-
-  for (const p of picks ?? []) {
-    const game = gameMap.get(p.game_id);
-    if (!game || !game.winner_team) continue;
-
-    const isWin = p.picked_team === game.winner_team;
-    const isHotpick = !!p.is_hotpick;
-    const isDoubleDown = p.power_up === "double_down";
-    const rank = game.effectiveRank;
-
-    let agg = aggByUser.get(p.user_id) ?? {
-      user_id: p.user_id, week_points: 0, correct_picks: 0,
-      total_picks: 0, is_hotpick_correct: null, hotpick_rank: null,
-      double_down_used: false, double_down_delta: 0,
-    };
-
-    agg.total_picks += 1;
-
-    let pickPoints = 0;
-    if (isHotpick) {
-      agg.hotpick_rank = rank;
-      if (isWin) {
-        pickPoints = isDoubleDown ? rank * 2 : rank;
-        agg.week_points += pickPoints;
-        agg.correct_picks += 1;
-        agg.is_hotpick_correct = true;
-        if (isDoubleDown) { agg.double_down_used = true; agg.double_down_delta = rank; }
-      } else {
-        pickPoints = -rank;
-        agg.week_points -= rank;
-        if (agg.is_hotpick_correct === null) agg.is_hotpick_correct = false;
-      }
-    } else if (isWin) {
-      pickPoints = BASE_WIN_POINTS;
-      agg.week_points += BASE_WIN_POINTS;
-      agg.correct_picks += 1;
-    }
-
-    pickResults.push({ user_id: p.user_id, game_id: p.game_id, is_correct: isWin, points: pickPoints });
-    aggByUser.set(p.user_id, agg);
-  }
+  // Pure scoring (see ../_shared/scoring.ts — covered by __tests__/scoring.test.ts).
+  // Returns per-user aggregates (incl. zero-row backfill), per-pick results, and
+  // the set of users who actually scored.
+  const { userAggs, pickResults, scoredUserIds } = scorePicks(gameMap, picks ?? []);
+  // Lookup for the SmackTalk auto-posts below (zero-row backfills carry
+  // is_hotpick_correct=null and are skipped by that loop's own guard).
+  const aggByUser = new Map(userAggs.map((u) => [u.user_id, u]));
 
   // Write per-pick results (points, is_correct) back to season_picks in a
   // single round-trip via RPC. (Was an unguarded N+1 update loop that swallowed
@@ -141,24 +99,6 @@ async function scoreWeek(competition: string, seasonYear: number, week: number) 
     });
     if (pickWriteErr) {
       return { users_scored: 0, final_games: games.length, error: `pick write: ${pickWriteErr.message}` };
-    }
-  }
-
-  const userAggs = Array.from(aggByUser.values());
-
-  // Write 0-rows for users who submitted picks this week but none match any final game yet.
-  // Without this, their season_user_totals row isn't created until one of their picked games
-  // becomes final — causing the pts-earned widget on the home screen to show "—" (null)
-  // for the entire time before their first game settles.
-  const scoredUserIds = new Set(userAggs.map((u) => u.user_id));
-  const picksUserIds = new Set((picks ?? []).map((p) => p.user_id));
-  for (const uid of picksUserIds) {
-    if (!scoredUserIds.has(uid)) {
-      userAggs.push({
-        user_id: uid, week_points: 0, correct_picks: 0,
-        total_picks: 0, is_hotpick_correct: null, hotpick_rank: null,
-        double_down_used: false, double_down_delta: 0,
-      });
     }
   }
 
