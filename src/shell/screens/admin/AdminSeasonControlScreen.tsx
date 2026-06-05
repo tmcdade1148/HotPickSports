@@ -67,6 +67,9 @@ interface CompRow {
   currentWeek: number | null;
   weekState: string;
   readiness: Readiness | null;
+  // Next week's readiness — admin_advance_week gates on it server-side, so the
+  // Advance button must mirror it (review #1).
+  nextReadiness: Readiness | null;
 }
 
 function nextPhaseOf(phase: string): string {
@@ -151,6 +154,7 @@ function AdminSeasonControlImpl() {
         currentWeek: v.currentWeek,
         weekState: v.weekState,
         readiness: v.currentWeek != null ? wrByKey[`${competition}#${v.currentWeek}`] ?? null : null,
+        nextReadiness: v.currentWeek != null ? wrByKey[`${competition}#${v.currentWeek + 1}`] ?? null : null,
       }))
       .sort((a, b) => a.competition.localeCompare(b.competition));
 
@@ -265,7 +269,10 @@ function AdminSeasonControlImpl() {
             const r = comp.readiness;
             const ready = isReady(r);
             const canOpen = ready && comp.weekState !== 'picks_open' && !isBusy;
-            const canAdvanceWeek = comp.weekState === 'complete' && !isBusy;
+            // Advance opens the NEXT week, so mirror the server gate on that
+            // week's readiness (review #1) — not the current week's.
+            const nextReady = isReady(comp.nextReadiness);
+            const canAdvanceWeek = comp.weekState === 'complete' && nextReady && !isBusy;
 
             return (
               <View
@@ -395,6 +402,11 @@ function AdminSeasonControlImpl() {
                   {!ready && (
                     <Text style={[bodyType.regular, styles.gateHint, {color: colors.textTertiary}]}>
                       Open Picks unlocks when games, odds and ranks are all green.
+                    </Text>
+                  )}
+                  {comp.weekState === 'complete' && !nextReady && (
+                    <Text style={[bodyType.regular, styles.gateHint, {color: colors.textTertiary}]}>
+                      Advance Week unlocks once Week {(comp.currentWeek ?? 0) + 1}'s games, odds and ranks are all green.
                     </Text>
                   )}
                 </View>
