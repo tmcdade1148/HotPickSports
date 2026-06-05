@@ -129,11 +129,18 @@ async function scoreWeek(competition: string, seasonYear: number, week: number) 
     aggByUser.set(p.user_id, agg);
   }
 
-  // Write per-pick results (points, is_correct) back to season_picks
+  // Write per-pick results (points, is_correct) back to season_picks in a
+  // single round-trip via RPC. (Was an unguarded N+1 update loop that swallowed
+  // errors → could leave season_picks inconsistent with award computation.)
   if (pickResults.length > 0) {
-    for (const pr of pickResults) {
-      await supabase.from("season_picks").update({ is_correct: pr.is_correct, points: pr.points })
-        .eq("user_id", pr.user_id).eq("game_id", pr.game_id).eq("competition", competition);
+    const { error: pickWriteErr } = await supabase.rpc("apply_season_pick_results", {
+      p_competition: competition,
+      p_season_year: seasonYear,
+      p_week: week,
+      p_results: pickResults,
+    });
+    if (pickWriteErr) {
+      return { users_scored: 0, final_games: games.length, error: `pick write: ${pickWriteErr.message}` };
     }
   }
 
@@ -157,30 +164,17 @@ async function scoreWeek(competition: string, seasonYear: number, week: number) 
 
   if (userAggs.length === 0) return { users_scored: 0, final_games: games.length };
 
-  const userIds = userAggs.map((u) => u.user_id);
-  const { data: existingRows } = await supabase
-    .from("season_user_totals").select("user_id, mulligan_used")
-    .eq("competition", competition).eq("season_year", seasonYear).eq("week", week)
-    .in("user_id", userIds);
-
-  const mulliganMap = new Map((existingRows ?? []).map((r) => [r.user_id, r.mulligan_used ?? false]));
-
-  const { error: upsertError } = await supabase
-    .from("season_user_totals")
-    .upsert(
-      userAggs.map((u) => ({
-        user_id: u.user_id, competition, season_year: seasonYear, week, phase,
-        week_points: u.week_points,
-        playoff_points: week >= 19 ? u.week_points : 0,
-        correct_picks: u.correct_picks, total_picks: u.total_picks,
-        is_hotpick_correct: u.is_hotpick_correct,
-        hotpick_rank: u.hotpick_rank, is_no_show: false,
-        double_down_used: u.double_down_used, double_down_delta: u.double_down_delta,
-        mulligan_used: mulliganMap.get(u.user_id) ?? false,
-        scored_at: new Date().toISOString(),
-      })),
-      { onConflict: "user_id,competition,season_year,week" }
-    );
+  // Upsert week totals via RPC with a COLUMN-SCOPED ON CONFLICT. This preserves
+  // is_no_show and mulligan_used (the old full-row .upsert() rewrote them every
+  // pass, and read-then-wrote mulligan racily). The scorer now only touches the
+  // columns it owns; no need to pre-read existing rows.
+  const { error: upsertError } = await supabase.rpc("upsert_season_week_scores", {
+    p_competition: competition,
+    p_season_year: seasonYear,
+    p_week: week,
+    p_phase: phase,
+    p_aggs: userAggs,
+  });
 
   if (upsertError) return { users_scored: 0, final_games: games.length, error: upsertError.message };
 
