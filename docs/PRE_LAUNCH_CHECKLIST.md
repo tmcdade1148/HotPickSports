@@ -57,3 +57,4 @@
 - **Regular-season results archive** — no persistent per-contest final-standings view after the playoff reset (spec §9). Champion *award* exists (`compute-hardware`); standings *archive* doesn't.
 - **Efficiency redesign (scale)** — make `compute-hardware` event-driven (fire on week settle, not every 30 min); window game-day crons; etc. Only matters at volume.
 - **History tab** — `HistoryScreen` is reachable from Settings ("Awards & Records"); the bottom-nav History *tab* stays shelved ("not ready for launch").
+- **Weekly Engine — Version B shadow run** — Parked for **September**. A `nfl_2026_sim` competition running the *real* production pipeline on `open_picks_mode = auto`, as a parallel shadow of the live (manual-open) season, to prove auto-open before it's ever trusted on production. Explicitly out of scope for the Weekly Engine build (`260605_HotPick_WeeklyEngine_Spec` v1.0, §1). Production (`nfl_2026`) stays **manual-open** for Season 2 regardless.
