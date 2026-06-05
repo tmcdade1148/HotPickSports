@@ -9,7 +9,7 @@
 //     The server is authoritative (gate + audit live in the RPCs); the client
 //     only reflects status and enables/disables the buttons.
 
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {Alert, ScrollView, StyleSheet, Text, View, Pressable, ActivityIndicator} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
@@ -163,6 +163,28 @@ function AdminSeasonControlImpl() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Realtime (review #6): week_state is advanced by an ESPN-driven trigger and
+  // readiness by the prep steps — neither originates on this screen. Subscribe so
+  // the indicator + button availability reflect the server without a manual
+  // refresh. Debounced to coalesce bursts (e.g. a poll updating many games).
+  const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleReload = useCallback(() => {
+    if (reloadTimer.current) clearTimeout(reloadTimer.current);
+    reloadTimer.current = setTimeout(() => { load(); }, 400);
+  }, [load]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('admin-season-control')
+      .on('postgres_changes', {event: 'UPDATE', schema: 'public', table: 'competition_config'}, scheduleReload)
+      .on('postgres_changes', {event: '*', schema: 'public', table: 'week_readiness'}, scheduleReload)
+      .subscribe();
+    return () => {
+      if (reloadTimer.current) clearTimeout(reloadTimer.current);
+      supabase.removeChannel(channel);
+    };
+  }, [scheduleReload]);
 
   const advancePhase = (comp: CompRow) => {
     const next = nextPhaseOf(comp.phase);
@@ -430,7 +452,7 @@ function CheckRow({
 }) {
   const s = status ?? 'pending';
   const Icon = s === 'ok' ? CircleCheck : s === 'failed' ? CircleAlert : CircleDashed;
-  const tint = s === 'ok' ? colors.success ?? '#3ba55d' : s === 'failed' ? colors.error ?? '#e03e3e' : colors.textTertiary;
+  const tint = s === 'ok' ? colors.success : s === 'failed' ? colors.error : colors.textTertiary;
   return (
     <View style={styles.checkRow}>
       <Icon size={16} color={tint} />
