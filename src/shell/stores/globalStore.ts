@@ -1,10 +1,9 @@
 import {create} from 'zustand';
-import type {AnyEventConfig} from '@shared/types/templates';
 import type {DbPool, DbProfile} from '@shared/types/database';
 import type {BrandConfig} from '@shell/theme/types';
 import {supabase} from '@shared/config/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {getAllEventsUnfiltered, getEventsByPriority, getDemoEvent, getEventByCompetition, DEMO_POOL_ID} from '@sports/registry';
+import {getAllEventsUnfiltered, getEventsByPriority, getEventByCompetition} from '@sports/registry';
 import {deactivateDeviceTokens} from '@shell/services/pushNotifications';
 import {setMonitoringUser} from '@shared/monitoring/sentry';
 import {isSandboxCompetition} from '@shared/utils/competition';
@@ -17,6 +16,7 @@ import {createHomeRecapSlice} from './slices/homeRecapSlice';
 import {createPoolIndicatorsSlice} from './slices/poolIndicatorsSlice';
 import {createPartnerModuleSlice} from './slices/partnerModuleSlice';
 import {createPoolAdminSlice} from './slices/poolAdminSlice';
+import {createDemoSlice} from './slices/demoSlice';
 import type {GlobalState} from './globalStore.types';
 // Re-exported so existing consumers keep importing these from globalStore.
 export type {
@@ -28,12 +28,6 @@ export type {
 
 const POOL_STORAGE_PREFIX = 'hotpick_active_pool_';
 const DEFAULT_POOL_PREFIX = 'hotpick_default_pool_';
-
-// Snapshot of the user's active selection before entering the onboarding demo,
-// restored by exitDemo(). Module-scoped (the store is a singleton) to avoid
-// widening the typed store interface with internal-only fields.
-let _preDemoSport: AnyEventConfig | null = null;
-let _preDemoPoolId: string | null = null;
 
 /**
  * DEV-only: AsyncStorage key for the active competition so Metro hot reloads
@@ -432,67 +426,9 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
 
   // ---------------------------------------------------------------------------
   // New-user onboarding demo (spec: docs/DEMO_WEEK_SPEC.md)
+  // (extracted into slices/demoSlice.ts — same set/get, same behaviour)
   // ---------------------------------------------------------------------------
-  isDemoActive: false,
-  demoIntroOpen: false,
-  demoScoreOpen: false,
-  demoResult: null,
-  enterDemo: async () => {
-    const {isDemoActive, activeSport, activePoolId} = get();
-    // Snapshot the prior selection once (so re-entry doesn't clobber it).
-    if (!isDemoActive) {
-      _preDemoSport = activeSport;
-      _preDemoPoolId = activePoolId;
-    }
-    // Best-effort server reset + demo-pool membership. The picks loop is
-    // pool-independent, so a failure here doesn't block the demo render.
-    try {
-      await supabase.rpc('enter_demo');
-    } catch {
-      // ignore — non-critical to rendering the demo picks screen
-    }
-    // Set state directly (not via setActiveSport) to avoid its async
-    // loadPersistedPoolId racing our activePoolId write. Open the scoring
-    // explainer, clear any prior reveal.
-    set({
-      isDemoActive: true,
-      activeSport: getDemoEvent(),
-      activePoolId: DEMO_POOL_ID,
-      activeBrandConfig: null,
-      userPools: [],
-      demoIntroOpen: true,
-      demoScoreOpen: false,
-      demoResult: null,
-    });
-  },
-  exitDemo: () => {
-    const prevSport = _preDemoSport;
-    const prevPool = _preDemoPoolId;
-    _preDemoSport = null;
-    _preDemoPoolId = null;
-    const demoReset = {
-      isDemoActive: false,
-      demoIntroOpen: false,
-      demoScoreOpen: false,
-      demoResult: null,
-    };
-    if (prevSport) {
-      const cached = get().poolsByCompetition[prevSport.competition] ?? [];
-      set({
-        ...demoReset,
-        activeSport: prevSport,
-        activePoolId: prevPool,
-        userPools: cached,
-        activeBrandConfig: null,
-      });
-    } else {
-      set(demoReset);
-    }
-  },
-  dismissDemoIntro: () => set({demoIntroOpen: false}),
-  dismissDemoScore: () => set({demoScoreOpen: false}),
-  setDemoResult: r => set({demoResult: r, demoScoreOpen: true}),
-  clearDemoReveal: () => set({demoResult: null, demoScoreOpen: false}),
+  ...createDemoSlice(set, get),
 
   // ---------------------------------------------------------------------------
   // Pool state
