@@ -146,6 +146,9 @@ export function PoolSettingsScreen() {
   const [newLabel, setNewLabel] = useState('');
   const [addingCode, setAddingCode] = useState(false);
   const [codeError, setCodeError] = useState<string | null>(null);
+  // Tracks which Club is being removed from the roster. Must live with the
+  // other hooks (above the `if (!pool)` early return) — never below it.
+  const [removingPartnerId, setRemovingPartnerId] = useState<string | null>(null);
 
   const fetchCodes = useCallback(async () => {
     if (!poolId) return;
@@ -318,7 +321,6 @@ export function PoolSettingsScreen() {
 
   // Remove a Club from this Contest's roster. Confirms first; the
   // store's loader is then re-run so the list re-paints in place.
-  const [removingPartnerId, setRemovingPartnerId] = useState<string | null>(null);
   const handleRemoveAffiliation = (partnerId: string, partnerName: string) => {
     Alert.alert(
       `Remove ${partnerName}?`,
