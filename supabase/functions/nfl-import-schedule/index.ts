@@ -14,16 +14,23 @@ const WEEK_TO_ESPN: Record<number, { seasonType: number; espnWeek: number; phase
 };
 
 Deno.serve(async (req) => {
+  // Hoisted so the catch block can record a readiness failure (§5b).
+  let competition = "nfl_2026";
+  let week = 0;
   try {
     const body = await req.json().catch(() => ({}));
-    const competition = body.competition ?? "nfl_2026";
-    const week = Number(body.week);
-    if (!week) return json({ error: "Missing week parameter" }, 400);
+    competition = body.competition ?? "nfl_2026";
 
     const { data: configRows } = await supabase
       .from("competition_config").select("key, value").eq("competition", competition);
     const cfg = Object.fromEntries((configRows ?? []).map((r) => [r.key, r.value]));
     if (!cfg.is_active) return json({ success: true, reason: "competition_inactive" }, 200);
+
+    // Week: explicit param wins; otherwise derive from the clock so the cron
+    // (which passes no week) preps the right week. See deriveWeek().
+    week = Number(body.week) || deriveWeek(cfg);
+    if (!week) return json({ success: true, reason: "no_active_week" }, 200);
+
     const seasonYear = Number(cfg.season_year ?? 2026);
 
     let seasonType: number, espnWeek: number, phase: string;
@@ -38,6 +45,7 @@ Deno.serve(async (req) => {
     const events = espnData.events ?? [];
 
     if (events.length === 0) {
+      await markReadiness(competition, week, { games_status: "ok", games_count: 0, games_at: new Date().toISOString() });
       return json({ success: true, competition, season_year: seasonYear, week, imported: 0, warning: "No games found" }, 200);
     }
 
@@ -85,26 +93,59 @@ Deno.serve(async (req) => {
     }
 
     const { error } = await supabase.from("season_games").upsert(rows, { onConflict: "game_id" });
-    if (error) return json({ error: error.message }, 500);
+    if (error) {
+      await markReadiness(competition, week, { games_status: "failed", games_at: new Date().toISOString() });
+      return json({ error: error.message }, 500);
+    }
+
+    // §5b — games loaded OK.
+    await markReadiness(competition, week, { games_status: "ok", games_count: rows.length, games_at: new Date().toISOString() });
 
     console.log(`[nfl-import-schedule] Imported ${rows.length} games`);
 
-    if (week !== 22) {
-      const rankRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/nfl-rank-games`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ competition, week }),
-      });
-      const rankData = await rankRes.json().catch(() => ({}));
-      console.log(`[nfl-import-schedule] Ranked ${rankData.updated ?? 0} games`);
-    }
+    // Ranking is intentionally NOT done here. frozen_rank is set by
+    // nfl-rank-games AFTER nfl-fetch-odds runs (REFERENCE.md §7), so ranks are
+    // computed from the Odds-API numbers — not ESPN's import-time scoreboard
+    // odds. Freezing inline at import would lock ranks on the weaker source and,
+    // via Hard Rule #6 (immutable frozen_rank), make the fetch-odds -> rank-games
+    // steps inert. The Tuesday cron (odds 10:00, rank 10:15) and
+    // nfl-weekly-transition both run rank after odds.
 
     return json({ success: true, competition, season_year: seasonYear, week, phase, imported: rows.length }, 200);
   } catch (err) {
+    if (week) await markReadiness(competition, week, { games_status: "failed", games_at: new Date().toISOString() });
     return json({ success: false, error: String(err) }, 500);
   }
 });
 
 function json(body: unknown, status: number) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+}
+
+// Derive which week to prep when the caller (cron) passes none. Explicit week
+// always wins upstream. After a week wraps up (settling/complete) the NEXT week
+// is what needs prepping for admin_advance_week's gate; otherwise it's the
+// current week (covers the Week-1 initial open while week_state is idle).
+function deriveWeek(cfg: Record<string, any>): number {
+  const strip = (v: any) => String(v ?? "").replace(/^"|"$/g, "");
+  // Auto-prep only runs inside the weekly cycle — never off-season / pre-season,
+  // which would prematurely import and FREEZE ranks on stale odds (Hard Rule #6).
+  const phase = strip(cfg.current_phase);
+  if (!["REGULAR", "PLAYOFFS", "SUPERBOWL"].includes(phase)) return 0;
+  const current = Number(strip(cfg.current_week)) || 0;
+  const ws = strip(cfg.week_state);
+  if (!current) return 0;
+  return (ws === "settling" || ws === "complete") ? current + 1 : current;
+}
+
+// §5b — best-effort upsert of this step's slice of week_readiness. Wrapped so a
+// readiness write never breaks the prep step itself. Partial column set; sibling
+// columns (odds_*, ranks_*) are preserved on conflict.
+async function markReadiness(competition: string, week: number, fields: Record<string, unknown>) {
+  try {
+    await supabase.from("week_readiness").upsert(
+      { competition, week_number: week, updated_at: new Date().toISOString(), ...fields },
+      { onConflict: "competition,week_number" },
+    );
+  } catch (_e) { /* best-effort */ }
 }
