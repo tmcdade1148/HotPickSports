@@ -17,9 +17,11 @@ module.exports = {
       ')',
   ],
 
-  // Use the built-in mock from react-native-safe-area-context
+  // Use the built-in mock from react-native-safe-area-context, plus our own
+  // global mocks (AsyncStorage) so suites don't crash at import time.
   setupFiles: [
     './node_modules/react-native-safe-area-context/jest/mock.tsx',
+    './jest.setup.js',
   ],
 
   // Map path aliases to match babel-plugin-module-resolver config
