@@ -7,6 +7,28 @@ const supabase = createClient(
 );
 
 /**
+ * Fetch ALL matching rows, paging past PostgREST's 1000-row default cap.
+ * `apply` adds the .select()/.eq() filters; .range() is added per page.
+ * Award math iterates the full result set, so a silent truncation at 1000
+ * rows would corrupt season/week winners once the user base grows.
+ */
+async function fetchAll<T = any>(
+  table: string,
+  apply: (q: any) => any,
+): Promise<T[]> {
+  const PAGE = 1000;
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await apply(supabase.from(table)).range(from, from + PAGE - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    out.push(...(data as T[]));
+    if (data.length < PAGE) break;
+  }
+  return out;
+}
+
+/**
  * compute-hardware — Award computation engine.
  *
  * Computes weekly and season-end awards, writes to user_hardware.
@@ -67,16 +89,15 @@ Deno.serve(async (req) => {
 
 async function computeSharpshooterWeek(competition: string, seasonYear: number, week: number) {
   // Highest regular pick win rate per pool. Min 10 picks. Ties: both awarded.
-  const { data: picks } = await supabase
-    .from("season_picks")
-    .select("user_id, is_correct, is_hotpick")
-    .eq("competition", competition)
-    .eq("week", week)
-    .eq("is_hotpick", false);
+  const picks = await fetchAll<{ user_id: string; is_correct: boolean; is_hotpick: boolean }>(
+    "season_picks",
+    q => q.select("user_id, is_correct, is_hotpick")
+      .eq("competition", competition).eq("week", week).eq("is_hotpick", false),
+  );
 
   const members = await activePoolMembers(competition);
 
-  if (!picks || !members) return { awarded: 0 };
+  if (!members) return { awarded: 0 };
 
   // Build user->pools map
   const userPools = new Map<string, string[]>();
@@ -145,15 +166,13 @@ async function computeSharpshooterWeek(competition: string, seasonYear: number, 
 
 async function computeGunslingerWeek(competition: string, seasonYear: number, week: number) {
   // Rank 12+ HotPick AND won. Highest rank winner per pool. Ties: both awarded.
-  const { data: hotpicks } = await supabase
-    .from("season_picks")
-    .select("user_id, game_id, picked_team, is_correct")
-    .eq("competition", competition)
-    .eq("week", week)
-    .eq("is_hotpick", true)
-    .eq("is_correct", true);
+  const hotpicks = await fetchAll<{ user_id: string; game_id: string; picked_team: string; is_correct: boolean }>(
+    "season_picks",
+    q => q.select("user_id, game_id, picked_team, is_correct")
+      .eq("competition", competition).eq("week", week).eq("is_hotpick", true).eq("is_correct", true),
+  );
 
-  if (!hotpicks || hotpicks.length === 0) return { awarded: 0 };
+  if (hotpicks.length === 0) return { awarded: 0 };
 
   // Get game frozen_ranks
   const gameIds = [...new Set(hotpicks.map(h => h.game_id))];
@@ -221,27 +240,26 @@ async function computeGunslingerWeek(competition: string, seasonYear: number, we
 
 async function computeContrarianWeek(competition: string, seasonYear: number, week: number) {
   // Against pool majority on 8+ games AND top 3 weekly AND hotpick correct
-  const { data: picks } = await supabase
-    .from("season_picks")
-    .select("user_id, game_id, picked_team, is_hotpick, is_correct")
-    .eq("competition", competition)
-    .eq("week", week);
+  const picks = await fetchAll<{ user_id: string; game_id: string; picked_team: string; is_hotpick: boolean; is_correct: boolean }>(
+    "season_picks",
+    q => q.select("user_id, game_id, picked_team, is_hotpick, is_correct")
+      .eq("competition", competition).eq("week", week),
+  );
 
-  const { data: stats } = await supabase
-    .from("game_pick_stats")
-    .select("game_id, pool_id, team_a, team_b, team_a_pick_count, team_b_pick_count, total_picks")
-    .eq("competition", competition)
-    .eq("week", week);
+  const stats = await fetchAll<{ game_id: string; pool_id: string; team_a: string; team_b: string; team_a_pick_count: number; team_b_pick_count: number; total_picks: number }>(
+    "game_pick_stats",
+    q => q.select("game_id, pool_id, team_a, team_b, team_a_pick_count, team_b_pick_count, total_picks")
+      .eq("competition", competition).eq("week", week),
+  );
 
-  const { data: weekTotals } = await supabase
-    .from("season_user_totals")
-    .select("user_id, week_points")
-    .eq("competition", competition)
-    .eq("week", week);
+  const weekTotals = await fetchAll<{ user_id: string; week_points: number }>(
+    "season_user_totals",
+    q => q.select("user_id, week_points").eq("competition", competition).eq("week", week),
+  );
 
   const members = await activePoolMembers(competition);
 
-  if (!picks || !stats || !members) return { awarded: 0 };
+  if (!members) return { awarded: 0 };
 
   // Build pool majority map: pool_id -> game_id -> majority team
   const majorityMap = new Map<string, Map<string, string>>();
@@ -352,13 +370,11 @@ async function computeContrarianWeek(competition: string, seasonYear: number, we
 
 async function computePerfectWeek(competition: string, seasonYear: number, week: number) {
   // 15/15 regular picks correct AND hotpick correct. Platform-scope.
-  const { data: picks } = await supabase
-    .from("season_picks")
-    .select("user_id, is_correct, is_hotpick, game_id, picked_team")
-    .eq("competition", competition)
-    .eq("week", week);
-
-  if (!picks) return { awarded: 0 };
+  const picks = await fetchAll<{ user_id: string; is_correct: boolean; is_hotpick: boolean; game_id: string; picked_team: string }>(
+    "season_picks",
+    q => q.select("user_id, is_correct, is_hotpick, game_id, picked_team")
+      .eq("competition", competition).eq("week", week),
+  );
 
   // Aggregate per user
   const userAgg = new Map<string, {
@@ -683,13 +699,11 @@ async function computeIronPoolie(competition: string, seasonYear: number) {
 
 async function computeSeasonSharpshooter(competition: string, seasonYear: number) {
   // Best regular pick win rate across full season. Min 15 weeks. Platform-wide.
-  const { data: picks } = await supabase
-    .from("season_picks")
-    .select("user_id, is_correct, is_hotpick, week")
-    .eq("competition", competition)
-    .eq("is_hotpick", false);
-
-  if (!picks) return { awarded: 0 };
+  const picks = await fetchAll<{ user_id: string; is_correct: boolean; is_hotpick: boolean; week: number }>(
+    "season_picks",
+    q => q.select("user_id, is_correct, is_hotpick, week")
+      .eq("competition", competition).eq("is_hotpick", false),
+  );
 
   const userStats = new Map<string, { correct: number; total: number; weeks: Set<number> }>();
   for (const p of picks) {
@@ -738,13 +752,11 @@ async function computeSeasonSharpshooter(competition: string, seasonYear: number
 
 async function computeHotPickArtist(competition: string, seasonYear: number) {
   // Best HotPick win rate. Min 15 HotPicks submitted. Platform-wide.
-  const { data: picks } = await supabase
-    .from("season_picks")
-    .select("user_id, game_id, is_correct")
-    .eq("competition", competition)
-    .eq("is_hotpick", true);
-
-  if (!picks) return { awarded: 0 };
+  const picks = await fetchAll<{ user_id: string; game_id: string; is_correct: boolean }>(
+    "season_picks",
+    q => q.select("user_id, game_id, is_correct")
+      .eq("competition", competition).eq("is_hotpick", true),
+  );
 
   // Get frozen_ranks for avg rank calc
   const gameIds = [...new Set(picks.map(p => p.game_id))];
@@ -800,13 +812,11 @@ async function computeHotPickArtist(competition: string, seasonYear: number) {
 
 async function computeSeasonTactician(competition: string, seasonYear: number) {
   // Rank 1-6 HotPick for 12+ weeks AND positive total points. Platform-wide.
-  const { data: picks } = await supabase
-    .from("season_picks")
-    .select("user_id, game_id, is_correct, week")
-    .eq("competition", competition)
-    .eq("is_hotpick", true);
-
-  if (!picks) return { awarded: 0 };
+  const picks = await fetchAll<{ user_id: string; game_id: string; is_correct: boolean; week: number }>(
+    "season_picks",
+    q => q.select("user_id, game_id, is_correct, week")
+      .eq("competition", competition).eq("is_hotpick", true),
+  );
 
   const gameIds = [...new Set(picks.map(p => p.game_id))];
   const { data: games } = await supabase
