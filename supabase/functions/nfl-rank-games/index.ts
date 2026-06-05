@@ -65,6 +65,7 @@ Deno.serve(async (req) => {
     const { data: configRows } = await supabase
       .from("competition_config").select("key, value").eq("competition", competition);
     const cfg = Object.fromEntries((configRows ?? []).map((r) => [r.key, r.value]));
+    if (!cfg.is_active) return json({ success: true, reason: "competition_inactive" }, 200);
 
     // Week: explicit param wins; otherwise derive from the clock (cron passes none).
     week = Number(body.week) || deriveWeek(cfg);
