@@ -6,7 +6,10 @@ const supabase = createClient(
   { auth: { persistSession: false } }
 );
 
-const PLAYOFF_WEEK_MAP: Record<number, number> = { 1:19, 2:20, 3:21, 4:21, 5:22 };
+// Postseason ESPN week numbering (seasontype=3): 1=Wild Card, 2=Divisional,
+// 3=Conference, 4=Pro Bowl (no scored games), 5=Super Bowl. This MUST match
+// nfl-import-schedule's mapping. We score only 1,2,3,5 → DB weeks 19,20,21,22.
+const PLAYOFF_WEEK_MAP: Record<number, number> = { 1: 19, 2: 20, 3: 21, 5: 22 };
 
 Deno.serve(async (req) => {
   try {
@@ -69,7 +72,16 @@ Deno.serve(async (req) => {
         }
 
         const espnWeek = event.week?.number ?? 1;
-        const dbWeek = isPlayoffs ? (PLAYOFF_WEEK_MAP[espnWeek] ?? 18 + espnWeek) : espnWeek;
+        // In the postseason, map only the rounds we score; skip unmapped weeks
+        // (Pro Bowl = 4, or anything unexpected) rather than guessing a DB week.
+        let dbWeek: number;
+        if (isPlayoffs) {
+          const mapped = PLAYOFF_WEEK_MAP[espnWeek];
+          if (mapped === undefined) { skippedCount++; continue; }
+          dbWeek = mapped;
+        } else {
+          dbWeek = espnWeek;
+        }
 
         const updateData: Record<string, unknown> = {
           status, home_score: homeScore, away_score: awayScore,
