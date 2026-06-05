@@ -345,7 +345,19 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       if (data?.error === 'pool_full') {
         return {error: 'pool_full', poolFull: true};
       }
-      return {error: data?.error ?? 'Invalid invite code or pool is full.'};
+      // Map the RPC's raw error codes to user-facing copy so internal
+      // tokens (NOT_FOUND, ALREADY_MEMBER) never surface in the join UI.
+      const friendlyJoinError: Record<string, string> = {
+        NOT_FOUND:
+          "We couldn't find a Contest with that invite code. Double-check it and try again.",
+        ALREADY_MEMBER: "You're already in this Contest.",
+      };
+      const rawCode = data?.error as string | undefined;
+      return {
+        error:
+          (rawCode && friendlyJoinError[rawCode]) ??
+          'Invalid invite code. Please check and try again.',
+      };
     }
 
     const typedPool = data.pool as DbPool;
