@@ -7,15 +7,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {getAllEventsUnfiltered, getEventsByPriority, getDemoEvent, getEventByCompetition, DEMO_POOL_ID} from '@sports/registry';
 import {deactivateDeviceTokens} from '@shell/services/pushNotifications';
 import {setMonitoringUser} from '@shared/monitoring/sentry';
-import {nflSeason} from '@sports/nfl/config';
 import {isSandboxCompetition} from '@shared/utils/competition';
 import {createSmackUnreadSlice} from './slices/smackUnreadSlice';
 import {createDelegateSlice} from './slices/delegateSlice';
-import type {
-  GlobalState,
-  PoolAffiliation,
-  UserHardwareItem,
-} from './globalStore.types';
+import {createHistoryHardwareSlice} from './slices/historyHardwareSlice';
+import {createBroadcastsSlice} from './slices/broadcastsSlice';
+import {createAffiliationsSlice} from './slices/affiliationsSlice';
+import type {GlobalState} from './globalStore.types';
 // Re-exported so existing consumers keep importing these from globalStore.
 export type {
   PoolAffiliation,
@@ -953,88 +951,10 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   ...createSmackUnreadSlice(set, get),
 
   // ---------------------------------------------------------------------------
-  // Recent broadcasts (last 24 hours across user's pools)
+  // Recent broadcasts (across user's pools)
+  // (extracted into slices/broadcastsSlice.ts — same set/get, same behaviour)
   // ---------------------------------------------------------------------------
-  recentBroadcasts: [],
-
-  fetchRecentBroadcasts: async () => {
-    const {userPools, user} = get();
-    if (userPools.length === 0) {
-      set({recentBroadcasts: []});
-      return;
-    }
-
-    const poolIds = userPools.map(p => p.id);
-    // 30-day window to match the HomeInbox unread badge (was 24h, which made
-    // the badge count messages the list couldn't show).
-    const windowStart = new Date(
-      Date.now() - 30 * 24 * 60 * 60 * 1000,
-    ).toISOString();
-
-    // Join times — a broadcast sent before the user joined a pool isn't theirs,
-    // so it's excluded here too (mirrors the HomeInbox badge logic).
-    const {data: memberRows} = await supabase
-      .from('pool_members')
-      .select('pool_id, joined_at')
-      .eq('user_id', user?.id ?? '')
-      .in('pool_id', poolIds);
-    const joinedByPool = new Map(
-      (memberRows ?? []).map((r: any) => [r.pool_id, r.joined_at]),
-    );
-
-    const {data: rawBroadcasts} = await supabase
-      .from('organizer_notifications')
-      .select('pool_id, message, sent_at, organizer_id, notification_type')
-      .in('pool_id', poolIds)
-      .eq('notification_type', 'broadcast')
-      .gte('sent_at', windowStart)
-      .order('sent_at', {ascending: false})
-      .limit(20);
-
-    const data = (rawBroadcasts ?? []).filter((r: any) => {
-      const joined = joinedByPool.get(r.pool_id);
-      return !joined || new Date(r.sent_at) > new Date(joined);
-    });
-
-    if (data.length === 0) {
-      set({recentBroadcasts: []});
-      return;
-    }
-
-    // Fetch sender names
-    const senderIds = [...new Set(data.map((r: any) => r.organizer_id))];
-    const {data: profiles} = await supabase
-      .from('profiles')
-      .select('id, first_name, last_name, poolie_name, display_name_preference')
-      .in('id', senderIds);
-
-    const nameMap: Record<string, string> = {};
-    for (const p of profiles ?? []) {
-      const pref = p.display_name_preference ?? 'first_name';
-      if (pref === 'poolie_name' && p.poolie_name) {
-        nameMap[p.id] = p.poolie_name;
-      } else {
-        nameMap[p.id] = [p.first_name, p.last_name?.charAt(0)]
-          .filter(Boolean)
-          .join(' ') || 'Organizer';
-      }
-    }
-
-    const poolNameMap: Record<string, string> = {};
-    for (const p of userPools) {
-      poolNameMap[p.id] = p.name;
-    }
-
-    const broadcasts = data.map((r: any) => ({
-      poolId: r.pool_id,
-      poolName: poolNameMap[r.pool_id] ?? 'Pool',
-      message: r.message,
-      sentAt: r.sent_at,
-      senderName: nameMap[r.organizer_id] ?? 'Organizer',
-    }));
-
-    set({recentBroadcasts: broadcasts});
-  },
+  ...createBroadcastsSlice(set, get),
 
   // ---------------------------------------------------------------------------
   // Global pool auto-enrollment
@@ -1076,144 +996,10 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   showGlobalPool: false,
 
   // ---------------------------------------------------------------------------
-  // History & Hardware
+  // History, hardware (career awards) & player archetype
+  // (extracted into slices/historyHardwareSlice.ts — same set/get, same behaviour)
   // ---------------------------------------------------------------------------
-  userHardware: [],
-  hasHistory: false,
-  historyVisibility: 'pools_only',
-  playerArchetype: null,
-
-  loadUserHardware: async () => {
-    const userId = get().user?.id;
-    if (!userId) return;
-
-    const {data} = await supabase
-      .from('user_hardware')
-      .select('*')
-      .eq('user_id', userId)
-      .order('awarded_at', {ascending: false});
-
-    const items: UserHardwareItem[] = (data ?? []).map((r: any) => ({
-      id: r.id,
-      hardwareSlug: r.hardware_slug,
-      hardwareName: r.hardware_name,
-      category: r.category,
-      scope: r.scope,
-      competition: r.competition,
-      seasonYear: r.season_year,
-      week: r.week,
-      poolId: r.pool_id,
-      contextJson: r.context_json ?? {},
-      awardedAt: r.awarded_at,
-      isVisible: r.is_visible,
-    }));
-
-    // Check if user has any history (non-no-show week in current competition)
-    const competition = nflSeason.competition;
-    const {count, error: countError} = await supabase
-      .from('season_user_totals')
-      .select('id', {count: 'exact', head: true})
-      .eq('user_id', userId)
-      .eq('competition', competition)
-      .eq('is_no_show', false);
-
-    // Read visibility preference from profile
-    const profile = get().userProfile;
-    const visibility = (profile as any)?.history_visibility ?? 'pools_only';
-
-    set({
-      userHardware: items,
-      hasHistory: (count ?? 0) > 0,
-      historyVisibility: visibility,
-    });
-
-    // Compute archetype after loading hardware
-    get().computePlayerArchetype();
-  },
-
-  updateHistoryVisibility: async (v: 'private' | 'pools_only' | 'public') => {
-    const userId = get().user?.id;
-    if (!userId) return;
-
-    await supabase
-      .from('profiles')
-      .update({history_visibility: v})
-      .eq('id', userId);
-
-    set({historyVisibility: v});
-  },
-
-  computePlayerArchetype: () => {
-    const hardware = get().userHardware;
-    const profile = get().userProfile;
-    if (!hardware.length || !profile) {
-      set({playerArchetype: null});
-      return;
-    }
-
-    // Count career stats from hardware
-    const poolChampionCount = hardware.filter(h => h.hardwareSlug === 'pool_champion').length;
-    const poolChampionPools = new Set(hardware.filter(h => h.hardwareSlug === 'pool_champion').map(h => h.poolId)).size;
-    const ironPoolieCount = hardware.filter(h => h.hardwareSlug === 'iron_poolie').length;
-    const gunslingerCount = hardware.filter(h => h.hardwareSlug === 'gunslinger_week').length;
-    const sharpshooterCount = hardware.filter(h => h.hardwareSlug === 'sharpshooter_week').length;
-
-    // Career stats from profiles table
-    const careerCorrect = (profile as any).career_picks_correct ?? 0;
-    const careerTotal = (profile as any).career_picks_total ?? 0;
-    const careerHPCorrect = (profile as any).career_hotpick_correct ?? 0;
-    const careerHPTotal = (profile as any).career_hotpick_total ?? 0;
-    const careerPickRate = careerTotal > 0 ? careerCorrect / careerTotal : 0;
-    const careerHPRate = careerHPTotal > 0 ? careerHPCorrect / careerHPTotal : 0;
-
-    // Determine archetype by priority
-    // The Closer: Pool Champion in 2+ different pools
-    if (poolChampionCount >= 2 && poolChampionPools >= 2) {
-      set({
-        playerArchetype: {
-          label: 'The Closer',
-          description: `You know how to finish. ${poolChampionCount} Contest Championships across ${poolChampionPools} different Contests.`,
-        },
-      });
-      return;
-    }
-
-    // The Sharpshooter: career regular pick win rate >= 65%
-    if (careerTotal >= 100 && careerPickRate >= 0.65) {
-      set({
-        playerArchetype: {
-          label: 'The Sharpshooter',
-          description: `Pure knowledge. You've hit ${Math.round(careerPickRate * 100)}% of your regular picks across your career.`,
-        },
-      });
-      return;
-    }
-
-    // The Gunslinger: frequent high-rank HotPick wins
-    if (gunslingerCount >= 3) {
-      set({
-        playerArchetype: {
-          label: 'The Gunslinger',
-          description: `You go big. ${gunslingerCount} Gunslinger awards. It's cost you. It's also won you ${poolChampionCount} Contest${poolChampionCount !== 1 ? 's' : ''}.`,
-        },
-      });
-      return;
-    }
-
-    // The Grinder: Iron Poolie in 2+ seasons
-    if (ironPoolieCount >= 2) {
-      set({
-        playerArchetype: {
-          label: 'The Grinder',
-          description: `Never missed a week. ${ironPoolieCount} Iron Player awards. ${careerCorrect} correct picks. Quietly dangerous.`,
-        },
-      });
-      return;
-    }
-
-    // No archetype threshold met — show nothing
-    set({playerArchetype: null});
-  },
+  ...createHistoryHardwareSlice(set, get),
 
   // ---------------------------------------------------------------------------
   // Home Redesign §6.6 — Last-week HotPick recap + Week Mini-Strip
@@ -1687,83 +1473,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     }));
   },
 
-  poolAffiliations: {},
-
-  loadPoolAffiliations: async (poolIds) => {
-    if (poolIds.length === 0) {
-      set({poolAffiliations: {}});
-      return;
-    }
-
-    // One query for all pools. RLS gates SELECT to active members of each
-    // pool, so this is safe to call with the full visible pool list.
-    const {data, error} = await supabase
-      .from('pool_partner_affiliations')
-      .select('pool_id, partner_id, brand_config_snapshot, is_primary, created_at')
-      .in('pool_id', poolIds);
-
-    if (error) {
-      // Don't blow away existing data on transient failures.
-      return;
-    }
-
-    type Row = {
-      pool_id:               string;
-      partner_id:            string;
-      brand_config_snapshot: Record<string, unknown> | null;
-      is_primary:            boolean;
-      created_at:            string;
-    };
-
-    const byPool: Record<string, PoolAffiliation[]> = {};
-    for (const pid of poolIds) byPool[pid] = [];
-
-    for (const row of (data ?? []) as Row[]) {
-      const bc   = (row.brand_config_snapshot ?? {}) as Record<string, unknown>;
-      const logo = (bc.logo ?? {}) as Record<string, unknown>;
-      const logoUrl =
-        typeof logo.full === 'string' && logo.full.length > 0
-          ? logo.full
-          : typeof bc.logo_url === 'string' && bc.logo_url.length > 0
-          ? bc.logo_url
-          : null;
-      const colorOrNull = (key: string): string | null =>
-        typeof bc[key] === 'string' && (bc[key] as string).length > 0
-          ? (bc[key] as string)
-          : null;
-      const brandColors = {
-        primary:    colorOrNull('primary_color'),
-        secondary:  colorOrNull('secondary_color'),
-        background: colorOrNull('background_color'),
-        highlight:  colorOrNull('highlight_color'),
-      };
-      const partnerName =
-        typeof bc.partner_name === 'string' && bc.partner_name.length > 0
-          ? bc.partner_name
-          : 'League';
-
-      byPool[row.pool_id]?.push({
-        partnerId:    row.partner_id,
-        partnerName,
-        brandColors,
-        logoUrl,
-        isPrimary:    row.is_primary,
-      });
-    }
-
-    // Sort each pool's affiliations: primary first, then by partner name.
-    for (const pid of Object.keys(byPool)) {
-      byPool[pid].sort((a, b) => {
-        if (a.isPrimary !== b.isPrimary) return a.isPrimary ? -1 : 1;
-        return a.partnerName.localeCompare(b.partnerName, undefined, {
-          sensitivity: 'base',
-        });
-      });
-    }
-
-    // Merge — never replace — so a single-pool refresh from
-    // PoolSettings / PartnerDirectory doesn't clobber the rest of the
-    // map loaded by HomeScreen's all-pool fetch.
-    set(state => ({poolAffiliations: {...state.poolAffiliations, ...byPool}}));
-  },
+  // Pool partner-affiliation (League) loading
+  // (extracted into slices/affiliationsSlice.ts — same set/get, same behaviour)
+  ...createAffiliationsSlice(set, get),
 }));
