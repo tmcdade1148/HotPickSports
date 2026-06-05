@@ -123,6 +123,14 @@ Deno.serve(async (req) => {
       }
     }
 
+    // In the postseason there are only a handful of games, so any skip is
+    // suspicious (most likely a team-abbreviation mismatch, e.g. WSH vs WAS,
+    // leaving a real game un-scored). Surface it loudly. Regular-season skips
+    // are normal (the scoreboard spans states/weeks) so we don't warn there.
+    if (isPlayoffs && skippedCount > 0) {
+      console.warn(`[nfl-update-scores] ⚠️ PLAYOFFS: ${skippedCount} game(s) skipped/unmatched for ${competition} ${seasonYear} — check for team-abbreviation mismatches; a real game may be un-scored.`);
+    }
+
     return json({ success: true, updated: updatedCount, skipped: skippedCount, updates, isPlayoffs }, 200);
   } catch (err) {
     return json({ success: false, error: String(err) }, 500);
