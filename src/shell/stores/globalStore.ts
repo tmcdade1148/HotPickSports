@@ -1,5 +1,4 @@
 import {create} from 'zustand';
-import type {User} from '@supabase/supabase-js';
 import type {AnyEventConfig} from '@shared/types/templates';
 import type {DbPool, DbProfile, DbPoolMember} from '@shared/types/database';
 import type {BrandConfig} from '@shell/theme/types';
@@ -10,10 +9,11 @@ import {deactivateDeviceTokens} from '@shell/services/pushNotifications';
 import {setMonitoringUser} from '@shared/monitoring/sentry';
 import {nflSeason} from '@sports/nfl/config';
 import {isSandboxCompetition} from '@shared/utils/competition';
+import {createSmackUnreadSlice} from './slices/smackUnreadSlice';
+import {createDelegateSlice} from './slices/delegateSlice';
 import type {
   GlobalState,
   PoolAffiliation,
-  PoolDelegate,
   UserHardwareItem,
 } from './globalStore.types';
 // Re-exported so existing consumers keep importing these from globalStore.
@@ -791,95 +791,9 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     return {success: true};
   },
 
-  grantPoolDelegate: async (poolId, email) => {
-    const {data, error} = await supabase.rpc('grant_pool_delegate_by_email', {
-      p_pool_id: poolId,
-      p_email: email,
-    });
-    if (error) return {success: false, error: error.message};
-    if (data?.error) return {success: false, error: data.error};
-    return {success: true, pending: data?.assigned === 'pending'};
-  },
-
-  revokePoolDelegate: async (poolId, target) => {
-    const {data, error} = await supabase.rpc('revoke_pool_delegate', {
-      p_pool_id: poolId,
-      p_user_id: target.userId ?? null,
-      p_email: target.email ?? null,
-    });
-    if (error) return {success: false, error: error.message};
-    if (data?.error) return {success: false, error: data.error};
-    return {success: true};
-  },
-
-  listPoolDelegates: async poolId => {
-    const {data, error} = await supabase.rpc('list_pool_delegates', {
-      p_pool_id: poolId,
-    });
-    if (error || !Array.isArray(data)) return [];
-    return (data as {user_id: string | null; email: string | null; role: string; status: string}[])
-      .map(r => ({
-        userId: r.user_id,
-        email: r.email,
-        role: r.role as PoolDelegate['role'],
-        status: r.status as PoolDelegate['status'],
-      }));
-  },
-
-  setLeagueChairman: async (partnerId, email) => {
-    const {data, error} = await supabase.rpc('admin_set_league_chairman', {
-      p_partner_id: partnerId,
-      p_email: email,
-    });
-    if (error) return {success: false, error: error.message};
-    if (data?.error) return {success: false, error: data.error};
-    return {success: true, pending: data?.assigned === 'pending'};
-  },
-
-  setClubPoolGaffer: async (partnerId, email) => {
-    const {data, error} = await supabase.rpc('admin_set_club_pool_gaffer', {
-      p_partner_id: partnerId,
-      p_email: email,
-    });
-    if (error) return {success: false, error: error.message};
-    if (data?.error) return {success: false, error: data.error};
-    return {success: true, pending: data?.assigned === 'pending'};
-  },
-
-  grantPartnerDirector: async (partnerId, email) => {
-    const {data, error} = await supabase.rpc('grant_partner_director_by_email', {
-      p_partner_id: partnerId,
-      p_email: email,
-    });
-    if (error) return {success: false, error: error.message};
-    if (data?.error) return {success: false, error: data.error};
-    return {success: true, pending: data?.assigned === 'pending'};
-  },
-
-  revokePartnerMember: async (partnerId, target) => {
-    const {data, error} = await supabase.rpc('revoke_partner_member', {
-      p_partner_id: partnerId,
-      p_user_id: target.userId ?? null,
-      p_email: target.email ?? null,
-    });
-    if (error) return {success: false, error: error.message};
-    if (data?.error) return {success: false, error: data.error};
-    return {success: true};
-  },
-
-  listPartnerMembers: async partnerId => {
-    const {data, error} = await supabase.rpc('list_partner_members', {
-      p_partner_id: partnerId,
-    });
-    if (error || !Array.isArray(data)) return [];
-    return (data as {user_id: string | null; email: string | null; role: string; status: string}[])
-      .map(r => ({
-        userId: r.user_id,
-        email: r.email,
-        role: r.role as PoolDelegate['role'],
-        status: r.status as PoolDelegate['status'],
-      }));
-  },
+  // Pool-board + partner-board (League) delegate management
+  // (extracted into slices/delegateSlice.ts — pure RPC wrappers, same behaviour)
+  ...createDelegateSlice(),
 
   // ---------------------------------------------------------------------------
   // Pool settings management
@@ -1033,148 +947,10 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   },
 
   // ---------------------------------------------------------------------------
-  // SmackTalk unread counts
+  // SmackTalk unread counts, Realtime, and flagged-message counts
+  // (extracted into slices/smackUnreadSlice.ts — same set/get, same behaviour)
   // ---------------------------------------------------------------------------
-  smackUnreadCounts: {},
-
-  setSmackUnreadCount: (poolId, count) =>
-    set(state => ({
-      smackUnreadCounts: {...state.smackUnreadCounts, [poolId]: count},
-    })),
-
-  markPoolAsRead: async (poolId: string) => {
-    const userId = get().user?.id;
-    if (!userId) {
-      return;
-    }
-
-    // Optimistic: clear count immediately
-    set(state => ({
-      smackUnreadCounts: {...state.smackUnreadCounts, [poolId]: 0},
-    }));
-
-    // Upsert read state
-    await supabase.from('smack_read_state').upsert(
-      {user_id: userId, pool_id: poolId, last_read_at: new Date().toISOString()},
-      {onConflict: 'user_id,pool_id'},
-    );
-  },
-
-  fetchSmackUnreadCounts: async (userId, poolIds) => {
-    if (poolIds.length === 0) return;
-
-    const {data, error} = await supabase
-      .rpc('get_smack_unread_counts', {
-        p_user_id: userId,
-        p_pool_ids: poolIds,
-      });
-
-    if (error || !data) return;
-
-    const counts: Record<string, number> = {};
-    for (const row of data) {
-      counts[row.pool_id] = Number(row.unread_count);
-    }
-
-    set({smackUnreadCounts: counts});
-  },
-
-  // ---------------------------------------------------------------------------
-  // SmackTalk Realtime subscription
-  // ---------------------------------------------------------------------------
-  smackRealtimeChannel: null,
-
-  subscribeSmackUnread: () => {
-    // Idempotent singleton: bail if we already have a live channel. Three boot
-    // paths (LoadingScreen, postAuthFlow, PoolWelcomeScreen) all call this on
-    // session start; only the first wires the channel up. signOut tears it down
-    // via unsubscribeSmackUnread.
-    //
-    // (The channel() wrapper in config/supabase.ts now gives every topic a
-    // unique suffix, so this guard is no longer also working around Supabase's
-    // dedup-by-name cache — it's purely a single-instance guard.)
-    if (get().smackRealtimeChannel) return;
-
-    const channel = supabase
-      .channel('smack-unread-global')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'smack_messages',
-        },
-        (payload: any) => {
-          const newMsg = payload.new;
-          if (!newMsg?.pool_id || !newMsg?.user_id) {
-            return;
-          }
-
-          const state = get();
-
-          // Skip if this is the current user's own message
-          if (newMsg.user_id === state.user?.id) {
-            return;
-          }
-
-          // Skip if this pool is not in the user's pools
-          const poolIds = new Set(state.userPools.map(p => p.id));
-          if (!poolIds.has(newMsg.pool_id)) {
-            return;
-          }
-
-          // Increment unread count for this pool
-          set(s => ({
-            smackUnreadCounts: {
-              ...s.smackUnreadCounts,
-              [newMsg.pool_id]: (s.smackUnreadCounts[newMsg.pool_id] ?? 0) + 1,
-            },
-          }));
-        },
-      )
-      .subscribe();
-
-    set({smackRealtimeChannel: channel});
-  },
-
-  unsubscribeSmackUnread: () => {
-    const channel = get().smackRealtimeChannel;
-    if (channel) {
-      supabase.removeChannel(channel);
-      set({smackRealtimeChannel: null});
-    }
-  },
-
-  // ---------------------------------------------------------------------------
-  // Flagged message counts (organizer/admin pools)
-  // ---------------------------------------------------------------------------
-  flaggedCounts: {},
-
-  fetchFlaggedCounts: async () => {
-    const {userPools, poolRoles} = get();
-    // Only fetch for pools where user is organizer or admin
-    const adminPools = userPools.filter(
-      p => poolRoles[p.id] === 'organizer' || poolRoles[p.id] === 'admin',
-    );
-    if (adminPools.length === 0) {
-      set({flaggedCounts: {}});
-      return;
-    }
-
-    const poolIds = adminPools.map(p => p.id);
-    const {data} = await supabase
-      .from('smack_messages')
-      .select('pool_id')
-      .in('pool_id', poolIds)
-      .eq('is_flagged', true)
-      .eq('moderation_status', 'pending');
-
-    const counts: Record<string, number> = {};
-    for (const row of data ?? []) {
-      counts[row.pool_id] = (counts[row.pool_id] ?? 0) + 1;
-    }
-    set({flaggedCounts: counts});
-  },
+  ...createSmackUnreadSlice(set, get),
 
   // ---------------------------------------------------------------------------
   // Recent broadcasts (last 24 hours across user's pools)
