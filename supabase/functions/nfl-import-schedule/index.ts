@@ -103,15 +103,13 @@ Deno.serve(async (req) => {
 
     console.log(`[nfl-import-schedule] Imported ${rows.length} games`);
 
-    if (week !== 22) {
-      const rankRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/nfl-rank-games`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ competition, week }),
-      });
-      const rankData = await rankRes.json().catch(() => ({}));
-      console.log(`[nfl-import-schedule] Ranked ${rankData.updated ?? 0} games`);
-    }
+    // Ranking is intentionally NOT done here. frozen_rank is set by
+    // nfl-rank-games AFTER nfl-fetch-odds runs (REFERENCE.md §7), so ranks are
+    // computed from the Odds-API numbers — not ESPN's import-time scoreboard
+    // odds. Freezing inline at import would lock ranks on the weaker source and,
+    // via Hard Rule #6 (immutable frozen_rank), make the fetch-odds -> rank-games
+    // steps inert. The Tuesday cron (odds 10:00, rank 10:15) and
+    // nfl-weekly-transition both run rank after odds.
 
     return json({ success: true, competition, season_year: seasonYear, week, phase, imported: rows.length }, 200);
   } catch (err) {
