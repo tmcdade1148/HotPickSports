@@ -20,13 +20,17 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     competition = body.competition ?? "nfl_2026";
-    week = Number(body.week);
-    if (!week) return json({ error: "Missing week parameter" }, 400);
 
     const { data: configRows } = await supabase
       .from("competition_config").select("key, value").eq("competition", competition);
     const cfg = Object.fromEntries((configRows ?? []).map((r) => [r.key, r.value]));
     if (!cfg.is_active) return json({ success: true, reason: "competition_inactive" }, 200);
+
+    // Week: explicit param wins; otherwise derive from the clock so the cron
+    // (which passes no week) preps the right week. See deriveWeek().
+    week = Number(body.week) || deriveWeek(cfg);
+    if (!week) return json({ error: "Missing week parameter" }, 400);
+
     const seasonYear = Number(cfg.season_year ?? 2026);
 
     let seasonType: number, espnWeek: number, phase: string;
@@ -118,6 +122,18 @@ Deno.serve(async (req) => {
 
 function json(body: unknown, status: number) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+}
+
+// Derive which week to prep when the caller (cron) passes none. Explicit week
+// always wins upstream. After a week wraps up (settling/complete) the NEXT week
+// is what needs prepping for admin_advance_week's gate; otherwise it's the
+// current week (covers the Week-1 initial open while week_state is idle).
+function deriveWeek(cfg: Record<string, any>): number {
+  const strip = (v: any) => String(v ?? "").replace(/^"|"$/g, "");
+  const current = Number(strip(cfg.current_week)) || 0;
+  const ws = strip(cfg.week_state);
+  if (!current) return 0;
+  return (ws === "settling" || ws === "complete") ? current + 1 : current;
 }
 
 // §5b — best-effort upsert of this step's slice of week_readiness. Wrapped so a

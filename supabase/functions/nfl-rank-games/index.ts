@@ -60,13 +60,16 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     competition = body.competition ?? "nfl_2026";
-    week = Number(body.week);
     const force = Boolean(body.force);
-    if (!week) return json({ error: "Missing week parameter" }, 400);
 
     const { data: configRows } = await supabase
       .from("competition_config").select("key, value").eq("competition", competition);
     const cfg = Object.fromEntries((configRows ?? []).map((r) => [r.key, r.value]));
+
+    // Week: explicit param wins; otherwise derive from the clock (cron passes none).
+    week = Number(body.week) || deriveWeek(cfg);
+    if (!week) return json({ error: "Missing week parameter" }, 400);
+
     const seasonYear = Number(cfg.season_year ?? 2026);
 
     const { data: games, error: gamesError } = await supabase
@@ -145,6 +148,17 @@ Deno.serve(async (req) => {
 
 function json(body: unknown, status: number) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+}
+
+// Derive which week to prep when the caller (cron) passes none. After a week
+// wraps up (settling/complete) prep the NEXT week (for the advance gate);
+// otherwise the current week (covers the Week-1 initial open while idle).
+function deriveWeek(cfg: Record<string, any>): number {
+  const strip = (v: any) => String(v ?? "").replace(/^"|"$/g, "");
+  const current = Number(strip(cfg.current_week)) || 0;
+  const ws = strip(cfg.week_state);
+  if (!current) return 0;
+  return (ws === "settling" || ws === "complete") ? current + 1 : current;
 }
 
 // §5b — best-effort upsert of this step's slice of week_readiness. Wrapped so a
