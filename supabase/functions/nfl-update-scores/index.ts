@@ -1,15 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { mapPlayoffWeek } from "../_shared/scoring.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL") ?? "",
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
   { auth: { persistSession: false } }
 );
-
-// Postseason ESPN week numbering (seasontype=3): 1=Wild Card, 2=Divisional,
-// 3=Conference, 4=Pro Bowl (no scored games), 5=Super Bowl. This MUST match
-// nfl-import-schedule's mapping. We score only 1,2,3,5 → DB weeks 19,20,21,22.
-const PLAYOFF_WEEK_MAP: Record<number, number> = { 1: 19, 2: 20, 3: 21, 5: 22 };
 
 Deno.serve(async (req) => {
   try {
@@ -76,8 +72,8 @@ Deno.serve(async (req) => {
         // (Pro Bowl = 4, or anything unexpected) rather than guessing a DB week.
         let dbWeek: number;
         if (isPlayoffs) {
-          const mapped = PLAYOFF_WEEK_MAP[espnWeek];
-          if (mapped === undefined) { skippedCount++; continue; }
+          const mapped = mapPlayoffWeek(espnWeek);
+          if (mapped === null) { skippedCount++; continue; }
           dbWeek = mapped;
         } else {
           dbWeek = espnWeek;
