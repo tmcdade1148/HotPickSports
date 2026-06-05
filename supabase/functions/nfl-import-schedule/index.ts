@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
     // Week: explicit param wins; otherwise derive from the clock so the cron
     // (which passes no week) preps the right week. See deriveWeek().
     week = Number(body.week) || deriveWeek(cfg);
-    if (!week) return json({ error: "Missing week parameter" }, 400);
+    if (!week) return json({ success: true, reason: "no_active_week" }, 200);
 
     const seasonYear = Number(cfg.season_year ?? 2026);
 
@@ -130,6 +130,10 @@ function json(body: unknown, status: number) {
 // current week (covers the Week-1 initial open while week_state is idle).
 function deriveWeek(cfg: Record<string, any>): number {
   const strip = (v: any) => String(v ?? "").replace(/^"|"$/g, "");
+  // Auto-prep only runs inside the weekly cycle — never off-season / pre-season,
+  // which would prematurely import and FREEZE ranks on stale odds (Hard Rule #6).
+  const phase = strip(cfg.current_phase);
+  if (!["REGULAR", "PLAYOFFS", "SUPERBOWL"].includes(phase)) return 0;
   const current = Number(strip(cfg.current_week)) || 0;
   const ws = strip(cfg.week_state);
   if (!current) return 0;
