@@ -65,12 +65,10 @@ Deno.serve(async (req) => {
 
     const poolIds = pools.map(p => p.id);
 
-    // Aggregate picks per game per pool
-    // PRIVACY GATE: Only includes picks for games that have kicked off
-    const { data: pickAggs, error: aggError } = await supabase.rpc("_noop").maybeSingle();
-    // Can't use .rpc for complex aggregation — use raw SQL via a direct query approach
-    // Instead, fetch picks and pool_members and aggregate in-memory
-    // This is efficient because we're only fetching the current week's picks
+    // Aggregate picks per game per pool.
+    // PRIVACY GATE: Only includes picks for games that have kicked off.
+    // No RPC for this aggregation — fetch picks + pool_members and aggregate
+    // in-memory (efficient: only the current week's picks are fetched).
 
     const { data: picks, error: picksError } = await supabase
       .from("season_picks")
