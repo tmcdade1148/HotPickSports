@@ -14,10 +14,13 @@ const WEEK_TO_ESPN: Record<number, { seasonType: number; espnWeek: number; phase
 };
 
 Deno.serve(async (req) => {
+  // Hoisted so the catch block can record a readiness failure (§5b).
+  let competition = "nfl_2026";
+  let week = 0;
   try {
     const body = await req.json().catch(() => ({}));
-    const competition = body.competition ?? "nfl_2026";
-    const week = Number(body.week);
+    competition = body.competition ?? "nfl_2026";
+    week = Number(body.week);
     if (!week) return json({ error: "Missing week parameter" }, 400);
 
     const { data: configRows } = await supabase
@@ -38,6 +41,7 @@ Deno.serve(async (req) => {
     const events = espnData.events ?? [];
 
     if (events.length === 0) {
+      await markReadiness(competition, week, { games_status: "ok", games_count: 0, games_at: new Date().toISOString() });
       return json({ success: true, competition, season_year: seasonYear, week, imported: 0, warning: "No games found" }, 200);
     }
 
@@ -85,7 +89,13 @@ Deno.serve(async (req) => {
     }
 
     const { error } = await supabase.from("season_games").upsert(rows, { onConflict: "game_id" });
-    if (error) return json({ error: error.message }, 500);
+    if (error) {
+      await markReadiness(competition, week, { games_status: "failed", games_at: new Date().toISOString() });
+      return json({ error: error.message }, 500);
+    }
+
+    // §5b — games loaded OK.
+    await markReadiness(competition, week, { games_status: "ok", games_count: rows.length, games_at: new Date().toISOString() });
 
     console.log(`[nfl-import-schedule] Imported ${rows.length} games`);
 
@@ -101,10 +111,23 @@ Deno.serve(async (req) => {
 
     return json({ success: true, competition, season_year: seasonYear, week, phase, imported: rows.length }, 200);
   } catch (err) {
+    if (week) await markReadiness(competition, week, { games_status: "failed", games_at: new Date().toISOString() });
     return json({ success: false, error: String(err) }, 500);
   }
 });
 
 function json(body: unknown, status: number) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+}
+
+// §5b — best-effort upsert of this step's slice of week_readiness. Wrapped so a
+// readiness write never breaks the prep step itself. Partial column set; sibling
+// columns (odds_*, ranks_*) are preserved on conflict.
+async function markReadiness(competition: string, week: number, fields: Record<string, unknown>) {
+  try {
+    await supabase.from("week_readiness").upsert(
+      { competition, week_number: week, updated_at: new Date().toISOString(), ...fields },
+      { onConflict: "competition,week_number" },
+    );
+  } catch (_e) { /* best-effort */ }
 }

@@ -27,10 +27,13 @@ const TEAM_MAP: Record<string, string[]> = {
 };
 
 Deno.serve(async (req) => {
+  // Hoisted so the catch block can record a readiness failure (§5b).
+  let competition = "nfl_2026";
+  let week = 0;
   try {
     const body = await req.json().catch(() => ({}));
-    const competition = body.competition ?? "nfl_2026";
-    const week = Number(body.week);
+    competition = body.competition ?? "nfl_2026";
+    week = Number(body.week);
     if (!week) return json({ error: "Missing week parameter" }, 400);
 
     const { data: configRows } = await supabase
@@ -44,11 +47,15 @@ Deno.serve(async (req) => {
       .eq("competition", competition).eq("season_year", seasonYear).eq("week", week);
 
     if (gamesError || !games || games.length === 0) {
+      await markReadiness(competition, week, { odds_status: "failed", odds_error: "No games for week (run import-schedule first)", odds_at: new Date().toISOString() });
       return json({ error: "No games found", competition, season_year: seasonYear, week }, 404);
     }
 
     const oddsApiKey = Deno.env.get("ODDS_API_KEY") ?? "";
-    if (!oddsApiKey) return json({ error: "Missing ODDS_API_KEY" }, 500);
+    if (!oddsApiKey) {
+      await markReadiness(competition, week, { odds_status: "failed", odds_error: "Missing ODDS_API_KEY", odds_expected: games.length, odds_at: new Date().toISOString() });
+      return json({ error: "Missing ODDS_API_KEY" }, 500);
+    }
 
     const oddsRes = await fetch(
       `https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?apiKey=${oddsApiKey}&regions=us&markets=spreads,h2h&oddsFormat=american`
@@ -96,13 +103,37 @@ Deno.serve(async (req) => {
       else updated++;
     }
 
+    // §5b — odds present = games updated this run plus those whose existing odds
+    // were preserved. The gate (§5c) compares odds_count against odds_expected.
+    const oddsPresent = updated + preserved;
+    await markReadiness(competition, week, {
+      odds_status: "ok",
+      odds_count: oddsPresent,
+      odds_expected: games.length,
+      odds_error: oddsPresent < games.length ? `${games.length - oddsPresent} game(s) missing odds` : null,
+      odds_at: new Date().toISOString(),
+    });
+
     return json({ success: true, competition, season_year: seasonYear, week, updated, skipped, preserved, total: games.length, errors,
       apiUsage: { used: oddsRes.headers.get("x-requests-used"), remaining: oddsRes.headers.get("x-requests-remaining") } }, 200);
   } catch (err) {
+    if (week) await markReadiness(competition, week, { odds_status: "failed", odds_error: String(err), odds_at: new Date().toISOString() });
     return json({ success: false, error: String(err) }, 500);
   }
 });
 
 function json(body: unknown, status: number) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+}
+
+// §5b — best-effort upsert of this step's slice of week_readiness. Wrapped so a
+// readiness write never breaks the prep step. Partial column set; sibling columns
+// (games_*, ranks_*) are preserved on conflict.
+async function markReadiness(competition: string, week: number, fields: Record<string, unknown>) {
+  try {
+    await supabase.from("week_readiness").upsert(
+      { competition, week_number: week, updated_at: new Date().toISOString(), ...fields },
+      { onConflict: "competition,week_number" },
+    );
+  } catch (_e) { /* best-effort */ }
 }
