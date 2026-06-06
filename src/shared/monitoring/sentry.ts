@@ -24,9 +24,16 @@ import Constants from 'expo-constants';
 import * as Updates from 'expo-updates';
 import type {ComponentType} from 'react';
 
-// Lazily required so a missing/unlinked native module can never crash startup.
-// (A bare `import` would still resolve the JS, but we keep the surface minimal.)
-import * as Sentry from '@sentry/react-native';
+// @sentry/react-native is required LAZILY — only inside initMonitoring(), and
+// only after a DSN is confirmed. A bare top-level `import` *evaluates* the module
+// at startup, which touches Sentry's native module; if that module isn't linked
+// into the binary (dev, or before a native rebuild) it throws
+// "Cannot read property 'EventEmitter' of undefined" and crashes the whole
+// bundle at startup. Deferring the require keeps the native surface untouched
+// until monitoring is actually turned on. The type-only import is erased at
+// compile time and produces no runtime require.
+type SentryModule = typeof import('@sentry/react-native');
+let Sentry: SentryModule | null = null;
 
 let monitoringActive = false;
 
@@ -63,6 +70,10 @@ export function initMonitoring(): void {
   }
 
   try {
+    // Lazy require — reached only when a DSN is present (release builds with the
+    // native module linked). Never evaluated in dev / when monitoring is off, so
+    // an unlinked native module can't crash startup.
+    Sentry = require('@sentry/react-native') as SentryModule;
     Sentry.init({
       dsn,
       environment: resolveEnvironment(),
@@ -84,6 +95,7 @@ export function initMonitoring(): void {
     // Native module not linked yet (pre-rebuild) or any init failure — the app
     // must keep running regardless.
     console.warn('[monitoring] Sentry init failed (native module not linked?):', err);
+    Sentry = null;
     monitoringActive = false;
   }
 }
@@ -94,7 +106,7 @@ export function initMonitoring(): void {
  * monitoring isn't active, so the app tree is identical in the no-DSN case.
  */
 export function wrapWithMonitoring<P extends object>(App: ComponentType<P>): ComponentType<P> {
-  if (!monitoringActive) return App;
+  if (!monitoringActive || !Sentry) return App;
   try {
     // Sentry.wrap's generic is stricter than ours; decouple via unknown. The
     // wrapped component is render-compatible with the original.
@@ -109,7 +121,7 @@ export function wrapWithMonitoring<P extends object>(App: ComponentType<P>): Com
  * only — no email/name — to keep reports free of PII. Call with null on logout.
  */
 export function setMonitoringUser(userId: string | null): void {
-  if (!monitoringActive) return;
+  if (!monitoringActive || !Sentry) return;
   try {
     Sentry.setUser(userId ? {id: userId} : null);
   } catch {
@@ -119,7 +131,7 @@ export function setMonitoringUser(userId: string | null): void {
 
 /** Manually report a handled error with optional context. Best-effort. */
 export function captureError(error: unknown, context?: Record<string, unknown>): void {
-  if (!monitoringActive) {
+  if (!monitoringActive || !Sentry) {
     if (__DEV__) {
       console.error('[monitoring:dev] captureError', error, context);
     }
