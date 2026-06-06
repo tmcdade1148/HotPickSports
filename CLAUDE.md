@@ -172,6 +172,9 @@ These rules apply from the moment the app is live in the App Store and Google Pl
 - **Build profile order is always: `development` → `preview` → `production`** — never skip preview; every non-trivial change verifies on a real device first
 - **When bumping the app's marketing version, bump `runtimeVersion` simultaneously in all three places** — `app.json`, `ios/HotPickSports/Supporting/Expo.plist` (`EXUpdatesRuntimeVersion`), and `android/app/src/main/res/values/strings.xml` (`expo_runtime_version`). Drift breaks OTA silently. Bare workflow requires a literal string; the `appVersion` policy is not supported
 - **File-type EAS env vars must be scoped to all three environments (`production, preview, development`)** — narrowing to one environment silently breaks builds on the others (the pre-install hook's `if [ -n "$VAR" ]` guard skips, the Gradle plugin then fails with "File google-services.json is missing"). Verify scope before a release cycle with `eas env:list --environment preview --format long`. Confirm the build log's `Environment secrets:` block lists the var before investigating any Gradle failure
+- **`react-native`'s version is owned by the Expo SDK — never bump it on its own.** Expo SDK 55 ⇒ react-native **0.83.2**. A stray bump to 0.84.0 made Expo's native modules undefined at launch (`Cannot read property 'EventEmitter' of undefined`). Realign with `npx expo install --fix`; never hand-edit the RN version. (See REFERENCE.md §24.)
+- **Never run `npm audit fix --force`** — it rewrites the dependency tree and breaks `node_modules`. Recover with `git checkout package.json package-lock.json && rm -rf node_modules && npm ci`.
+- **After any native or dependency-version change, restart Metro with `--clear`** (`npx expo start --dev-client --clear`). A "module not found" error spanning *unrelated* packages is a stale Metro cache, not the packages — `expo run:ios/android` does not reset it.
 
 ---
 
@@ -185,6 +188,7 @@ These rules apply from the moment the app is live in the App Store and Google Pl
   git checkout main && git pull && git checkout -b feature/[name]
   ```
   Never start new sport work on main.
+- **Local `main` can go stale silently** — `git pull` sometimes no-ops while `origin/main` has moved. If a merged fix appears to be "missing" locally, force the sync: `git fetch origin main && git reset --hard origin/main` (discards uncommitted tracked changes).
 
 ---
 
