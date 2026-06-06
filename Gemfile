@@ -14,3 +14,7 @@ gem 'bigdecimal'
 gem 'logger'
 gem 'benchmark'
 gem 'mutex_m'
+# `nkf` provides `kconv`, which xcodeproj (< 1.26) still requires while
+# reading the Xcode project. Without it, `pod install` fails on Ruby 3.4+
+# with "cannot load such file -- kconv".
+gem 'nkf'
