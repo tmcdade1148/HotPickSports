@@ -146,6 +146,8 @@ export function PoolSettingsScreen() {
   const [newLabel, setNewLabel] = useState('');
   const [addingCode, setAddingCode] = useState(false);
   const [codeError, setCodeError] = useState<string | null>(null);
+  // Edit-before-share: holds the code being shared + the (editable) message.
+  const [shareEdit, setShareEdit] = useState<{code: string; text: string} | null>(null);
   // Tracks which Club is being removed from the roster. Must live with the
   // other hooks (above the `if (!pool)` early return) — never below it.
   const [removingPartnerId, setRemovingPartnerId] = useState<string | null>(null);
@@ -431,17 +433,29 @@ export function PoolSettingsScreen() {
     Alert.alert('Copied', `${code} copied to clipboard.`);
   };
 
-  const handleShareAnyCode = async (code: string) => {
+  const buildShareText = (code: string) => {
+    // Universal link (https) linkifies in Messages and opens the app when
+    // installed; the bare code on its own line is an easy-to-copy fallback.
+    const inviteUrl = `https://hotpick.app/join/${code}`;
+    return (
+      `Hey, I'd love for you to join my HotPick football pool "${pool!.name}"! ` +
+      `Pick games 🏈, talk smack, and settle who's got bragging rights.\n\n` +
+      `Tap to join 👉 ${inviteUrl}\n\n` +
+      `Invite code:\n${code}`
+    );
+  };
+
+  // Open an editable preview so the Gaffer can tweak the invite before sending.
+  const handleShareAnyCode = (code: string) => {
+    setShareEdit({code, text: buildShareText(code)});
+  };
+
+  const submitShare = async () => {
+    if (!shareEdit) return;
+    const {text} = shareEdit;
+    setShareEdit(null);
     try {
-      // Universal link (https) so it linkifies in Messages and opens the app
-      // directly when installed; the code is included as a manual fallback.
-      const inviteUrl = `https://hotpick.app/join/${code}`;
-      await Share.share({
-        message:
-          `Join my Contest "${pool!.name}" on HotPick Sports!\n\n` +
-          `Tap to join: ${inviteUrl}\n` +
-          `Or use invite code: ${code}`,
-      });
+      await Share.share({message: text});
     } catch {
       // user cancelled
     }
@@ -913,6 +927,66 @@ export function PoolSettingsScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* Edit-before-share: the Gaffer can tweak the invite copy, or copy just
+          the bare invite code (separated from the message). */}
+      <Modal
+        visible={shareEdit !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShareEdit(null)}>
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setShareEdit(null)}
+          accessibilityLabel="Dismiss share dialog">
+          <Pressable style={styles.modalCard} onPress={() => {}}>
+            <Text style={styles.modalTitle}>Share invite</Text>
+            <Text style={styles.modalHint}>
+              Edit the message if you like, then tap Share — or copy just the
+              invite code.
+            </Text>
+            <TextInput
+              style={[styles.modalInput, styles.shareInput]}
+              value={shareEdit?.text ?? ''}
+              onChangeText={text =>
+                setShareEdit(prev => (prev ? {...prev, text} : prev))
+              }
+              placeholderTextColor={colors.textSecondary}
+              multiline
+              textAlignVertical="top"
+            />
+            <TouchableOpacity
+              style={[styles.codeButton, styles.shareCopyBtn, {borderColor: accentColor}]}
+              onPress={() => {
+                if (!shareEdit) return;
+                Clipboard.setString(shareEdit.code);
+                Alert.alert('Copied', `${shareEdit.code} copied to clipboard.`);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Copy invite code">
+              <Copy size={14} color={accentColor} />
+              <Text style={[styles.codeButtonText, {color: accentColor}]}>
+                Copy invite code{shareEdit ? ` (${shareEdit.code})` : ''}
+              </Text>
+            </TouchableOpacity>
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                onPress={() => setShareEdit(null)}
+                accessibilityRole="button"
+                accessibilityLabel="Cancel">
+                <Text style={styles.modalCancel}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalSubmit}
+                onPress={submitShare}
+                accessibilityRole="button"
+                accessibilityLabel="Share invite">
+                <Text style={styles.modalSubmitText}>Share</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1369,6 +1443,13 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     textAlignVertical: 'top',
+  },
+  shareInput: {
+    minHeight: 150,
+  },
+  shareCopyBtn: {
+    alignSelf: 'flex-start',
+    marginTop: spacing.sm,
   },
   modalActions: {
     flexDirection: 'row',
