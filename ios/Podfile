@@ -36,11 +36,14 @@ target 'HotPickSports' do
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |config|
         config.build_settings['DEBUG_INFORMATION_FORMAT'] = 'dwarf-with-dsym'
-        # Xcode 16+ enables "Explicitly Built Modules" by default, which makes
-        # the Clang dependency scanner fail to resolve ExpoModulesCore headers
-        # ("could not build module 'Expo'"). Disable it to use implicit modules
-        # (pre-Xcode-16 behavior) — safe and what RN/Expo expect.
+        # Xcode 16+/26 enables "Explicitly Built Modules" by default. With it on,
+        # the dependency scanner expects every pod's module map to exist up front,
+        # but CocoaPods generates them later in the build — so it fails with
+        # "module map file ... not found" (e.g. RCTSwiftUI.modulemap). Disable it
+        # for BOTH the C/Obj-C (CLANG) and the Swift compilers; setting only the
+        # CLANG flag leaves Swift pods (RCTSwiftUI, etc.) still broken.
         config.build_settings['CLANG_ENABLE_EXPLICIT_MODULES'] = 'NO'
+        config.build_settings['SWIFT_ENABLE_EXPLICIT_MODULES'] = 'NO'
         if target.name == 'React-RCTLinking'
           config.build_settings['DEFINES_MODULE'] = 'YES'
         end
