@@ -49,6 +49,16 @@
 - [x] Confirm `nfl_2026` season setup present in `competition_config`. **Verified 2026-06-05:** `scoring_locked` (emergency brake) ✓, `current_phase`, `current_week`, `week_state`, `playoff_start_week`, `season_opener_date`, `preseason_start_date`, `season_picks_open_at`, `is_active`, `season_year` all present. *(Schedule rows in `season_games` not re-checked here.)* Minor hygiene: `is_active` / `scoring_locked` rows lack a `description` (non-blocking).
 - [ ] Cron health (verified 2026-06: all jobs attach auth, returning 200; ~2% transient DNS timeouts, self-healing). **Optional:** bump `timeout_milliseconds` on heavy jobs (`nfl-calculate-scores`, `compute-hardware`) from the 5s default to ~30s for cleaner launch-week monitoring.
 
+## 6. Monitoring — activate Sentry (before launch)
+
+Crash/error reporting is **scaffolded but inert** (PR #207, `src/shared/monitoring/sentry.ts`). It no-ops until **both** a DSN is configured **and** a fresh native build ships. Turn it on before Season 2 so live crashes are actually visible. One-time native setup: `docs/SENTRY.md`.
+
+- [ ] **Create a Sentry project** (react-native platform) and copy its **DSN** (a public ingest key — safe to expose, but we keep it out of git so it can rotate without a code change).
+- [ ] **Supply the DSN** via the EAS env var **`EXPO_PUBLIC_SENTRY_DSN`** (preferred), scoped to **production + preview** — leave dev unset (Sentry is disabled in `__DEV__` anyway). `app.json` `extra.sentryDsn` is the fallback.
+- [ ] **Native rebuild required.** `@sentry/react-native` is a native module — the DSN alone does nothing without a fresh `eas build` (`cd ios && pod install` for iOS). OTA won't activate it.
+- [ ] **Verify events flow** in a release/TestFlight build: trigger a test error and confirm it lands in the dashboard (check `release` = `hotpicksports@<version>` and the right `environment`).
+- [ ] *(Optional, robustness)* Harden `sentry.ts` to a **guarded `require()`** so a missing/stale `@sentry/react-native` install degrades to a no-op instead of red-screening Metro — the current static `import` bit us once during a stale `npm install`.
+
 ---
 
 ## Deferred — NOT launch blockers (post-launch / Nov 2026)
