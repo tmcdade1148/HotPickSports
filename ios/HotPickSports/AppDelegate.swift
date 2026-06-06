@@ -1,4 +1,8 @@
-import Expo
+// `internal import` (not plain `import`) so the access level matches the
+// generated ExpoModulesProvider.swift, which imports Expo as internal under
+// Expo SDK 55 / Swift 6. Mixing implicit + explicit levels for the same module
+// triggers "ambiguous implicit access level for import of 'Expo'".
+internal import Expo
 import React
 import ReactAppDependencyProvider
 import RNBootSplash
