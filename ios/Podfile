@@ -5,6 +5,14 @@ require Pod::Executable.execute_command('node', ['-p',
     {paths: [process.argv[1]]},
   )', __dir__]).strip
 
+# Expo modules autolinking. Required so ExpoModulesCore installs the `expo`
+# JSI global (ExpoGlobal) at native startup — without this, every expo-* module
+# (expo-notifications/-device/-updates/-asset/-font/-constants) crashes on iOS
+# with "Cannot read property 'EventEmitter' of undefined". Android installs the
+# same global via its autolinked ExpoModulesCore ReactPackage, so it needs no
+# equivalent — this gap is iOS-only.
+require File.join(File.dirname(`node --print "require.resolve('expo/package.json')"`), "scripts/autolinking")
+
 platform :ios, min_ios_version_supported
 prepare_react_native_project!
 
@@ -15,6 +23,7 @@ if linkage != nil
 end
 
 target 'HotPickSports' do
+  use_expo_modules!
   config = use_native_modules!
 
   use_react_native!(

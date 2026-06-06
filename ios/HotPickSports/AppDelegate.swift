@@ -1,26 +1,31 @@
-import UIKit
+import Expo
 import React
-import React_RCTAppDelegate
 import ReactAppDependencyProvider
 import RNBootSplash
 
+// Subclasses ExpoAppDelegate (not a bare UIResponder). ExpoAppDelegate boots
+// ExpoModulesCore and forwards UIApplicationDelegate lifecycle events to every
+// ExpoAppDelegateSubscriber (expo-notifications, expo-updates, expo-linking…).
+// ExpoReactNativeFactory installs the `expo` JSI global (ExpoGlobal) that the
+// expo-* JS modules read at load time — the piece that was missing before.
 @main
-class AppDelegate: UIResponder, UIApplicationDelegate {
+class AppDelegate: ExpoAppDelegate {
   var window: UIWindow?
 
-  var reactNativeDelegate: ReactNativeDelegate?
+  var reactNativeDelegate: ExpoReactNativeFactoryDelegate?
   var reactNativeFactory: RCTReactNativeFactory?
 
-  func application(
+  override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
     let delegate = ReactNativeDelegate()
-    let factory = RCTReactNativeFactory(delegate: delegate)
+    let factory = ExpoReactNativeFactory(delegate: delegate)
     delegate.dependencyProvider = RCTAppDependencyProvider()
 
     reactNativeDelegate = delegate
     reactNativeFactory = factory
+    bindReactNativeFactory(factory)
 
     window = UIWindow(frame: UIScreen.main.bounds)
 
@@ -30,44 +35,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
       launchOptions: launchOptions
     )
 
-    return true
+    // ExpoAppDelegate.application(_:didFinishLaunchingWithOptions:) dispatches
+    // didFinishLaunching to all subscribers — must be called.
+    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
-  // Handle deep links (hotpick:// URL scheme)
-  func application(
-    _ app: UIApplication,
-    open url: URL,
-    options: [UIApplication.OpenURLOptionsKey: Any] = [:]
-  ) -> Bool {
-    // Forward to RN Linking module via the same notification RCTLinkingManager uses
-    NotificationCenter.default.post(
-      name: NSNotification.Name("RCTOpenURLNotification"),
-      object: self,
-      userInfo: ["url": url.absoluteString]
-    )
-    return true
-  }
-
-  // Handle universal links (https://hotpick.app)
-  func application(
-    _ application: UIApplication,
-    continue userActivity: NSUserActivity,
-    restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void
-  ) -> Bool {
-    guard userActivity.activityType == NSUserActivityTypeBrowsingWeb,
-          let url = userActivity.webpageURL else {
-      return false
-    }
-    NotificationCenter.default.post(
-      name: NSNotification.Name("RCTOpenURLNotification"),
-      object: self,
-      userInfo: ["url": url.absoluteString]
-    )
-    return true
-  }
+  // Deep links (hotpick://) and universal links (https://hotpick.app) are now
+  // handled by ExpoAppDelegate's openURL / continueUserActivity, which forward
+  // to RCTLinkingManager and the Expo subscribers. The previous manual
+  // NotificationCenter RCTOpenURLNotification workaround was needed only for the
+  // bare RCTReactNativeFactory; keeping it here would double-fire the url event.
 }
 
-class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
+class ReactNativeDelegate: ExpoReactNativeFactoryDelegate {
   override func sourceURL(for bridge: RCTBridge) -> URL? {
     self.bundleURL()
   }
