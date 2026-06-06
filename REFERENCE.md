@@ -649,7 +649,7 @@ Partners get branded pool experiences inside the standard app. Users download Ho
 Never copy hex strings into component files — import from `hotpickDefaults.ts`.
 
 ### Splash Screen Exception
-The launch/splash background is the brand black `#303030` (rgb 48,48,48). It is hardcoded in four native places that must stay in sync — change all or none:
+The launch/splash background is `#181818` (rgb 24,24,24). It is hardcoded in four native places that must stay in sync — change all or none:
 `app.json` (`expo.splash` + `android.splash`), `android/.../colors.xml` (`bootsplash_background`), the iOS `BootSplashBackground-bc2d1d.colorset` (asset catalog — the value loaded at runtime), and the inline `<namedColor>` in `ios/.../BootSplash.storyboard`. (There is no longer a `SplashScreen.tsx`; the splash is the native BootSplash launch screen via `react-native-bootsplash`.)
 
 ### BrandConfig Interface
