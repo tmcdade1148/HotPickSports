@@ -7,11 +7,9 @@ import React
 import ReactAppDependencyProvider
 import RNBootSplash
 
-// Subclasses ExpoAppDelegate (not a bare UIResponder). ExpoAppDelegate boots
-// ExpoModulesCore and forwards UIApplicationDelegate lifecycle events to every
-// ExpoAppDelegateSubscriber (expo-notifications, expo-updates, expo-linking…).
-// ExpoReactNativeFactory installs the `expo` JSI global (ExpoGlobal) that the
-// expo-* JS modules read at load time — the piece that was missing before.
+// Subclasses ExpoAppDelegate so ExpoModulesCore boots and forwards lifecycle
+// (incl. deep links / universal links) to its subscribers. ExpoReactNativeFactory
+// installs the `expo` JSI global (ExpoGlobal) the expo-* JS modules read at load.
 @main
 class AppDelegate: ExpoAppDelegate {
   var window: UIWindow?
@@ -29,7 +27,6 @@ class AppDelegate: ExpoAppDelegate {
 
     reactNativeDelegate = delegate
     reactNativeFactory = factory
-    bindReactNativeFactory(factory)
 
     window = UIWindow(frame: UIScreen.main.bounds)
 
@@ -39,21 +36,15 @@ class AppDelegate: ExpoAppDelegate {
       launchOptions: launchOptions
     )
 
-    // ExpoAppDelegate.application(_:didFinishLaunchingWithOptions:) dispatches
-    // didFinishLaunching to all subscribers — must be called.
+    // ExpoAppDelegate dispatches didFinishLaunching to all subscribers.
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
-
-  // Deep links (hotpick://) and universal links (https://hotpick.app) are now
-  // handled by ExpoAppDelegate's openURL / continueUserActivity, which forward
-  // to RCTLinkingManager and the Expo subscribers. The previous manual
-  // NotificationCenter RCTOpenURLNotification workaround was needed only for the
-  // bare RCTReactNativeFactory; keeping it here would double-fire the url event.
 }
 
 class ReactNativeDelegate: ExpoReactNativeFactoryDelegate {
   override func sourceURL(for bridge: RCTBridge) -> URL? {
-    self.bundleURL()
+    // bridge.bundleURL first so expo-dev-client returns the correct URL.
+    bridge.bundleURL ?? bundleURL()
   }
 
   override func customize(_ rootView: RCTRootView) {
@@ -63,7 +54,9 @@ class ReactNativeDelegate: ExpoReactNativeFactoryDelegate {
 
   override func bundleURL() -> URL? {
 #if DEBUG
-    RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: "index")
+    // Expo's virtual entry (not "index") — matches expo/metro-config, which the
+    // project uses so EAS can produce OTA-compatible bundles.
+    RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: ".expo/.virtual-metro-entry")
 #else
     Bundle.main.url(forResource: "main", withExtension: "jsbundle")
 #endif
