@@ -158,6 +158,21 @@ async function buildContext(sb: any, competition: string): Promise<SimContext> {
   return { competition, seasonYear };
 }
 
+// Real testers = non-sim-prefixed picks or totals (real auth users with real
+// progress). Their data is the valuable signal: the simulator must never
+// fabricate over it (decision #1), and setup/cleanup must never wipe it
+// (decision #2). Only ever called on an allowlisted sandbox.
+async function hasRealTesters(sb: any, competition: string): Promise<boolean> {
+  const { count: realPicks } = await sb.from("season_picks")
+    .select("user_id", { count: "exact", head: true })
+    .eq("competition", competition).not("user_id", "like", "sim-%");
+  if ((realPicks ?? 0) > 0) return true;
+  const { count: realTotals } = await sb.from("season_user_totals")
+    .select("user_id", { count: "exact", head: true })
+    .eq("competition", competition).not("user_id", "like", "sim-%");
+  return (realTotals ?? 0) > 0;
+}
+
 // Deterministic pseudo-random for reproducible picks.
 function seededRandom(seed: number): () => number {
   let s = seed;
@@ -186,6 +201,14 @@ async function getStatus(sb: any, ctx: SimContext) {
 // DESTRUCTIVE (confirm-gated). Reset existing sandbox games to scheduled, or seed
 // them from the read-only source if the sandbox is empty.
 async function setup(sb: any, ctx: SimContext) {
+  // Decision #2 (extended): never reset/reseed a sandbox that holds real testers —
+  // that would scrub their progress. Reseeding a live tester sandbox is a separate,
+  // deliberate, backed-up operation, not a tool call.
+  if (await hasRealTesters(sb, ctx.competition)) {
+    throw new SimError("SANDBOX_HAS_REAL_TESTERS",
+      `${ctx.competition} holds real (non-sim) testers and their progress — setup would ` +
+        `reset their games and scores. Refused. Reseed only as a deliberate, backed-up op.`, 409);
+  }
   // Clear only simulator-generated picks (sim-prefixed users) — never real picks.
   await sb.from("season_picks").delete().eq("competition", ctx.competition).like("user_id", "sim-%");
 
@@ -278,39 +301,43 @@ async function runWeek(sb: any, ctx: SimContext, week: number, runId?: string) {
   log("config_picks_open", "week_state=picks_open", `week_state=${cfgMap.week_state}`,
     String(cfgMap.week_state).replace(/^"|"$/g, "") === "picks_open");
 
-  // Step 3: fabricate picks for the sandbox's global-pool members.
-  // SCOPED TO THE TARGET (the original lookup had no competition filter — a bug
-  // that, once re-pointed, would have fabricated against the wrong competition).
-  const { data: globalPool } = await sb.from("pools").select("id")
-    .eq("competition", ctx.competition).eq("is_global", true).maybeSingle();
-
+  // Step 3: fabricate picks — ONLY for a purely-synthetic sandbox.
+  // LOCKED RULE (decision #1): never fabricate when real testers/picks are
+  // present. The testers' real picks are the valuable signal — that is the proof
+  // the experience works — and must never be overwritten.
   let picksSubmitted = 0;
-  if (!globalPool) {
-    // OPEN DECISION (see re-scope notes): nfl_2025_sim currently has no is_global
-    // pool, and its testers submit their OWN picks. Skip fabrication rather than
-    // overwrite real tester picks or crash.
-    log("picks_submitted", "global pool present", "no global pool", true,
-      `No is_global pool for ${ctx.competition}; pick fabrication skipped (testers' own picks preserved).`);
+  if (await hasRealTesters(sb, ctx.competition)) {
+    log("picks_submitted", "real testers' picks preserved", "fabrication skipped", true,
+      `${ctx.competition} has real (non-sim) testers — fabrication is disabled to protect their picks.`);
   } else {
-    const { data: members } = await sb.from("pool_members").select("user_id")
-      .eq("pool_id", globalPool.id).eq("status", "active");
-    for (const member of members ?? []) {
-      await sb.from("season_picks").delete()
-        .eq("user_id", member.user_id).eq("competition", ctx.competition).eq("week", week);
-      const hotpickIdx = Math.floor(rand() * (simGames?.length ?? 1));
-      for (let i = 0; i < (simGames?.length ?? 0); i++) {
-        const game = simGames![i];
-        if (game.status !== "scheduled") continue;
-        const pickedTeam = rand() < 0.6 ? game.home_team : game.away_team;
-        const { error: pickErr } = await sb.from("season_picks").insert({
-          user_id: member.user_id, game_id: game.game_id, competition: ctx.competition,
-          season_year: ctx.seasonYear, week, picked_team: pickedTeam, is_hotpick: i === hotpickIdx,
-        });
-        if (!pickErr) picksSubmitted++;
+    // Synthetic sandbox only. Global-pool lookup is competition-scoped (the
+    // original was unscoped — would have fabricated against the wrong competition).
+    const { data: globalPool } = await sb.from("pools").select("id")
+      .eq("competition", ctx.competition).eq("is_global", true).maybeSingle();
+    if (!globalPool) {
+      log("picks_submitted", "global pool present", "no global pool", true,
+        `No is_global pool for ${ctx.competition}; nothing to fabricate.`);
+    } else {
+      const { data: members } = await sb.from("pool_members").select("user_id")
+        .eq("pool_id", globalPool.id).eq("status", "active");
+      for (const member of members ?? []) {
+        await sb.from("season_picks").delete()
+          .eq("user_id", member.user_id).eq("competition", ctx.competition).eq("week", week);
+        const hotpickIdx = Math.floor(rand() * (simGames?.length ?? 1));
+        for (let i = 0; i < (simGames?.length ?? 0); i++) {
+          const game = simGames![i];
+          if (game.status !== "scheduled") continue;
+          const pickedTeam = rand() < 0.6 ? game.home_team : game.away_team;
+          const { error: pickErr } = await sb.from("season_picks").insert({
+            user_id: member.user_id, game_id: game.game_id, competition: ctx.competition,
+            season_year: ctx.seasonYear, week, picked_team: pickedTeam, is_hotpick: i === hotpickIdx,
+          });
+          if (!pickErr) picksSubmitted++;
+        }
       }
+      log("picks_submitted", ">0 picks", `${picksSubmitted} picks`, picksSubmitted > 0,
+        `${members?.length ?? 0} users x ${simGames?.length ?? 0} games`);
     }
-    log("picks_submitted", ">0 picks", `${picksSubmitted} picks`, picksSubmitted > 0,
-      `${members?.length ?? 0} users x ${simGames?.length ?? 0} games`);
   }
 
   // Step 4 + 5: locked -> live (games in progress).
@@ -419,6 +446,14 @@ async function runRange(sb: any, ctx: SimContext, fromWeek: number, toWeek: numb
 
 // DESTRUCTIVE (confirm-gated). Remove simulator data and reset the sandbox clock.
 async function cleanup(sb: any, ctx: SimContext) {
+  // Decision #2: cleanup must never nuke a live tester sandbox. Even with
+  // confirm_destructive, refuse when real testers/progress are present — we do
+  // not run cleanup against the live tester sandbox during the testing period.
+  if (await hasRealTesters(sb, ctx.competition)) {
+    throw new SimError("SANDBOX_HAS_REAL_TESTERS",
+      `${ctx.competition} holds real (non-sim) testers and their progress — cleanup would ` +
+        `wipe totals/picks and reset the clock. Refused. Clear it only as a deliberate, backed-up op.`, 409);
+  }
   await sb.from("season_user_totals").delete().eq("competition", ctx.competition).eq("season_year", ctx.seasonYear);
   await sb.from("season_picks").delete().eq("competition", ctx.competition).eq("season_year", ctx.seasonYear);
   // Only simulator-seeded (sim-prefixed) games are removed; a straight-copy
