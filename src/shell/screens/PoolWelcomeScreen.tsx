@@ -195,7 +195,7 @@ export function PoolWelcomeScreen({navigation}: any) {
                 }}
                 autoCapitalize="characters"
                 autoCorrect={false}
-                maxLength={6}
+                maxLength={12}
                 returnKeyType="go"
                 onSubmitEditing={handleSubmitCode}
               />
