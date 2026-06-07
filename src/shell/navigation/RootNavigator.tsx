@@ -42,7 +42,7 @@ import {ResetPasswordScreen} from '@shell/screens/ResetPasswordScreen';
 import {HardwareAdminScreen} from '@shell/screens/HardwareAdminScreen';
 import {HistoryStackScreen} from '@shell/screens/HistoryScreen';
 import {TosVersionGateScreen} from '@shell/screens/TosVersionGateScreen';
-import {useGlobalStore} from '@shell/stores/globalStore';
+import {persistPendingInviteCode} from '@shell/services/pendingInvite';
 import {supabase} from '@shared/config/supabase';
 import {Linking} from 'react-native';
 
@@ -96,7 +96,9 @@ function handleDeepLink(url: string) {
     if (parsed.hostname === 'join') {
       const codeParam = parsed.searchParams.get('code');
       if (codeParam) {
-        useGlobalStore.getState().setPendingInviteCode(codeParam.toUpperCase());
+        // persist (not just in-memory) so the code survives the app being
+        // backgrounded during signup before PoolWelcome consumes it.
+        persistPendingInviteCode(codeParam);
       }
       return;
     }
@@ -104,9 +106,7 @@ function handleDeepLink(url: string) {
     // Invite code — path style: https://hotpick.app/join/XXXX
     const pathMatch = parsed.pathname.match(/\/join\/([A-Za-z0-9]+)/);
     if (pathMatch) {
-      useGlobalStore
-        .getState()
-        .setPendingInviteCode(pathMatch[1].toUpperCase());
+      persistPendingInviteCode(pathMatch[1]);
     }
   } catch {
     // Invalid URL — ignore

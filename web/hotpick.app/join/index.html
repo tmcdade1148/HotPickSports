@@ -33,6 +33,12 @@
       font-weight: 700; font-size: 16px; color: #fff; background: var(--teal);
     }
     a.store.primary { background: var(--orange); }
+    .copybtn {
+      display: inline-block; margin: -16px 0 28px; padding: 10px 18px;
+      border: 1px solid var(--orange); border-radius: 10px; background: transparent;
+      color: var(--orange); font-size: 14px; font-weight: 700; cursor: pointer;
+    }
+    .copybtn.copied { background: var(--orange); color: #fff; }
     .hint { margin-top: 22px; font-size: 13px; color: #8a97aa; }
   </style>
 </head>
@@ -42,11 +48,12 @@
     <p>HotPick Sports — make your picks once and compete with your group all season.</p>
     <div class="code-label">YOUR INVITE CODE</div>
     <div class="code" id="code">······</div>
+    <button class="copybtn" id="copybtn" type="button">Copy code</button>
     <div class="stores">
       <a class="store primary" id="appstore" href="https://apps.apple.com/app/id6761190235">Download on the App Store</a>
       <a class="store" id="playstore" href="https://play.google.com/store/apps/details?id=com.hotpicksports">Get it on Google Play</a>
     </div>
-    <div class="hint">Already have the app? Open it and enter the code above on the Join a Contest screen.</div>
+    <div class="hint">After you install, open HotPick and your code fills in automatically. If it doesn't, just enter the code above on the Join a Contest screen.</div>
   </div>
 
   <script>
@@ -58,10 +65,61 @@
     (function () {
       var m = location.pathname.match(/\/join\/([A-Za-z0-9]+)/);
       var code = m ? m[1].toUpperCase() : null;
-      if (code) {
-        document.getElementById('code').textContent = code;
-        document.title = 'Join with code ' + code + ' · HotPick Sports';
+      if (!code) return;
+
+      document.getElementById('code').textContent = code;
+      document.title = 'Join with code ' + code + ' · HotPick Sports';
+
+      // Cold-install handoff: copy the code to the clipboard so the freshly
+      // installed app can read it back on first launch and auto-fill the join
+      // field. Best-effort — the app also shows manual entry as a fallback.
+      function copyCode() {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          return navigator.clipboard.writeText(code).then(function () { return true; },
+                                                           function () { return false; });
+        }
+        try {
+          var ta = document.createElement('textarea');
+          ta.value = code;
+          ta.setAttribute('readonly', '');
+          ta.style.position = 'absolute';
+          ta.style.left = '-9999px';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+          return Promise.resolve(true);
+        } catch (e) {
+          return Promise.resolve(false);
+        }
       }
+
+      // Manual Copy button.
+      var copyBtn = document.getElementById('copybtn');
+      copyBtn.addEventListener('click', function () {
+        copyCode().then(function (ok) {
+          if (!ok) return;
+          copyBtn.textContent = 'Copied!';
+          copyBtn.classList.add('copied');
+          setTimeout(function () {
+            copyBtn.textContent = 'Copy code';
+            copyBtn.classList.remove('copied');
+          }, 1800);
+        });
+      });
+
+      // Store buttons: copy the code first (the tap is the required user gesture),
+      // then continue to the store. We wait for the copy to settle so navigating
+      // away doesn't cut off the async clipboard write.
+      ['appstore', 'playstore'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('click', function (e) {
+          e.preventDefault();
+          var href = el.getAttribute('href');
+          copyCode().finally(function () { window.location.href = href; });
+        });
+      });
     })();
   </script>
 </body>

@@ -11,6 +11,7 @@ import {
   DEV_ACTIVE_COMPETITION_KEY,
 } from '@shell/stores/globalStore';
 import {getDefaultEvent, getAllEventsUnfiltered} from '@sports/registry';
+import {resolvePendingInviteCodeOnLaunch} from '@shell/services/pendingInvite';
 
 /**
  * LoadingScreen — bootstraps auth session and navigates to the first real screen.
@@ -42,6 +43,12 @@ export function LoadingScreen({navigation}: any) {
   const didNavigate = useRef(false);
 
   useEffect(() => {
+    // Resolve a pending invite code for the deferred deep-link flow: restore a
+    // persisted code, or (first launch only) probe the clipboard for one the
+    // landing page copied. Fire-and-forget — it lands in the store well before
+    // the user reaches PoolWelcome, which also re-resolves as a safety net.
+    resolvePendingInviteCodeOnLaunch();
+
     // Populate available events from registry
     refreshAvailableEvents();
 
