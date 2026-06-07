@@ -3,12 +3,18 @@ name: CI
 # Runs on every PR into main and on pushes to main. Spins up a fresh
 # machine, installs dependencies, then runs the two fast, deterministic
 # checks: a full TypeScript typecheck and the locked lexicon test.
+#
+# workflow_dispatch allows running the checks on demand from the Actions tab
+# (pick any branch). Useful when a PR opened by an automation/integration token
+# doesn't auto-trigger the pull_request run. Note: the manual "Run workflow"
+# button only appears once this trigger is present on the default branch.
 
 on:
   pull_request:
     branches: [main]
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   checks:
