@@ -1,12 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { mapPlayoffWeek } from "../_shared/scoring.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL") ?? "",
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
   { auth: { persistSession: false } }
 );
-
-const PLAYOFF_WEEK_MAP: Record<number, number> = { 1:19, 2:20, 3:21, 4:21, 5:22 };
 
 Deno.serve(async (req) => {
   try {
@@ -69,7 +68,16 @@ Deno.serve(async (req) => {
         }
 
         const espnWeek = event.week?.number ?? 1;
-        const dbWeek = isPlayoffs ? (PLAYOFF_WEEK_MAP[espnWeek] ?? 18 + espnWeek) : espnWeek;
+        // In the postseason, map only the rounds we score; skip unmapped weeks
+        // (Pro Bowl = 4, or anything unexpected) rather than guessing a DB week.
+        let dbWeek: number;
+        if (isPlayoffs) {
+          const mapped = mapPlayoffWeek(espnWeek);
+          if (mapped === null) { skippedCount++; continue; }
+          dbWeek = mapped;
+        } else {
+          dbWeek = espnWeek;
+        }
 
         const updateData: Record<string, unknown> = {
           status, home_score: homeScore, away_score: awayScore,
@@ -109,6 +117,14 @@ Deno.serve(async (req) => {
       } catch (gameErr) {
         skippedCount++;
       }
+    }
+
+    // In the postseason there are only a handful of games, so any skip is
+    // suspicious (most likely a team-abbreviation mismatch, e.g. WSH vs WAS,
+    // leaving a real game un-scored). Surface it loudly. Regular-season skips
+    // are normal (the scoreboard spans states/weeks) so we don't warn there.
+    if (isPlayoffs && skippedCount > 0) {
+      console.warn(`[nfl-update-scores] ⚠️ PLAYOFFS: ${skippedCount} game(s) skipped/unmatched for ${competition} ${seasonYear} — check for team-abbreviation mismatches; a real game may be un-scored.`);
     }
 
     return json({ success: true, updated: updatedCount, skipped: skippedCount, updates, isPlayoffs }, 200);

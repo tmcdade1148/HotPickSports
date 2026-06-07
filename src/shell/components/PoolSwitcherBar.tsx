@@ -26,9 +26,9 @@ import {useTheme, useBrand} from '@shell/theme';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {spacing} from '@shared/theme';
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+ 
 const wordmarkLight = require('../../assets/hotpick-wordmark-lt.png');
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+ 
 const wordmarkDark = require('../../assets/hotpick-wordmark-dk.png');
 
 function isDarkBg(hex: string): boolean {

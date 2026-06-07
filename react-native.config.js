@@ -8,4 +8,17 @@
 
 module.exports = {
   assets: ['./assets/fonts'],
+  // Sentry is deferred and inert (no DSN configured, so its native module is
+  // never initialized — see src/shared/monitoring/sentry.ts). Its CocoaPods
+  // build does not produce a module map under Xcode 26, which breaks the iOS
+  // build. Skip autolinking the Sentry pod on iOS until monitoring is actually
+  // activated. The JS package stays installed (Metro still resolves the lazy
+  // require), and Android keeps Sentry. Remove this block when wiring Sentry up.
+  dependencies: {
+    '@sentry/react-native': {
+      platforms: {
+        ios: null,
+      },
+    },
+  },
 };

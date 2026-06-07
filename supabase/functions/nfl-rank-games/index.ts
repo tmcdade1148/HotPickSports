@@ -54,16 +54,23 @@ function applyPlayoffEscalation(ranked: any[], week: number) {
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("Method not allowed", { status: 405 });
+  // Hoisted so the catch block can record a readiness failure (§5b).
+  let competition = "nfl_2026";
+  let week = 0;
   try {
     const body = await req.json().catch(() => ({}));
-    const competition = body.competition ?? "nfl_2026";
-    const week = Number(body.week);
+    competition = body.competition ?? "nfl_2026";
     const force = Boolean(body.force);
-    if (!week) return json({ error: "Missing week parameter" }, 400);
 
     const { data: configRows } = await supabase
       .from("competition_config").select("key, value").eq("competition", competition);
     const cfg = Object.fromEntries((configRows ?? []).map((r) => [r.key, r.value]));
+    if (!cfg.is_active) return json({ success: true, reason: "competition_inactive" }, 200);
+
+    // Week: explicit param wins; otherwise derive from the clock (cron passes none).
+    week = Number(body.week) || deriveWeek(cfg);
+    if (!week) return json({ success: true, reason: "no_active_week" }, 200);
+
     const seasonYear = Number(cfg.season_year ?? 2026);
 
     const { data: games, error: gamesError } = await supabase
@@ -71,11 +78,20 @@ Deno.serve(async (req) => {
       .select("game_id, kickoff_at, frozen_rank, home_moneyline, away_moneyline, spread")
       .eq("competition", competition).eq("season_year", seasonYear).eq("week", week);
 
-    if (gamesError) return json({ error: gamesError.message }, 500);
-    if (!games || games.length === 0) return json({ competition, season_year: seasonYear, week, updated: 0, message: "No games found" }, 200);
+    if (gamesError) {
+      await markReadiness(competition, week, { ranks_status: "failed", ranks_error: gamesError.message, ranks_at: new Date().toISOString() });
+      return json({ error: gamesError.message }, 500);
+    }
+    if (!games || games.length === 0) {
+      await markReadiness(competition, week, { ranks_status: "failed", ranks_error: "No games for week (run import-schedule first)", ranks_at: new Date().toISOString() });
+      return json({ competition, season_year: seasonYear, week, updated: 0, message: "No games found" }, 200);
+    }
 
     const alreadyFrozen = games.filter((g) => g.frozen_rank !== null);
     if (alreadyFrozen.length > 0 && !force) {
+      // Ranks already frozen = ranks ARE ready (Hard Rule #6 keeps them immutable
+      // after the deadline). Record OK so the gate isn't falsely blocked.
+      await markReadiness(competition, week, { ranks_status: "ok", ranks_count: alreadyFrozen.length, ranks_error: null, ranks_at: new Date().toISOString() });
       return json({ competition, season_year: seasonYear, week, updated: 0, frozen: alreadyFrozen.length, message: "Ranks already frozen. Use force=true to re-rank." }, 200);
     }
 
@@ -121,12 +137,43 @@ Deno.serve(async (req) => {
       }));
     }
 
+    // §5b — ranks computed/frozen OK.
+    await markReadiness(competition, week, { ranks_status: "ok", ranks_count: ranked.length, ranks_error: null, ranks_at: new Date().toISOString() });
+
     return json({ success: true, competition, season_year: seasonYear, week, updated: ranked.length, frozen: ranked.length, errors, rankings: ranked }, 200);
   } catch (err) {
+    if (week) await markReadiness(competition, week, { ranks_status: "failed", ranks_error: String(err), ranks_at: new Date().toISOString() });
     return json({ success: false, error: String(err) }, 500);
   }
 });
 
 function json(body: unknown, status: number) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+}
+
+// Derive which week to prep when the caller (cron) passes none. After a week
+// wraps up (settling/complete) prep the NEXT week (for the advance gate);
+// otherwise the current week (covers the Week-1 initial open while idle).
+function deriveWeek(cfg: Record<string, any>): number {
+  const strip = (v: any) => String(v ?? "").replace(/^"|"$/g, "");
+  // Auto-prep only runs inside the weekly cycle — never off-season / pre-season,
+  // which would prematurely import and FREEZE ranks on stale odds (Hard Rule #6).
+  const phase = strip(cfg.current_phase);
+  if (!["REGULAR", "PLAYOFFS", "SUPERBOWL"].includes(phase)) return 0;
+  const current = Number(strip(cfg.current_week)) || 0;
+  const ws = strip(cfg.week_state);
+  if (!current) return 0;
+  return (ws === "settling" || ws === "complete") ? current + 1 : current;
+}
+
+// §5b — best-effort upsert of this step's slice of week_readiness. Wrapped so a
+// readiness write never breaks the prep step. Partial column set; sibling columns
+// (games_*, odds_*) are preserved on conflict.
+async function markReadiness(competition: string, week: number, fields: Record<string, unknown>) {
+  try {
+    await supabase.from("week_readiness").upsert(
+      { competition, week_number: week, updated_at: new Date().toISOString(), ...fields },
+      { onConflict: "competition,week_number" },
+    );
+  } catch (_e) { /* best-effort */ }
 }

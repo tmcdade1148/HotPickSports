@@ -32,7 +32,6 @@ export function RecruiterBand() {
   const visiblePools   = useGlobalStore(s => s.visiblePools);
   const userRankByPool = useGlobalStore(s => s.userRankByPool);
   const userId         = useGlobalStore(s => s.user?.id);
-  const sportName      = useGlobalStore(s => s.activeSport?.sportIdentity?.displayName) ?? 'HotPick';
 
   // Prefer a pool the current user organizes (the Gaffer's primary
   // share surface). Fall back to any pool they're in with an invite
@@ -51,13 +50,13 @@ export function RecruiterBand() {
   const inviteUrl = `${INVITE_BASE}/${code}`;
 
   const handleShare = async () => {
-    const message = [
-      `Get in on my ${sportName} Contest "${poolName}".`,
-      `Pick the winners each week — friendly competition, your group.`,
-      ``,
-      `Tap to join: ${inviteUrl}`,
-      `Or use invite code: ${code}`,
-    ].join('\n');
+    // Unified invite voice — matches PoolSettings → Share. Code on its own line
+    // so it's easy to select in the recipient's messenger.
+    const message =
+      `Hey, I'd love for you to join my HotPick football pool "${poolName}"! ` +
+      `Pick games 🏈, talk smack, and settle who's got bragging rights.\n\n` +
+      `Tap to join 👉 ${inviteUrl}\n\n` +
+      `Invite code:\n${code}`;
     try {
       await Share.share({message});
     } catch {

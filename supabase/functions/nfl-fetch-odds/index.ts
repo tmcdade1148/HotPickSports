@@ -27,15 +27,22 @@ const TEAM_MAP: Record<string, string[]> = {
 };
 
 Deno.serve(async (req) => {
+  // Hoisted so the catch block can record a readiness failure (§5b).
+  let competition = "nfl_2026";
+  let week = 0;
   try {
     const body = await req.json().catch(() => ({}));
-    const competition = body.competition ?? "nfl_2026";
-    const week = Number(body.week);
-    if (!week) return json({ error: "Missing week parameter" }, 400);
+    competition = body.competition ?? "nfl_2026";
 
     const { data: configRows } = await supabase
       .from("competition_config").select("key, value").eq("competition", competition);
     const cfg = Object.fromEntries((configRows ?? []).map((r) => [r.key, r.value]));
+    if (!cfg.is_active) return json({ success: true, reason: "competition_inactive" }, 200);
+
+    // Week: explicit param wins; otherwise derive from the clock (cron passes none).
+    week = Number(body.week) || deriveWeek(cfg);
+    if (!week) return json({ success: true, reason: "no_active_week" }, 200);
+
     const seasonYear = Number(cfg.season_year ?? 2026);
 
     const { data: games, error: gamesError } = await supabase
@@ -44,11 +51,15 @@ Deno.serve(async (req) => {
       .eq("competition", competition).eq("season_year", seasonYear).eq("week", week);
 
     if (gamesError || !games || games.length === 0) {
+      await markReadiness(competition, week, { odds_status: "failed", odds_error: "No games for week (run import-schedule first)", odds_at: new Date().toISOString() });
       return json({ error: "No games found", competition, season_year: seasonYear, week }, 404);
     }
 
     const oddsApiKey = Deno.env.get("ODDS_API_KEY") ?? "";
-    if (!oddsApiKey) return json({ error: "Missing ODDS_API_KEY" }, 500);
+    if (!oddsApiKey) {
+      await markReadiness(competition, week, { odds_status: "failed", odds_error: "Missing ODDS_API_KEY", odds_expected: games.length, odds_at: new Date().toISOString() });
+      return json({ error: "Missing ODDS_API_KEY" }, 500);
+    }
 
     const oddsRes = await fetch(
       `https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?apiKey=${oddsApiKey}&regions=us&markets=spreads,h2h&oddsFormat=american`
@@ -96,13 +107,52 @@ Deno.serve(async (req) => {
       else updated++;
     }
 
+    // §5b — odds present = games updated this run plus those whose existing odds
+    // were preserved. The gate (§5c) compares odds_count against odds_expected.
+    const oddsPresent = updated + preserved;
+    await markReadiness(competition, week, {
+      odds_status: "ok",
+      odds_count: oddsPresent,
+      odds_expected: games.length,
+      odds_error: oddsPresent < games.length ? `${games.length - oddsPresent} game(s) missing odds` : null,
+      odds_at: new Date().toISOString(),
+    });
+
     return json({ success: true, competition, season_year: seasonYear, week, updated, skipped, preserved, total: games.length, errors,
       apiUsage: { used: oddsRes.headers.get("x-requests-used"), remaining: oddsRes.headers.get("x-requests-remaining") } }, 200);
   } catch (err) {
+    if (week) await markReadiness(competition, week, { odds_status: "failed", odds_error: String(err), odds_at: new Date().toISOString() });
     return json({ success: false, error: String(err) }, 500);
   }
 });
 
 function json(body: unknown, status: number) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+}
+
+// Derive which week to prep when the caller (cron) passes none. After a week
+// wraps up (settling/complete) prep the NEXT week (for the advance gate);
+// otherwise the current week (covers the Week-1 initial open while idle).
+function deriveWeek(cfg: Record<string, any>): number {
+  const strip = (v: any) => String(v ?? "").replace(/^"|"$/g, "");
+  // Auto-prep only runs inside the weekly cycle — never off-season / pre-season,
+  // which would prematurely import and FREEZE ranks on stale odds (Hard Rule #6).
+  const phase = strip(cfg.current_phase);
+  if (!["REGULAR", "PLAYOFFS", "SUPERBOWL"].includes(phase)) return 0;
+  const current = Number(strip(cfg.current_week)) || 0;
+  const ws = strip(cfg.week_state);
+  if (!current) return 0;
+  return (ws === "settling" || ws === "complete") ? current + 1 : current;
+}
+
+// §5b — best-effort upsert of this step's slice of week_readiness. Wrapped so a
+// readiness write never breaks the prep step. Partial column set; sibling columns
+// (games_*, ranks_*) are preserved on conflict.
+async function markReadiness(competition: string, week: number, fields: Record<string, unknown>) {
+  try {
+    await supabase.from("week_readiness").upsert(
+      { competition, week_number: week, updated_at: new Date().toISOString(), ...fields },
+      { onConflict: "competition,week_number" },
+    );
+  } catch (_e) { /* best-effort */ }
 }

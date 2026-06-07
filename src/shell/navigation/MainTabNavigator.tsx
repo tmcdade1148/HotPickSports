@@ -80,9 +80,9 @@ const emptyStyles = StyleSheet.create({
   },
 });
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+ 
 const wordmarkLight = require('../../assets/hotpick-wordmark-lt.png');
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+ 
 const wordmarkDark = require('../../assets/hotpick-wordmark-dk.png');
 
 function isDarkBg(hex: string): boolean {
