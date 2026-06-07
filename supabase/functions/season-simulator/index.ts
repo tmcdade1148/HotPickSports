@@ -1,21 +1,52 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-const COMPETITION = "nfl_2026";
+// ─────────────────────────────────────────────────────────────────────────────
+// SAFETY MODEL — the simulator is STRUCTURALLY incapable of touching production.
+// 260606_HotPick_SimulatorRescope_Spec.
+//
+//   * There is NO default target. The target competition is a required input.
+//   * It must appear in SANDBOX_COMPETITIONS — checked at the entry point,
+//     BEFORE any database read or write, for EVERY command.
+//   * Adding a production competition here would require this reviewed, deployed
+//     code change — never a config row or a stray SQL UPDATE. That asymmetry is
+//     the whole point: the safe state lives in the structure, not in a setting.
+// ─────────────────────────────────────────────────────────────────────────────
+const SANDBOX_COMPETITIONS = ["nfl_2025_sim"];
+// future: a shadow-run sandbox (e.g. "nfl_2026_sim") may be added here as a
+// DELIBERATE, reviewed code change. nfl_2026 — and any live competition — must
+// NEVER be added. If you are tempted to add one "temporarily", stop.
+
+// Read-only replay source: the real 2025 results the simulator copies/replays.
+// Reading the source is harmless; only the TARGET is gated.
 const SOURCE_COMPETITION = "nfl_2025";
-const SEASON_YEAR = 2026;
 const SOURCE_YEAR = 2025;
 
-// Deterministic pseudo-random for reproducible picks
-function seededRandom(seed: number): () => number {
-  let s = seed;
-  return () => {
-    s = (s * 1664525 + 1013904223) & 0x7fffffff;
-    return s / 0x7fffffff;
-  };
+// Destructive commands wipe / re-initialise sandbox data. They are gated behind
+// an explicit confirm flag so routine advancing (run_week/run_range) can NEVER
+// re-initialise the sandbox and erase the testers living in it.
+const DESTRUCTIVE_COMMANDS = new Set(["setup", "cleanup"]);
+
+interface SimContext {
+  competition: string; // a validated sandbox target (never production)
+  seasonYear: number;  // read from competition_config — never hardcoded
+}
+
+// Typed error so the handler can map a refusal to the right status + code.
+class SimError extends Error {
+  code: string;
+  status: number;
+  constructor(code: string, message: string, status: number) {
+    super(message);
+    this.code = code;
+    this.status = status;
+  }
 }
 
 Deno.serve(async (req: Request) => {
+  // Service-role client for the simulator's own DB work (bypasses RLS). The
+  // gates below — allowlist first, then super-admin — are what keep this power
+  // away from production.
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -24,43 +55,127 @@ Deno.serve(async (req: Request) => {
   try {
     const body = await req.json().catch(() => ({}));
     const command = body.command ?? "status";
+    const target = body.competition;
+
+    // ── GATE 1 — ALLOWLIST. Pure input validation, before ANY DB I/O, for
+    //    EVERY command. This is the single most important line in the file. ──
+    if (!target) {
+      throw new SimError(
+        "MISSING_TARGET",
+        "No competition supplied. Pass { competition } — there is no default target.",
+        400,
+      );
+    }
+    if (!SANDBOX_COMPETITIONS.includes(target)) {
+      throw new SimError(
+        "REFUSED",
+        `${target} is not a sandbox. The simulator only runs against: ` +
+          `${SANDBOX_COMPETITIONS.join(", ")}. It is structurally barred from production.`,
+        403,
+      );
+    }
+
+    // ── GATE 2 — SUPER-ADMIN. Basic hygiene; the allowlist already blocks prod
+    //    harm, so this runs after it (and only touches profiles, not sim data). ──
+    await assertSuperAdmin(req, supabase);
+
+    // ── GATE 3 — DESTRUCTIVE CONFIRM. setup/cleanup can erase testers' data, so
+    //    they need an explicit flag. Routine advancing never reaches this. ──
+    if (DESTRUCTIVE_COMMANDS.has(command) && body.confirm_destructive !== true) {
+      throw new SimError(
+        "CONFIRM_REQUIRED",
+        `'${command}' wipes / re-initialises ${target} and can erase testers' ` +
+          `data. Re-send with { confirm_destructive: true } to proceed.`,
+        400,
+      );
+    }
+
+    // Past the gates — build the validated context (season_year from config).
+    const ctx = await buildContext(supabase, target);
 
     switch (command) {
       case "status":
-        return json(await getStatus(supabase), 200);
-
+        return json(await getStatus(supabase, ctx), 200);
       case "setup":
-        return json(await setup(supabase), 200);
-
+        return json(await setup(supabase, ctx), 200);
       case "run_week":
-        return json(await runWeek(supabase, body.week, body.run_id), 200);
-
+        return json(await runWeek(supabase, ctx, body.week, body.run_id), 200);
       case "run_range":
-        return json(await runRange(supabase, body.from_week ?? 1, body.to_week ?? 18, body.run_id), 200);
-
+        return json(await runRange(supabase, ctx, body.from_week ?? 1, body.to_week ?? 18, body.run_id), 200);
       case "run_full_season":
-        return json(await runRange(supabase, 1, 22, body.run_id), 200);
-
+        return json(await runRange(supabase, ctx, 1, 22, body.run_id), 200);
       case "run_playoffs":
-        return json(await runRange(supabase, 19, 22, body.run_id), 200);
-
+        return json(await runRange(supabase, ctx, 19, 22, body.run_id), 200);
       case "cleanup":
-        return json(await cleanup(supabase), 200);
-
+        return json(await cleanup(supabase, ctx), 200);
       default:
         return json({ error: `Unknown command: ${command}. Use: status, setup, run_week, run_range, run_full_season, run_playoffs, cleanup` }, 400);
     }
   } catch (err: unknown) {
+    if (err instanceof SimError) {
+      return json({ error: err.message, code: err.code }, err.status);
+    }
     return json({ error: err instanceof Error ? err.message : String(err) }, 500);
   }
 });
 
-async function getStatus(sb: any) {
-  const { data: games } = await sb.from("season_games").select("week").eq("competition", COMPETITION).eq("season_year", SEASON_YEAR);
-  const { data: config } = await sb.from("competition_config").select("key, value").eq("competition", COMPETITION);
+// Resolve and verify the caller is a super-admin. The simulator works under the
+// service role for its DB writes, so we build a SEPARATE user-scoped client from
+// the caller's JWT purely to read their identity.
+// NOTE (operational): this requires the caller to pass a signed-in super-admin's
+// Authorization header. A service-role/cron invocation has no user JWT and will
+// be rejected here — confirm who advances the sandbox before relying on this.
+async function assertSuperAdmin(req: Request, service: any) {
+  const authHeader = req.headers.get("Authorization") ?? "";
+  if (!authHeader) {
+    throw new SimError("UNAUTHENTICATED", "Missing Authorization header — call as a signed-in super-admin.", 401);
+  }
+  const userClient = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_ANON_KEY")!,
+    { global: { headers: { Authorization: authHeader } } },
+  );
+  const { data: { user }, error } = await userClient.auth.getUser();
+  if (error || !user) {
+    throw new SimError("UNAUTHENTICATED", "Could not resolve caller identity from the token.", 401);
+  }
+  const { data: profile } = await service.from("profiles").select("is_super_admin").eq("id", user.id).single();
+  if (!profile?.is_super_admin) {
+    throw new SimError("FORBIDDEN", "Super-admin only.", 403);
+  }
+}
+
+// season_year is read from config so the simulator is correct for ANY sandbox
+// (nfl_2025_sim is season_year 2025, not 2026 — never hardcode it).
+async function buildContext(sb: any, competition: string): Promise<SimContext> {
+  const { data } = await sb
+    .from("competition_config").select("value")
+    .eq("competition", competition).eq("key", "season_year").maybeSingle();
+  const seasonYear = Number(String(data?.value ?? "").replace(/^"|"$/g, ""));
+  if (!Number.isFinite(seasonYear) || seasonYear === 0) {
+    throw new SimError("NO_SEASON_YEAR", `${competition} has no season_year in competition_config.`, 400);
+  }
+  return { competition, seasonYear };
+}
+
+// Deterministic pseudo-random for reproducible picks.
+function seededRandom(seed: number): () => number {
+  let s = seed;
+  return () => {
+    s = (s * 1664525 + 1013904223) & 0x7fffffff;
+    return s / 0x7fffffff;
+  };
+}
+
+async function getStatus(sb: any, ctx: SimContext) {
+  const { data: games } = await sb.from("season_games").select("week")
+    .eq("competition", ctx.competition).eq("season_year", ctx.seasonYear);
+  const { data: config } = await sb.from("competition_config").select("key, value")
+    .eq("competition", ctx.competition);
   const cfg = Object.fromEntries((config ?? []).map((r: any) => [r.key, r.value]));
   return {
-    competition: COMPETITION,
+    competition: ctx.competition,
+    season_year: ctx.seasonYear,
     games_loaded: games?.length ?? 0,
     current_week: cfg.current_week,
     current_phase: cfg.current_phase,
@@ -68,38 +183,35 @@ async function getStatus(sb: any) {
   };
 }
 
-async function setup(sb: any) {
-  // Copy 2025 games to 2026 (clear existing 2026 sim data first)
-  await sb.from("season_picks").delete().eq("competition", COMPETITION).like("user_id", "sim-%");
-  // Don't delete real user picks — only sim data
+// DESTRUCTIVE (confirm-gated). Reset existing sandbox games to scheduled, or seed
+// them from the read-only source if the sandbox is empty.
+async function setup(sb: any, ctx: SimContext) {
+  // Clear only simulator-generated picks (sim-prefixed users) — never real picks.
+  await sb.from("season_picks").delete().eq("competition", ctx.competition).like("user_id", "sim-%");
 
-  // Check if we already have 2026 games from 2025 data
-  const { data: existing } = await sb.from("season_games").select("game_id").eq("competition", COMPETITION).eq("season_year", SEASON_YEAR).limit(1);
+  const { data: existing } = await sb.from("season_games").select("game_id")
+    .eq("competition", ctx.competition).eq("season_year", ctx.seasonYear).limit(1);
 
   if (existing && existing.length > 0) {
-    // Reset all 2026 games to scheduled
+    // Sandbox already seeded (the nfl_2025_sim case) — reset to scheduled.
     await sb.from("season_games")
       .update({ status: "scheduled", home_score: null, away_score: null, winner_team: null, is_finalized: false })
-      .eq("competition", COMPETITION).eq("season_year", SEASON_YEAR);
-
-    return { status: "reset", message: "Existing 2026 games reset to scheduled" };
+      .eq("competition", ctx.competition).eq("season_year", ctx.seasonYear);
+    return { status: "reset", competition: ctx.competition, message: "Existing sandbox games reset to scheduled" };
   }
 
-  // Copy 2025 games to 2026
-  const { data: source } = await sb.from("season_games")
-    .select("*")
-    .eq("competition", SOURCE_COMPETITION)
-    .eq("season_year", SOURCE_YEAR)
+  // Empty sandbox — seed from the read-only source.
+  const { data: source } = await sb.from("season_games").select("*")
+    .eq("competition", SOURCE_COMPETITION).eq("season_year", SOURCE_YEAR)
     .order("week", { ascending: true });
-
   if (!source || source.length === 0) {
-    return { error: "No 2025 data found" };
+    return { error: `No source data found in ${SOURCE_COMPETITION}/${SOURCE_YEAR}` };
   }
 
   const mapped = source.map((g: any) => ({
     game_id: `sim-${g.game_id}`,
-    competition: COMPETITION,
-    season_year: SEASON_YEAR,
+    competition: ctx.competition,
+    season_year: ctx.seasonYear,
     week: g.week,
     phase: g.phase ?? "REGULAR",
     home_team: g.home_team,
@@ -121,15 +233,14 @@ async function setup(sb: any) {
   const { error } = await sb.from("season_games").insert(mapped);
   if (error) return { error: error.message };
 
-  // Reset competition config
-  await setConfig(sb, "current_week", 1);
-  await setConfig(sb, "current_phase", "REGULAR");
-  await setConfig(sb, "week_state", "picks_open");
+  await setConfig(sb, ctx, "current_week", 1);
+  await setConfig(sb, ctx, "current_phase", "REGULAR");
+  await setConfig(sb, ctx, "week_state", "picks_open");
 
-  return { status: "setup_complete", games_loaded: mapped.length, weeks: [...new Set(mapped.map((g: any) => g.week))].length };
+  return { status: "setup_complete", competition: ctx.competition, games_loaded: mapped.length, weeks: [...new Set(mapped.map((g: any) => g.week))].length };
 }
 
-async function runWeek(sb: any, week: number, runId?: string) {
+async function runWeek(sb: any, ctx: SimContext, week: number, runId?: string) {
   const rid = runId ?? crypto.randomUUID();
   const rand = seededRandom(week * 12345);
   const logs: any[] = [];
@@ -138,133 +249,105 @@ async function runWeek(sb: any, week: number, runId?: string) {
     logs.push({ run_id: rid, week, step, expected, actual, passed, detail });
   }
 
-  // Get source data for this week (has the real results)
-  const { data: sourceGames } = await sb.from("season_games")
-    .select("*")
-    .eq("competition", SOURCE_COMPETITION)
-    .eq("season_year", SOURCE_YEAR)
-    .eq("week", week);
-
+  // Source data for this week (the real results to replay).
+  const { data: sourceGames } = await sb.from("season_games").select("*")
+    .eq("competition", SOURCE_COMPETITION).eq("season_year", SOURCE_YEAR).eq("week", week);
   if (!sourceGames || sourceGames.length === 0) {
-    log("load_source", "games found", "no games", false, `No 2025 data for week ${week}`);
+    log("load_source", "games found", "no games", false, `No ${SOURCE_COMPETITION} data for week ${week}`);
     await sb.from("simulation_log").insert(logs);
     return { run_id: rid, week, status: "failed", logs };
   }
-
   const sourceMap = new Map(sourceGames.map((g: any) => [g.game_id, g]));
 
-  // Step 1: Verify games exist in 2026 and are scheduled
-  const { data: simGames } = await sb.from("season_games")
-    .select("*")
-    .eq("competition", COMPETITION)
-    .eq("season_year", SEASON_YEAR)
-    .eq("week", week);
-
+  // Step 1: the sandbox has this week's games.
+  const { data: simGames } = await sb.from("season_games").select("*")
+    .eq("competition", ctx.competition).eq("season_year", ctx.seasonYear).eq("week", week);
   log("games_exist", `${sourceGames.length} games`, `${simGames?.length ?? 0} games`,
     (simGames?.length ?? 0) === sourceGames.length);
 
-  // Step 2: Set week state to picks_open
-  await setConfig(sb, "current_week", week);
-  await setConfig(sb, "week_state", "picks_open");
-
+  // Step 2: open picks for the week.
+  await setConfig(sb, ctx, "current_week", week);
+  await setConfig(sb, ctx, "week_state", "picks_open");
   const phase = week <= 18 ? "REGULAR" : week === 19 ? "WILDCARD" : week === 20 ? "DIVISIONAL" : week === 21 ? "CONFERENCE" : "SUPERBOWL";
-  if (week === 19) await setConfig(sb, "current_phase", "PLAYOFFS");
-  if (week === 22) await setConfig(sb, "current_phase", "SUPERBOWL");
+  if (week === 19) await setConfig(sb, ctx, "current_phase", "PLAYOFFS");
+  if (week === 22) await setConfig(sb, ctx, "current_phase", "SUPERBOWL");
 
-  const { data: cfgCheck } = await sb.from("competition_config").select("key, value").eq("competition", COMPETITION).in("key", ["current_week", "week_state"]);
+  const { data: cfgCheck } = await sb.from("competition_config").select("key, value")
+    .eq("competition", ctx.competition).in("key", ["current_week", "week_state"]);
   const cfgMap = Object.fromEntries((cfgCheck ?? []).map((r: any) => [r.key, r.value]));
-  log("config_picks_open", "week_state=picks_open", `week_state=${cfgMap.week_state}`, cfgMap.week_state === "picks_open");
+  log("config_picks_open", "week_state=picks_open", `week_state=${cfgMap.week_state}`,
+    String(cfgMap.week_state).replace(/^"|"$/g, "") === "picks_open");
 
-  // Step 3: Submit picks for all pool members
-  const { data: globalPool } = await sb.from("pools").select("id").eq("is_global", true).single();
-  const { data: members } = await sb.from("pool_members").select("user_id").eq("pool_id", globalPool?.id).eq("status", "active");
+  // Step 3: fabricate picks for the sandbox's global-pool members.
+  // SCOPED TO THE TARGET (the original lookup had no competition filter — a bug
+  // that, once re-pointed, would have fabricated against the wrong competition).
+  const { data: globalPool } = await sb.from("pools").select("id")
+    .eq("competition", ctx.competition).eq("is_global", true).maybeSingle();
 
   let picksSubmitted = 0;
-  for (const member of members ?? []) {
-    // Delete existing picks for this user/week (in case of re-run)
-    await sb.from("season_picks").delete()
-      .eq("user_id", member.user_id)
-      .eq("competition", COMPETITION)
-      .eq("week", week);
-
-    // Make sure games are scheduled before inserting picks
-    const hotpickIdx = Math.floor(rand() * (simGames?.length ?? 1));
-
-    for (let i = 0; i < (simGames?.length ?? 0); i++) {
-      const game = simGames![i];
-      if (game.status !== "scheduled") continue;
-
-      // 60% chance of picking home team (realistic bias)
-      const pickedTeam = rand() < 0.6 ? game.home_team : game.away_team;
-      const isHotpick = i === hotpickIdx;
-
-      const { error: pickErr } = await sb.from("season_picks").insert({
-        user_id: member.user_id,
-        game_id: game.game_id,
-        competition: COMPETITION,
-        season_year: SEASON_YEAR,
-        week,
-        picked_team: pickedTeam,
-        is_hotpick: isHotpick,
-      });
-
-      if (!pickErr) picksSubmitted++;
+  if (!globalPool) {
+    // OPEN DECISION (see re-scope notes): nfl_2025_sim currently has no is_global
+    // pool, and its testers submit their OWN picks. Skip fabrication rather than
+    // overwrite real tester picks or crash.
+    log("picks_submitted", "global pool present", "no global pool", true,
+      `No is_global pool for ${ctx.competition}; pick fabrication skipped (testers' own picks preserved).`);
+  } else {
+    const { data: members } = await sb.from("pool_members").select("user_id")
+      .eq("pool_id", globalPool.id).eq("status", "active");
+    for (const member of members ?? []) {
+      await sb.from("season_picks").delete()
+        .eq("user_id", member.user_id).eq("competition", ctx.competition).eq("week", week);
+      const hotpickIdx = Math.floor(rand() * (simGames?.length ?? 1));
+      for (let i = 0; i < (simGames?.length ?? 0); i++) {
+        const game = simGames![i];
+        if (game.status !== "scheduled") continue;
+        const pickedTeam = rand() < 0.6 ? game.home_team : game.away_team;
+        const { error: pickErr } = await sb.from("season_picks").insert({
+          user_id: member.user_id, game_id: game.game_id, competition: ctx.competition,
+          season_year: ctx.seasonYear, week, picked_team: pickedTeam, is_hotpick: i === hotpickIdx,
+        });
+        if (!pickErr) picksSubmitted++;
+      }
     }
+    log("picks_submitted", ">0 picks", `${picksSubmitted} picks`, picksSubmitted > 0,
+      `${members?.length ?? 0} users x ${simGames?.length ?? 0} games`);
   }
 
-  log("picks_submitted", ">0 picks", `${picksSubmitted} picks`, picksSubmitted > 0,
-    `${members?.length ?? 0} users x ${simGames?.length ?? 0} games`);
-
-  // Step 4: Transition to locked
-  await setConfig(sb, "week_state", "locked");
+  // Step 4 + 5: locked -> live (games in progress).
+  await setConfig(sb, ctx, "week_state", "locked");
   log("week_locked", "week_state=locked", "locked", true);
-
-  // Step 5: Transition to live (set games to in_progress)
-  await setConfig(sb, "week_state", "live");
-  await sb.from("season_games")
-    .update({ status: "in_progress" })
-    .eq("competition", COMPETITION)
-    .eq("season_year", SEASON_YEAR)
-    .eq("week", week);
+  await setConfig(sb, ctx, "week_state", "live");
+  await sb.from("season_games").update({ status: "in_progress" })
+    .eq("competition", ctx.competition).eq("season_year", ctx.seasonYear).eq("week", week);
   log("games_live", "all games in_progress", "in_progress", true);
 
-  // Step 6: Set final scores from 2025 real data
+  // Step 6: final scores from the source. Sandbox ids may be a straight copy of
+  // the source ids OR sim-prefixed — handle both.
   for (const simGame of simGames ?? []) {
-    const sourceId = simGame.game_id.replace("sim-", "");
-    const src = sourceMap.get(sourceId);
+    const stripped = simGame.game_id.startsWith("sim-") ? simGame.game_id.slice(4) : simGame.game_id;
+    const src = sourceMap.get(stripped) ?? sourceMap.get(simGame.game_id);
     if (!src) continue;
-
-    await sb.from("season_games")
-      .update({
-        status: "final",
-        home_score: src.home_score,
-        away_score: src.away_score,
-        winner_team: src.winner_team,
-        is_finalized: true,
-      })
-      .eq("game_id", simGame.game_id);
+    await sb.from("season_games").update({
+      status: "final", home_score: src.home_score, away_score: src.away_score,
+      winner_team: src.winner_team, is_finalized: true,
+    }).eq("game_id", simGame.game_id).eq("competition", ctx.competition);
   }
+  log("games_final", "all games final", "final", true, `${simGames?.length} games finalized with source scores`);
 
-  log("games_final", "all games final", "final", true, `${simGames?.length} games finalized with 2025 scores`);
-
-  // Step 7: Trigger scoring
-  await setConfig(sb, "week_state", "settling");
-
-  // Call scoring directly (same logic as Edge Function)
+  // Step 7: scoring. NOTE: this is the simulator's OWN inline scorer (a divergent
+  // path from the canonical nfl-calculate-scores / nfl-finalize-week). It is kept
+  // sandbox-only. See re-scope notes — converging the sandbox onto the real
+  // engine is the longer-term direction.
+  await setConfig(sb, ctx, "week_state", "settling");
   const { data: finalGames } = await sb.from("season_games")
     .select("game_id, home_team, away_team, rank, frozen_rank, winner_team")
-    .eq("competition", COMPETITION)
-    .eq("season_year", SEASON_YEAR)
-    .eq("week", week)
+    .eq("competition", ctx.competition).eq("season_year", ctx.seasonYear).eq("week", week)
     .ilike("status", "%final%");
-
   const gameMap = new Map((finalGames ?? []).map((g: any) => [g.game_id, { ...g, effectiveRank: g.frozen_rank ?? g.rank ?? 1 }]));
 
   const { data: picks } = await sb.from("season_picks")
     .select("user_id, game_id, picked_team, is_hotpick")
-    .eq("competition", COMPETITION)
-    .eq("season_year", SEASON_YEAR)
-    .eq("week", week);
+    .eq("competition", ctx.competition).eq("season_year", ctx.seasonYear).eq("week", week);
 
   const aggByUser = new Map<string, any>();
   for (const p of picks ?? []) {
@@ -273,7 +356,7 @@ async function runWeek(sb: any, week: number, runId?: string) {
     const isTie = game.winner_team === null;
     const isWin = !isTie && p.picked_team === game.winner_team;
     const rank = game.effectiveRank;
-    let agg = aggByUser.get(p.user_id) ?? { user_id: p.user_id, week_points: 0, correct_picks: 0, total_picks: 0, is_hotpick_correct: null, hotpick_rank: null };
+    const agg = aggByUser.get(p.user_id) ?? { user_id: p.user_id, week_points: 0, correct_picks: 0, total_picks: 0, is_hotpick_correct: null, hotpick_rank: null };
     agg.total_picks += 1;
     if (p.is_hotpick) {
       agg.hotpick_rank = rank;
@@ -290,86 +373,71 @@ async function runWeek(sb: any, week: number, runId?: string) {
   if (userAggs.length > 0) {
     await sb.from("season_user_totals").upsert(
       userAggs.map((u: any) => ({
-        user_id: u.user_id, competition: COMPETITION, season_year: SEASON_YEAR, week, phase,
+        user_id: u.user_id, competition: ctx.competition, season_year: ctx.seasonYear, week, phase,
         week_points: u.week_points, correct_picks: u.correct_picks, total_picks: u.total_picks,
         is_hotpick_correct: u.is_hotpick_correct, hotpick_rank: u.hotpick_rank, is_no_show: false,
         scored_at: new Date().toISOString(),
       })),
-      { onConflict: "user_id,competition,season_year,week" }
+      { onConflict: "user_id,competition,season_year,week" },
     );
   }
-
   log("scoring_complete", ">0 users scored", `${userAggs.length} users scored`, userAggs.length > 0);
 
-  // Step 8: Complete the week
-  await setConfig(sb, "week_state", "complete");
+  // Step 8: complete.
+  await setConfig(sb, ctx, "week_state", "complete");
   log("week_complete", "week_state=complete", "complete", true);
 
-  // Save logs
-  if (logs.length > 0) {
-    await sb.from("simulation_log").insert(logs);
-  }
+  if (logs.length > 0) await sb.from("simulation_log").insert(logs);
 
   const failures = logs.filter((l: any) => !l.passed);
   return {
-    run_id: rid,
-    week,
+    run_id: rid, week, competition: ctx.competition,
     status: failures.length === 0 ? "passed" : "failed",
-    steps: logs.length,
-    passed: logs.filter((l: any) => l.passed).length,
-    failed: failures.length,
-    users_scored: userAggs.length,
-    picks_submitted: picksSubmitted,
+    steps: logs.length, passed: logs.filter((l: any) => l.passed).length, failed: failures.length,
+    users_scored: userAggs.length, picks_submitted: picksSubmitted,
     failures: failures.map((f: any) => ({ step: f.step, expected: f.expected, actual: f.actual })),
   };
 }
 
-async function runRange(sb: any, fromWeek: number, toWeek: number, runId?: string) {
+async function runRange(sb: any, ctx: SimContext, fromWeek: number, toWeek: number, runId?: string) {
   const rid = runId ?? crypto.randomUUID();
   const results = [];
-
   for (let week = fromWeek; week <= toWeek; week++) {
-    const result = await runWeek(sb, week, rid);
+    const result = await runWeek(sb, ctx, week, rid);
     results.push(result);
-
-    // Phase transitions
-    if (week === 18) {
-      await setConfig(sb, "current_phase", "REGULAR_COMPLETE");
-    }
+    if (week === 18) await setConfig(sb, ctx, "current_phase", "REGULAR_COMPLETE");
   }
-
   const totalPassed = results.reduce((s, r) => s + (r.passed ?? 0), 0);
   const totalFailed = results.reduce((s, r) => s + (r.failed ?? 0), 0);
-
   return {
-    run_id: rid,
-    weeks_run: results.length,
-    total_steps: totalPassed + totalFailed,
-    total_passed: totalPassed,
-    total_failed: totalFailed,
+    run_id: rid, competition: ctx.competition, weeks_run: results.length,
+    total_steps: totalPassed + totalFailed, total_passed: totalPassed, total_failed: totalFailed,
     overall: totalFailed === 0 ? "ALL PASSED" : "FAILURES DETECTED",
     weekly_summary: results.map((r) => ({ week: r.week, status: r.status, users_scored: r.users_scored })),
   };
 }
 
-async function cleanup(sb: any) {
-  // Remove sim games and related data
-  await sb.from("season_user_totals").delete().eq("competition", COMPETITION).eq("season_year", SEASON_YEAR);
-  await sb.from("season_picks").delete().eq("competition", COMPETITION).eq("season_year", SEASON_YEAR);
-  await sb.from("season_games").delete().eq("competition", COMPETITION).eq("season_year", SEASON_YEAR).like("game_id", "sim-%");
-  await sb.from("simulation_log").delete().neq("id", "00000000-0000-0000-0000-000000000000"); // delete all
+// DESTRUCTIVE (confirm-gated). Remove simulator data and reset the sandbox clock.
+async function cleanup(sb: any, ctx: SimContext) {
+  await sb.from("season_user_totals").delete().eq("competition", ctx.competition).eq("season_year", ctx.seasonYear);
+  await sb.from("season_picks").delete().eq("competition", ctx.competition).eq("season_year", ctx.seasonYear);
+  // Only simulator-seeded (sim-prefixed) games are removed; a straight-copy
+  // sandbox keeps its games. (OPEN DECISION — see re-scope notes.)
+  await sb.from("season_games").delete()
+    .eq("competition", ctx.competition).eq("season_year", ctx.seasonYear).like("game_id", "sim-%");
+  // simulation_log has no competition column; scope-down is a separate decision.
+  await sb.from("simulation_log").delete().neq("id", "00000000-0000-0000-0000-000000000000");
 
-  await setConfig(sb, "current_week", 1);
-  await setConfig(sb, "current_phase", "REGULAR");
-  await setConfig(sb, "week_state", "picks_open");
-
-  return { status: "cleaned", message: "All simulation data removed, config reset" };
+  await setConfig(sb, ctx, "current_week", 1);
+  await setConfig(sb, ctx, "current_phase", "REGULAR");
+  await setConfig(sb, ctx, "week_state", "picks_open");
+  return { status: "cleaned", competition: ctx.competition, message: "Simulation data removed, config reset" };
 }
 
-async function setConfig(sb: any, key: string, value: any) {
+async function setConfig(sb: any, ctx: SimContext, key: string, value: any) {
   await sb.from("competition_config").upsert(
-    { competition: COMPETITION, key, value: JSON.stringify(value), description: `Set by season-simulator` },
-    { onConflict: "competition,key" }
+    { competition: ctx.competition, key, value: JSON.stringify(value), description: `Set by season-simulator (sandbox: ${ctx.competition})` },
+    { onConflict: "competition,key" },
   );
 }
 
