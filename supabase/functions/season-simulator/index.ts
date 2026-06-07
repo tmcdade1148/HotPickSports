@@ -12,10 +12,11 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 //     code change — never a config row or a stray SQL UPDATE. That asymmetry is
 //     the whole point: the safe state lives in the structure, not in a setting.
 // ─────────────────────────────────────────────────────────────────────────────
-const SANDBOX_COMPETITIONS = ["nfl_2025_sim"];
-// future: a shadow-run sandbox (e.g. "nfl_2026_sim") may be added here as a
-// DELIBERATE, reviewed code change. nfl_2026 — and any live competition — must
-// NEVER be added. If you are tempted to add one "temporarily", stop.
+const SANDBOX_COMPETITIONS = ["nfl_2025_sim", "nfl_2025_simA", "nfl_2025_simG"];
+// nfl_2025_sim  = testers · nfl_2025_simA = Apple review · nfl_2025_simG = Google
+// review. All three are driven by the simulator. A future shadow-run sandbox may
+// be added here as a DELIBERATE, reviewed code change. nfl_2026 — and any live
+// competition — must NEVER be added. If you are tempted to add one, stop.
 
 // Read-only replay source: the real 2025 results the simulator copies/replays.
 // Reading the source is harmless; only the TARGET is gated.
@@ -75,9 +76,16 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // ── GATE 2 — SUPER-ADMIN. Basic hygiene; the allowlist already blocks prod
-    //    harm, so this runs after it (and only touches profiles, not sim data). ──
-    await assertSuperAdmin(req, supabase);
+    // ── GATE 2 — OPTIONAL SHARED SECRET. The simulator runs service-role (the
+    //    HTML tool has no user login), so there is deliberately NO super-admin /
+    //    JWT check — that would lock out the only way the sandboxes are advanced.
+    //    The allowlist (gate 1) is what prevents production harm. If
+    //    SIMULATOR_ADMIN_SECRET is configured, require a matching x-simulator-secret
+    //    header as an extra lock; if unset, allowlist + destructive-confirm stand. ──
+    const requiredSecret = Deno.env.get("SIMULATOR_ADMIN_SECRET");
+    if (requiredSecret && req.headers.get("x-simulator-secret") !== requiredSecret) {
+      throw new SimError("BAD_SECRET", "Missing or invalid x-simulator-secret header.", 401);
+    }
 
     // ── GATE 3 — DESTRUCTIVE CONFIRM. setup/cleanup can erase testers' data, so
     //    they need an explicit flag. Routine advancing never reaches this. ──
@@ -118,32 +126,6 @@ Deno.serve(async (req: Request) => {
     return json({ error: err instanceof Error ? err.message : String(err) }, 500);
   }
 });
-
-// Resolve and verify the caller is a super-admin. The simulator works under the
-// service role for its DB writes, so we build a SEPARATE user-scoped client from
-// the caller's JWT purely to read their identity.
-// NOTE (operational): this requires the caller to pass a signed-in super-admin's
-// Authorization header. A service-role/cron invocation has no user JWT and will
-// be rejected here — confirm who advances the sandbox before relying on this.
-async function assertSuperAdmin(req: Request, service: any) {
-  const authHeader = req.headers.get("Authorization") ?? "";
-  if (!authHeader) {
-    throw new SimError("UNAUTHENTICATED", "Missing Authorization header — call as a signed-in super-admin.", 401);
-  }
-  const userClient = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_ANON_KEY")!,
-    { global: { headers: { Authorization: authHeader } } },
-  );
-  const { data: { user }, error } = await userClient.auth.getUser();
-  if (error || !user) {
-    throw new SimError("UNAUTHENTICATED", "Could not resolve caller identity from the token.", 401);
-  }
-  const { data: profile } = await service.from("profiles").select("is_super_admin").eq("id", user.id).single();
-  if (!profile?.is_super_admin) {
-    throw new SimError("FORBIDDEN", "Super-admin only.", 403);
-  }
-}
 
 // season_year is read from config so the simulator is correct for ANY sandbox
 // (nfl_2025_sim is season_year 2025, not 2026 — never hardcode it).

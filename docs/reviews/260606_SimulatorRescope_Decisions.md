@@ -42,34 +42,50 @@ supervised preview deploy + §7 verification is the next (Tom-owned) step.**
   simulator reduced to a pick/fast-forward helper. Tied to the **September shadow
   run** (`nfl_2026_sim` running the real pipeline).
 
-## How the sandbox is advanced today (investigated 2026-06-07)
+## Allowlist — three sandboxes (corrected 2026-06-07)
 
-- **No `pg_cron` job invokes `season-simulator`** — all 14 scheduled jobs are the
-  production pipeline; none call the simulator.
-- **No app/client code invokes it** — the only repo reference is its own source.
-- Conclusion: **manual/ad-hoc human invocation only.** No automated/service-role
-  advance process exists.
+The simulator drives **three** sandboxes, all on the allowlist:
+`nfl_2025_sim` (testers), `nfl_2025_simA` (Apple review), `nfl_2025_simG` (Google
+review). A single-entry allowlist would `REFUSE` the reviewer sandboxes and could
+**freeze an in-progress App Review** — so all three are included. `season_year` is
+read per-competition, so each sandbox is handled correctly.
 
-### Super-admin gate implication
-Because invocation is manual, the JWT super-admin gate **can stay** — there is no
-cron/service-role caller it would lock out. **One operational wrinkle:** the gate
-resolves identity from the caller's JWT, so a manual call must carry a **signed-in
-super-admin access token**, *not* the service-role key. If current manual ops curl
-the function with the service-role key, that path will now return `UNAUTHENTICATED`.
+## Auth: super-admin gate DROPPED → optional shared secret (decided 2026-06-07)
 
-Options if the user-JWT requirement is inconvenient:
-- **A (default):** keep as-is; invoke with a super-admin access token.
-- **B (fallback):** accept a `SIMULATOR_ADMIN_SECRET` header as an alternative to
-  the JWT (the allowlist already prevents prod harm). Add only if A proves annoying.
+**How the sandbox is advanced (confirmed by Tom):** manually, through the
+`season-simulator` **HTML tool**, which authenticates with the **service-role
+key** — there is **no user login / JWT**. (Corroborated: no `pg_cron` job and no
+app/client code invokes the simulator.)
 
-> Decision pending Tom's confirmation of the preferred manual-invocation method.
+Therefore the JWT super-admin gate as originally drafted would have rejected the
+tool and **locked Tom out of advancing the sandboxes.** Decision: **drop the
+super-admin/JWT gate.** The allowlist (gate 1) is what prevents production harm —
+that was always the point — and destructive-confirm (gate 3) protects the testers.
+
+In its place, an **optional shared-secret** gate: if `SIMULATOR_ADMIN_SECRET` is
+configured, the call must send a matching `x-simulator-secret` header; if it is not
+set, the allowlist + destructive-confirm stand alone (non-breaking default). This
+is a service-role-appropriate lock — not a user-identity check.
+
+> **The two protections that matter — allowlist + destructive-confirm — are kept.**
+> To enable the extra lock: set `SIMULATOR_ADMIN_SECRET` (all envs) and have the
+> HTML tool send the `x-simulator-secret` header.
 
 ## Verification still required (Tom-owned, per spec §7)
-Preview deploy, then prove: `nfl_2026` → `REFUSED` + writes nothing · no target →
-`MISSING_TARGET` · `nfl_2025_sim` `run_week` advances · `setup`/`cleanup` without
-confirm → `CONFIRM_REQUIRED` · `setup`/`cleanup` *with* confirm but real testers
-present → `SANDBOX_HAS_REAL_TESTERS` · non-super-admin → rejected · `nfl_2026`
-`current_week`/`week_state` unchanged across all of the above.
+Preview deploy, then prove:
+- `nfl_2026` → `REFUSED` + writes nothing
+- no target → `MISSING_TARGET`
+- **all three sandboxes** (`nfl_2025_sim`, `nfl_2025_simA`, `nfl_2025_simG`)
+  `run_week` advances normally (reviewer sandboxes NOT frozen)
+- `setup`/`cleanup` without confirm → `CONFIRM_REQUIRED`
+- `setup`/`cleanup` *with* confirm but real testers present →
+  `SANDBOX_HAS_REAL_TESTERS`
+- if `SIMULATOR_ADMIN_SECRET` is set: missing/wrong `x-simulator-secret` →
+  `BAD_SECRET`; correct secret passes
+- `nfl_2026` `current_week`/`week_state` unchanged across all of the above
+
+(The original "non-super-admin → rejected" check is removed — the super-admin gate
+was dropped; see Auth section.)
 
 ---
 *260606 · Simulator Re-Scope decisions · HotPick Sports — Confidential*
