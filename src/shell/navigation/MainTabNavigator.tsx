@@ -19,6 +19,7 @@ import {SettingsScreen} from '@shell/screens/SettingsScreen';
 import {useTheme} from '@shell/theme';
 import {useBrand} from '@shell/theme';
 import {useGlobalStore} from '@shell/stores/globalStore';
+import {consumePendingInviteCode} from '@shell/services/pendingInvite';
 import {PoweredByHotPick} from '@shell/components/PoweredByHotPick';
 import {PoolSwitcherBar} from '@shell/components/PoolSwitcherBar';
 import {PoolHeader} from '@shell/components/PoolHeader';
@@ -469,13 +470,12 @@ export function MainTabNavigator() {
   // double-fires.
   const navigation = useNavigation<any>();
   const pendingInviteCode = useGlobalStore(s => s.pendingInviteCode);
-  const clearPendingInviteCode = useGlobalStore(s => s.clearPendingInviteCode);
   useEffect(() => {
     if (!pendingInviteCode || !userId) return;
     const code = pendingInviteCode;
-    clearPendingInviteCode();
+    consumePendingInviteCode();
     navigation.navigate('JoinPool', {code});
-  }, [pendingInviteCode, userId, navigation, clearPendingInviteCode]);
+  }, [pendingInviteCode, userId, navigation]);
 
   const nflCurrentWeek = useNFLStore(s => s.currentWeek);
   // Direct check: does this user have any fully completed weeks?

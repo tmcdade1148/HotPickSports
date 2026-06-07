@@ -11,6 +11,10 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useGlobalStore} from '@shell/stores/globalStore';
+import {
+  resolvePendingInviteCodeOnLaunch,
+  consumePendingInviteCode,
+} from '@shell/services/pendingInvite';
 import {getDefaultEvent} from '@sports/registry';
 import {getDisplayName} from '@shared/utils/displayName';
 import {spacing, borderRadius} from '@shared/theme';
@@ -22,9 +26,6 @@ export function PoolWelcomeScreen({navigation}: any) {
   const user = useGlobalStore(s => s.user);
   const userProfile = useGlobalStore(s => s.userProfile);
   const pendingInviteCode = useGlobalStore(s => s.pendingInviteCode);
-  const clearPendingInviteCode = useGlobalStore(
-    s => s.clearPendingInviteCode,
-  );
   const joinPool = useGlobalStore(s => s.joinPool);
   const setActiveSport = useGlobalStore(s => s.setActiveSport);
   const refreshAvailableEvents = useGlobalStore(
@@ -47,11 +48,17 @@ export function PoolWelcomeScreen({navigation}: any) {
   const displayName = getDisplayName(userProfile);
   const hasDeepLinkInvite = !!pendingInviteCode;
 
-  // Auto-join pool if there's a pending deep-link invite code
+  // Auto-join if there's a pending invite code. Re-resolve first as a safety net
+  // in case LoadingScreen's async resolution hadn't landed before this mounted
+  // (e.g. a persisted code restored from disk, or the first-launch clipboard probe).
   useEffect(() => {
-    if (pendingInviteCode && user?.id) {
-      handleJoinWithCode(pendingInviteCode);
-    }
+    (async () => {
+      if (!user?.id) return;
+      await resolvePendingInviteCodeOnLaunch();
+      const code = useGlobalStore.getState().pendingInviteCode;
+      if (code) handleJoinWithCode(code);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleJoinWithCode = async (code: string) => {
@@ -61,7 +68,7 @@ export function PoolWelcomeScreen({navigation}: any) {
     setJoinError('');
 
     const result = await joinPool(user.id, code.trim());
-    clearPendingInviteCode();
+    consumePendingInviteCode();
 
     if (result.pool) {
       setJoinedPool({name: result.pool.name});
