@@ -46,8 +46,8 @@ class SimError extends Error {
 
 Deno.serve(async (req: Request) => {
   // Service-role client for the simulator's own DB work (bypasses RLS). The
-  // gates below — allowlist first, then super-admin — are what keep this power
-  // away from production.
+  // sandbox allowlist (gate 1) is what keeps this power away from production;
+  // there is deliberately NO super-admin/JWT gate (the tool runs service-role).
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
