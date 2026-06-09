@@ -19,19 +19,17 @@ This runbook avoids both.
 
 ---
 
-## 0. Path determination — read this first
-
-The three questions from the task, answered as far as is knowable without the
-Dashboard, plus what **you** must confirm:
+## 0. Path determination — CONFIRMED (Dashboard, 2026-06-09)
 
 | Question | Finding | Source |
 |---|---|---|
-| On new API keys yet, or legacy? | Project is **operating on legacy keys** today: cron uses the legacy `service_role` JWT, client uses the legacy `anon` JWT, both currently valid. Whether `sb_*` keys have been *created* yet is **unknown from here** — check **Settings → API Keys**. | code + cron inspection |
-| Can legacy `service_role` be disabled **independently** of legacy `anon`? | **No (expected).** Legacy `anon` + `service_role` are a JWT pair signed by the same JWT secret; Supabase exposes a **single "disable legacy API keys"** action for the pair — there is no per-key revoke for legacy keys. **Confirm in Dashboard**, but plan for the combined toggle. | Supabase new-API-key model |
-| Why this forces Path B | The leaked credential is the **legacy** `service_role` JWT. Creating `sb_secret_…` and moving servers to it does **not** invalidate the leaked legacy JWT — it stays valid until **legacy keys are disabled**. Disabling legacy keys also kills the legacy `anon` in the shipped build → client must move to `sb_publishable_…` first. | inference |
+| On new API keys yet, or legacy? | **Both coexist.** `sb_publishable_…` keys **already exist** (one for web, one for mobile). **No `sb_secret_…` key exists yet** — Stage 0 must create it. The project is still *operating* on legacy keys (cron uses the legacy `service_role` JWT; the **shipped app build** still uses the hardcoded legacy `anon` literal — existence of a publishable key ≠ the build using it). | **Dashboard confirmed** |
+| Can legacy `service_role` be disabled **independently** of legacy `anon`? | **No — confirmed.** "Disable legacy keys" is a **single combined toggle** for the anon + service_role pair. No per-key revoke for legacy keys. | **Dashboard confirmed** |
+| Why this forces Path B | The leaked credential is the **legacy** `service_role` JWT. Creating `sb_secret_…` and moving servers to it does **not** invalidate the leaked legacy JWT — it stays valid until **legacy keys are disabled** (the combined toggle), which also kills the legacy `anon` in the shipped build → client must move to `sb_publishable_…` first. | inference + confirmed toggle |
 
-**Conclusion:** because the burned key is a *legacy* JWT, **Path B is the path that
-actually neutralizes the leak.** Path A (revoke server key, leave client alone) is
+**Conclusion: Path B confirmed.** Because the burned key is a *legacy* JWT and the
+disable is a combined toggle, **Path B is the only path that neutralizes the leak.**
+Path A (revoke server key, leave client alone) is
 documented below for completeness but **does not apply to a leaked legacy key** —
 it would only apply if you had already migrated and the leaked key were an
 individually-revocable `sb_secret_…`.
@@ -90,6 +88,23 @@ passed to `createClient`. **JS layer → OTA-updatable.**
 `supabase/migrations/20260527211734_fix_notification_cron_auth.sql` — the source of
 the leak; rewrite to read from Vault (Stage 4).
 
+### E. Operator / browser tools that take a service-role key pasted at runtime
+These hold no committed secret (the key is pasted into the UI each session), but
+they are live `service_role` consumers — **after legacy keys are disabled they will
+break until the operator pastes the new `{{NEW_SECRET_KEY}}`**, and any tool that
+sends the key as `Authorization: Bearer` must switch to the **`apikey`** header
+(see §2).
+
+| Tool | Location | Notes |
+|---|---|---|
+| `season-simulator` (browser) | `tools/season-simulator{,-v2,-v3,-v4}.html` | REST calls already send the key in the `apikey` header (good); verify the `functions/v1` calls do too. The committed `eyJ` in these files is the **anon** key (public) — not a leak. |
+| `season-simulator` (Edge Function) | already counted in **B** | reads `SUPABASE_SERVICE_ROLE_KEY` → migrate to `SB_SECRET_KEY` in Stage 2. |
+| **`hotpick_engine_monitor`** | **external — not in this repo** | operator monitor that takes a pasted service-role key. Source not present here; the owner must update it to (a) accept the new `sb_secret_…` and (b) send it via the `apikey` header. See the bug note below. |
+
+> After Stage 5, circulate the new `{{NEW_SECRET_KEY}}` to whoever runs these tools
+> and have them paste it in place of the old key. The old key stops working the
+> moment legacy keys are disabled.
+
 ---
 
 ## 2. The cron gotcha (critical, easy to get wrong)
@@ -125,13 +140,15 @@ Because legacy keys have no per-key revoke, **skip to Path B**.
 Each stage has a **verify** gate; do not proceed until it passes. Take a manual
 DB backup before Stage 3 and Stage 4 (they run migrations).
 
-### Stage 0 — Enable the new API key system
-- Dashboard → **Settings → API Keys** → enable new keys. Create:
-  - `{{NEW_PUBLISHABLE_KEY}}` = `sb_publishable_…` (replaces anon)
-  - `{{NEW_SECRET_KEY}}` = `sb_secret_…` (replaces service_role)
-- **Do NOT disable legacy keys yet.** New and legacy keys coexist now — this is
-  what makes a zero-downtime cutover possible.
-- **Verify:** both new keys exist; app + cron still green (nothing changed yet).
+### Stage 0 — Create the missing secret key
+- `{{NEW_PUBLISHABLE_KEY}}` = `sb_publishable_…` **already exists** (web + mobile) —
+  reuse the appropriate one in Stage 1; nothing to create.
+- Dashboard → **Settings → API Keys** → **create the secret key**
+  `{{NEW_SECRET_KEY}}` = `sb_secret_…` (this is the one that does **not** exist yet).
+- **Do NOT disable legacy keys yet** (that's the combined toggle = Stage 5). New and
+  legacy coexist now — that overlap is what makes a zero-downtime cutover possible.
+- **Verify:** the new secret key exists alongside the publishable keys; app + cron
+  still green (nothing wired up yet).
 
 ### Stage 1 — Migrate the CLIENT anon → publishable (OTA)
 - In `src/shared/config/supabase.ts`, replace the hardcoded anon literal with
@@ -230,8 +247,30 @@ Do scrubbing *after* rotation, if at all.
 
 ---
 
-### Open items for you to confirm in the Dashboard (I can't read these via API)
-1. Whether `sb_*` keys already exist (Settings → API Keys).
-2. That legacy disable is a **combined** anon+service_role toggle (drives whether
-   Stage 1 is required — it almost certainly is).
-3. Per-function `verify_jwt` current values, to finalize the Stage-3 header choice.
+## 8. `hotpick_engine_monitor` — "Missing URL or API key" (bug note)
+The monitor tool's source is **not in this repo**, so this is a diagnosis, not a fix.
+The strongest lead is the wording: **"Missing URL *or* API key"** is an **OR** check
+that fires if **either** field is empty. With a key pasted and the error still
+showing, the usual cause is the **Project URL field being blank** (operators focus on
+the key and miss the URL). Check, in order:
+1. The **URL field is populated** (`https://mzqtrpdiqhopjmxjccwy.supabase.co`) — most
+   likely culprit.
+2. The pasted key has **no leading/trailing whitespace or newline** (a trailing `\n`
+   from copy/paste can fail a `.trim()`-less truthiness/length check).
+3. The paste actually **fired the field's change/input event** (some single-paste
+   into a password input doesn't register until you type or blur the field).
+4. If it validates the key **format/prefix**: a new `sb_secret_…`/`sb_publishable_…`
+   key is **not** a JWT — a tool that checks for an `eyJ…` prefix will reject the new
+   key and report it as "missing/invalid." This becomes relevant once you rotate.
+If you can share the tool's source (or which repo it lives in), I'll pinpoint the
+exact line.
+
+---
+
+### Open items — status
+1. ~~Whether `sb_*` keys already exist~~ → **Confirmed:** publishable keys exist
+   (web + mobile); **no secret key yet** (Stage 0 creates it).
+2. ~~Whether legacy disable is a combined toggle~~ → **Confirmed: combined** →
+   Path B (Stage 1 OTA) is required.
+3. **Still open:** per-function `verify_jwt` values, to finalize the Stage-3 header
+   choice (resolve via the Stage-3 canary).
