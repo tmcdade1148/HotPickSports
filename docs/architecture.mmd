@@ -1,0 +1,144 @@
+%% HotPick Sports — REAL architecture, generated from the live Supabase schema
+%% (project mzqtrpdiqhopjmxjccwy) + the /src tree on branch
+%% claude/hotpick-architecture-audit-cAlbr, 2026-06-08.
+%%
+%% Ground-truth notes baked into this diagram:
+%%  - 54 public tables. NO *_picks / *_user_totals table carries pool_id (MOAT intact).
+%%  - NO per-sport / per-event clone tables — everything is template tables keyed by `competition` (text).
+%%  - pool_members is the ONLY edge linking a pool to a user inside the scoring path.
+%%  - frozen_rank lives on the GAME/MATCHUP tables (season_games / series_matchups /
+%%    tournament_matches), never on *_picks. hotpick_rank + is_hotpick_correct live on *_user_totals.
+
+flowchart TB
+
+  %% ================= POOL-DEPENDENT SIDE (social lens) =================
+  subgraph POOLDEP["POOL-SCOPED  (social lens — pool_id is a column here)"]
+    direction TB
+    pools["pools<br/>partner_id, owning_club_id, invite_slug,<br/>invite_code, brand_config, pool_start_date,<br/>is_founding_pool, organizer_id (+legacy created_by),<br/>is_archived, is_hidden_from_users"]
+    pool_members["pool_members<br/>(pool_id + user_id)<br/>role / status — soft-delete only"]
+    smack_messages["smack_messages"]
+    smack_reactions["smack_reactions"]
+    smack_read_state["smack_read_state"]
+    smack_archive["smack_messages_archive<br/>(RLS on, no policy — service role only)"]
+    organizer_notifications["organizer_notifications"]
+    pool_events["pool_events (enum event_type)"]
+    pool_pulse["pool_pulse"]
+    pool_invite_codes["pool_invite_codes"]
+    pool_member_notes["pool_member_notes"]
+    event_recaps["event_recaps"]
+    game_pick_stats["game_pick_stats (pool-scoped splits)"]
+    member_engagement["member_engagement"]
+    awards_cache["awards_cache"]
+    subscriptions["subscriptions (pool_id)"]
+    notification_queue["notification_queue (pool_id)"]
+  end
+
+  %% ================= POOL-INDEPENDENT BOUNDARY =================
+  BOUNDARY{{"POOL-INDEPENDENT BOUNDARY<br/>scores belong to the USER, never the pool —<br/>pool_id is a WHERE filter, never a column below"}}
+
+  %% ================= USER-SCOPED SHARED =================
+  subgraph USERCORE["USER-SCOPED  (no pool_id)"]
+    direction TB
+    profiles["profiles<br/>poolie_name, first/last,<br/>career_* stats, is_super_admin,<br/>history_visibility"]
+    user_hardware["user_hardware<br/>award rows — is_visible=false to hide.<br/>UNIQUE(user_id,hardware_slug,competition,week,pool_id)<br/>(pool_id = award scope, NOT a score)"]
+    user_devices["user_devices (push tokens)"]
+    user_blocks["user_blocks"]
+    competition_config["competition_config<br/>(competition,key,value) — incl. 'global'"]
+    competition_access["competition_access (beta allowlist)"]
+    events_reg["events / organizer_acknowledgments"]
+  end
+
+  %% ================= THREE TEMPLATE GROUPS (keyed by competition text) =================
+  subgraph SEASON["SEASON template  (NFL — nfl_2026, nfl_2025_sim)"]
+    direction TB
+    season_games["season_games<br/>schedule + frozen_rank + rank + lock_at<br/>(+ sb_* / super_bowl_* SB cols on picks)"]
+    season_picks["season_picks  (NO pool_id)<br/>is_hotpick, picked_team,<br/>sb_q1/q2/q3_leader, sb_margin_tier,<br/>super_bowl_q1/q2/q3_pick, super_bowl_margin_prediction"]
+    season_user_totals["season_user_totals  (NO pool_id)<br/>week_points, playoff_points,<br/>is_hotpick_correct (null until FINAL), hotpick_rank"]
+    season_games --> season_picks --> season_user_totals
+  end
+
+  subgraph SERIES["SERIES template  (NHL — scaffolded)"]
+    direction TB
+    series_matchups["series_matchups (frozen_rank)"]
+    series_games["series_games"]
+    series_picks["series_picks  (NO pool_id)"]
+    series_user_totals["series_user_totals  (NO pool_id)<br/>is_hotpick_correct, hotpick_rank"]
+    series_matchups --> series_games --> series_picks --> series_user_totals
+  end
+
+  subgraph TOURN["TOURNAMENT template  (World Cup — scaffolded)"]
+    direction TB
+    tournament_matches["tournament_matches (frozen_rank)"]
+    tournament_group_picks["tournament_group_picks (NO pool_id)"]
+    tournament_group_results["tournament_group_results"]
+    tournament_picks["tournament_picks  (NO pool_id)"]
+    tournament_user_totals["tournament_user_totals  (NO pool_id)"]
+    tournament_matches --> tournament_picks --> tournament_user_totals
+    tournament_group_picks --> tournament_user_totals
+    tournament_group_results --> tournament_user_totals
+  end
+
+  %% ================= PARTNER / WHITE-LABEL =================
+  subgraph PARTNER["PARTNER / WHITE-LABEL"]
+    direction TB
+    partners["partners<br/>partner_type, can_run_pools, club_pool_id,<br/>perk_text/icon, roster_pass, public_info,<br/>brand_config, is_active"]
+    partner_members["partner_members<br/>Chairman + Directors (board)"]
+    pending_role_grants["pending_role_grants<br/>(RLS on, no policy)"]
+    pool_partner_affiliations["pool_partner_affiliations<br/>(many-to-many + brand_config_snapshot)"]
+    partner_notifications["partner_notifications / *_read_state"]
+    partners --> partner_members
+    partners --> pool_partner_affiliations
+    partners -.->|"club_pool_id"| pools
+    pools -.->|"partner_id / owning_club_id"| partners
+  end
+
+  %% ================= EDGE FUNCTIONS (server-side only) =================
+  subgraph EF["EDGE FUNCTIONS  (21 deployed — scoring/state never client-side)"]
+    direction TB
+    EFscore["SCORING/WEEK:<br/>nfl-calculate-scores, nfl-update-scores,<br/>nfl-finalize-week, nfl-rank-games,<br/>nfl-open-picks, nfl-import-schedule,<br/>nfl-fetch-odds, nfl-weekly-transition,<br/>nfl-announce-regular-winners"]
+    EFaward["AWARDS/RECAP:<br/>compute-hardware, refresh-game-pick-stats"]
+    EFnotify["NOTIFY:<br/>process-notification-queue, send-partner-broadcast,<br/>admin-broadcast  (send-broadcast-email = in repo, NOT deployed)"]
+    EFops["OPS/ADMIN:<br/>espn-health-check, smack-archive-messages,<br/>delete-account, suspend-user, suspend-pool"]
+    EFsim["SIM/DEMO (sandbox):<br/>season-simulator, demo-settle"]
+  end
+
+  %% ================= APP SHELL =================
+  subgraph SHELL["APP SHELL  (src/shell — never imports a sport module directly)"]
+    direction TB
+    registry["SportRegistry (src/sports/registry.ts)"]
+    globalStore["globalStore (src/shell/stores)"]
+    seasonStore["season/series/tournament template stores"]
+    sportStore["nflStore / nhlStore / worldCupStore"]
+    registry --> sportStore
+    globalStore --> seasonStore
+  end
+
+  %% ---- relationships across the boundary ----
+  pools --> pool_members
+  pool_members --> BOUNDARY
+  BOUNDARY --> profiles
+  BOUNDARY --> SEASON
+  BOUNDARY --> SERIES
+  BOUNDARY --> TOURN
+
+  competition_config -. "competition string keys every template" .- SEASON
+  competition_config -. "global tier limits, espn health" .- POOLDEP
+
+  EFscore ==> season_user_totals
+  EFscore ==> season_games
+  EFaward ==> user_hardware
+  EFaward ==> game_pick_stats
+  EFnotify ==> notification_queue
+  EFops ==> smack_archive
+  SHELL -. "RLS anon reads only" .-> POOLDEP
+  SHELL -. "reads, never computes" .-> SEASON
+
+  classDef nopool fill:#e6ffe6,stroke:#2e7d32,stroke-width:2px,color:#000;
+  classDef poolscoped fill:#fff3e0,stroke:#e65100,color:#000;
+  classDef ef fill:#e3f2fd,stroke:#1565c0,color:#000;
+  classDef boundary fill:#fffde7,stroke:#f9a825,stroke-width:3px,color:#000;
+
+  class season_picks,season_user_totals,series_picks,series_user_totals,tournament_picks,tournament_user_totals,tournament_group_picks,profiles,user_hardware,competition_config nopool;
+  class pools,pool_members,smack_messages,subscriptions,game_pick_stats,notification_queue,pool_events poolscoped;
+  class EFscore,EFaward,EFnotify,EFops,EFsim ef;
+  class BOUNDARY boundary;
