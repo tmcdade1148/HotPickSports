@@ -19,6 +19,20 @@ const supabase = createClient(
  * On non-game days, returns immediately after checking competition_config.
  */
 Deno.serve(async (req) => {
+  // Cron auth gate. This function is verify_jwt=false because pg_cron invokes it
+  // with the new sb_secret key, which is not a JWT and so cannot satisfy
+  // verify_jwt. Instead we require a DEDICATED cron shared secret — decoupled from
+  // SB_SECRET_KEY so the two rotate independently. Read by name from
+  // CRON_SHARED_SECRET (Edge Function Secret); cron sends it in x-cron-secret
+  // (value sourced from Vault by reference, never hardcoded).
+  const cronSecret = Deno.env.get("CRON_SHARED_SECRET");
+  if (!cronSecret || req.headers.get("x-cron-secret") !== cronSecret) {
+    return new Response(JSON.stringify({ error: "unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   try {
     const body = await req.json().catch(() => ({}));
     const competition = body.competition ?? "nfl_2026";
