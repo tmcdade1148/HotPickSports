@@ -5,7 +5,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL") ?? "",
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+  (Deno.env.get("SB_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")) ?? "",
   { auth: { persistSession: false } }
 );
 
@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
     const currentWeek = Number(body.week ?? cfg.current_week ?? 1);
     const seasonYear = Number(cfg.season_year ?? 2026);
     const baseUrl = Deno.env.get("SUPABASE_URL");
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const serviceKey = (Deno.env.get("SB_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"));
 
     console.warn(`[nfl-weekly-transition] MANUAL RUN: ${competition} ${seasonYear} week=${currentWeek}`);
 
