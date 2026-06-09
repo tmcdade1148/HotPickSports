@@ -8,10 +8,9 @@ const SUPABASE_URL = 'https://mzqtrpdiqhopjmxjccwy.supabase.co';
 // JS bundle, exactly as the anon key was. This swap is JS-only, so it ships via
 // EAS Update (OTA) with no native rebuild / store review.
 //
-// TODO(rotation): paste the MOBILE publishable key (Settings → API Keys) below,
-// then publish the OTA. Leaving the placeholder unshipped is safe; shipping it is
-// not — the client cannot reach Supabase with a placeholder key.
-const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_PASTE_MOBILE_PUBLISHABLE_KEY';
+// Verified pre-OTA: a direct REST read with this key returns 200 (a bogus key -> 401).
+// Publish to production ONLY after the dev-client login + pools-load test also passes.
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_AaENLNqjJ8jNVHGdTGhOnA_WnHze2CH';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
