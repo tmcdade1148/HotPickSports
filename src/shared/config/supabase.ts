@@ -3,10 +3,17 @@ import {createClient} from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SUPABASE_URL = 'https://mzqtrpdiqhopjmxjccwy.supabase.co';
-const SUPABASE_ANON_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im16cXRycGRpcWhvcGpteGpjY3d5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MDIwMDQsImV4cCI6MjA3MjA3ODAwNH0.017SoJAJLh4UKRYm4jVVCWDf1gCN2wjkpcUTHJJOsU4';
+// Rotation Stage 6: the legacy anon JWT is replaced by the new PUBLISHABLE key
+// (sb_publishable_…). Publishable keys are public by design — safe to ship in the
+// JS bundle, exactly as the anon key was. This swap is JS-only, so it ships via
+// EAS Update (OTA) with no native rebuild / store review.
+//
+// TODO(rotation): paste the MOBILE publishable key (Settings → API Keys) below,
+// then publish the OTA. Leaving the placeholder unshipped is safe; shipping it is
+// not — the client cannot reach Supabase with a placeholder key.
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_PASTE_MOBILE_PUBLISHABLE_KEY';
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storage: AsyncStorage,
     autoRefreshToken: true,
