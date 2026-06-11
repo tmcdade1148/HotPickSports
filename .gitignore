@@ -86,8 +86,9 @@ dist/
 .env
 .env.*
 
-# Claude Code
-.claude/
+# Claude Code — ignore local settings, but TRACK shared skills
+.claude/*
+!.claude/skills/
 
 # Supabase local
 supabase/.temp/
