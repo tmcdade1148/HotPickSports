@@ -397,7 +397,7 @@ Both views always available via toggle. Both use `pool_start_date` filter.
 | Function | Trigger | Schedule |
 |---|---|---|
 | `nfl-calculate-scores` | Cron + manual | Every 30 min |
-| `nfl-update-scores` | Cron | Every 5 min (game days) |
+| `nfl-update-scores` | Cron | Every 5 min |
 | `nfl-import-schedule` | Cron | Tuesdays 5am UTC |
 | `nfl-fetch-odds` | Cron | Tuesdays 10am UTC |
 | `nfl-rank-games` | Cron | Tuesdays 10:15am UTC |
