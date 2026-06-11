@@ -1,36 +1,63 @@
 {
-  "fill" : {
-    "linear-gradient" : [
-      "extended-gray:1.00000,1.00000",
-      "extended-gray:0.75000,1.00000"
-    ],
-    "orientation" : {
-      "start" : {
-        "x" : 0.5,
-        "y" : 0
-      },
-      "stop" : {
-        "x" : 0.5,
-        "y" : 0.7
+  "fill-specializations" : [
+    {
+      "value" : {
+        "linear-gradient" : [
+          "display-p3:0.59243,0.71985,0.77269,1.00000",
+          "srgb:0.64706,0.80000,0.85098,1.00000"
+        ],
+        "orientation" : {
+          "start" : {
+            "x" : 0.5,
+            "y" : 1
+          },
+          "stop" : {
+            "x" : 0.5,
+            "y" : 0.3
+          }
+        }
+      }
+    },
+    {
+      "appearance" : "dark",
+      "value" : {
+        "linear-gradient" : [
+          "srgb:0.18824,0.18824,0.18824,1.00000",
+          "display-p3:0.35059,0.35059,0.35059,1.00000"
+        ],
+        "orientation" : {
+          "start" : {
+            "x" : 0.5,
+            "y" : 0
+          },
+          "stop" : {
+            "x" : 0.5,
+            "y" : 0.7
+          }
+        }
       }
     }
-  },
+  ],
   "groups" : [
     {
-      "hidden" : false,
       "layers" : [
         {
-          "blend-mode" : "normal",
-          "fill" : "automatic",
+          "fill-specializations" : [
+            {
+              "appearance" : "dark",
+              "value" : {
+                "solid" : "display-p3:0.91895,0.93838,1.00000,1.00000"
+              }
+            }
+          ],
           "glass" : false,
-          "hidden" : false,
-          "image-name" : "title.svg",
-          "name" : "title",
+          "image-name" : "wordmark.svg",
+          "name" : "wordmark",
           "position" : {
-            "scale" : 0.52,
+            "scale" : 1.0899999999999999,
             "translation-in-points" : [
-              3.0966,
-              -5.59375
+              3.8274190058911017,
+              267.9453125
             ]
           }
         },
@@ -39,49 +66,9 @@
           "fill" : "none",
           "glass" : false,
           "hidden" : false,
-          "image-name" : "backer.svg",
-          "name" : "backer",
-          "position" : {
-            "scale" : 0.53,
-            "translation-in-points" : [
-              7,
-              23
-            ]
-          }
-        }
-      ],
-      "position" : {
-        "scale" : 1,
-        "translation-in-points" : [
-          0,
-          152
-        ]
-      },
-      "shadow" : {
-        "kind" : "neutral",
-        "opacity" : 0.5
-      },
-      "translucency" : {
-        "enabled" : true,
-        "value" : 0.5
-      }
-    },
-    {
-      "layers" : [
-        {
-          "blend-mode" : "normal",
-          "fill" : "automatic",
-          "glass" : true,
-          "hidden" : false,
-          "image-name" : "flame.svg",
-          "name" : "flame",
-          "position" : {
-            "scale" : 0.78,
-            "translation-in-points" : [
-              0,
-              0
-            ]
-          }
+          "image-name" : "flame2.svg",
+          "name" : "flame2",
+          "opacity" : 1
         }
       ],
       "shadow" : {
@@ -95,9 +82,8 @@
     }
   ],
   "supported-platforms" : {
-    "circles" : [
-      "watchOS"
-    ],
-    "squares" : "shared"
+    "squares" : [
+      "iOS"
+    ]
   }
 }
