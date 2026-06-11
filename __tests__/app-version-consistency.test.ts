@@ -1,5 +1,11 @@
-import {readFileSync} from 'fs';
-import {join} from 'path';
+// Node built-ins via require + local ambient declarations. The repo's tsconfig
+// sets `types: ["jest"]` (no @types/node), so importing 'fs'/'path' or using
+// __dirname directly fails `tsc --noEmit`. Declaring them locally keeps this
+// file self-contained and avoids adding "node" to the global types array (which
+// would shift setTimeout/Buffer typings across the whole RN codebase).
+declare const __dirname: string;
+const {readFileSync} = require('fs') as {readFileSync: (p: string, enc: string) => string};
+const {join} = require('path') as {join: (...parts: string[]) => string};
 
 // =============================================================================
 // Version-consistency guard (runs in the same CI gate as the rest of the suite).
