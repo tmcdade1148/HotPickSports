@@ -105,6 +105,9 @@ If you find yourself writing any of the following, stop and revise.
 - `pool_events` written with freeform `event_type` strings → use defined enum values
 - Notification sent without rate limit check → always call `check_notification_rate_limit()` first
 
+### Simulator & Sandbox
+- **`nfl-import-schedule` must never run against a simulator competition** — an ESPN import matches zero sim game_ids and the stale-id cleanup deletes the entire sim week before inserting. The importer refuses any competition whose `data_provider` isn't `espn` (covers sim + demo, config-driven); only the simulator writes sim rows.
+
 ### Scope Creep (do not build before NFL Season 2 launch)
 Power-ups, career hardware awards, AI archetypes, tier system, pool discovery, Super Bowl enhanced scoring UI, playoff reset UI, global leaderboard, NHL/Tournament templates, white label billing, admin analytics dashboard.
 > "That feature is explicitly deferred until after NFL Season 2 launch. Let's stay on scope."

@@ -33,6 +33,20 @@ Deno.serve(async (req) => {
     const { data: configRows } = await supabase
       .from("competition_config").select("key, value").eq("competition", competition);
     const cfg = Object.fromEntries((configRows ?? []).map((r) => [r.key, r.value]));
+
+    // Guard (260611): the ESPN importer must never run against a competition it
+    // doesn't own. Simulator/demo game_ids are seeded (sim_*) and match zero
+    // ESPN event ids, so the stale-id cleanup below would DELETE the entire
+    // week before inserting — destroying the App Review sandbox. Config-driven
+    // via data_provider (covers sim + demo + future providers); fail closed if
+    // the key is missing. Refuse loudly — never silently no-op.
+    const provider = String(cfg.data_provider ?? "").replace(/^"|"$/g, "");
+    if (provider !== "espn") {
+      const msg = `refused: ${competition} is not an espn-driven competition (data_provider=${provider || "missing"}); sims are driven by the simulator, not the importer.`;
+      console.error(`[nfl-import-schedule] ${msg}`);
+      return json({ success: false, error: msg }, 403);
+    }
+
     if (!cfg.is_active) return json({ success: true, reason: "competition_inactive" }, 200);
 
     // Week: explicit param wins; otherwise derive from the clock so the cron
