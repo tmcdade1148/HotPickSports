@@ -154,6 +154,6 @@ written from bad data. If miscomputed scores landed before the brake:
 | Health monitor | `espn-health-check` Edge Function (cron hourly at :17) |
 | Health status value | `competition_config` key `espn_health_status` (`competition = 'global'`) |
 | The brake | `competition_config` key `scoring_locked` (per competition) |
-| Live score poller | `nfl-update-scores` (every 5 min on game days) |
+| Live score poller | `nfl-update-scores` (every 5 min) |
 | Score computation | `nfl-calculate-scores` (every 30 min) |
 | Where to set the brake | Supabase dashboard → SQL editor (no deploy) |
