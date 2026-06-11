@@ -1035,7 +1035,7 @@ not architecture — but each one cost real time, so they're written down.
 
 ### Dependency versions
 - **`react-native` is pinned by the Expo SDK — never bump it on its own.**
-  Expo SDK 55 ⇒ **react-native 0.83.2**. A stray bump to 0.84.0 (in the prebuild
+  Expo SDK 55 ⇒ **react-native 0.83.6**. A stray bump to 0.84.0 (in the prebuild
   commit) left Expo's native modules undefined at runtime →
   `Cannot read property 'EventEmitter' of undefined` on launch. Always realign
   with `npx expo install --fix`; never hand-edit the RN version in
@@ -1043,7 +1043,7 @@ not architecture — but each one cost real time, so they're written down.
 - **Never run `npm audit fix --force`.** It rewrote ~250 packages and broke
   `node_modules` twice. Recover with
   `git checkout package.json package-lock.json && rm -rf node_modules && npm ci`.
-- RN 0.83.2's bundled global `URL`/`URLSearchParams` types are narrower than
+- RN 0.83.6's bundled global `URL`/`URLSearchParams` types are narrower than
   0.84's (no `hostname`/`pathname`/`URLSearchParams.get`). `react-native-url-polyfill`
   supplies them at runtime; the TS gap is patched in
   `src/shared/types/url-polyfill.d.ts`.
@@ -1065,6 +1065,19 @@ not architecture — but each one cost real time, so they're written down.
   project), so local Xcode must stay buildable — don't rely on EAS alone.
 
 ### Metro
+- **`config.resolver.unstable_enablePackageExports = false` in `metro.config.js`
+  is load-bearing — do NOT remove it.** It disables Metro's package-"exports"
+  resolution. With it ON (the SDK 55 default), Metro resolves an ESM build of a
+  bootstrap polyfill (`@react-native/js-polyfills/console.js`) that calls
+  `require` before the module runtime exists → the launch-blocking redbox
+  `[runtime not ready]: Property 'require' doesn't exist`. The stack is
+  bootstrap-level with **no app frames**, which is why it reads like a native/cache
+  problem and sent us chasing babel, Pods, and Metro cache for a long time — none
+  of those were it. This one line was the fix (expo/expo #36635 / #36551).
+  **Caveat / known cost:** turning exports resolution off can occasionally
+  mis-resolve a package that ships *only* an `exports` map (no legacy `main`), so
+  if a dependency misbehaves around module loading later, this line is the first
+  suspect — but replace it with a tested alternative; never delete it as "cleanup."
 - **After any native or dependency-version change, start Metro with
   `--clear`** (`npx expo start --dev-client --clear`). Metro caches a snapshot of
   `node_modules`; a "module/file not found" error spanning *unrelated* packages
