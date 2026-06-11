@@ -1,0 +1,61 @@
+# Supabase CLI project config.
+#
+# This file exists primarily to PIN `verify_jwt = false` for the 12 cron-driven
+# Edge Functions. Those functions were intentionally switched to verify_jwt=false
+# during the Jun 2026 service_role key rotation and now do their own in-body auth:
+# they require the dedicated `x-cron-secret` header (value held in Vault /
+# CRON_SHARED_SECRET, sent by the pg_cron jobs) — NOT a Supabase JWT. The new
+# sb_secret_/sb_publishable_ API keys are not JWTs, so leaving verify_jwt=true here
+# would 401 every cron invocation.
+#
+# Without this file, a future `supabase functions deploy <name>` (which defaults
+# verify_jwt back to true) would silently re-break cron auth. Keep the 12 blocks
+# below in sync with the functions that carry the `x-cron-secret` gate.
+#
+# Functions NOT listed here keep the CLI default verify_jwt = true (they are
+# called with a user/anon JWT from the app): admin-broadcast, delete-account,
+# demo-settle, nfl-announce-regular-winners, nfl-weekly-transition,
+# send-broadcast-email, send-partner-broadcast, suspend-pool, suspend-user.
+# (nfl-weekly-transition is admin-initiated via JWT, not a pg_cron HTTP call.)
+
+project_id = "mzqtrpdiqhopjmxjccwy"
+
+# ── Cron-driven functions: in-body x-cron-secret gate, no JWT ──
+[functions.nfl-calculate-scores]
+verify_jwt = false
+
+[functions.nfl-update-scores]
+verify_jwt = false
+
+[functions.nfl-fetch-odds]
+verify_jwt = false
+
+[functions.nfl-rank-games]
+verify_jwt = false
+
+[functions.nfl-import-schedule]
+verify_jwt = false
+
+[functions.nfl-open-picks]
+verify_jwt = false
+
+[functions.nfl-finalize-week]
+verify_jwt = false
+
+[functions.refresh-game-pick-stats]
+verify_jwt = false
+
+[functions.process-notification-queue]
+verify_jwt = false
+
+[functions.smack-archive-messages]
+verify_jwt = false
+
+[functions.espn-health-check]
+verify_jwt = false
+
+# compute-hardware uses a HYBRID gate: x-cron-secret (cron) OR a super_admin JWT
+# it verifies itself via supabase.auth.getUser(). Either way it must own the
+# check, so verify_jwt stays false.
+[functions.compute-hardware]
+verify_jwt = false
