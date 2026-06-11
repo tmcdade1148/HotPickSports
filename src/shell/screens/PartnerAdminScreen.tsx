@@ -66,8 +66,6 @@ export function PartnerAdminScreen() {
   const styles = createStyles(colors);
   const navigation = useNavigation<any>();
   const user = useGlobalStore(s => s.user);
-  const userPools = useGlobalStore(s => s.userPools);
-  const updatePoolBrandConfig = useGlobalStore(s => s.updatePoolBrandConfig);
 
   const [partners, setPartners] = useState<Partner[]>([]);
   const [loading, setLoading] = useState(true);
@@ -575,20 +573,13 @@ export function PartnerAdminScreen() {
         return;
       }
 
-      // Update any pools that use this partner's brand
-      const assignedPools = userPools.filter(
-        p => (p as any).partner_id === partner.id,
-      );
-      for (const pool of assignedPools) {
-        const {error: poolError} = await supabase
-          .from('pools')
-          .update({brand_config: updatedConfig as unknown})
-          .eq('id', pool.id);
-        if (poolError) {
-          console.warn('Pool brand update error:', poolError.message);
-        }
-        updatePoolBrandConfig(pool.id, updatedConfig);
-      }
+      // Pool brand_config propagation is owned server-side by the
+      // partners_propagate_brand AFTER UPDATE trigger, which cascades this
+      // partner's new brand_config to pools (partner_id / owning_club_id) and
+      // to pool_partner_affiliations. The partner UPDATE above carries
+      // brand_config, so that trigger has fired — no client-side pool write
+      // needed (Hard Rule #23; CLAUDE.md red flag against direct client
+      // UPDATE of pools.brand_config). T2-1.
 
       setEditingPartnerId(null);
       fetchPartners();

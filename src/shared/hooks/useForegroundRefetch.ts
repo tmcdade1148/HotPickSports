@@ -49,14 +49,18 @@ export function useForegroundRefetch() {
         // No active session — nothing to refetch.
         if (!userId) return;
 
-        // 1. NFL store — competition_config (week_state, picks_open, etc).
-        // Only when on a season-template competition. The handler is
-        // already write-safe (gates derived state behind configLoaded).
+        // 1. NFL store — competition_config (week_state, picks_open, etc) and
+        // live scores. Only when on a season-template competition. The handler
+        // is already write-safe (gates derived state behind configLoaded).
         if (activeSport?.templateType === 'season') {
-          await useNFLStore
-            .getState()
-            .fetchCompetitionConfig()
-            .catch(() => {});
+          const nfl = useNFLStore.getState();
+          await nfl.fetchCompetitionConfig().catch(() => {});
+          // Refresh live scores once on resume (T3-1). Realtime is the primary
+          // path but does not replay events missed while backgrounded, so a
+          // user who left during a live HotPick game would otherwise return to
+          // a stale score. One-shot fetch, never a poll; runs after config so
+          // currentWeek is current.
+          await nfl.fetchLiveScores().catch(() => {});
         }
 
         // 2. Season store — user picks + leaderboards (active pool).
