@@ -92,3 +92,14 @@ dist/
 
 # Supabase local
 supabase/.temp/
+
+# Expo local cache / dev artifacts
+.expo/
+
+# Database dumps / backups — NEVER commit (this is a public repo).
+# Keep these outside the repo (e.g. ~/Developer/hotpick-backups/). These
+# patterns are a backstop so a stray `git add .` can't leak a full DB dump.
+# (Migration .sql under supabase/migrations/ is unaffected — only these prefixes.)
+*.dump
+hotpick_backup_*
+hotpick_schema_*.sql
