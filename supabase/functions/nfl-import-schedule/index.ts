@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL") ?? "",
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+  (Deno.env.get("SB_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")) ?? "",
   { auth: { persistSession: false } }
 );
 
@@ -14,6 +14,15 @@ const WEEK_TO_ESPN: Record<number, { seasonType: number; espnWeek: number; phase
 };
 
 Deno.serve(async (req) => {
+  // Cron auth gate (verify_jwt=false): require the dedicated cron shared secret.
+  // CRON_SHARED_SECRET (Edge Secret) is compared to the x-cron-secret header that
+  // pg_cron sends (value from Vault by reference). Decoupled from SB_SECRET_KEY.
+  const cronSecret = Deno.env.get("CRON_SHARED_SECRET");
+  if (!cronSecret || req.headers.get("x-cron-secret") !== cronSecret) {
+    return new Response(JSON.stringify({ error: "unauthorized" }), {
+      status: 401, headers: { "Content-Type": "application/json" },
+    });
+  }
   // Hoisted so the catch block can record a readiness failure (§5b).
   let competition = "nfl_2026";
   let week = 0;

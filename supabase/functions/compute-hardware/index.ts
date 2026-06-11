@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL") ?? "",
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+  (Deno.env.get("SB_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")) ?? "",
   { auth: { persistSession: false } }
 );
 
@@ -40,6 +40,26 @@ async function fetchAll<T = any>(
  * - manual_override: Tom triggers from admin panel
  */
 Deno.serve(async (req) => {
+  // Auth gate (verify_jwt=false). compute-hardware is invoked two ways, so allow
+  // EITHER:
+  //   (a) pg_cron: x-cron-secret header == CRON_SHARED_SECRET (value from Vault), OR
+  //   (b) a super-admin client (HardwareAdminScreen) presenting a valid user JWT.
+  // The cron shared secret is decoupled from SB_SECRET_KEY (the DB key).
+  const cronSecret = Deno.env.get("CRON_SHARED_SECRET");
+  let authorized = !!cronSecret && req.headers.get("x-cron-secret") === cronSecret;
+  if (!authorized) {
+    const authz = req.headers.get("Authorization") ?? "";
+    const token = authz.startsWith("Bearer ") ? authz.slice(7) : "";
+    if (token) {
+      const { data: { user } } = await supabase.auth.getUser(token);
+      if (user) {
+        const { data: prof } = await supabase
+          .from("profiles").select("is_super_admin").eq("id", user.id).single();
+        authorized = !!prof?.is_super_admin;
+      }
+    }
+  }
+  if (!authorized) return json({ error: "unauthorized" }, 401);
   try {
     const body = await req.json().catch(() => ({}));
     const trigger = body.trigger ?? "weekly_settle";

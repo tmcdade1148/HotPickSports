@@ -3,11 +3,20 @@ import { mapPlayoffWeek } from "../_shared/scoring.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL") ?? "",
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+  (Deno.env.get("SB_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")) ?? "",
   { auth: { persistSession: false } }
 );
 
 Deno.serve(async (req) => {
+  // Cron auth gate (verify_jwt=false): require the dedicated cron shared secret.
+  // CRON_SHARED_SECRET (Edge Secret) is compared to the x-cron-secret header that
+  // pg_cron sends (value from Vault by reference). Decoupled from SB_SECRET_KEY.
+  const cronSecret = Deno.env.get("CRON_SHARED_SECRET");
+  if (!cronSecret || req.headers.get("x-cron-secret") !== cronSecret) {
+    return new Response(JSON.stringify({ error: "unauthorized" }), {
+      status: 401, headers: { "Content-Type": "application/json" },
+    });
+  }
   try {
     const body = await req.json().catch(() => ({}));
     const competition = body.competition ?? "nfl_2026";

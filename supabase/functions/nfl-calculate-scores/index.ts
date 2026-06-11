@@ -3,7 +3,7 @@ import { effectiveRank, scorePicks, weekPhase } from "../_shared/scoring.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL") ?? "",
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+  (Deno.env.get("SB_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")) ?? "",
   { auth: { persistSession: false } }
 );
 
@@ -14,8 +14,18 @@ const CORS_HEADERS = {
 };
 
 Deno.serve(async (req) => {
+  // Let CORS preflight through before any auth check.
   if (req.method === "OPTIONS") {
     return new Response("ok", { status: 200, headers: CORS_HEADERS });
+  }
+  // Cron auth gate (verify_jwt=false): require the dedicated cron shared secret.
+  // CRON_SHARED_SECRET (Edge Secret) is compared to the x-cron-secret header that
+  // pg_cron sends (value from Vault by reference). Decoupled from SB_SECRET_KEY.
+  const cronSecret = Deno.env.get("CRON_SHARED_SECRET");
+  if (!cronSecret || req.headers.get("x-cron-secret") !== cronSecret) {
+    return new Response(JSON.stringify({ error: "unauthorized" }), {
+      status: 401, headers: { "Content-Type": "application/json" },
+    });
   }
   try {
     const body = await req.json().catch(() => ({}));
