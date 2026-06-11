@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
       let status = "SCHEDULED";
       if (espnStatus.includes("FINAL")) status = "FINAL";
       else if (espnStatus.includes("PROGRESS") || espnStatus === "IN") status = "IN_PROGRESS";
-      const rank = week === 22 ? 16 : null;
+      // rank / frozen_rank are deliberately ABSENT — see the ranking note below.
       return {
         game_id: event.id, competition, season_year: seasonYear, week, phase,
         home_team: homeTeam.team.abbreviation, away_team: awayTeam.team.abbreviation,
@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
         spread: odds?.details ? parseFloat(odds.details) : null,
         home_moneyline: odds?.homeTeamOdds?.moneyLine ? parseInt(odds.homeTeamOdds.moneyLine, 10) : null,
         away_moneyline: odds?.awayTeamOdds?.moneyLine ? parseInt(odds.awayTeamOdds.moneyLine, 10) : null,
-        rank, frozen_rank: rank, is_finalized: false,
+        is_finalized: false,
       };
     });
 
@@ -107,18 +107,33 @@ Deno.serve(async (req) => {
       return json({ error: error.message }, 500);
     }
 
+    // Week 22 (Super Bowl): the single game is always rank 16 (REFERENCE.md §7).
+    // Its own statement — not part of the batch payload — so the rank columns
+    // stay out of the conflict-update path for weeks 1–21.
+    if (week === 22) {
+      const { error: sbRankError } = await supabase.from("season_games")
+        .update({ rank: 16, frozen_rank: 16 })
+        .eq("competition", competition).eq("season_year", seasonYear).eq("week", week);
+      if (sbRankError) {
+        await markReadiness(competition, week, { games_status: "failed", games_at: new Date().toISOString() });
+        return json({ error: sbRankError.message }, 500);
+      }
+    }
+
     // §5b — games loaded OK.
     await markReadiness(competition, week, { games_status: "ok", games_count: rows.length, games_at: new Date().toISOString() });
 
     console.log(`[nfl-import-schedule] Imported ${rows.length} games`);
 
-    // Ranking is intentionally NOT done here. frozen_rank is set by
+    // Ranking is intentionally NOT done here (weeks 1–21). frozen_rank is set by
     // nfl-rank-games AFTER nfl-fetch-odds runs (REFERENCE.md §7), so ranks are
     // computed from the Odds-API numbers — not ESPN's import-time scoreboard
-    // odds. Freezing inline at import would lock ranks on the weaker source and,
-    // via Hard Rule #6 (immutable frozen_rank), make the fetch-odds -> rank-games
-    // steps inert. The Tuesday cron (odds 10:00, rank 10:15) and
-    // nfl-weekly-transition both run rank after odds.
+    // odds. The rank columns are omitted from the upsert payload entirely:
+    // PostgREST only updates columns present in the body, so a re-import of an
+    // already-ranked week can no longer overwrite frozen_rank (Hard Rule #6 —
+    // 260611 FrozenRankImmutability spec). New games get the column default
+    // (null) until nfl-rank-games freezes them. The Tuesday cron (odds 10:00,
+    // rank 10:15) and nfl-weekly-transition both run rank after odds.
 
     return json({ success: true, competition, season_year: seasonYear, week, phase, imported: rows.length }, 200);
   } catch (err) {
