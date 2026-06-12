@@ -5,9 +5,11 @@
 // function, five super-admin-gated actions, SANDBOX-ONLY via a hardcoded allowlist.
 //
 // SECURITY / DESIGN (see CLAUDE.md + spec §7):
-//   * verify_jwt = true (CLI default; NOT pinned false in config.toml). The caller's
-//     session JWT gates a server-side is_super_admin check — service role never
-//     leaves the server.
+//   * verify_jwt = false (pinned in config.toml) because the Operator Console is a
+//     browser page and a verify_jwt=true gateway rejects the unauthenticated CORS
+//     preflight. The function owns its gate instead: it reads the caller's session
+//     JWT via auth.getUser() and requires is_super_admin — service role never leaves
+//     the server. Same hybrid pattern as compute-hardware.
 //   * SIM_ALLOWLIST is HARDCODED here, not config-driven. nfl_2026 and every other
 //     competition are refused 403 regardless of what the client sends.
 //   * Built on the REAL weekly engine, not raw week_state writes:
@@ -39,10 +41,21 @@ const SOURCE_COMPETITION = "nfl_2025";
 
 const VALID_ACTIONS = ["advance_week_state", "advance_phase", "jump_to_week", "reset_to_off_season", "auto_pick_tom"];
 
+// CORS — the Operator Console is a browser page, so preflight + headers are required.
+// (This is also why the function runs verify_jwt=false and checks super-admin itself:
+// a verify_jwt=true gateway rejects the unauthenticated OPTIONS preflight. Same
+// pattern as compute-hardware.)
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
 // Forward-only in-week order (idle is the off-cycle resting state).
 const WS_ORDER = ["idle", "picks_open", "locked", "live", "settling", "complete"];
 
 Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) return json({ success: false, error: "Missing Authorization" }, 401);
@@ -329,5 +342,5 @@ function friendlyRpcError(msg: string): string {
   return "Transition rejected by the engine.";
 }
 function json(body: unknown, status: number) {
-  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  return new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 }
