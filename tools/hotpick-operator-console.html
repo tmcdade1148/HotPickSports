@@ -184,6 +184,15 @@
   .ctl-disabled-note { font-size: 11px; color: #8A97AA; }
   .ctl-num { width: 70px; background: #0D1117; border: 1px solid #2C3A52; color: #E8EAF0; padding: 8px; border-radius: 6px; font-size: 13px; }
   .reviewer-tag { display: inline-block; background: #F5C842; color: #0D1117; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; letter-spacing: 0.5px; margin-bottom: 8px; }
+
+  /* ---- Phase 2: Stage banner (NOW PLAYING) ---- */
+  .stage-banner { margin: 12px 0; padding: 12px 14px; border-radius: 8px; background: #161C26; border: 1px solid #2C3A52; border-left: 4px solid #F5620F; }
+  .stage-banner.playing { border-left-color: #1b9a06; }
+  .stage-kicker { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #8A97AA; }
+  .stage-name { font-size: 18px; font-weight: 800; letter-spacing: 0.5px; color: #F5C842; margin: 2px 0 4px; }
+  .stage-name .stage-token { font-size: 12px; font-weight: 600; color: #8A97AA; font-family: ui-monospace, Menlo, monospace; letter-spacing: 0; }
+  .stage-desc { font-size: 12px; color: #C7D2E0; }
+  .stage-run { font-size: 11px; color: #1b9a06; font-weight: 700; margin-top: 6px; }
 </style>
 </head>
 <body>
@@ -259,6 +268,7 @@
       <!-- RIGHT PANEL -->
       <main class="right">
         <div class="panel-scroll">
+          <div id="stage-banner" class="stage-banner"></div>
           <div class="panel-block">
             <h2 id="games-title">Games — Current Week</h2>
             <div id="games-view"><div class="empty">—</div></div>
@@ -337,6 +347,20 @@ const PHASE_SEQUENCE = ['OFF_SEASON', 'PRE_SEASON', 'REGULAR', 'REGULAR_COMPLETE
 function isWritable(comp) { return SIM_ALLOWLIST.includes(comp); }
 // Auto-pick-before-step toggle — in memory only, resets to off on refresh.
 let autoPickBeforeStep = false;
+// "Run Week" auto-play state (in memory).
+let autoPlayRunning = false;
+const AUTOPLAY_PAUSE_MS = 3500;
+
+// Named stages the app's Home Screen card cycles through — used by the NOW PLAYING
+// banner so formatting issues can be called out by stage name + week_state token.
+const STAGE_INFO = {
+  idle:       { name: 'IDLE (off-cycle)', desc: 'Calm salutation · 0 pts · join/create CTA · SmackTalk pointer' },
+  picks_open: { name: 'PICKS OPEN',       desc: 'Countdown to kickoff · HotPick preview · "X of Y locked in"' },
+  locked:     { name: 'LOCKED',           desc: 'Picks are in · games have not started' },
+  live:       { name: 'LIVE',             desc: 'HotPick live score · point impact · pool rank delta' },
+  settling:   { name: 'SETTLING',         desc: 'Weekly result · net points · rank movement · SmackTalk CTA' },
+  complete:   { name: 'COMPLETE',         desc: 'Season standings as a race · mini sparkline' },
+};
 const REFRESH_MS = 30000;
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -518,6 +542,7 @@ async function refreshAll() {
       renderReviewerStatus(),
     ]);
     renderHomeScreenSpec();
+    renderStageBanner();
     renderControls();
     const now = new Date().toLocaleTimeString('en-US', { hour12: false });
     document.getElementById('sb-refreshed').textContent = 'Updated ' + now;
@@ -642,10 +667,11 @@ function renderTimeline(ws, r) {
     { label: 'Games imported',         kind: 'r', done: hasR && okR(r.games_status), at: r && r.games_at },
     { label: 'Odds fetched',           kind: 'r', done: hasR && okR(r.odds_status),  at: r && r.odds_at },
     { label: 'Ranks frozen',           kind: 'r', done: hasR && okR(r.ranks_status), at: r && r.ranks_at },
-    { label: 'Picks open',             kind: 's', done: ['picks_open','locked','live','settling','complete'].includes(ws), at: stateAt('week_state') },
-    { label: 'Picks locked / Kickoff', kind: 's', done: ['locked','live','settling','complete'].includes(ws), at: stateAt('week_state') },
-    { label: 'Scores settling',        kind: 's', done: ['settling','complete'].includes(ws), at: stateAt('week_state') },
-    { label: 'Week complete',          kind: 's', done: ws === 'complete', at: stateAt('week_state') },
+    { label: 'Picks open · picks_open',     kind: 's', done: ['picks_open','locked','live','settling','complete'].includes(ws), at: stateAt('week_state') },
+    { label: 'Picks locked / Kickoff · locked', kind: 's', done: ['locked','live','settling','complete'].includes(ws), at: stateAt('week_state') },
+    { label: 'Live · live',                 kind: 's', done: ['live','settling','complete'].includes(ws), at: stateAt('week_state') },
+    { label: 'Scores settling · settling',  kind: 's', done: ['settling','complete'].includes(ws), at: stateAt('week_state') },
+    { label: 'Week complete · complete',    kind: 's', done: ws === 'complete', at: stateAt('week_state') },
   ];
   // The "current" (spinner) stage = first not-done ACTIONABLE stage. When no
   // week_readiness row exists (sims don't run the Tuesday prep pipeline), readiness
@@ -896,6 +922,58 @@ function currentStepLabel() {
   return ({ idle: 'Open Picks', picks_open: 'Lock / Kickoff', locked: 'Go Live', live: 'Settle', settling: 'Complete Week', complete: 'Next Week' })[ws] || 'Advance';
 }
 
+// NOW PLAYING banner — names the current app Home-card stage + week_state token.
+function renderStageBanner() {
+  const el = document.getElementById('stage-banner');
+  if (!el) return;
+  const phase = String(cfg('current_phase', 'OFF_SEASON'));
+  let ws = String(cfg('week_state', 'idle'));
+  if (!WEEKLY_CYCLE_PHASES.includes(phase)) ws = 'idle'; // off-cycle phases force the idle card
+  const info = STAGE_INFO[ws] || STAGE_INFO.idle;
+  el.className = 'stage-banner' + (autoPlayRunning ? ' playing' : '');
+  el.innerHTML =
+    `<div class="stage-kicker">Now playing · app Home Screen card</div>
+     <div class="stage-name">${info.name} <span class="stage-token">week_state="${ws}" · ${phase}</span></div>
+     <div class="stage-desc">${info.desc}</div>` +
+    (autoPlayRunning ? `<div class="stage-run">▶ Run Week auto-playing… (pauses ${Math.round(AUTOPLAY_PAUSE_MS / 1000)}s per stage)</div>` : '');
+}
+
+// Run Week — auto-advance week_state through to `complete`, pausing between stages
+// so the live app updates and each named stage can be inspected. v4's "run entire
+// week", on the real engine. Stops at `complete` (like v4, before opening next week).
+async function runWeekAutoPlay() {
+  if (autoPlayRunning || !isWritable(selectedComp)) return;
+  if (REVIEWER_COMPS.includes(selectedComp)) {
+    if (!window.confirm(`⚠️ REVIEWER ENVIRONMENT\n\nRun Week will auto-advance ${selectedComp} through to week-complete.\nApp-store reviewers may be testing here.\n\nProceed?`)) return;
+  }
+  autoPlayRunning = true;
+  log(`Run Week started on ${selectedComp}`, 'success');
+  renderControls(); renderStageBanner();
+  let guard = 0;
+  while (autoPlayRunning && guard++ < 8) {
+    const ws = String(cfg('week_state', 'idle'));
+    if (ws === 'complete') { log('Run Week: reached complete — stopped for inspection.', 'success'); break; }
+    if (!['picks_open', 'locked', 'live', 'settling'].includes(ws)) { log(`Run Week: nothing to advance from "${ws}".`, 'warn'); break; }
+    // Honour the auto-pick toggle before the first lock, same as manual steps.
+    if (autoPickBeforeStep) {
+      const ap = await invokeOp('auto_pick_tom', {});
+      if (ap && ap.success) log(`Auto-picked ${ap.picks_submitted} games`, 'info');
+      else if (!(ap && /already submitted/i.test(ap.error || ''))) { log(`Auto-pick failed: ${(ap && ap.error) || 'error'} — Run Week stopped`, 'error'); break; }
+    }
+    const res = await invokeOp('advance_week_state', { isStep: true });
+    if (!res || !res.success) { log(`Run Week stopped: ${(res && res.error) || 'error'}`, 'error'); break; }
+    log(`→ ${res.from || ws} → ${res.state ? res.state.week_state : '?'}`, 'info');
+    await loadConfig();
+    renderStateBar(); renderStageBanner();
+    await Promise.all([renderGames(), renderLeaderboard(), renderReadinessAndTimeline()]);
+    renderControls();
+    if (autoPlayRunning) await new Promise(r => setTimeout(r, AUTOPLAY_PAUSE_MS));
+  }
+  autoPlayRunning = false;
+  await refreshAll();
+}
+function stopAutoPlay() { autoPlayRunning = false; log('Run Week: stop requested.', 'warn'); }
+
 function renderControls() {
   const el = document.getElementById('controls');
   const comp = selectedComp;
@@ -923,11 +1001,22 @@ function renderControls() {
   let html = '';
   if (REVIEWER_COMPS.includes(comp)) html += `<div class="reviewer-tag">⚠ REVIEWER ENV — every action confirms</div>`;
 
+  const inCycle = WEEKLY_CYCLE_PHASES.includes(phase);
   html += `<div class="ctl-group"><div class="ctl-label">Week ${week} · state: ${ws}</div>`;
   steps.forEach(s => {
-    html += `<button class="ctl-btn ${s.on ? 'active' : ''}" ${s.on ? '' : 'disabled'} onclick="opStep()">${s.label}</button>`;
+    const on = s.on && !autoPlayRunning;
+    html += `<button class="ctl-btn ${s.on ? 'active' : ''}" ${on ? '' : 'disabled'} onclick="opStep()">${s.label}</button>`;
   });
   if (ws === 'idle' && readinessBlocks) html += `<div class="ctl-disabled-note">Open Picks blocked — readiness gate is failing.</div>`;
+  // Run Week (auto-play) — walks the week_state stages with a pause so the app
+  // updates live and you can watch each named stage (v4 "run entire week").
+  if (autoPlayRunning) {
+    html += `<button class="ctl-btn" style="background:#C0392B;color:#fff;margin-top:6px;" onclick="stopAutoPlay()">◼ Stop Run Week</button>`;
+  } else {
+    const canRun = inCycle && ['picks_open','locked','live','settling'].includes(ws);
+    html += `<button class="ctl-btn" style="background:#1b9a06;color:#fff;margin-top:6px;" ${canRun ? '' : 'disabled'} onclick="runWeekAutoPlay()">▶ Run Week (auto-play)</button>`;
+    if (!inCycle) html += `<div class="ctl-disabled-note">Run Week needs an in-cycle phase (REGULAR / PLAYOFFS / SUPERBOWL).</div>`;
+  }
   html += `</div>`;
 
   html += `<div class="ctl-group"><div class="ctl-label">Phase transition</div>`;
