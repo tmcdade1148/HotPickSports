@@ -3,6 +3,12 @@
 
 [build]
   publish = "web/hotpick.app"
+  # Cost control: only deploy when the site (or this config) actually changes.
+  # Netlify otherwise rebuilds on EVERY push/PR — burning build credits on commits
+  # that only touch app code, tools/, or supabase/. The ignore command runs before
+  # each build (incl. Deploy Previews): exit 0 = skip. `git diff --quiet` exits 0
+  # when none of these paths changed between the last built commit and this one.
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- web/hotpick.app netlify.toml"
 
 # Path-style invite codes (/join/CODE) all render the one landing page.
 # 200 = rewrite (URL stays /join/CODE), not a 301/302 redirect.
