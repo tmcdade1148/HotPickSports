@@ -101,9 +101,12 @@ async function getConfig(admin: any, competition: string): Promise<Record<string
   return Object.fromEntries((data ?? []).map((r: any) => [r.key, r.value]));
 }
 async function setConfig(admin: any, competition: string, key: string, value: any) {
-  // jsonb column — JSON.stringify so strings/numbers/bools round-trip (mirrors prior tooling).
+  // jsonb column — pass the NATIVE JS value so PostgREST stores native jsonb
+  // (number/boolean/string). JSON.stringify here would double-encode (e.g. store
+  // the string "8" instead of the number 8), which breaks the app's type checks
+  // and the playoff leaderboard scoping.
   await admin.from("competition_config").upsert(
-    { competition, key, value: JSON.stringify(value), description: "Set by sim-operator" },
+    { competition, key, value, description: "Set by sim-operator" },
     { onConflict: "competition,key" },
   );
 }
