@@ -154,13 +154,17 @@ export const createProfileSlice = (set: Set, get: Get): ProfileSlice => ({
     }
     const {data: partnerRows} = await supabase
       .from('partners')
-      .select('id, name, club_pool_id')
+      .select('id, name, club_pool_id, brand_config')
       .eq('id', membership.partner_id)
       .eq('is_active', true)
       .limit(1);
     const row = (partnerRows ?? [])[0] as
-      | {id: string; name: string; club_pool_id: string | null}
+      | {id: string; name: string; club_pool_id: string | null; brand_config: any}
       | undefined;
+    // Logo for the board-discovery tile. brand_config carries either a nested
+    // logo.full or a flat logo_url (REFERENCE §15 shape drift) — tolerate both.
+    const bc = row?.brand_config ?? null;
+    const logo: string | null = bc?.logo?.full ?? bc?.logo_url ?? null;
     set({
       managedClub: row
         ? {
@@ -168,6 +172,7 @@ export const createProfileSlice = (set: Set, get: Get): ProfileSlice => ({
             name: row.name,
             clubPoolId: row.club_pool_id,
             role: membership.role,
+            logo,
           }
         : null,
     });

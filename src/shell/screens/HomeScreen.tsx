@@ -18,6 +18,7 @@ import {ordinalSuffix} from '@shared/utils/format';
 import {SystemMessageSlot} from '@shell/components/home/SystemMessageSlot';
 import {HomeHeader} from '@shell/components/home/HomeHeader';
 import {IdentityBar} from '@shell/components/home/IdentityBar';
+import {ManagedLeagueModule} from '@shell/components/home/ManagedLeagueModule';
 import {StateHero} from '@shell/components/home/StateHero';
 import {HeroSkeleton} from '@shell/components/home/HeroSkeleton';
 import {CrossContestStrip} from '@shell/components/home/CrossContestStrip';
@@ -412,6 +413,10 @@ export function HomeScreen() {
             carries platform-wide admin broadcasts). Self-hides when
             there's nothing unread. */}
         <HomeInbox />
+
+        {/* Board Discovery Tile — routes partner board members (Chairman /
+            Director) into League Tools. Self-hides when not on a board. */}
+        <ManagedLeagueModule />
 
         {/* In-cycle YOUR CONTESTS section — replaced on off-cycle
             states (off_season_idle / pre_season_games) by the action
