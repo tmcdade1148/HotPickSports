@@ -120,7 +120,9 @@
   .cp-label { flex: 1; font-size: 13px; }
   .cp-elapsed { font-size: 10px; color: #8A97AA; font-variant-numeric: tabular-nums; }
   .checkpoint.done .cp-label { color: #1b9a06; }
-  .checkpoint.current .cp-label { color: #F5620F; font-weight: 600; }
+  .checkpoint.current { background: #1b9a0618; border-radius: 4px; }
+  .checkpoint.current .cp-label { color: #1b9a06; font-weight: 800; }
+  .checkpoint.current .cp-icon { color: #1b9a06; }
   .checkpoint.pending .cp-label { color: #8A97AA; opacity: 0.7; }
   .spinner { display: inline-block; width: 11px; height: 11px; border: 2px solid #F5620F; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -184,6 +186,11 @@
   .ctl-disabled-note { font-size: 11px; color: #8A97AA; }
   .ctl-num { width: 70px; background: #0D1117; border: 1px solid #2C3A52; color: #E8EAF0; padding: 8px; border-radius: 6px; font-size: 13px; }
   .reviewer-tag { display: inline-block; background: #F5C842; color: #0D1117; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .state-chip { font-size: 12px; padding: 3px 8px; color: #8A97AA; font-family: ui-monospace, Menlo, monospace; }
+  .state-chip.cur { color: #1b9a06; font-weight: 800; }
+  .picks-made { font-size: 11px; padding: 0 8px 2px 18px; }
+  .picks-made.yes { color: #1b9a06; }
+  .picks-made.no { color: #8A97AA; }
 
   /* ---- Phase 2: Stage banner (NOW PLAYING) ---- */
   .stage-banner { margin: 12px 0; padding: 12px 14px; border-radius: 8px; background: #161C26; border: 1px solid #2C3A52; border-left: 4px solid #F5620F; }
@@ -252,11 +259,6 @@
         <div class="section">
           <h2>Checkpoint Timeline</h2>
           <div id="checkpoint-list"></div>
-        </div>
-
-        <div class="section">
-          <h2>Reviewer Status</h2>
-          <div id="reviewer-status"><div class="empty">Loading reviewer environments…</div></div>
         </div>
 
         <div class="section">
@@ -347,9 +349,10 @@ const PHASE_SEQUENCE = ['OFF_SEASON', 'PRE_SEASON', 'REGULAR', 'REGULAR_COMPLETE
 function isWritable(comp) { return SIM_ALLOWLIST.includes(comp); }
 // Auto-pick-before-step toggle — in memory only, resets to off on refresh.
 let autoPickBeforeStep = false;
-// "Run Week" auto-play state (in memory).
-let autoPlayRunning = false;
-const AUTOPLAY_PAUSE_MS = 3500;
+// Logged-in super-admin id + whether their picks exist for the current week
+// (drives the "picks made" indicator under Picks Open).
+let currentUserId = null;
+let myPicksThisWeek = false;
 
 // Named stages the app's Home Screen card cycles through — used by the NOW PLAYING
 // banner so formatting issues can be called out by stage name + week_state token.
@@ -446,6 +449,7 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
       throw new Error('not authorized: not a super admin');
     }
     userEmail = email;
+    currentUserId = data.user.id;
     document.getElementById('login-wrap').style.display = 'none';
     document.getElementById('app').classList.add('visible');
     log(`Connected as ${email} (super_admin)`, 'success');
@@ -535,11 +539,11 @@ async function refreshAll() {
     await loadConfig();
     renderStateBar();
     renderProdBanner();
+    await fetchMyPicksThisWeek();
     await Promise.all([
       renderReadinessAndTimeline(),
       renderGames(),
       renderLeaderboard(),
-      renderReviewerStatus(),
     ]);
     renderHomeScreenSpec();
     renderStageBanner();
@@ -561,6 +565,17 @@ async function loadConfig() {
   const week = cfg('current_week', '—');
   const ws = cfg('week_state', 'idle');
   log(`Loaded ${selectedComp} · Phase: ${phase} · Week ${week} · ${ws}`, 'info');
+}
+
+// Does the logged-in operator have picks in for the current week? (RLS lets a
+// user read their own season_picks.) Drives the "picks made" indicator.
+async function fetchMyPicksThisWeek() {
+  myPicksThisWeek = false;
+  const week = cfg('current_week');
+  if (!currentUserId || typeof week !== 'number') return;
+  const { data } = await sb.from('season_picks').select('id')
+    .eq('user_id', currentUserId).eq('competition', selectedComp).eq('week', week).limit(1);
+  myPicksThisWeek = !!(data && data.length);
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -687,7 +702,7 @@ function renderTimeline(ws, r) {
   stages.forEach((s, i) => {
     let cls, icon;
     if (s.done) { cls = 'done'; icon = '✓'; }
-    else if (i === currentIdx) { cls = 'current'; icon = '<span class="spinner"></span>'; }
+    else if (i === currentIdx) { cls = 'current'; icon = '▶'; }
     else { cls = 'pending'; icon = s.kind === 'r' && !hasR ? '–' : '○'; }
     const elapsed = s.done && s.at ? timeAgo(s.at) : '';
     html += `<div class="checkpoint ${cls}"><span class="cp-icon">${icon}</span>
@@ -696,36 +711,6 @@ function renderTimeline(ws, r) {
   document.getElementById('checkpoint-list').innerHTML = html;
 }
 function stateAt(key) { return lastConfig[key] && lastConfig[key].updated_at; }
-
-// ---- Reviewer Status (independent reads for simA + simG; always shown) ----
-async function renderReviewerStatus() {
-  const rows = await Promise.all(REVIEWER_ENVS.map(async (env) => {
-    const { data, error } = await sb
-      .from('competition_config').select('key, value')
-      .eq('competition', env.comp).in('key', ['current_week', 'week_state']);
-    if (error) return { env, err: true };
-    const map = {};
-    for (const r of (data || [])) map[r.key] = r.value;
-    return { env, week: map.current_week, week_state: map.week_state };
-  }));
-
-  let html = `<div style="font-size:10px;color:#8A97AA;margin-bottom:6px;">Expected anchor: Week ${REVIEWER_ANCHOR.week} · ${REVIEWER_ANCHOR.week_state}</div>`;
-  for (const row of rows) {
-    if (row.err) {
-      html += `<div class="rev-row"><span class="rev-env">${row.env.label}</span>
-        <span class="rev-detail">read failed</span><span class="rev-status drift">⚠</span></div>`;
-      continue;
-    }
-    const ok = row.week === REVIEWER_ANCHOR.week && row.week_state === REVIEWER_ANCHOR.week_state;
-    html += `<div class="rev-row">
-      <span class="rev-env">${row.env.label}</span>
-      <span class="rev-detail">Week ${row.week ?? '—'} · ${row.week_state ?? '—'}</span>
-      <span class="rev-status ${ok ? 'ok' : 'drift'}">${ok ? '✓' : '⚠ DRIFT'}</span></div>`;
-  }
-  document.getElementById('reviewer-status').innerHTML = html;
-  const drift = rows.filter(r => !r.err && !(r.week === REVIEWER_ANCHOR.week && r.week_state === REVIEWER_ANCHOR.week_state));
-  if (drift.length) log(`Reviewer drift: ${drift.map(d => d.env.comp).join(', ')} not at Week 8 / picks_open`, 'warn');
-}
 
 // ---- Games view ----
 async function renderGames() {
@@ -930,49 +915,12 @@ function renderStageBanner() {
   let ws = String(cfg('week_state', 'idle'));
   if (!WEEKLY_CYCLE_PHASES.includes(phase)) ws = 'idle'; // off-cycle phases force the idle card
   const info = STAGE_INFO[ws] || STAGE_INFO.idle;
-  el.className = 'stage-banner' + (autoPlayRunning ? ' playing' : '');
+  el.className = 'stage-banner';
   el.innerHTML =
     `<div class="stage-kicker">Now playing · app Home Screen card</div>
      <div class="stage-name">${info.name} <span class="stage-token">week_state="${ws}" · ${phase}</span></div>
-     <div class="stage-desc">${info.desc}</div>` +
-    (autoPlayRunning ? `<div class="stage-run">▶ Run Week auto-playing… (pauses ${Math.round(AUTOPLAY_PAUSE_MS / 1000)}s per stage)</div>` : '');
+     <div class="stage-desc">${info.desc}</div>`;
 }
-
-// Run Week — auto-advance week_state through to `complete`, pausing between stages
-// so the live app updates and each named stage can be inspected. v4's "run entire
-// week", on the real engine. Stops at `complete` (like v4, before opening next week).
-async function runWeekAutoPlay() {
-  if (autoPlayRunning || !isWritable(selectedComp)) return;
-  if (REVIEWER_COMPS.includes(selectedComp)) {
-    if (!window.confirm(`⚠️ REVIEWER ENVIRONMENT\n\nRun Week will auto-advance ${selectedComp} through to week-complete.\nApp-store reviewers may be testing here.\n\nProceed?`)) return;
-  }
-  autoPlayRunning = true;
-  log(`Run Week started on ${selectedComp}`, 'success');
-  renderControls(); renderStageBanner();
-  let guard = 0;
-  while (autoPlayRunning && guard++ < 8) {
-    const ws = String(cfg('week_state', 'idle'));
-    if (ws === 'complete') { log('Run Week: reached complete — stopped for inspection.', 'success'); break; }
-    if (!['picks_open', 'locked', 'live', 'settling'].includes(ws)) { log(`Run Week: nothing to advance from "${ws}".`, 'warn'); break; }
-    // Honour the auto-pick toggle before the first lock, same as manual steps.
-    if (autoPickBeforeStep) {
-      const ap = await invokeOp('auto_pick_tom', {});
-      if (ap && ap.success) log(`Auto-picked ${ap.picks_submitted} games`, 'info');
-      else if (!(ap && /already submitted/i.test(ap.error || ''))) { log(`Auto-pick failed: ${(ap && ap.error) || 'error'} — Run Week stopped`, 'error'); break; }
-    }
-    const res = await invokeOp('advance_week_state', { isStep: true });
-    if (!res || !res.success) { log(`Run Week stopped: ${(res && res.error) || 'error'}`, 'error'); break; }
-    log(`→ ${res.from || ws} → ${res.state ? res.state.week_state : '?'}`, 'info');
-    await loadConfig();
-    renderStateBar(); renderStageBanner();
-    await Promise.all([renderGames(), renderLeaderboard(), renderReadinessAndTimeline()]);
-    renderControls();
-    if (autoPlayRunning) await new Promise(r => setTimeout(r, AUTOPLAY_PAUSE_MS));
-  }
-  autoPlayRunning = false;
-  await refreshAll();
-}
-function stopAutoPlay() { autoPlayRunning = false; log('Run Week: stop requested.', 'warn'); }
 
 function renderControls() {
   const el = document.getElementById('controls');
@@ -987,35 +935,41 @@ function renderControls() {
   const week = cfg('current_week', '—');
   const readinessBlocks = lastReadinessHasRow && !lastReadinessOk;
 
-  const steps = [
-    { label: 'Open Picks',    on: ws === 'idle' && !readinessBlocks },
-    { label: 'Lock / Kickoff',on: ws === 'picks_open' },
-    { label: 'Go Live',       on: ws === 'locked' },
-    { label: 'Settle',        on: ws === 'live' },
-    { label: 'Complete Week', on: ws === 'settling' },
-    { label: 'Next Week',     on: ws === 'complete' },
-  ];
   const pidx = PHASE_SEQUENCE.indexOf(phase);
   const nextPhase = (pidx >= 0 && pidx < PHASE_SEQUENCE.length - 1) ? PHASE_SEQUENCE[pidx + 1] : null;
+  const inCycle = WEEKLY_CYCLE_PHASES.includes(phase);
+
+  // Single NEXT button walks the week through its states; the current state is
+  // highlighted green in the list above it.
+  const CYCLE_STATES = ['picks_open', 'locked', 'live', 'settling', 'complete'];
+  const NEXT_TARGET = { idle: 'picks_open', picks_open: 'locked', locked: 'live', live: 'settling', settling: 'complete', complete: 'picks_open (next week)' };
 
   let html = '';
-  if (REVIEWER_COMPS.includes(comp)) html += `<div class="reviewer-tag">⚠ REVIEWER ENV — every action confirms</div>`;
 
-  const inCycle = WEEKLY_CYCLE_PHASES.includes(phase);
-  html += `<div class="ctl-group"><div class="ctl-label">Week ${week} · state: ${ws}</div>`;
-  steps.forEach(s => {
-    const on = s.on && !autoPlayRunning;
-    html += `<button class="ctl-btn ${s.on ? 'active' : ''}" ${on ? '' : 'disabled'} onclick="opStep()">${s.label}</button>`;
+  html += `<div class="ctl-group"><div class="ctl-label">Week ${week} state</div>`;
+  CYCLE_STATES.forEach(st => {
+    const cur = ws === st;
+    let line = `<div class="state-chip ${cur ? 'cur' : ''}">${cur ? '▶ ' : ''}${st}</div>`;
+    // Under Picks Open, show whether the operator's picks are in (auto-pick result).
+    if (st === 'picks_open' && (cur || autoPickBeforeStep)) {
+      line += myPicksThisWeek
+        ? `<div class="picks-made yes">✓ Your picks are in for week ${week}</div>`
+        : (autoPickBeforeStep ? `<div class="picks-made no">Auto-pick will run on NEXT</div>` : '');
+    }
+    html += line;
   });
-  if (ws === 'idle' && readinessBlocks) html += `<div class="ctl-disabled-note">Open Picks blocked — readiness gate is failing.</div>`;
-  // Run Week (auto-play) — walks the week_state stages with a pause so the app
-  // updates live and you can watch each named stage (v4 "run entire week").
-  if (autoPlayRunning) {
-    html += `<button class="ctl-btn" style="background:#C0392B;color:#fff;margin-top:6px;" onclick="stopAutoPlay()">◼ Stop Run Week</button>`;
+
+  if (!inCycle) {
+    html += `<div class="ctl-disabled-note">Off-cycle phase — advance to REGULAR / PLAYOFFS / SUPERBOWL below to run a week.</div>`;
+  } else if (ws === 'idle' && readinessBlocks) {
+    html += `<div class="ctl-disabled-note">Can't open picks — readiness gate is failing.</div>`;
   } else {
-    const canRun = inCycle && ['picks_open','locked','live','settling'].includes(ws);
-    html += `<button class="ctl-btn" style="background:#1b9a06;color:#fff;margin-top:6px;" ${canRun ? '' : 'disabled'} onclick="runWeekAutoPlay()">▶ Run Week (auto-play)</button>`;
-    if (!inCycle) html += `<div class="ctl-disabled-note">Run Week needs an in-cycle phase (REGULAR / PLAYOFFS / SUPERBOWL).</div>`;
+    // At picks_open with auto-pick on and no picks yet, let the operator make picks
+    // here (so the "picks are in" indicator shows) before locking.
+    if (ws === 'picks_open' && autoPickBeforeStep && !myPicksThisWeek) {
+      html += `<button class="ctl-btn" style="margin-top:8px;" onclick="opAutoPick()">Auto-pick my picks now</button>`;
+    }
+    html += `<button class="ctl-btn" style="background:#1b9a06;color:#fff;margin-top:8px;" onclick="opStep()">NEXT → ${NEXT_TARGET[ws] || 'advance'}</button>`;
   }
   html += `</div>`;
 
@@ -1085,6 +1039,7 @@ async function callSimOperator(action, opts = {}) {
 }
 
 function opStep() { callSimOperator('advance_week_state', { isStep: true, label: currentStepLabel() }); }
+function opAutoPick() { callSimOperator('auto_pick_tom', { label: 'Auto-pick my picks' }); }
 function opPhase() {
   const sel = document.getElementById('phase-next');
   callSimOperator('advance_phase', { label: 'Advance phase → ' + (sel ? sel.value : '') });
