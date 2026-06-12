@@ -120,9 +120,9 @@
   .cp-label { flex: 1; font-size: 13px; }
   .cp-elapsed { font-size: 10px; color: #8A97AA; font-variant-numeric: tabular-nums; }
   .checkpoint.done .cp-label { color: #1b9a06; }
-  .checkpoint.current { background: rgba(245,98,15,0.08); border-radius: 4px; }
-  .checkpoint.current .cp-label { color: rgba(245,98,15,0.72); font-weight: 600; }
-  .checkpoint.current .cp-icon { color: rgba(245,98,15,0.72); }
+  .checkpoint.current { background: rgba(245,200,66,0.12); border-radius: 4px; }
+  .checkpoint.current .cp-label { color: #F5C842; font-weight: 700; }
+  .checkpoint.current .cp-icon { color: #F5C842; }
   .checkpoint.pending .cp-label { color: #8A97AA; opacity: 0.7; }
   .spinner { display: inline-block; width: 11px; height: 11px; border: 2px solid #F5620F; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -674,40 +674,41 @@ function renderReadinessGate(week, r) {
 }
 
 function renderTimeline(ws, r) {
-  // Stage definition + done condition. Readiness stages key off week_readiness
-  // *_status='ok'; week-state stages key off competition_config.week_state.
+  // Readiness stages (prep pipeline) then week-state stages. State stages compare
+  // their position to the CURRENT week_state: PAST -> green ✓, CURRENT -> yellow
+  // (in progress / you are here), FUTURE -> grey. Nothing not-yet-reached is green.
   const okR = (s) => normStatus(s) === 'ok';
   const hasR = !!r;
-  const stages = [
-    { label: 'Games imported',         kind: 'r', done: hasR && okR(r.games_status), at: r && r.games_at },
-    { label: 'Odds fetched',           kind: 'r', done: hasR && okR(r.odds_status),  at: r && r.odds_at },
-    { label: 'Ranks frozen',           kind: 'r', done: hasR && okR(r.ranks_status), at: r && r.ranks_at },
-    { label: 'Picks open · picks_open',     kind: 's', done: ['picks_open','locked','live','settling','complete'].includes(ws), at: stateAt('week_state') },
-    { label: 'Picks locked / Kickoff · locked', kind: 's', done: ['locked','live','settling','complete'].includes(ws), at: stateAt('week_state') },
-    { label: 'Live · live',                 kind: 's', done: ['live','settling','complete'].includes(ws), at: stateAt('week_state') },
-    { label: 'Scores settling · settling',  kind: 's', done: ['settling','complete'].includes(ws), at: stateAt('week_state') },
-    { label: 'Week complete · complete',    kind: 's', done: ws === 'complete', at: stateAt('week_state') },
+  const WS_POS = { picks_open: 1, locked: 2, live: 3, settling: 4, complete: 5 };
+  const curPos = WS_POS[ws] || 0; // 0 = idle / off-cycle
+  const at = stateAt('week_state');
+
+  const readiness = [
+    { label: 'Games imported', ok: hasR && okR(r.games_status), at: r && r.games_at },
+    { label: 'Odds fetched',   ok: hasR && okR(r.odds_status),  at: r && r.odds_at },
+    { label: 'Ranks frozen',   ok: hasR && okR(r.ranks_status), at: r && r.ranks_at },
   ];
-  // The "current" (spinner) stage = first not-done ACTIONABLE stage. When no
-  // week_readiness row exists (sims don't run the Tuesday prep pipeline), readiness
-  // stages are N/A — render them grey, and put the spinner on the first not-done
-  // week-state stage instead of spinning forever on "Games imported".
-  let currentIdx = -1;
-  for (let i = 0; i < stages.length; i++) {
-    if (stages[i].done) continue;
-    if (stages[i].kind === 'r' && !hasR) continue;
-    currentIdx = i; break;
-  }
+  const states = [
+    { label: 'Picks open · picks_open', pos: 1 },
+    { label: 'Picks locked / Kickoff · locked', pos: 2 },
+    { label: 'Live · live', pos: 3 },
+    { label: 'Scores settling · settling', pos: 4 },
+    { label: 'Week complete · complete', pos: 5 },
+  ];
+  const row = (cls, icon, label, elapsed) =>
+    `<div class="checkpoint ${cls}"><span class="cp-icon">${icon}</span><span class="cp-label">${label}</span><span class="cp-elapsed">${elapsed || ''}</span></div>`;
+
   let html = '';
-  stages.forEach((s, i) => {
-    let cls, icon;
-    if (s.done) { cls = 'done'; icon = '✓'; }
-    else if (i === currentIdx) { cls = 'current'; icon = '▶'; }
-    else { cls = 'pending'; icon = s.kind === 'r' && !hasR ? '–' : '○'; }
-    const elapsed = s.done && s.at ? timeAgo(s.at) : '';
-    html += `<div class="checkpoint ${cls}"><span class="cp-icon">${icon}</span>
-      <span class="cp-label">${s.label}</span><span class="cp-elapsed">${elapsed}</span></div>`;
-  });
+  for (const s of readiness) {
+    html += s.ok ? row('done', '✓', s.label, s.at ? timeAgo(s.at) : '')
+                 : row('pending', hasR ? '○' : '–', s.label, '');
+  }
+  for (const s of states) {
+    if (curPos === 0) { html += row('pending', '○', s.label, ''); continue; }
+    if (s.pos < curPos) html += row('done', '✓', s.label, '');
+    else if (s.pos === curPos) html += row('current', '▶', s.label, at ? timeAgo(at) : '');
+    else html += row('pending', '○', s.label, '');
+  }
   document.getElementById('checkpoint-list').innerHTML = html;
 }
 function stateAt(key) { return lastConfig[key] && lastConfig[key].updated_at; }
