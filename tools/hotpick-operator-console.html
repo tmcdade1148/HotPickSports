@@ -59,6 +59,7 @@
   /* State Bar (pinned top) */
   .statebar { background: #161C26; border-bottom: 1px solid #2C3A52; padding: 8px 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .statebar .wm { color: #F5C842; font-size: 15px; font-weight: 700; letter-spacing: 0.5px; margin-right: 4px; }
+  .build-stamp { font-size: 9px; color: #8A97AA; font-family: ui-monospace, Menlo, monospace; margin-right: 8px; }
   .statebar select { width: auto; min-width: 150px; padding: 5px 8px; font-size: 12px; }
   .statebar .spacer { margin-left: auto; }
   .sb-item { display: flex; align-items: center; gap: 6px; }
@@ -231,6 +232,7 @@
     <!-- State Bar -->
     <div class="statebar">
       <span class="wm">HotPick</span>
+      <span class="build-stamp" id="build-stamp"></span>
       <div class="sb-item">
         <span class="sb-lbl">Competition</span>
         <select id="sel-comp"></select>
@@ -392,6 +394,10 @@ const STAGE_INFO = {
   complete:   { name: 'COMPLETE',         desc: 'Season standings as a race · mini sparkline' },
 };
 const REFRESH_MS = 30000;
+// Bump on each console change so you can confirm the loaded file is current
+// (file:// caching otherwise hides updates). Shown next to the wordmark.
+const CONSOLE_BUILD = 'build 2026-06-12.1 · game-day';
+document.getElementById('build-stamp').textContent = CONSOLE_BUILD;
 
 // ───────────────────────────────────────────────────────────────────────────
 // State (memory only)
