@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HotPick — Operator Console (Phase 1 · Read-Only)</title>
+<!--
+  HotPick Sports — Operator Console · Phase 1 (Read-Only Monitor)
+  Spec: 260612_HotPick_OperatorConsole_Phase1_Spec
+
+  WHAT THIS IS
+    A single self-contained file Tom (super-admin) opens locally in a browser.
+    It logs in with email/password via the PUBLISHABLE anon key, gets a scoped
+    session JWT, and reads competition state THROUGH RLS as his super-admin user.
+
+  SECURITY (non-negotiable — see CLAUDE.md + spec §7)
+    - No service_role key, no sb_secret, no cron secret. Ever. Reads go through
+      the super-admin session JWT + existing RLS policies.
+    - Session lives in a JS variable only (memory). persistSession:false — no
+      localStorage / sessionStorage. Closing or refreshing the tab => re-login.
+    - Phase 1 has ZERO writes and calls ZERO Edge Functions. Write controls,
+      step buttons, reset, and auto-pick are Phase 2 (separate spec + file).
+    - The anon/publishable key below is public by design (already shipped in
+      src/shared/config/supabase.ts). It is NOT a secret.
+-->
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0D1117; color: #8A97AA; font-size: 14px; line-height: 1.4; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; color: #A0B4D0; }
+
+  h1 { color: #F5C842; font-size: 17px; font-weight: 700; letter-spacing: 0.5px; }
+  h2 { color: #F5620F; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+
+  /* ---- Login ---- */
+  .login-wrap { display: flex; align-items: center; justify-content: center; height: 100vh; }
+  .login-card { width: 320px; background: #161C26; border: 1px solid #2C3A52; border-radius: 12px; padding: 28px 24px; }
+  .login-card .wordmark { text-align: center; margin-bottom: 4px; }
+  .login-card .sub { text-align: center; font-size: 11px; color: #8A97AA; margin-bottom: 20px; }
+  .login-card label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; margin: 12px 0 4px; }
+  .login-card .err { color: #C0392B; font-size: 12px; margin-top: 12px; min-height: 16px; text-align: center; }
+
+  input[type="email"], input[type="password"], select {
+    width: 100%; background: #0D1117; border: 1px solid #2C3A52; color: #E8EAF0;
+    padding: 9px 10px; border-radius: 6px; font-size: 13px; outline: none; font-family: inherit;
+  }
+  input:focus, select:focus { border-color: #F5620F; }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: opacity 0.15s; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary { background: #F5620F; color: #fff; }
+  .btn-secondary { background: #2C3A52; color: #E8EAF0; }
+  .btn-full { width: 100%; }
+  .btn:not(:disabled):hover { opacity: 0.85; }
+
+  /* ---- App shell ---- */
+  .app { display: none; flex-direction: column; height: 100vh; }
+  .app.visible { display: flex; }
+
+  /* State Bar (pinned top) */
+  .statebar { background: #161C26; border-bottom: 1px solid #2C3A52; padding: 8px 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .statebar .wm { color: #F5C842; font-size: 15px; font-weight: 700; letter-spacing: 0.5px; margin-right: 4px; }
+  .statebar select { width: auto; min-width: 150px; padding: 5px 8px; font-size: 12px; }
+  .statebar .spacer { margin-left: auto; }
+  .sb-item { display: flex; align-items: center; gap: 6px; }
+  .sb-lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: #8A97AA; }
+
+  .pill { display: inline-block; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 11px; letter-spacing: 0.4px; }
+  .tier-badge { display: inline-block; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; letter-spacing: 0.5px; margin-left: 6px; vertical-align: middle; }
+  .tier-green  { background: #1b9a06; color: #fff; }
+  .tier-amber  { background: #F5C842; color: #0D1117; }
+  .tier-red    { background: #C0392B; color: #fff; }
+  .tier-grey   { background: #2C3A52; color: #E8EAF0; }
+
+  /* phase pill colours */
+  .ph-OFF_SEASON      { background: #2C3A52; color: #C7D2E0; }
+  .ph-PRE_SEASON      { background: #2563eb; color: #fff; }
+  .ph-REGULAR         { background: #1b9a06; color: #fff; }
+  .ph-REGULAR_COMPLETE{ background: #F5C842; color: #0D1117; }
+  .ph-PLAYOFFS        { background: #F5620F; color: #fff; }
+  .ph-SUPERBOWL_INTRO { background: #C0392B; color: #fff; }
+  .ph-SUPERBOWL       { background: #C0392B; color: #fff; font-weight: 800; }
+  .ph-SEASON_COMPLETE { background: #082640; color: #E8EAF0; }
+
+  /* week-state pill colours */
+  .ws-picks_open { background: #1b9a06; color: #fff; }
+  .ws-locked     { background: #F5C842; color: #0D1117; }
+  .ws-live       { background: #F5620F; color: #fff; }
+  .ws-settling   { background: #2563eb; color: #fff; }
+  .ws-complete   { background: #082640; color: #E8EAF0; }
+  .ws-idle       { background: #2C3A52; color: #C7D2E0; }
+
+  .scoring-lock { background: #C0392B; color: #fff; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 4px; letter-spacing: 0.5px; }
+
+  .refresh-meta { font-size: 10px; color: #8A97AA; }
+
+  /* Layout */
+  .layout { display: grid; grid-template-columns: 35% 65%; flex: 1; overflow: hidden; }
+  .left  { background: #161C26; border-right: 1px solid #2C3A52; overflow-y: auto; }
+  .right { display: flex; flex-direction: column; overflow: hidden; }
+  .section { padding: 12px 16px; border-bottom: 1px solid #2C3A52; }
+
+  /* Production banner */
+  .prod-banner { background: #C0392B; color: #fff; font-weight: 700; text-align: center; padding: 10px; font-size: 13px; letter-spacing: 0.5px; }
+  .prod-banner small { display: block; font-weight: 400; font-size: 11px; opacity: 0.9; margin-top: 2px; }
+
+  /* Readiness gate */
+  .gate-row { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 3px 0; }
+  .gate-icon { width: 16px; text-align: center; flex-shrink: 0; }
+  .gate-ok    { color: #1b9a06; }
+  .gate-fail  { color: #C0392B; }
+  .gate-pending { color: #8A97AA; }
+  .gate-verdict { margin-top: 8px; padding-top: 8px; border-top: 1px solid #2C3A52; font-weight: 700; font-size: 13px; }
+  .gate-verdict.ready { color: #1b9a06; }
+  .gate-verdict.notready { color: #C0392B; }
+  .gate-reason { font-size: 11px; color: #F5C842; margin-top: 4px; }
+
+  /* Checkpoint timeline */
+  .checkpoint { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
+  .cp-icon { width: 18px; text-align: center; flex-shrink: 0; font-size: 13px; }
+  .cp-label { flex: 1; font-size: 13px; }
+  .cp-elapsed { font-size: 10px; color: #8A97AA; font-variant-numeric: tabular-nums; }
+  .checkpoint.done .cp-label { color: #1b9a06; }
+  .checkpoint.current .cp-label { color: #F5620F; font-weight: 600; }
+  .checkpoint.pending .cp-label { color: #8A97AA; opacity: 0.7; }
+  .spinner { display: inline-block; width: 11px; height: 11px; border: 2px solid #F5620F; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Reviewer status */
+  .rev-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 12px; border-bottom: 1px solid #2C3A5240; }
+  .rev-env { font-weight: 600; color: #E8EAF0; }
+  .rev-detail { color: #8A97AA; flex: 1; }
+  .rev-status.ok    { color: #1b9a06; font-weight: 700; }
+  .rev-status.drift { color: #F5C842; font-weight: 700; }
+
+  /* Right panel scroll area */
+  .panel-scroll { flex: 1; overflow-y: auto; padding: 0 16px; }
+  .panel-block { padding: 14px 0; border-bottom: 1px solid #2C3A52; }
+
+  /* Tables */
+  table.grid { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table.grid th { text-align: left; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #8A97AA; padding: 4px 6px; border-bottom: 1px solid #2C3A52; }
+  table.grid td { padding: 5px 6px; border-bottom: 1px solid #2C3A5230; color: #C7D2E0; }
+  table.grid tr:hover td { background: #161C2680; }
+  .num { font-variant-numeric: tabular-nums; }
+  .pos { color: #1b9a06; } .neg { color: #C0392B; }
+
+  .st-scheduled   { color: #8A97AA; } .st-in_progress { color: #F5620F; font-weight: 600; } .st-final { color: #1b9a06; font-weight: 600; }
+  .rank-pill { display: inline-block; background: #F5620F; color: #fff; border-radius: 10px; font-size: 9px; font-weight: 700; padding: 1px 6px; }
+  .test-badge { display: inline-block; background: #F28B30; color: #fff; border-radius: 4px; font-size: 8px; font-weight: 700; padding: 1px 5px; letter-spacing: 0.5px; margin-left: 6px; }
+  .hp-correct { color: #1b9a06; } .hp-incorrect { color: #C0392B; } .hp-pending { color: #8A97AA; }
+  .empty { padding: 16px; text-align: center; color: #8A97AA; font-size: 12px; }
+
+  /* Home Screen Spec Preview */
+  .hs-toggle { cursor: pointer; user-select: none; }
+  .hs-block { background: #0D1117; border: 1px solid #2C3A52; border-radius: 6px; padding: 10px 12px; margin-top: 8px; }
+  .hs-state-name { font-size: 13px; font-weight: 700; color: #F5C842; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .hs-section { font-size: 9px; color: #8A97AA; margin: 10px 0 4px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+  .hs-line { font-size: 12px; color: #E8EAF0; margin: 3px 0; }
+  .hs-line-absent { color: #8A97AA; }
+  .hs-quote { font-size: 11px; color: #51A1A6; font-style: italic; margin: 2px 0; }
+  .hs-warn { font-size: 11px; color: #F5C842; margin-top: 8px; padding: 6px 8px; background: rgba(245,200,66,0.1); border-left: 2px solid #F5C842; }
+
+  /* Log */
+  .log-strip { background: #0D1117; border-top: 1px solid #2C3A52; height: 150px; display: flex; flex-direction: column; }
+  .log-head { display: flex; align-items: center; justify-content: space-between; padding: 5px 16px; border-bottom: 1px solid #2C3A5240; }
+  .log-head h2 { margin: 0; }
+  .log-body { flex: 1; overflow-y: auto; padding: 4px 16px; display: flex; flex-direction: column-reverse; }
+  .log-entry { display: flex; gap: 10px; padding: 2px 0; font-size: 11px; }
+  .log-time { color: #8A97AA; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+  .log-msg.success { color: #1b9a06; } .log-msg.warn { color: #F5C842; } .log-msg.error { color: #C0392B; } .log-msg.info { color: #51A1A6; } .log-msg { color: #C7D2E0; }
+  .copy-btn { background: #2C3A52; color: #E8EAF0; border: none; border-radius: 4px; font-size: 10px; padding: 3px 8px; cursor: pointer; }
+</style>
+</head>
+<body>
+
+  <!-- ============================ LOGIN ============================ -->
+  <div class="login-wrap" id="login-wrap">
+    <div class="login-card">
+      <div class="wordmark"><h1>HotPick</h1></div>
+      <div class="sub">Operator Console · Phase 1 · Read-Only</div>
+      <form id="login-form">
+        <label for="email">Email</label>
+        <input type="email" id="email" autocomplete="username" required>
+        <label for="password">Password</label>
+        <input type="password" id="password" autocomplete="current-password" required>
+        <div style="margin-top:18px;">
+          <button type="submit" class="btn btn-primary btn-full" id="login-btn">Log in</button>
+        </div>
+        <div class="err" id="login-err"></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================ CONSOLE ============================ -->
+  <div class="app" id="app">
+
+    <!-- State Bar -->
+    <div class="statebar">
+      <span class="wm">HotPick</span>
+      <div class="sb-item">
+        <span class="sb-lbl">Competition</span>
+        <select id="sel-comp"></select>
+      </div>
+      <div class="sb-item">
+        <span class="sb-lbl">Pool</span>
+        <select id="sel-pool"></select>
+      </div>
+      <div class="sb-item"><span class="sb-lbl">Phase</span><span class="pill" id="sb-phase">—</span></div>
+      <div class="sb-item"><span class="sb-lbl">Week</span><span class="pill" id="sb-week" style="background:#2C3A52;color:#E8EAF0;">—</span></div>
+      <div class="sb-item"><span class="sb-lbl">State</span><span class="pill" id="sb-state">—</span></div>
+      <span class="scoring-lock" id="sb-scoring-lock" style="display:none;">SCORING LOCKED</span>
+      <div class="spacer"></div>
+      <span class="refresh-meta" id="sb-refreshed">—</span>
+      <button class="btn btn-secondary" id="btn-refresh">Refresh</button>
+      <button class="btn btn-secondary" id="btn-logout">Log out</button>
+    </div>
+
+    <div class="layout">
+      <!-- LEFT PANEL -->
+      <aside class="left">
+        <div id="prod-banner-slot"></div>
+
+        <div class="section">
+          <h2>Week Readiness</h2>
+          <div id="readiness-gate"><div class="empty">—</div></div>
+        </div>
+
+        <div class="section">
+          <h2>Checkpoint Timeline</h2>
+          <div id="checkpoint-list"></div>
+        </div>
+
+        <div class="section">
+          <h2>Reviewer Status</h2>
+          <div id="reviewer-status"><div class="empty">Loading reviewer environments…</div></div>
+        </div>
+      </aside>
+
+      <!-- RIGHT PANEL -->
+      <main class="right">
+        <div class="panel-scroll">
+          <div class="panel-block">
+            <h2 id="games-title">Games — Current Week</h2>
+            <div id="games-view"><div class="empty">—</div></div>
+          </div>
+
+          <div class="panel-block">
+            <h2>Leaderboard (the Ladder)</h2>
+            <div id="leaderboard-view"><div class="empty">—</div></div>
+          </div>
+
+          <div class="panel-block">
+            <h2 class="hs-toggle" id="hs-toggle">▸ Home Screen Spec Preview</h2>
+            <div id="hs-preview" style="display:none;"></div>
+          </div>
+        </div>
+
+        <!-- Log -->
+        <div class="log-strip">
+          <div class="log-head">
+            <h2>Log</h2>
+            <button class="copy-btn" id="copy-log">Copy</button>
+          </div>
+          <div class="log-body" id="log-body"></div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+'use strict';
+
+// ───────────────────────────────────────────────────────────────────────────
+// Config
+// ───────────────────────────────────────────────────────────────────────────
+const SUPABASE_URL = 'https://mzqtrpdiqhopjmxjccwy.supabase.co';
+// Publishable (anon) key — public by design, already shipped in
+// src/shared/config/supabase.ts. NOT a secret. No service_role key here, ever.
+const SUPABASE_ANON_KEY = 'sb_publishable_AaENLNqjJ8jNVHGdTGhOnA_WnHze2CH';
+
+// Session is held in the client's memory only (persistSession:false). Refreshing
+// the tab discards it and forces re-login — see spec "Login session not persisted".
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+});
+
+// Write-tier classification — DISPLAY ONLY in Phase 1. (Phase 2 enforces the
+// real allowlist server-side in the sim-operator Edge Function.) The badge tells
+// Tom which competitions WILL be writeable later, and flags production red.
+const WRITE_TIER = {
+  nfl_2025_sim:  { tier: 'green', label: 'SANDBOX' },
+  nfl_demo:      { tier: 'green', label: 'SANDBOX' },
+  nfl_2025_simA: { tier: 'amber', label: 'REVIEWER (Apple)' },
+  nfl_2025_simG: { tier: 'amber', label: 'REVIEWER (Google)' },
+  nfl_2026:      { tier: 'red',   label: 'PRODUCTION · READ-ONLY' },
+};
+function writeTier(comp) {
+  return WRITE_TIER[comp] || { tier: 'grey', label: 'READ-ONLY' };
+}
+
+// Reviewer environments are anchored at Week 8 / picks_open. These are CONSTANTS,
+// not config — they are the known-stable state the sandboxes are pinned to.
+const REVIEWER_ANCHOR = { week: 8, week_state: 'picks_open' };
+const REVIEWER_ENVS = [
+  { comp: 'nfl_2025_simA', label: 'nfl_2025_simA (Apple)' },
+  { comp: 'nfl_2025_simG', label: 'nfl_2025_simG (Google)' },
+];
+
+const WEEKLY_CYCLE_PHASES = ['REGULAR', 'PLAYOFFS', 'SUPERBOWL'];
+const REFRESH_MS = 30000;
+
+// ───────────────────────────────────────────────────────────────────────────
+// State (memory only)
+// ───────────────────────────────────────────────────────────────────────────
+let userEmail = null;
+let selectedComp = null;
+let selectedPool = null;
+let refreshTimer = null;
+let lastConfig = {};        // key -> { value, updated_at }
+
+// ───────────────────────────────────────────────────────────────────────────
+// Logging
+// ───────────────────────────────────────────────────────────────────────────
+const LOG_MAX = 200;
+function log(msg, level = '') {
+  const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+  const body = document.getElementById('log-body');
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.innerHTML = `<span class="log-time">${time}</span><span class="log-msg ${level}"></span>`;
+  entry.querySelector('.log-msg').textContent = msg; // textContent => no HTML injection
+  body.prepend(entry);
+  while (body.children.length > LOG_MAX) body.removeChild(body.lastChild);
+}
+
+// Translate internal Supabase/Postgres errors into friendly UI strings.
+// Raw error is logged to the devtools console for debugging — never shown raw.
+function translateError(err) {
+  const raw = (err && (err.message || err.error_description || String(err))) || 'Unknown error';
+  console.error('[operator-console]', err);
+  const m = raw.toLowerCase();
+  if (m.includes('invalid login') || m.includes('invalid_grant') || m.includes('credentials')) return 'Invalid credentials';
+  if (m.includes('jwt') || m.includes('expired') || m.includes('token')) return 'Session expired — please log in again';
+  if (m.includes('permission') || m.includes('rls') || m.includes('row-level') || m.includes('not authorized')) return 'Permission denied — this account may not have super-admin read access';
+  if (m.includes('failed to fetch') || m.includes('network')) return 'Connection error — check your internet connection';
+  return 'Something went wrong — see browser console for details';
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Small helpers
+// ───────────────────────────────────────────────────────────────────────────
+function timeAgo(ts) {
+  if (!ts) return '';
+  const s = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
+  if (s < 0) return '';
+  if (s < 60) return s + 's ago';
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + 'm ago';
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + 'h ago';
+  return Math.floor(h / 24) + 'd ago';
+}
+function cfg(key, fallback = null) {
+  const row = lastConfig[key];
+  return row && row.value !== undefined ? row.value : fallback;
+}
+function normStatus(s) { return (s || '').toLowerCase(); }
+
+// ───────────────────────────────────────────────────────────────────────────
+// Auth
+// ───────────────────────────────────────────────────────────────────────────
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const errEl = document.getElementById('login-err');
+  const btn = document.getElementById('login-btn');
+  errEl.textContent = '';
+  btn.disabled = true; btn.textContent = 'Logging in…';
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    // Confirm super-admin before showing anything — a non-admin would get RLS
+    // empties everywhere; better to fail fast with a clear message.
+    const { data: prof, error: pErr } = await sb
+      .from('profiles').select('is_super_admin, poolie_name').eq('id', data.user.id).single();
+    if (pErr) throw pErr;
+    if (!prof || !prof.is_super_admin) {
+      await sb.auth.signOut();
+      throw new Error('not authorized: not a super admin');
+    }
+    userEmail = email;
+    document.getElementById('login-wrap').style.display = 'none';
+    document.getElementById('app').classList.add('visible');
+    log(`Connected as ${email} (super_admin)`, 'success');
+    await initConsole();
+  } catch (err) {
+    errEl.textContent = translateError(err);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Log in';
+  }
+});
+
+document.getElementById('btn-logout').addEventListener('click', async () => {
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = null;
+  try { await sb.auth.signOut(); } catch (_) {}
+  // Full reset to login. Session was memory-only; nothing persisted to clear.
+  location.reload();
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// Init — populate competition + pool selectors, then first refresh + timer
+// ───────────────────────────────────────────────────────────────────────────
+async function initConsole() {
+  // Competitions readable by super-admin (exclude the 'global' config bucket).
+  const { data: comps, error } = await sb
+    .from('competition_config').select('competition').neq('competition', 'global');
+  if (error) { log('Failed to load competitions: ' + translateError(error), 'error'); return; }
+  const unique = [...new Set((comps || []).map(r => r.competition))].sort();
+
+  const compSel = document.getElementById('sel-comp');
+  compSel.innerHTML = '';
+  for (const c of unique) {
+    const t = writeTier(c);
+    const opt = document.createElement('option');
+    opt.value = c;
+    opt.textContent = `${c}  [${t.label}]`;
+    compSel.appendChild(opt);
+  }
+  selectedComp = unique.includes('nfl_2025_sim') ? 'nfl_2025_sim' : unique[0];
+  compSel.value = selectedComp;
+
+  compSel.addEventListener('change', async () => {
+    selectedComp = compSel.value;
+    selectedPool = null;
+    await loadPools();
+    await refreshAll();
+  });
+  document.getElementById('sel-pool').addEventListener('change', async () => {
+    selectedPool = document.getElementById('sel-pool').value || null;
+    await renderLeaderboard();
+  });
+  document.getElementById('btn-refresh').addEventListener('click', refreshAll);
+
+  await loadPools();
+  await refreshAll();
+  refreshTimer = setInterval(refreshAll, REFRESH_MS);
+}
+
+async function loadPools() {
+  const poolSel = document.getElementById('sel-pool');
+  const { data, error } = await sb
+    .from('pools').select('id, name').eq('competition', selectedComp).order('name');
+  poolSel.innerHTML = '';
+  if (error) { log('Failed to load pools: ' + translateError(error), 'error'); return; }
+  const pools = data || [];
+  if (pools.length === 0) {
+    const opt = document.createElement('option');
+    opt.value = ''; opt.textContent = '(no pools)';
+    poolSel.appendChild(opt);
+    selectedPool = null;
+    return;
+  }
+  for (const p of pools) {
+    const opt = document.createElement('option');
+    opt.value = p.id; opt.textContent = p.name;
+    poolSel.appendChild(opt);
+  }
+  selectedPool = pools[0].id;
+  poolSel.value = selectedPool;
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Refresh — pulls all read data for the selected competition
+// ───────────────────────────────────────────────────────────────────────────
+async function refreshAll() {
+  try {
+    await loadConfig();
+    renderStateBar();
+    renderProdBanner();
+    await Promise.all([
+      renderReadinessAndTimeline(),
+      renderGames(),
+      renderLeaderboard(),
+      renderReviewerStatus(),
+    ]);
+    renderHomeScreenSpec();
+    const now = new Date().toLocaleTimeString('en-US', { hour12: false });
+    document.getElementById('sb-refreshed').textContent = 'Updated ' + now;
+  } catch (err) {
+    log('Refresh failed: ' + translateError(err), 'error');
+  }
+}
+
+async function loadConfig() {
+  const { data, error } = await sb
+    .from('competition_config').select('key, value, updated_at').eq('competition', selectedComp);
+  if (error) throw error;
+  lastConfig = {};
+  for (const r of (data || [])) lastConfig[r.key] = { value: r.value, updated_at: r.updated_at };
+  const phase = cfg('current_phase', '—');
+  const week = cfg('current_week', '—');
+  const ws = cfg('week_state', 'idle');
+  log(`Loaded ${selectedComp} · Phase: ${phase} · Week ${week} · ${ws}`, 'info');
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Renderers
+// ───────────────────────────────────────────────────────────────────────────
+function renderStateBar() {
+  const phase = String(cfg('current_phase', '—'));
+  const week = cfg('current_week', '—');
+  const ws = String(cfg('week_state', 'idle'));
+  const locked = cfg('scoring_locked', false) === true;
+
+  const phEl = document.getElementById('sb-phase');
+  phEl.textContent = phase;
+  phEl.className = 'pill ph-' + phase;
+
+  document.getElementById('sb-week').textContent = 'W' + week;
+
+  const wsEl = document.getElementById('sb-state');
+  wsEl.textContent = ws;
+  wsEl.className = 'pill ws-' + ws;
+
+  document.getElementById('sb-scoring-lock').style.display = locked ? 'inline-block' : 'none';
+}
+
+function renderProdBanner() {
+  const slot = document.getElementById('prod-banner-slot');
+  const t = writeTier(selectedComp);
+  if (t.tier === 'red') {
+    slot.innerHTML = `<div class="prod-banner">READ-ONLY — PRODUCTION
+      <small>${selectedComp} · the live season is never writeable from this console</small></div>`;
+  } else if (t.tier === 'amber') {
+    slot.innerHTML = `<div class="prod-banner" style="background:#F5C842;color:#0D1117;">REVIEWER ENVIRONMENT — GUARDED
+      <small>${selectedComp} · app-store reviewers test here; Phase 2 writes require double-confirm</small></div>`;
+  } else {
+    slot.innerHTML = '';
+  }
+}
+
+// ---- Readiness Gate + Checkpoint Timeline (share the week_readiness read) ----
+async function renderReadinessAndTimeline() {
+  const week = cfg('current_week');
+  const ws = String(cfg('week_state', 'idle'));
+  let readiness = null;
+  if (typeof week === 'number') {
+    const { data, error } = await sb
+      .from('week_readiness').select('*')
+      .eq('competition', selectedComp).eq('week_number', week).maybeSingle();
+    if (error) { log('week_readiness read failed: ' + translateError(error), 'warn'); }
+    else readiness = data;
+  }
+  renderReadinessGate(week, readiness);
+  renderTimeline(ws, readiness);
+}
+
+function readinessLine(label, status, count, unit, errText) {
+  const s = normStatus(status);
+  let icon, cls;
+  if (s === 'ok') { icon = '✓'; cls = 'gate-ok'; }
+  else if (s === 'failed') { icon = '✗'; cls = 'gate-fail'; }
+  else { icon = '○'; cls = 'gate-pending'; }
+  const detail = s === 'ok' && typeof count === 'number' ? `${count} ${unit}`
+    : s === 'failed' ? (errText || 'failed')
+    : (status ? status : 'not run');
+  return { ok: s === 'ok', failed: s === 'failed', html:
+    `<div class="gate-row ${cls}"><span class="gate-icon">${icon}</span><span>${label}</span>
+       <span style="margin-left:auto;font-size:11px;">${detail}</span></div>` };
+}
+
+function renderReadinessGate(week, r) {
+  const el = document.getElementById('readiness-gate');
+  if (typeof week !== 'number') { el.innerHTML = `<div class="empty">No current week set.</div>`; return; }
+  if (!r) {
+    el.innerHTML = `<div style="font-weight:600;color:#E8EAF0;margin-bottom:6px;">Week ${week} Readiness</div>
+      <div class="empty">No readiness recorded for week ${week} — the Tuesday prep pipeline
+      (nfl-import-schedule / nfl-fetch-odds / nfl-rank-games) hasn't run for this week.</div>`;
+    return;
+  }
+  const games = readinessLine('Games imported', r.games_status, r.games_count, 'games', null);
+  const odds  = readinessLine('Odds fetched',  r.odds_status,  r.odds_count,  'spreads', r.odds_error);
+  const ranks = readinessLine('Ranks frozen',  r.ranks_status, r.ranks_count, 'ranks', r.ranks_error);
+  const allOk = games.ok && odds.ok && ranks.ok;
+
+  let html = `<div style="font-weight:600;color:#E8EAF0;margin-bottom:6px;">Week ${week} Readiness</div>`;
+  html += games.html + odds.html + ranks.html;
+  if (allOk) {
+    html += `<div class="gate-verdict ready">READY TO OPEN PICKS</div>`;
+  } else {
+    html += `<div class="gate-verdict notready">NOT READY</div>`;
+    if (!games.ok) html += `<div class="gate-reason">Games not imported — nfl-import-schedule has not completed this week.</div>`;
+    if (!odds.ok)  html += `<div class="gate-reason">Odds not ready — ${r.odds_error || 'nfl-fetch-odds has not completed this week.'}</div>`;
+    if (!ranks.ok) html += `<div class="gate-reason">Ranks not frozen — ${r.ranks_error || 'nfl-rank-games has not completed this week.'}</div>`;
+  }
+  el.innerHTML = html;
+}
+
+function renderTimeline(ws, r) {
+  // Stage definition + done condition. Readiness stages key off week_readiness
+  // *_status='ok'; week-state stages key off competition_config.week_state.
+  const okR = (s) => normStatus(s) === 'ok';
+  const stages = [
+    { label: 'Games imported',         done: r ? okR(r.games_status) : false, at: r && r.games_at },
+    { label: 'Odds fetched',           done: r ? okR(r.odds_status)  : false, at: r && r.odds_at },
+    { label: 'Ranks frozen',           done: r ? okR(r.ranks_status) : false, at: r && r.ranks_at },
+    { label: 'Picks open',             done: ['picks_open','locked','live','settling','complete'].includes(ws), at: stateAt('week_state') },
+    { label: 'Picks locked / Kickoff', done: ['locked','live','settling','complete'].includes(ws), at: stateAt('week_state') },
+    { label: 'Scores settling',        done: ['settling','complete'].includes(ws), at: stateAt('week_state') },
+    { label: 'Week complete',          done: ws === 'complete', at: stateAt('week_state') },
+  ];
+  // First not-done stage = current (amber spinner). Everything after = pending.
+  const firstPending = stages.findIndex(s => !s.done);
+  let html = '';
+  stages.forEach((s, i) => {
+    let cls, icon;
+    if (s.done) { cls = 'done'; icon = '✓'; }
+    else if (i === firstPending) { cls = 'current'; icon = '<span class="spinner"></span>'; }
+    else { cls = 'pending'; icon = '○'; }
+    const elapsed = s.done && s.at ? timeAgo(s.at) : '';
+    html += `<div class="checkpoint ${cls}"><span class="cp-icon">${icon}</span>
+      <span class="cp-label">${s.label}</span><span class="cp-elapsed">${elapsed}</span></div>`;
+  });
+  document.getElementById('checkpoint-list').innerHTML = html;
+}
+function stateAt(key) { return lastConfig[key] && lastConfig[key].updated_at; }
+
+// ---- Reviewer Status (independent reads for simA + simG; always shown) ----
+async function renderReviewerStatus() {
+  const rows = await Promise.all(REVIEWER_ENVS.map(async (env) => {
+    const { data, error } = await sb
+      .from('competition_config').select('key, value')
+      .eq('competition', env.comp).in('key', ['current_week', 'week_state']);
+    if (error) return { env, err: true };
+    const map = {};
+    for (const r of (data || [])) map[r.key] = r.value;
+    return { env, week: map.current_week, week_state: map.week_state };
+  }));
+
+  let html = `<div style="font-size:10px;color:#8A97AA;margin-bottom:6px;">Expected anchor: Week ${REVIEWER_ANCHOR.week} · ${REVIEWER_ANCHOR.week_state}</div>`;
+  for (const row of rows) {
+    if (row.err) {
+      html += `<div class="rev-row"><span class="rev-env">${row.env.label}</span>
+        <span class="rev-detail">read failed</span><span class="rev-status drift">⚠</span></div>`;
+      continue;
+    }
+    const ok = row.week === REVIEWER_ANCHOR.week && row.week_state === REVIEWER_ANCHOR.week_state;
+    html += `<div class="rev-row">
+      <span class="rev-env">${row.env.label}</span>
+      <span class="rev-detail">Week ${row.week ?? '—'} · ${row.week_state ?? '—'}</span>
+      <span class="rev-status ${ok ? 'ok' : 'drift'}">${ok ? '✓' : '⚠ DRIFT'}</span></div>`;
+  }
+  document.getElementById('reviewer-status').innerHTML = html;
+  const drift = rows.filter(r => !r.err && !(r.week === REVIEWER_ANCHOR.week && r.week_state === REVIEWER_ANCHOR.week_state));
+  if (drift.length) log(`Reviewer drift: ${drift.map(d => d.env.comp).join(', ')} not at Week 8 / picks_open`, 'warn');
+}
+
+// ---- Games view ----
+async function renderGames() {
+  const week = cfg('current_week');
+  const el = document.getElementById('games-view');
+  const t = writeTier(selectedComp);
+  document.getElementById('games-title').textContent =
+    `Games — Week ${week ?? '—'}` + (t.tier === 'red' ? '  ·  PRODUCTION' : '');
+  if (typeof week !== 'number') { el.innerHTML = `<div class="empty">No current week set.</div>`; return; }
+
+  const { data, error } = await sb
+    .from('season_games')
+    .select('away_team, home_team, away_score, home_score, status, rank, frozen_rank, kickoff_at')
+    .eq('competition', selectedComp).eq('week', week)
+    .order('rank', { ascending: true, nullsFirst: false }).order('kickoff_at');
+  if (error) { el.innerHTML = `<div class="empty">${translateError(error)}</div>`; return; }
+  const games = data || [];
+  if (!games.length) { el.innerHTML = `<div class="empty">No games for week ${week}.</div>`; return; }
+
+  let rows = '';
+  for (const g of games) {
+    const st = normStatus(g.status);
+    const stCls = st.includes('final') ? 'st-final' : st.includes('progress') ? 'st-in_progress' : 'st-scheduled';
+    const fr = (g.frozen_rank ?? null) !== null ? `<span class="rank-pill">${g.frozen_rank}</span>` : '—';
+    rows += `<tr>
+      <td class="num">${g.rank ?? '—'}</td>
+      <td>${g.away_team ?? '?'}</td><td class="num">${g.away_score ?? '–'}</td>
+      <td>${g.home_team ?? '?'}</td><td class="num">${g.home_score ?? '–'}</td>
+      <td class="${stCls}">${(g.status || '—').toUpperCase()}</td>
+      <td>${fr}</td></tr>`;
+  }
+  el.innerHTML = `<table class="grid"><thead><tr>
+    <th>Rank</th><th>Away</th><th>Score</th><th>Home</th><th>Score</th><th>Status</th><th>Frozen</th>
+    </tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+// ---- Leaderboard (the Ladder) ----
+// Faithful to seasonStore.fetchSeasonLeaderboard:
+//   startWeek = first season_games.week with kickoff_at >= pool_start_date (default 1)
+//   season pts = SUM(week_points) for phase-scoped rows, week >= startWeek
+//   week pts   = current week's week_points
+async function renderLeaderboard() {
+  const el = document.getElementById('leaderboard-view');
+  if (!selectedPool) { el.innerHTML = `<div class="empty">No pool selected for ${selectedComp}.</div>`; return; }
+
+  const currentWeek = cfg('current_week');
+  const phase = String(cfg('current_phase', 'REGULAR'));
+  const ws = String(cfg('week_state', 'idle'));
+  const isPlayoffs = phase === 'PLAYOFFS' || phase === 'SUPERBOWL' || phase === 'SUPERBOWL_INTRO';
+  const weekInProgress = ['locked', 'live', 'settling'].includes(ws);
+
+  // 1) active members + pool start date
+  const [membersRes, poolRes] = await Promise.all([
+    sb.from('pool_members').select('user_id').eq('pool_id', selectedPool).eq('status', 'active'),
+    sb.from('pools').select('pool_start_date').eq('id', selectedPool).single(),
+  ]);
+  if (membersRes.error) { el.innerHTML = `<div class="empty">${translateError(membersRes.error)}</div>`; return; }
+  const memberIds = (membersRes.data || []).map(m => m.user_id);
+  if (!memberIds.length) { el.innerHTML = `<div class="empty">No active members in this pool.</div>`; return; }
+
+  // 2) derive startWeek from pool_start_date via the schedule
+  let startWeek = 1;
+  if (poolRes.data && poolRes.data.pool_start_date) {
+    const { data: fg } = await sb.from('season_games').select('week')
+      .eq('competition', selectedComp).gte('kickoff_at', poolRes.data.pool_start_date)
+      .order('kickoff_at', { ascending: true }).limit(1).maybeSingle();
+    if (fg && typeof fg.week === 'number') startWeek = fg.week;
+  }
+
+  // 3) per-week totals (phase-scoped), week >= startWeek
+  let q = sb.from('season_user_totals')
+    .select('user_id, week, week_points, is_hotpick_correct, phase')
+    .eq('competition', selectedComp).in('user_id', memberIds).gte('week', startWeek);
+  q = isPlayoffs ? q.neq('phase', 'REGULAR') : q.eq('phase', 'REGULAR');
+  const { data: totals, error: tErr } = await q;
+  if (tErr) { el.innerHTML = `<div class="empty">${translateError(tErr)}</div>`; return; }
+
+  // 4) profiles for the member set ('*' tolerates is_test_account not existing
+  //    yet — it lands as a Phase 2 migration; until then the TEST badge simply
+  //    never shows.)
+  const { data: profs, error: pErr } = await sb.from('profiles').select('*').in('id', memberIds);
+  if (pErr) { el.innerHTML = `<div class="empty">${translateError(pErr)}</div>`; return; }
+  const profById = {};
+  for (const p of (profs || [])) profById[p.id] = p;
+
+  // aggregate
+  const agg = {};
+  for (const id of memberIds) agg[id] = { user_id: id, season: 0, week: null, hp: null };
+  for (const row of (totals || [])) {
+    const a = agg[row.user_id]; if (!a) continue;
+    if (!(weekInProgress && row.week === currentWeek)) a.season += (row.week_points || 0);
+    if (row.week === currentWeek) { a.week = row.week_points; a.hp = row.is_hotpick_correct; }
+  }
+  const list = Object.values(agg).sort((x, y) => y.season - x.season);
+
+  let rows = '';
+  list.forEach((e, i) => {
+    const p = profById[e.user_id] || {};
+    const name = p.poolie_name || '(unknown)';
+    const tail = p.first_name ? ` — ${p.first_name}${p.last_name ? ' ' + p.last_name[0] + '.' : ''}` : '';
+    const testBadge = p.is_test_account === true ? `<span class="test-badge">TEST</span>` : '';
+    const wk = e.week === null ? '—' : e.week;
+    const wkCls = typeof e.week === 'number' ? (e.week >= 0 ? 'pos' : 'neg') : '';
+    const seasonCls = e.season > 0 ? 'pos' : e.season < 0 ? 'neg' : '';
+    let hp = '<span class="hp-pending">pending</span>';
+    if (e.hp === true) hp = '<span class="hp-correct">correct</span>';
+    else if (e.hp === false) hp = '<span class="hp-incorrect">incorrect</span>';
+    rows += `<tr>
+      <td class="num">${i + 1}</td>
+      <td>${name}<span style="color:#8A97AA;">${tail}</span>${testBadge}</td>
+      <td class="num ${wkCls}">${wk}</td>
+      <td class="num ${seasonCls}">${e.season}</td>
+      <td>${hp}</td></tr>`;
+  });
+  el.innerHTML = `<div style="font-size:10px;color:#8A97AA;margin-bottom:6px;">
+      Season total from week ${startWeek}${weekInProgress ? ` · current week (W${currentWeek}) excluded while in progress` : ''}</div>
+    <table class="grid"><thead><tr>
+      <th>#</th><th>Player</th><th>Week Pts</th><th>Season Pts</th><th>HotPick</th>
+    </tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+// ---- Home Screen Spec Preview (static reference; mirrors REFERENCE.md §11) ----
+const HOME_SCREEN_SPECS = {
+  idle: { title: 'IDLE (off-cycle)',
+    salutations: ['"Nothing today."', '"Rest day."', '"Back at it soon."'],
+    elements: ['Calm salutation', '0 pts season total', 'Join/create pool CTA', 'SmackTalk pointer'],
+    absent: ['No countdown', 'No live data'], cta: 'Join or create a pool' },
+  picks_open: { title: 'PICKS OPEN',
+    salutations: ['"Picks are open."', '"Your move."', '"Clock\'s running."'],
+    salutationsLate: ['"Last call."', '"Closing time."', '"You sure about this?"'],
+    elements: ['Countdown to kickoff', 'HotPick game preview', 'Social pressure: "X of Y poolies locked in"'],
+    cta: 'Tap to set picks' },
+  locked: { title: 'LOCKED (waiting)',
+    salutations: ['"On record. No edits."', '"Said what you said."', '"Locked in."'],
+    elements: ['Waiting state — picks are in', 'Games have not started yet'], cta: 'View your picks' },
+  live: { title: 'LIVE',
+    salutations: ['"It\'s happening."', '"Too late to change anything."'],
+    elements: ['HotPick game: teams + live score', 'Current point impact ("+6 if this holds")', 'Pool rank delta'],
+    cta: 'Tap to view live game' },
+  settling: { title: 'SETTLING',
+    salutations: ['"The record doesn\'t lie."', '"It\'s official."'],
+    elements: ['Weekly result: net points', 'Rank movement with named players', 'SmackTalk CTA'], cta: 'See the damage' },
+  complete: { title: 'COMPLETE (between weeks)',
+    salutations: ['"Nothing today."', '"Rest day."', '"Back at it soon."'],
+    elements: ['Season standings as a race ("47 pts behind 1st. 9 weeks left.")', 'Mini sparkline of season trajectory'],
+    cta: 'View season standings' },
+};
+
+function renderHomeScreenSpec() {
+  const el = document.getElementById('hs-preview');
+  const phase = String(cfg('current_phase', 'OFF_SEASON'));
+  let effective = String(cfg('week_state', 'idle'));
+  const phaseForcesIdle = !WEEKLY_CYCLE_PHASES.includes(phase);
+  if (phaseForcesIdle) effective = 'idle';
+
+  const spec = HOME_SCREEN_SPECS[effective] || HOME_SCREEN_SPECS.idle;
+  let html = `<div class="hs-block"><div class="hs-state-name">${spec.title} CARD</div>`;
+  if (phaseForcesIdle && cfg('week_state') && cfg('week_state') !== 'idle') {
+    html += `<div class="hs-warn">Phase <strong>${phase}</strong> is outside the weekly cycle —
+      <code>week_state="${cfg('week_state')}"</code> is ignored; the app shows the idle card.</div>`;
+  }
+  if (spec.salutations) {
+    html += `<div class="hs-section">Salutation (any of)</div>`;
+    spec.salutations.forEach(s => html += `<div class="hs-quote">${s}</div>`);
+    if (spec.salutationsLate) {
+      html += `<div class="hs-section">Salutation (deadline close)</div>`;
+      spec.salutationsLate.forEach(s => html += `<div class="hs-quote">${s}</div>`);
+    }
+  }
+  if (spec.elements) { html += `<div class="hs-section">Elements shown</div>`; spec.elements.forEach(e => html += `<div class="hs-line">• ${e}</div>`); }
+  if (spec.absent)   { html += `<div class="hs-section">NOT shown</div>`; spec.absent.forEach(a => html += `<div class="hs-line hs-line-absent">– ${a}</div>`); }
+  if (spec.cta)      { html += `<div class="hs-section">CTA</div><div class="hs-line">${spec.cta}</div>`; }
+  if (phase !== 'SEASON_COMPLETE') {
+    html += `<div class="hs-section">Conditional</div>
+      <div class="hs-line hs-line-absent">Join Pool Module shown if user has no visible private pool (suppressed during SEASON_COMPLETE).</div>`;
+  }
+  html += `</div>`;
+  el.innerHTML = html;
+}
+
+document.getElementById('hs-toggle').addEventListener('click', () => {
+  const el = document.getElementById('hs-preview');
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
+  document.getElementById('hs-toggle').textContent = (open ? '▸' : '▾') + ' Home Screen Spec Preview';
+});
+
+// Copy log
+document.getElementById('copy-log').addEventListener('click', () => {
+  const lines = [...document.getElementById('log-body').children]
+    .reverse()
+    .map(e => `${e.querySelector('.log-time').textContent} ${e.querySelector('.log-msg').textContent}`)
+    .join('\n');
+  navigator.clipboard.writeText(lines).then(() => log('Log copied to clipboard', 'info'));
+});
+</script>
+</body>
+</html>
