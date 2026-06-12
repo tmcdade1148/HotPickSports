@@ -409,10 +409,13 @@ Both views always available via toggle. Both use `pool_start_date` filter.
 | `process-notification-queue` | Cron | Every 60s |
 | `smack-archive-messages` | Cron | Daily 3am UTC |
 | `espn-health-check` | Cron | Hourly at :17 |
-| `season-simulator` | Manual (admin) | On demand |
+| `sim-operator` | Manual (super-admin, Operator Console Phase 2) | On demand |
+| `bypass-tester-signup` | Pre-auth (verify_jwt=false), tester signups | On demand |
 | `send-broadcast-email` | Client-triggered (non-blocking) | On broadcast send |
 | `send-partner-broadcast` | Client-triggered (super-admin OR Club Pool organizer) | On broadcast send |
 | `compute-hardware` | weekly_settle / season_settle / manual_override | — |
+
+**`season-simulator` was retired** (Operator Console Phase 2, June 2026) — it was hardcoded to `nfl_2026` (production!) and had zero runtime callers (no cron, no app, no other function). `sim-operator` supersedes it as the single sanctioned, allowlist-gated simulator write path. `tools/sim-runner.mjs` (headless/CI) is unaffected — it only calls `nfl-calculate-scores`.
 
 **Cron jobs require hardcoded service role JWT** — `current_setting('app.service_role_key', true)` does not resolve in cron context.
 

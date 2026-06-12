@@ -43,6 +43,10 @@ export interface DbProfile {
   platform_suspended_at: string | null;
   platform_suspended_by: string | null;
   platform_suspension_reason: string | null;
+  // Tester account flag — set only by bypass-tester-signup (service role) at
+  // creation, never client-settable. Drives the in-app "Test Account" banner,
+  // the operator-console TEST badge, and lifetime-stat exclusion.
+  is_test_account: boolean;
   created_at: string;
   updated_at: string;
 }
