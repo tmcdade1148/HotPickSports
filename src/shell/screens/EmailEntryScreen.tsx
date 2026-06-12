@@ -18,6 +18,11 @@ import {runPostAuthFlow} from '@shell/services/postAuthFlow';
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
 
+// Tester accounts bypass email confirmation via bypass-tester-signup. This client
+// check only routes the call; the Edge Function is the authoritative gate.
+const isTesterEmail = (e: string) =>
+  e.startsWith('tester_') && e.endsWith('@hotpicksports.com');
+
 type Mode = 'sign_in' | 'sign_up';
 
 export function EmailEntryScreen({navigation, route}: any) {
@@ -53,6 +58,38 @@ export function EmailEntryScreen({navigation, route}: any) {
     setLoading(true);
 
     if (mode === 'sign_up') {
+      // Tester signup: create a pre-confirmed account server-side, then sign in
+      // normally. Names are collected later in ProfileSetup (same as every user),
+      // so the tester still lands directly in the app — no "check your email"
+      // screen. Operator Console Phase 2 spec §6b.
+      if (isTesterEmail(trimmedEmail)) {
+        const {error: fnError} = await supabase.functions.invoke(
+          'bypass-tester-signup',
+          {body: {email: trimmedEmail, password}},
+        );
+        if (fnError) {
+          setLoading(false);
+          setError(
+            'Could not create tester account. It may already exist, or the email/password is invalid.',
+          );
+          return;
+        }
+        const {data: signInData, error: signInError} =
+          await supabase.auth.signInWithPassword({
+            email: trimmedEmail,
+            password,
+          });
+        setLoading(false);
+        if (signInError) {
+          setError(signInError.message);
+          return;
+        }
+        if (signInData.user) {
+          await runPostAuthFlow({user: signInData.user, navigation});
+        }
+        return;
+      }
+
       const {data, error: signUpError} = await supabase.auth.signUp({
         email: trimmedEmail,
         password,

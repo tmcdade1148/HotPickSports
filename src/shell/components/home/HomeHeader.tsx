@@ -16,6 +16,7 @@ import {Pressable, StyleSheet, Text, View} from 'react-native';
 import {Settings} from 'lucide-react-native';
 import {useNavigation} from '@react-navigation/native';
 import {useTheme} from '@shell/theme/hooks';
+import {useGlobalStore} from '@shell/stores/globalStore';
 import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
 import {COMPACT_PERIOD_LENGTH} from './shortPeriod';
 import {usePeriodLabel} from './usePeriodLabel';
@@ -24,8 +25,12 @@ export function HomeHeader() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
   const period = usePeriodLabel();
+  // Persistent reminder for sandbox tester accounts (Operator Console Phase 2 §6c).
+  // Brand-themed per Hard Rule #9 (the spec's literal #F28B30 would violate it).
+  const isTestAccount = useGlobalStore(s => s.userProfile?.is_test_account === true);
 
   return (
+    <>
     <View style={styles.row}>
       <View style={styles.wordmarkRow}>
         <Text style={[displayType.display, styles.wordmark, {color: colors.primary}]}>HOT</Text>
@@ -64,6 +69,16 @@ export function HomeHeader() {
         </Pressable>
       </View>
     </View>
+    {isTestAccount && (
+      <View style={styles.testBannerWrap}>
+        <View style={[styles.testBanner, {backgroundColor: colors.primary}]}>
+          <Text style={[bodyType.bold, styles.testBannerText, {color: colors.onPrimary}]}>
+            🧪 Test Account — Sim Only
+          </Text>
+        </View>
+      </View>
+    )}
+    </>
   );
 }
 
@@ -115,5 +130,19 @@ const styles = StyleSheet.create({
   },
   gearBtn: {
     padding: 4,
+  },
+  testBannerWrap: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xs,
+    alignItems: 'flex-start',
+  },
+  testBanner: {
+    borderRadius: borderRadius.full,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 3,
+  },
+  testBannerText: {
+    fontSize: 11,
+    letterSpacing: 0.3,
   },
 });

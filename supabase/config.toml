@@ -59,3 +59,13 @@ verify_jwt = false
 # check, so verify_jwt stays false.
 [functions.compute-hardware]
 verify_jwt = false
+
+# bypass-tester-signup handles PRE-AUTH tester signup — no JWT exists yet, so
+# verify_jwt MUST be false (Operator Console Phase 2 spec §7). Its own gate is the
+# server-side tester email-pattern check + the service role key. Leaving this at the
+# CLI default (true) would reject every tester signup.
+[functions.bypass-tester-signup]
+verify_jwt = false
+
+# sim-operator keeps the CLI default verify_jwt = true (not listed): the caller's
+# session JWT gates the server-side is_super_admin check. Do NOT add it here.

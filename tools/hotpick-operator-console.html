@@ -169,6 +169,21 @@
   .log-time { color: #8A97AA; flex-shrink: 0; font-variant-numeric: tabular-nums; }
   .log-msg.success { color: #1b9a06; } .log-msg.warn { color: #F5C842; } .log-msg.error { color: #C0392B; } .log-msg.info { color: #51A1A6; } .log-msg { color: #C7D2E0; }
   .copy-btn { background: #2C3A52; color: #E8EAF0; border: none; border-radius: 4px; font-size: 10px; padding: 3px 8px; cursor: pointer; }
+
+  /* ---- Phase 2: Controls ---- */
+  .ctl-group { margin-bottom: 12px; }
+  .ctl-group .ctl-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: #8A97AA; margin-bottom: 5px; }
+  .ctl-btn { display: block; width: 100%; text-align: left; background: #2C3A52; color: #E8EAF0; border: none; border-radius: 6px; padding: 8px 10px; font-size: 12px; font-weight: 600; cursor: pointer; margin-bottom: 6px; }
+  .ctl-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .ctl-btn.active { background: #F5620F; color: #fff; }
+  .ctl-btn:not(:disabled):hover { opacity: 0.88; }
+  .ctl-row { display: flex; gap: 6px; }
+  .ctl-row > * { margin-bottom: 6px; }
+  .ctl-toggle { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #E8EAF0; cursor: pointer; margin-bottom: 10px; }
+  .ctl-reset { background: #C0392B !important; color: #fff !important; margin-top: 14px; border-top: 2px solid #7a2018; }
+  .ctl-disabled-note { font-size: 11px; color: #8A97AA; }
+  .ctl-num { width: 70px; background: #0D1117; border: 1px solid #2C3A52; color: #E8EAF0; padding: 8px; border-radius: 6px; font-size: 13px; }
+  .reviewer-tag { display: inline-block; background: #F5C842; color: #0D1117; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; letter-spacing: 0.5px; margin-bottom: 8px; }
 </style>
 </head>
 <body>
@@ -233,6 +248,11 @@
         <div class="section">
           <h2>Reviewer Status</h2>
           <div id="reviewer-status"><div class="empty">Loading reviewer environments…</div></div>
+        </div>
+
+        <div class="section">
+          <h2>Controls</h2>
+          <div id="controls"><div class="empty">—</div></div>
         </div>
       </aside>
 
@@ -308,6 +328,15 @@ const REVIEWER_ENVS = [
 ];
 
 const WEEKLY_CYCLE_PHASES = ['REGULAR', 'PLAYOFFS', 'SUPERBOWL'];
+
+// Phase 2 — write layer. The server-side sim-operator allowlist is authoritative;
+// this client copy only drives the UI (which controls render / enable).
+const SIM_ALLOWLIST = ['nfl_2025_sim', 'nfl_2025_simA', 'nfl_2025_simG', 'nfl_demo'];
+const REVIEWER_COMPS = ['nfl_2025_simA', 'nfl_2025_simG'];
+const PHASE_SEQUENCE = ['OFF_SEASON', 'PRE_SEASON', 'REGULAR', 'REGULAR_COMPLETE', 'PLAYOFFS', 'SUPERBOWL_INTRO', 'SUPERBOWL', 'SEASON_COMPLETE'];
+function isWritable(comp) { return SIM_ALLOWLIST.includes(comp); }
+// Auto-pick-before-step toggle — in memory only, resets to off on refresh.
+let autoPickBeforeStep = false;
 const REFRESH_MS = 30000;
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -318,6 +347,8 @@ let selectedComp = null;
 let selectedPool = null;
 let refreshTimer = null;
 let lastConfig = {};        // key -> { value, updated_at }
+let lastReadinessOk = false;   // all three readiness checks 'ok' for current week
+let lastReadinessHasRow = false; // a week_readiness row exists for current week
 
 // ───────────────────────────────────────────────────────────────────────────
 // Logging
@@ -487,6 +518,7 @@ async function refreshAll() {
       renderReviewerStatus(),
     ]);
     renderHomeScreenSpec();
+    renderControls();
     const now = new Date().toLocaleTimeString('en-US', { hour12: false });
     document.getElementById('sb-refreshed').textContent = 'Updated ' + now;
   } catch (err) {
@@ -574,6 +606,7 @@ function readinessLine(label, status, count, unit, errText) {
 
 function renderReadinessGate(week, r) {
   const el = document.getElementById('readiness-gate');
+  lastReadinessOk = false; lastReadinessHasRow = !!r;
   if (typeof week !== 'number') { el.innerHTML = `<div class="empty">No current week set.</div>`; return; }
   if (!r) {
     el.innerHTML = `<div style="font-weight:600;color:#E8EAF0;margin-bottom:6px;">Week ${week} Readiness</div>
@@ -585,6 +618,7 @@ function renderReadinessGate(week, r) {
   const odds  = readinessLine('Odds fetched',  r.odds_status,  r.odds_count,  'spreads', r.odds_error);
   const ranks = readinessLine('Ranks frozen',  r.ranks_status, r.ranks_count, 'ranks', r.ranks_error);
   const allOk = games.ok && odds.ok && ranks.ok;
+  lastReadinessOk = allOk;
 
   let html = `<div style="font-weight:600;color:#E8EAF0;margin-bottom:6px;">Week ${week} Readiness</div>`;
   html += games.html + odds.html + ranks.html;
@@ -843,6 +877,136 @@ document.getElementById('hs-toggle').addEventListener('click', () => {
   el.style.display = open ? 'none' : 'block';
   document.getElementById('hs-toggle').textContent = (open ? '▸' : '▾') + ' Home Screen Spec Preview';
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// Phase 2 — Controls (write layer). Every action routes through the sim-operator
+// Edge Function with the session JWT; the server re-checks super-admin + allowlist.
+// ───────────────────────────────────────────────────────────────────────────
+function currentStepLabel() {
+  const ws = String(cfg('week_state', 'idle'));
+  return ({ idle: 'Open Picks', picks_open: 'Lock / Kickoff', locked: 'Go Live', live: 'Settle', settling: 'Complete Week', complete: 'Next Week' })[ws] || 'Advance';
+}
+
+function renderControls() {
+  const el = document.getElementById('controls');
+  const comp = selectedComp;
+  const tier = writeTier(comp);
+  if (!isWritable(comp)) {
+    el.innerHTML = `<div class="ctl-disabled-note">Read-only — no write controls for <code>${comp}</code>${tier.tier === 'red' ? ' (production · never writeable)' : ''}.</div>`;
+    return;
+  }
+  const ws = String(cfg('week_state', 'idle'));
+  const phase = String(cfg('current_phase', 'OFF_SEASON'));
+  const week = cfg('current_week', '—');
+  const readinessBlocks = lastReadinessHasRow && !lastReadinessOk;
+
+  const steps = [
+    { label: 'Open Picks',    on: ws === 'idle' && !readinessBlocks },
+    { label: 'Lock / Kickoff',on: ws === 'picks_open' },
+    { label: 'Go Live',       on: ws === 'locked' },
+    { label: 'Settle',        on: ws === 'live' },
+    { label: 'Complete Week', on: ws === 'settling' },
+    { label: 'Next Week',     on: ws === 'complete' },
+  ];
+  const pidx = PHASE_SEQUENCE.indexOf(phase);
+  const nextPhase = (pidx >= 0 && pidx < PHASE_SEQUENCE.length - 1) ? PHASE_SEQUENCE[pidx + 1] : null;
+
+  let html = '';
+  if (REVIEWER_COMPS.includes(comp)) html += `<div class="reviewer-tag">⚠ REVIEWER ENV — every action confirms</div>`;
+
+  html += `<div class="ctl-group"><div class="ctl-label">Week ${week} · state: ${ws}</div>`;
+  steps.forEach(s => {
+    html += `<button class="ctl-btn ${s.on ? 'active' : ''}" ${s.on ? '' : 'disabled'} onclick="opStep()">${s.label}</button>`;
+  });
+  if (ws === 'idle' && readinessBlocks) html += `<div class="ctl-disabled-note">Open Picks blocked — readiness gate is failing.</div>`;
+  html += `</div>`;
+
+  html += `<div class="ctl-group"><div class="ctl-label">Phase transition</div>`;
+  if (nextPhase) {
+    html += `<select id="phase-next" class="ctl-num" style="width:100%;margin-bottom:6px;"><option value="${nextPhase}">${nextPhase}</option></select>`;
+    html += `<button class="ctl-btn" onclick="opPhase()">Advance Phase → ${nextPhase}</button>`;
+  } else {
+    html += `<div class="ctl-disabled-note">No next phase from ${phase}.</div>`;
+  }
+  html += `</div>`;
+
+  const jumpDefault = typeof week === 'number' ? Math.min(22, week + 1) : 1;
+  html += `<div class="ctl-group"><div class="ctl-label">Jump to week (forward only)</div>
+    <div class="ctl-row"><input id="jump-week" type="number" min="1" max="22" value="${jumpDefault}" class="ctl-num">
+    <button class="ctl-btn" style="flex:1;margin:0;" onclick="opJump()">Jump</button></div></div>`;
+
+  html += `<label class="ctl-toggle"><input type="checkbox" ${autoPickBeforeStep ? 'checked' : ''} onchange="toggleAutoPick(this)"> Auto-pick my picks before each step</label>`;
+
+  html += `<button class="ctl-btn ctl-reset" onclick="opReset()">Reset to Off Season — DESTRUCTIVE</button>`;
+  el.innerHTML = html;
+}
+
+function toggleAutoPick(cb) { autoPickBeforeStep = cb.checked; }
+
+// Invoke sim-operator; normalise both transport errors and {success:false} bodies.
+async function invokeOp(action, opts) {
+  try {
+    const body = { action, competition: selectedComp };
+    if (opts && opts.target_week !== undefined) body.target_week = opts.target_week;
+    const { data, error } = await sb.functions.invoke('sim-operator', { body });
+    if (error) {
+      let msg = translateError(error);
+      try { const ctx = await error.context.json(); if (ctx && ctx.error) msg = ctx.error; } catch (_) {}
+      return { success: false, error: msg };
+    }
+    return data;
+  } catch (e) { return { success: false, error: translateError(e) }; }
+}
+
+async function callSimOperator(action, opts = {}) {
+  const comp = selectedComp;
+  if (!isWritable(comp)) { log(`Refused: ${comp} is read-only`, 'error'); return; }
+
+  // Reviewer-environment confirm — every write action, no "don't show again".
+  if (REVIEWER_COMPS.includes(comp)) {
+    const wk = cfg('current_week', '?');
+    const ok = window.confirm(`⚠️ REVIEWER ENVIRONMENT\n\nYou are about to modify ${comp}.\nApp-store reviewers may be testing in this environment.\n\nAction: ${opts.label || action} (Week ${wk})\n\nCancel to abort, OK to proceed.`);
+    if (!ok) { log(`Cancelled "${opts.label || action}" on ${comp}`, 'warn'); return; }
+  }
+
+  // Auto-pick before a step (spec §6a): skip on "already submitted", abort on any other error.
+  if (opts.isStep && autoPickBeforeStep) {
+    const ap = await invokeOp('auto_pick_tom', {});
+    if (ap && ap.success) log(`Auto-picked ${ap.picks_submitted} games`, 'info');
+    else if (ap && /already submitted/i.test(ap.error || '')) { /* fine — proceed */ }
+    else { log(`Auto-pick failed: ${(ap && ap.error) || 'error'} — step aborted`, 'error'); return; }
+  }
+
+  const res = await invokeOp(action, opts);
+  if (res && res.success) {
+    log(`${opts.label || action} ✓${res.message ? ' — ' + res.message : ''}`, 'success');
+    await refreshAll();
+  } else {
+    log(`${opts.label || action} failed: ${(res && res.error) || 'error'}`, 'error');
+  }
+}
+
+function opStep() { callSimOperator('advance_week_state', { isStep: true, label: currentStepLabel() }); }
+function opPhase() {
+  const sel = document.getElementById('phase-next');
+  callSimOperator('advance_phase', { label: 'Advance phase → ' + (sel ? sel.value : '') });
+}
+function opJump() {
+  const t = parseInt(document.getElementById('jump-week').value, 10);
+  const cur = cfg('current_week');
+  if (!Number.isInteger(t) || t < 1 || t > 22) { log('Jump: week must be 1–22', 'error'); return; }
+  if (typeof cur === 'number' && t <= cur) { log(`Jump: target must be greater than current week ${cur}`, 'error'); return; }
+  const lo = typeof cur === 'number' ? cur + 1 : 1, hi = t - 1;
+  const skipMsg = hi >= lo ? `Weeks ${lo}–${hi} will be skipped with neutral (0-pt) scores.` : 'No weeks skipped.';
+  if (!window.confirm(`Jump to week ${t}?\n${skipMsg}\nThis cannot be undone.`)) return;
+  callSimOperator('jump_to_week', { target_week: t, label: `Jump to week ${t}` });
+}
+function opReset() {
+  const comp = selectedComp;
+  const typed = window.prompt(`This will DELETE all picks and scores for ${comp} and reset it to OFF_SEASON week 1.\nThis cannot be undone.\n\nType RESET to confirm:`);
+  if (typed !== 'RESET') { if (typed !== null) log('Reset cancelled — confirmation text did not match', 'warn'); return; }
+  callSimOperator('reset_to_off_season', { label: 'Reset to Off Season' });
+}
 
 // Copy log
 document.getElementById('copy-log').addEventListener('click', () => {
