@@ -158,8 +158,10 @@ async function advanceWeekState(caller: any, admin: any, competition: string, au
 
     case "complete": {
       // Next week — delegate to the production owner of the weekly clock.
-      const { data, error } = await caller.rpc("admin_advance_week", { p_competition: competition });
-      if (error) return json({ success: false, error: friendlyRpcError(error.message) }, 400);
+      // Pass p_next_picks_open_at explicitly (null) so PostgREST resolves the
+      // two-arg signature rather than depending on default-arg omission.
+      const { data, error } = await caller.rpc("admin_advance_week", { p_competition: competition, p_next_picks_open_at: null });
+      if (error) { console.error("[sim-operator] admin_advance_week", error); return json({ success: false, error: friendlyRpcError(error.message) }, 400); }
       return json({ success: true, action: "advance_week_state", from: "complete", rpc: data, state: await getConfig(admin, competition) }, 200);
     }
 
@@ -242,7 +244,7 @@ async function advancePhase(caller: any, admin: any, competition: string, authHe
 
   // Delegate to the audited production owner of phase transitions.
   const { error } = await caller.rpc("admin_advance_season_phase", { p_competition: competition, p_phase: toPhase });
-  if (error) return json({ success: false, error: friendlyRpcError(error.message) }, 400);
+  if (error) { console.error("[sim-operator] admin_advance_season_phase", error); return json({ success: false, error: friendlyRpcError(error.message) }, 400); }
 
   // Mandatory side effects the spec requires (idempotent; applied on top of the RPC).
   if (toPhase === "PLAYOFFS") {
@@ -342,7 +344,9 @@ function friendlyRpcError(msg: string): string {
   if (/SEASON_ENDED/i.test(msg)) return "Already at the final week — advance the phase instead.";
   if (/not authorized|super admin/i.test(msg)) return "Not authorized.";
   if (/invalid phase|unknown competition/i.test(msg)) return "Invalid phase transition for this competition.";
-  return "Transition rejected by the engine.";
+  // Surface the raw engine reason — this is a super-admin-only operator tool, and
+  // hiding it (the old generic string) made the real cause undiagnosable.
+  return "Engine: " + (msg || "unknown error").slice(0, 200);
 }
 function json(body: unknown, status: number) {
   return new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
