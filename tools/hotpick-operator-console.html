@@ -148,6 +148,9 @@
 
   .st-scheduled   { color: #8A97AA; } .st-in_progress { color: #F5620F; font-weight: 600; } .st-final { color: #1b9a06; font-weight: 600; }
   .rank-pill { display: inline-block; background: #F5620F; color: #fff; border-radius: 10px; font-size: 9px; font-weight: 700; padding: 1px 6px; }
+  .wave-head { display: flex; justify-content: space-between; align-items: baseline; margin: 10px 0 2px; padding: 3px 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #8A97AA; border-bottom: 1px solid #2C3A52; }
+  .wave-head span { font-weight: 400; text-transform: none; letter-spacing: 0; }
+  .wave-head.active { color: #F5620F; border-bottom-color: #F5620F; }
   .test-badge { display: inline-block; background: #F28B30; color: #fff; border-radius: 4px; font-size: 8px; font-weight: 700; padding: 1px 5px; letter-spacing: 0.5px; margin-left: 6px; }
   .hp-correct { color: #1b9a06; } .hp-incorrect { color: #C0392B; } .hp-pending { color: #8A97AA; }
   .empty { padding: 16px; text-align: center; color: #8A97AA; font-size: 12px; }
@@ -347,6 +350,30 @@ const SIM_ALLOWLIST = ['nfl_2025_sim', 'nfl_2025_simA', 'nfl_2025_simG', 'nfl_de
 const REVIEWER_COMPS = ['nfl_2025_simA', 'nfl_2025_simG'];
 const PHASE_SEQUENCE = ['OFF_SEASON', 'PRE_SEASON', 'REGULAR', 'REGULAR_COMPLETE', 'PLAYOFFS', 'SUPERBOWL_INTRO', 'SUPERBOWL', 'SEASON_COMPLETE'];
 function isWritable(comp) { return SIM_ALLOWLIST.includes(comp); }
+
+// NFL kickoff slots ("waves") — mirrors sim-operator + tools/sim-runner.mjs.
+const WAVE_ORDER = ['thursday', 'sunday1', 'sunday4', 'snf', 'mnf', 'other'];
+const WAVE_LABEL = { thursday: 'Thursday', sunday1: 'Sunday 1pm', sunday4: 'Sunday 4pm', snf: 'SNF', mnf: 'MNF', other: 'Other slot' };
+function detectWave(kickoffAt) {
+  if (!kickoffAt) return 'other';
+  const d = new Date(kickoffAt), day = d.getUTCDay(), hour = d.getUTCHours();
+  if (day === 4 && hour >= 17) return 'thursday';
+  if (day === 5 && hour < 4) return 'thursday';
+  if (day === 0 && hour >= 17 && hour < 20) return 'sunday1';
+  if (day === 0 && hour >= 20 && hour < 23) return 'sunday4';
+  if (day === 0 && hour >= 23) return 'snf';
+  if (day === 1 && hour < 4) return 'snf';
+  if (day === 1 && hour >= 17) return 'mnf';
+  if (day === 2 && hour < 4) return 'mnf';
+  if (day === 5 || day === 6) return 'sunday1';
+  return 'other';
+}
+const gameStatusClass = (s) => { s = normStatus(s); return s.includes('final') ? 'final' : s.includes('progress') ? 'live' : 'scheduled'; };
+
+// Last-fetched current-week games (set by renderGames; used for wave grouping + the
+// NEXT-button game-day label).
+let lastGames = [];
+
 // Auto-pick-before-step toggle — in memory only, resets to off on refresh.
 let autoPickBeforeStep = false;
 // Logged-in super-admin id + whether their picks exist for the current week
@@ -724,28 +751,43 @@ async function renderGames() {
 
   const { data, error } = await sb
     .from('season_games')
-    .select('away_team, home_team, away_score, home_score, status, rank, frozen_rank, kickoff_at')
+    .select('game_id, away_team, home_team, away_score, home_score, status, rank, frozen_rank, kickoff_at')
     .eq('competition', selectedComp).eq('week', week)
-    .order('rank', { ascending: true, nullsFirst: false }).order('kickoff_at');
-  if (error) { el.innerHTML = `<div class="empty">${translateError(error)}</div>`; return; }
+    .order('kickoff_at', { nullsFirst: false }).order('rank', { ascending: true, nullsFirst: false });
+  if (error) { el.innerHTML = `<div class="empty">${translateError(error)}</div>`; lastGames = []; return; }
   const games = data || [];
+  lastGames = games;
   if (!games.length) { el.innerHTML = `<div class="empty">No games for week ${week}.</div>`; return; }
 
-  let rows = '';
-  for (const g of games) {
-    const st = normStatus(g.status);
-    const stCls = st.includes('final') ? 'st-final' : st.includes('progress') ? 'st-in_progress' : 'st-scheduled';
+  // The wave currently "on the clock" (live wave, else the next scheduled wave) —
+  // highlighted so progress through game day is obvious.
+  const liveWave = WAVE_ORDER.find(w => games.some(g => detectWave(g.kickoff_at) === w && gameStatusClass(g.status) === 'live'));
+  const nextSched = WAVE_ORDER.find(w => games.some(g => detectWave(g.kickoff_at) === w && gameStatusClass(g.status) === 'scheduled'));
+  const activeWave = liveWave || nextSched;
+
+  const gameRow = (g) => {
+    const stCls = `st-${gameStatusClass(g.status) === 'live' ? 'in_progress' : gameStatusClass(g.status)}`;
     const fr = (g.frozen_rank ?? null) !== null ? `<span class="rank-pill">${g.frozen_rank}</span>` : '—';
-    rows += `<tr>
+    return `<tr>
       <td class="num">${g.rank ?? '—'}</td>
       <td>${g.away_team ?? '?'}</td><td class="num">${g.away_score ?? '–'}</td>
       <td>${g.home_team ?? '?'}</td><td class="num">${g.home_score ?? '–'}</td>
       <td class="${stCls}">${(g.status || '—').toUpperCase()}</td>
       <td>${fr}</td></tr>`;
+  };
+
+  let html = '';
+  for (const w of WAVE_ORDER) {
+    const wg = games.filter(g => detectWave(g.kickoff_at) === w);
+    if (!wg.length) continue;
+    const nF = wg.filter(g => gameStatusClass(g.status) === 'final').length;
+    const nL = wg.filter(g => gameStatusClass(g.status) === 'live').length;
+    const nS = wg.filter(g => gameStatusClass(g.status) === 'scheduled').length;
+    const summary = nL ? `${nL} live` : nS && nF ? `${nF} final · ${nS} to play` : nS ? 'scheduled' : 'final';
+    html += `<div class="wave-head ${w === activeWave ? 'active' : ''}">${w === activeWave ? '▶ ' : ''}${WAVE_LABEL[w]} <span>${summary}</span></div>`;
+    html += `<table class="grid"><tbody>${wg.map(gameRow).join('')}</tbody></table>`;
   }
-  el.innerHTML = `<table class="grid"><thead><tr>
-    <th>Rank</th><th>Away</th><th>Score</th><th>Home</th><th>Score</th><th>Status</th><th>Frozen</th>
-    </tr></thead><tbody>${rows}</tbody></table>`;
+  el.innerHTML = html;
 }
 
 // ---- Leaderboard (the Ladder) ----
@@ -970,7 +1012,10 @@ function renderControls() {
     if (ws === 'picks_open' && autoPickBeforeStep && !myPicksThisWeek) {
       html += `<button class="ctl-btn" style="margin-top:8px;" onclick="opAutoPick()">Auto-pick my picks now</button>`;
     }
-    html += `<button class="ctl-btn" style="background:#1b9a06;color:#fff;margin-top:8px;" onclick="opStep()">NEXT → ${NEXT_TARGET[ws] || 'advance'}</button>`;
+    // In the live window, NEXT walks game-day waves (kickoff/final per slot);
+    // otherwise it advances the macro week_state.
+    const label = (ws === 'locked' || ws === 'live') ? gameDayNextLabel() : `NEXT → ${NEXT_TARGET[ws] || 'advance'}`;
+    html += `<button class="ctl-btn" style="background:#1b9a06;color:#fff;margin-top:8px;" onclick="opNext()">${label}</button>`;
   }
   html += `</div>`;
 
@@ -1041,6 +1086,26 @@ async function callSimOperator(action, opts = {}) {
 
 function opStep() { callSimOperator('advance_week_state', { isStep: true, label: currentStepLabel() }); }
 function opAutoPick() { callSimOperator('auto_pick_tom', { label: 'Auto-pick my picks' }); }
+
+// What the next game-day sub-step will do, computed from the current games (the
+// server is authoritative; this is for the button label only).
+function gameDayNextLabel() {
+  const g = lastGames || [];
+  const liveWave = WAVE_ORDER.find(w => g.some(x => detectWave(x.kickoff_at) === w && gameStatusClass(x.status) === 'live'));
+  if (liveWave) return `NEXT → final ${WAVE_LABEL[liveWave]}`;
+  const schedWave = WAVE_ORDER.find(w => g.some(x => detectWave(x.kickoff_at) === w && gameStatusClass(x.status) === 'scheduled'));
+  if (schedWave) return `NEXT → kickoff ${WAVE_LABEL[schedWave]}`;
+  return 'NEXT → settle week';
+}
+// NEXT button: game-day waves during the live window, macro week_state otherwise.
+function opNext() {
+  const ws = String(cfg('week_state', 'idle'));
+  if (ws === 'locked' || ws === 'live') {
+    callSimOperator('advance_game_day', { label: gameDayNextLabel().replace('NEXT → ', '') });
+  } else {
+    opStep();
+  }
+}
 function opPhase() {
   const sel = document.getElementById('phase-next');
   callSimOperator('advance_phase', { label: 'Advance phase → ' + (sel ? sel.value : '') });
