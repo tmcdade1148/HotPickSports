@@ -52,10 +52,33 @@ SIM_COMPETITION=nfl_2025_simA node tools/sim-runner.mjs status   # Apple reviewe
 `SIM_SOURCE`, `SIM_SEASON`, `SIM_POOL_ID`, `SIM_REVIEWER_ID`, `SIM_TESTER_ID` are
 also overridable.
 
+## Monitoring (read-only) — replaces the browser Engine Monitor
+
+The old read-only HTML monitor can't run either (its tables are `authenticated`-only,
+the publishable key is anon, and the secret key is browser-blocked). It's folded in
+here as `monitor`, which prints the **week state** + the Tuesday-morning **readiness
+chain** (games → odds → ranks, with the gate OPEN/CLOSED verdict) and a games summary:
+
+```bash
+node tools/sim-runner.mjs monitor                # the sim sandbox (SIM_COMPETITION)
+node tools/sim-runner.mjs monitor nfl_2026       # LIVE production — read-only
+```
+
+`monitor` (and `status`) read **any** competition, including live `nfl_2026`.
+
+## Writes are sandbox-only
+
+Every **mutating** command refuses any target outside the sim allowlist
+(`nfl_2025_sim`, `nfl_2025_simA`, `nfl_2025_simG`, `nfl_demo`) — enforced at dispatch
+and again per-request, so production data can never be written from here even if
+`SIM_COMPETITION` is pointed at it by mistake. Reads are unrestricted. Override the
+allowlist only to add a genuine new sandbox: `SIM_WRITE_ALLOWLIST=a,b,c`.
+
 ## Commands
 
 ```
 status                         Show config + current-week game status
+monitor [competition]          READ-ONLY: week state + readiness chain (any competition)
 run-week [week] [--tester]     Full week: reset → open(seed) → waves → score → complete
 run-season [from] [to] [-t]    Step weeks from..to (default current..22)   [needs --yes]
 open-picks [week] [--tester]   Open picks + seed fake (and tester) picks

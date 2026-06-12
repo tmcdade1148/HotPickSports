@@ -45,6 +45,26 @@ const TESTER_USER_ID = process.env.SIM_TESTER_ID || REVIEWER_USER_ID;
 const SECRET_KEY = process.env.SB_SECRET_KEY || '';
 const CRON_SECRET = process.env.CRON_SHARED_SECRET || '';
 
+// Competitions this runner may WRITE to. The simulator exists only to drive the
+// sandbox; live/production competitions (nfl_2026, the real nfl_2025 source,
+// world_cup_2026) are READ-ONLY here. The `status` and `monitor` commands read
+// any competition; every mutating command refuses a target outside this set.
+// Enforced twice (defense in depth): once at dispatch, and again per-request in
+// api()/callEdgeFunction() so a future write path can't silently escape it.
+// Override only to add another genuine sandbox: SIM_WRITE_ALLOWLIST=a,b,c.
+const SIM_WRITE_ALLOWLIST = new Set(
+  (process.env.SIM_WRITE_ALLOWLIST || 'nfl_2025_sim,nfl_2025_simA,nfl_2025_simG,nfl_demo')
+    .split(',').map((s) => s.trim()).filter(Boolean)
+);
+function assertWritableTarget(comp) {
+  if (!SIM_WRITE_ALLOWLIST.has(comp)) {
+    throw new Error(
+      `Refusing to WRITE to "${comp}" — not a sim sandbox. Writes are allowed only for: ` +
+      `${[...SIM_WRITE_ALLOWLIST].join(', ')}. (Reads are fine: "status" / "monitor ${comp}" work read-only.)`
+    );
+  }
+}
+
 // ── tiny logger ──
 const C = { dim: '\x1b[2m', red: '\x1b[31m', grn: '\x1b[32m', yel: '\x1b[33m', cyn: '\x1b[36m', rst: '\x1b[0m' };
 function log(msg, type = 'info') {
@@ -57,6 +77,14 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // ── REST + Edge Function clients (service-role; Node, not a browser) ──
 async function api(path, method = 'GET', body = null) {
   if (!SECRET_KEY) throw new Error('SB_SECRET_KEY is not set in the environment.');
+  // Defense in depth: a write (PATCH/POST/DELETE) whose path names a competition
+  // must target a sandbox. GET reads any competition (that's how `monitor` watches
+  // nfl_2026). RPC/edge writes carry the competition in the body, not the path —
+  // those are gated by the dispatch guard + callEdgeFunction().
+  if (method !== 'GET') {
+    const m = /[?&]competition=eq\.([^&]+)/.exec(path);
+    if (m) assertWritableTarget(decodeURIComponent(m[1]));
+  }
   const headers = {
     apikey: SECRET_KEY,
     Authorization: `Bearer ${SECRET_KEY}`,
@@ -76,6 +104,8 @@ async function api(path, method = 'GET', body = null) {
 }
 
 async function callEdgeFunction(name, body) {
+  // Scoring/finalize functions mutate the named competition — keep them sandbox-only.
+  if (body && body.competition) assertWritableTarget(body.competition);
   if (!CRON_SECRET) {
     throw new Error(
       `CRON_SHARED_SECRET is not set — required to call ${name} (cron-gated Edge Function). ` +
@@ -143,9 +173,12 @@ const FAKE_MEMBERS = [
 ];
 
 // ── config read/write ──
-async function readConfig() {
-  const cfg = await api(`competition_config?competition=eq.${COMPETITION}&select=key,value`);
+async function readConfigFor(comp) {
+  const cfg = await api(`competition_config?competition=eq.${comp}&select=key,value`);
   return Object.fromEntries((cfg || []).map((r) => [r.key, r.value]));
+}
+async function readConfig() {
+  return readConfigFor(COMPETITION);
 }
 async function setConfig(key, value) {
   await api(`competition_config?competition=eq.${COMPETITION}&key=eq.${key}`, 'PATCH', { value });
@@ -183,6 +216,74 @@ async function cmdStatus() {
       byStatus[s] = (byStatus[s] || 0) + 1;
     }
     log(`  Week ${wk}: ${sim.length} sim games (${Object.entries(byStatus).map(([s, n]) => `${n} ${s}`).join(', ') || 'none'}), ${source.length} source games`, 'info');
+  }
+}
+
+// ── monitor (READ-ONLY) — the Engine Monitor, folded into the runner ──
+// Prints week state + the Tuesday-morning readiness chain for ANY competition,
+// including live production (nfl_2026), read-only. Never writes. This is the
+// replacement for the browser engine-monitor HTML, which can't run under the new
+// keys (secret keys are hard-blocked in browsers; the publishable key is anon and
+// these tables are authenticated-only). The service key works fine here in Node.
+function fmtTs(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  return Number.isNaN(d.getTime()) ? String(ts) : d.toISOString().slice(0, 16).replace('T', ' ') + 'Z';
+}
+function readinessStep(label, status, detail, at, err) {
+  const s = status || 'pending';
+  const icon = s === 'ok' ? '✅' : s === 'failed' ? '❌' : (s === 'pending' || s == null) ? '⏳' : '•';
+  const type = s === 'ok' ? 'success' : s === 'failed' ? 'error' : 'info';
+  log(`  ${icon} ${label.padEnd(22)} ${String(detail).padEnd(14)} ${fmtTs(at)}`, type);
+  if (err) log(`       ↳ ${err}`, 'error');
+}
+
+async function cmdMonitor(comp) {
+  log(`Engine Monitor (read-only) — ${comp}`, 'info');
+  const cfg = await readConfigFor(comp);
+  const wk = cfg.current_week != null ? Number(cfg.current_week) : null;
+
+  // Week state (from competition_config)
+  log(`  current_week  = ${cfg.current_week ?? '—'}    current_phase = ${cfg.current_phase ?? '—'}`, 'info');
+  log(`  week_state    = ${cfg.week_state ?? '—'}    picks_open = ${cfg.picks_open ?? '—'}   picks_locked = ${cfg.picks_locked ?? '—'}`, 'info');
+  log(`  scoring_locked = ${cfg.scoring_locked ?? '—'}`, cfg.scoring_locked ? 'warn' : 'info');
+
+  // Readiness chain (from week_readiness) — tolerate an unpopulated table.
+  const rows = await api(`week_readiness?competition=eq.${comp}&select=*&order=week_number.desc`);
+  const r = (rows && rows.length)
+    ? ((wk != null && rows.find((x) => Number(x.week_number) === wk)) || rows[0])
+    : null;
+  log(`  ── Readiness chain${r ? ` (week ${r.week_number})` : ''} ──`, 'info');
+  if (!r) {
+    log('  No week_readiness row yet for this competition (prep steps have not run, or readiness is not populated here).', 'warn');
+  } else {
+    readinessStep('Games loaded', r.games_status, r.games_count != null ? `${r.games_count}` : 'ok', r.games_at, null);
+    readinessStep('Spreads & moneylines', r.odds_status,
+      r.odds_expected != null ? `${r.odds_count ?? 0}/${r.odds_expected}` : `${r.odds_count ?? 0}`, r.odds_at, r.odds_error);
+    readinessStep('Ranks calculated', r.ranks_status,
+      r.games_count != null ? `${r.ranks_count ?? 0}/${r.games_count}` : `${r.ranks_count ?? 0}`, r.ranks_at, r.ranks_error);
+    const gateOpen = r.games_status === 'ok' && r.odds_status === 'ok' && r.ranks_status === 'ok'
+      && (r.odds_expected == null || (r.odds_count ?? 0) >= r.odds_expected)
+      && (r.games_count == null || (r.ranks_count ?? 0) >= r.games_count);
+    log(gateOpen
+      ? '  ✅ Readiness gate OPEN — safe to open picks.'
+      : '  ❌ Readiness gate CLOSED — do not open picks until every step is green.',
+    gateOpen ? 'success' : 'error');
+  }
+
+  // Games summary for the current week (read-only)
+  if (wk != null) {
+    const games = await api(`season_games?competition=eq.${comp}&week=eq.${wk}&select=status`);
+    const byStatus = {};
+    let final = 0;
+    for (const g of (games || [])) {
+      const s = (g.status || 'scheduled').toUpperCase();
+      byStatus[s] = (byStatus[s] || 0) + 1;
+      if (s.includes('FINAL')) final++;
+    }
+    const total = (games || []).length;
+    const summary = Object.entries(byStatus).map(([s, n]) => `${n} ${s}`).join(', ') || 'none';
+    log(`  Week ${wk} games: ${total} (${summary})${total > 0 && final === total ? '  — all FINAL' : ''}`, 'info');
   }
 }
 
@@ -523,9 +624,12 @@ const HELP = `HotPick Season Simulator — Node runner
 
 Required env:  SB_SECRET_KEY (sb_secret_…)   CRON_SHARED_SECRET (for scoring commands)
 Target (env):  SIM_COMPETITION=${COMPETITION}  SIM_SOURCE=${SOURCE_COMP}  SIM_SEASON=${SEASON_YEAR}
+Writes allowed only on sandboxes: ${[...SIM_WRITE_ALLOWLIST].join(', ')}
+               (status + monitor read ANY competition, including live nfl_2026)
 
 Commands:
   status                         Show config + current-week game status
+  monitor [competition]          READ-ONLY: week state + readiness chain (any comp, incl. nfl_2026)
   run-week [week] [--tester]     Full week: reset→open(seed)→waves→score→complete
   run-season [from] [to] [-t]    Step weeks from..to (default current..22)
   open-picks [week] [--tester]   Open picks + seed fake (and tester) picks
@@ -553,6 +657,13 @@ async function main() {
   const cmd = pos[0];
   if (!cmd || cmd === 'help' || cmd === '--help' || cmd === '-h') { console.log(HELP); return; }
   if (!SECRET_KEY) { log('SB_SECRET_KEY is not set. export SB_SECRET_KEY=\'sb_secret_…\' and retry.', 'error'); process.exit(1); }
+  // Writes never escape the sim sandbox. Read-only commands (status, monitor) may
+  // target any competition — including live production — for monitoring.
+  const READONLY_CMDS = new Set(['status', 'monitor']);
+  if (!READONLY_CMDS.has(cmd)) {
+    try { assertWritableTarget(COMPETITION); }
+    catch (e) { log(e.message, 'error'); process.exit(1); }
+  }
   if (NEEDS_YES.has(cmd) && !flags.yes) {
     log(`"${cmd}" is destructive (multi-week / wipe / reviewer). Re-run with --yes to confirm.`, 'error');
     process.exit(1);
@@ -564,6 +675,7 @@ async function main() {
   try {
     switch (cmd) {
       case 'status': await cmdStatus(); break;
+      case 'monitor': await cmdMonitor(pos[1] || COMPETITION); break;
       case 'run-week': await runEntireWeek(await wkOrCurrent(1), { tester: flags.tester }); break;
       case 'run-season': {
         const from = wkArg(1) ?? (await currentWeek()) ?? 1;
