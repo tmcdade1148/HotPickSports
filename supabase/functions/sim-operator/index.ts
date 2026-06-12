@@ -5,9 +5,11 @@
 // function, five super-admin-gated actions, SANDBOX-ONLY via a hardcoded allowlist.
 //
 // SECURITY / DESIGN (see CLAUDE.md + spec §7):
-//   * verify_jwt = true (CLI default; NOT pinned false in config.toml). The caller's
-//     session JWT gates a server-side is_super_admin check — service role never
-//     leaves the server.
+//   * verify_jwt = false (pinned in config.toml) because the Operator Console is a
+//     browser page and a verify_jwt=true gateway rejects the unauthenticated CORS
+//     preflight. The function owns its gate instead: it reads the caller's session
+//     JWT via auth.getUser() and requires is_super_admin — service role never leaves
+//     the server. Same hybrid pattern as compute-hardware.
 //   * SIM_ALLOWLIST is HARDCODED here, not config-driven. nfl_2026 and every other
 //     competition are refused 403 regardless of what the client sends.
 //   * Built on the REAL weekly engine, not raw week_state writes:
