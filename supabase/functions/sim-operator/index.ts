@@ -39,7 +39,25 @@ const TOM_USER_ID = "7b4f41c8-008d-4319-98e7-8c80ec6edf69";
 // Canonical results source for every NFL sim.
 const SOURCE_COMPETITION = "nfl_2025";
 
-const VALID_ACTIONS = ["advance_week_state", "advance_phase", "jump_to_week", "reset_to_off_season", "auto_pick_tom"];
+const VALID_ACTIONS = ["advance_week_state", "advance_game_day", "advance_phase", "jump_to_week", "reset_to_off_season", "auto_pick_tom"];
+
+// NFL kickoff slots ("waves") derived from kickoff_at — matches tools/sim-runner.mjs.
+const WAVE_ORDER = ["thursday", "sunday1", "sunday4", "snf", "mnf", "other"];
+function detectWave(kickoffAt: string | null): string {
+  if (!kickoffAt) return "other";
+  const d = new Date(kickoffAt);
+  const day = d.getUTCDay(), hour = d.getUTCHours();
+  if (day === 4 && hour >= 17) return "thursday";
+  if (day === 5 && hour < 4) return "thursday";
+  if (day === 0 && hour >= 17 && hour < 20) return "sunday1";
+  if (day === 0 && hour >= 20 && hour < 23) return "sunday4";
+  if (day === 0 && hour >= 23) return "snf";
+  if (day === 1 && hour < 4) return "snf";
+  if (day === 1 && hour >= 17) return "mnf";
+  if (day === 2 && hour < 4) return "mnf";
+  if (day === 5 || day === 6) return "sunday1";
+  return "other";
+}
 
 // CORS — the Operator Console is a browser page, so preflight + headers are required.
 // (This is also why the function runs verify_jwt=false and checks super-admin itself:
@@ -82,6 +100,7 @@ Deno.serve(async (req: Request) => {
 
     switch (action) {
       case "advance_week_state": return await advanceWeekState(caller, admin, competition, authHeader);
+      case "advance_game_day":   return await advanceGameDay(admin, competition);
       case "advance_phase":      return await advancePhase(caller, admin, competition, authHeader);
       case "jump_to_week":       return await jumpToWeek(admin, competition, body.target_week);
       case "reset_to_off_season":return await resetToOffSeason(admin, competition, callerId);
@@ -175,18 +194,96 @@ async function advanceWeekState(caller: any, admin: any, competition: string, au
 async function finalizeGamesFromSource(admin: any, competition: string, year: number, week: number) {
   const { data: simGames } = await admin.from("season_games")
     .select("game_id, home_team, away_team").eq("competition", competition).eq("season_year", year).eq("week", week);
-  const { data: src } = await admin.from("season_games")
-    .select("game_id, home_team, away_team, home_score, away_score, winner_team").eq("competition", SOURCE_COMPETITION).eq("week", week);
-  const byId = new Map((src ?? []).map((g: any) => [String(g.game_id), g]));
-
+  const srcMap = await sourceScoreMap(admin, week);
   for (const g of simGames ?? []) {
-    const sourceId = String(g.game_id).replace(/^sim[_-]/, "");
-    const s: any = byId.get(sourceId);
+    const s: any = srcFor(g.game_id, srcMap);
     const upd = s
       ? { status: "final", home_score: s.home_score, away_score: s.away_score, winner_team: s.winner_team }
       // Fallback when no source row exists (e.g. nfl_demo): deterministic home win.
       : { status: "final", home_score: 20, away_score: 17, winner_team: g.home_team };
     await admin.from("season_games").update(upd).eq("game_id", g.game_id).eq("competition", competition);
+  }
+}
+
+// ── advance_game_day ──────────────────────────────────────────────────────────
+// Walks the live window one NFL wave-substep at a time so the app UI can be checked
+// as the football week progresses: kickoff a wave (scheduled -> in_progress with
+// partial live scores), then final that wave (-> final with the real result), then
+// the next wave, etc. When every game is final, flips to settling + scores the week.
+async function advanceGameDay(admin: any, competition: string) {
+  const cfg = await getConfig(admin, competition);
+  const week = Number(cfg.current_week);
+  const year = Number(cfg.season_year ?? 2025);
+  const phase = String(cfg.current_phase ?? "REGULAR");
+
+  const { data: games } = await admin.from("season_games")
+    .select("game_id, kickoff_at, status").eq("competition", competition).eq("season_year", year).eq("week", week);
+  if (!games || !games.length) return json({ success: false, error: "No games for this week" }, 400);
+
+  const norm = (s: string) => (s || "").toLowerCase();
+  const inProgress = games.filter((g: any) => norm(g.status).includes("progress"));
+  const scheduled = games.filter((g: any) => norm(g.status) === "scheduled");
+  const earliestWave = (set: any[]) => WAVE_ORDER.find(w => set.some((g: any) => detectWave(g.kickoff_at) === w));
+
+  const srcMap = await sourceScoreMap(admin, week);
+
+  // 1. Finish the wave that's currently live before kicking off the next.
+  if (inProgress.length) {
+    const wave = earliestWave(inProgress)!;
+    const ids = inProgress.filter((g: any) => detectWave(g.kickoff_at) === wave).map((g: any) => g.game_id);
+    await finalizeWaveGames(admin, competition, ids, srcMap);
+    const { data: after } = await admin.from("season_games").select("status").eq("competition", competition).eq("season_year", year).eq("week", week);
+    const allFinal = (after ?? []).every((g: any) => norm(g.status).includes("final"));
+    if (allFinal) { await setConfig(admin, competition, "week_state", "settling"); await scoreWeek(admin, competition, year, week, phase); }
+    return json({ success: true, action: "advance_game_day", did: "final", wave, allFinal, state: await getConfig(admin, competition) }, 200);
+  }
+
+  // 2. Otherwise kick off the next scheduled wave.
+  if (scheduled.length) {
+    const wave = earliestWave(scheduled)!;
+    const ids = scheduled.filter((g: any) => detectWave(g.kickoff_at) === wave).map((g: any) => g.game_id);
+    await kickoffWaveGames(admin, competition, ids, srcMap);
+    await setConfig(admin, competition, "week_state", "live");
+    return json({ success: true, action: "advance_game_day", did: "kickoff", wave, state: await getConfig(admin, competition) }, 200);
+  }
+
+  // 3. Everything is final already — settle + score.
+  await setConfig(admin, competition, "week_state", "settling");
+  await scoreWeek(admin, competition, year, week, phase);
+  return json({ success: true, action: "advance_game_day", did: "settle", allFinal: true, state: await getConfig(admin, competition) }, 200);
+}
+
+async function sourceScoreMap(admin: any, week: number): Promise<Map<string, any>> {
+  const { data: src } = await admin.from("season_games")
+    .select("game_id, home_score, away_score, winner_team").eq("competition", SOURCE_COMPETITION).eq("week", week);
+  return new Map((src ?? []).map((g: any) => [String(g.game_id), g]));
+}
+function srcFor(gameId: string, srcMap: Map<string, any>) {
+  return srcMap.get(String(gameId).replace(/^sim[_-]/, "")) || null;
+}
+// Kickoff: in_progress with partial (~half) live scores so the live UI has real numbers.
+async function kickoffWaveGames(admin: any, competition: string, ids: string[], srcMap: Map<string, any>) {
+  for (const id of ids) {
+    const s = srcFor(id, srcMap);
+    const home = s ? Math.floor((s.home_score ?? 14) / 2) : 7;
+    const away = s ? Math.floor((s.away_score ?? 10) / 2) : 3;
+    await admin.from("season_games")
+      .update({ status: "in_progress", home_score: home, away_score: away, current_period: 2, game_clock: "8:30" })
+      .eq("game_id", id).eq("competition", competition);
+  }
+}
+// Final: real result from source (fallback deterministic home win).
+async function finalizeWaveGames(admin: any, competition: string, ids: string[], srcMap: Map<string, any>) {
+  for (const id of ids) {
+    const s = srcFor(id, srcMap);
+    const upd = s
+      ? { status: "final", home_score: s.home_score, away_score: s.away_score, winner_team: s.winner_team, current_period: 4, game_clock: "0:00" }
+      : { status: "final", home_score: 20, away_score: 17, winner_team: null, current_period: 4, game_clock: "0:00" };
+    if (!s) { // deterministic fallback winner = home team
+      const { data: g } = await admin.from("season_games").select("home_team").eq("game_id", id).single();
+      (upd as any).winner_team = g?.home_team ?? null;
+    }
+    await admin.from("season_games").update(upd).eq("game_id", id).eq("competition", competition);
   }
 }
 
