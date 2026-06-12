@@ -637,23 +637,32 @@ function renderTimeline(ws, r) {
   // Stage definition + done condition. Readiness stages key off week_readiness
   // *_status='ok'; week-state stages key off competition_config.week_state.
   const okR = (s) => normStatus(s) === 'ok';
+  const hasR = !!r;
   const stages = [
-    { label: 'Games imported',         done: r ? okR(r.games_status) : false, at: r && r.games_at },
-    { label: 'Odds fetched',           done: r ? okR(r.odds_status)  : false, at: r && r.odds_at },
-    { label: 'Ranks frozen',           done: r ? okR(r.ranks_status) : false, at: r && r.ranks_at },
-    { label: 'Picks open',             done: ['picks_open','locked','live','settling','complete'].includes(ws), at: stateAt('week_state') },
-    { label: 'Picks locked / Kickoff', done: ['locked','live','settling','complete'].includes(ws), at: stateAt('week_state') },
-    { label: 'Scores settling',        done: ['settling','complete'].includes(ws), at: stateAt('week_state') },
-    { label: 'Week complete',          done: ws === 'complete', at: stateAt('week_state') },
+    { label: 'Games imported',         kind: 'r', done: hasR && okR(r.games_status), at: r && r.games_at },
+    { label: 'Odds fetched',           kind: 'r', done: hasR && okR(r.odds_status),  at: r && r.odds_at },
+    { label: 'Ranks frozen',           kind: 'r', done: hasR && okR(r.ranks_status), at: r && r.ranks_at },
+    { label: 'Picks open',             kind: 's', done: ['picks_open','locked','live','settling','complete'].includes(ws), at: stateAt('week_state') },
+    { label: 'Picks locked / Kickoff', kind: 's', done: ['locked','live','settling','complete'].includes(ws), at: stateAt('week_state') },
+    { label: 'Scores settling',        kind: 's', done: ['settling','complete'].includes(ws), at: stateAt('week_state') },
+    { label: 'Week complete',          kind: 's', done: ws === 'complete', at: stateAt('week_state') },
   ];
-  // First not-done stage = current (amber spinner). Everything after = pending.
-  const firstPending = stages.findIndex(s => !s.done);
+  // The "current" (spinner) stage = first not-done ACTIONABLE stage. When no
+  // week_readiness row exists (sims don't run the Tuesday prep pipeline), readiness
+  // stages are N/A — render them grey, and put the spinner on the first not-done
+  // week-state stage instead of spinning forever on "Games imported".
+  let currentIdx = -1;
+  for (let i = 0; i < stages.length; i++) {
+    if (stages[i].done) continue;
+    if (stages[i].kind === 'r' && !hasR) continue;
+    currentIdx = i; break;
+  }
   let html = '';
   stages.forEach((s, i) => {
     let cls, icon;
     if (s.done) { cls = 'done'; icon = '✓'; }
-    else if (i === firstPending) { cls = 'current'; icon = '<span class="spinner"></span>'; }
-    else { cls = 'pending'; icon = '○'; }
+    else if (i === currentIdx) { cls = 'current'; icon = '<span class="spinner"></span>'; }
+    else { cls = 'pending'; icon = s.kind === 'r' && !hasR ? '–' : '○'; }
     const elapsed = s.done && s.at ? timeAgo(s.at) : '';
     html += `<div class="checkpoint ${cls}"><span class="cp-icon">${icon}</span>
       <span class="cp-label">${s.label}</span><span class="cp-elapsed">${elapsed}</span></div>`;

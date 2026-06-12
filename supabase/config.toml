@@ -67,5 +67,10 @@ verify_jwt = false
 [functions.bypass-tester-signup]
 verify_jwt = false
 
-# sim-operator keeps the CLI default verify_jwt = true (not listed): the caller's
-# session JWT gates the server-side is_super_admin check. Do NOT add it here.
+# sim-operator runs verify_jwt = false because the Operator Console is a BROWSER
+# page: a verify_jwt=true gateway rejects the unauthenticated CORS preflight
+# (OPTIONS carries no JWT), breaking every call. The function owns its own gate —
+# it reads the caller's session JWT via auth.getUser() and requires is_super_admin,
+# then enforces the sandbox allowlist. Same hybrid pattern as compute-hardware.
+[functions.sim-operator]
+verify_jwt = false
