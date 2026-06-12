@@ -20,7 +20,8 @@
 //         trigger is inert.
 //       - phase transitions delegate to the audited admin_advance_season_phase RPC
 //         (called via the caller's JWT so its own auth.uid() super-admin check runs).
-//       - complete -> next week delegates to admin_advance_week (same pattern).
+//       - complete -> next week is a SANDBOX advance (bumps the week directly); it
+//         does NOT use admin_advance_week, whose production readiness gate sims fail.
 //   * Reset logs to admin_audit_log BEFORE deleting anything (Hard Rule #17).
 //
 // Sandbox results are sourced from nfl_2025 (sim game_id is `sim_<sourceId>`).
@@ -176,12 +177,19 @@ async function advanceWeekState(caller: any, admin: any, competition: string, au
       break;
 
     case "complete": {
-      // Next week — delegate to the production owner of the weekly clock.
-      // Pass p_next_picks_open_at explicitly (null) so PostgREST resolves the
-      // two-arg signature rather than depending on default-arg omission.
-      const { data, error } = await caller.rpc("admin_advance_week", { p_competition: competition, p_next_picks_open_at: null });
-      if (error) { console.error("[sim-operator] admin_advance_week", error); return json({ success: false, error: friendlyRpcError(error.message) }, 400); }
-      return json({ success: true, action: "advance_week_state", from: "complete", rpc: data, state: await getConfig(admin, competition) }, 200);
+      // Next week — sandbox advance. We do NOT delegate to admin_advance_week: the
+      // production weekly clock gates on a week_readiness row (the Tuesday
+      // import/odds/rank prep pipeline), which sims never run, so it always returns
+      // NOT_READY. The simulator owns its own clock. Bump the week, reopen picks, and
+      // reset the new week's games to a clean pickable slate.
+      const next = week + 1;
+      if (next > 22) return json({ success: false, error: "Already at the final week (22) — advance the phase instead." }, 400);
+      await admin.from("season_games")
+        .update({ status: "scheduled", home_score: null, away_score: null, winner_team: null, is_finalized: false, current_period: null, game_clock: null })
+        .eq("competition", competition).eq("season_year", year).eq("week", next);
+      await setConfig(admin, competition, "current_week", next);
+      await setConfig(admin, competition, "week_state", "picks_open");
+      return json({ success: true, action: "advance_week_state", from: "complete", to_week: next, state: await getConfig(admin, competition) }, 200);
     }
 
     default:
