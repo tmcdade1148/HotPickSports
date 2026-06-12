@@ -60,7 +60,7 @@ export interface GlobalState {
   // one League per user. (`managedClub` is a frozen legacy identifier for the
   // partner/League concept — see REFERENCE §22.)
   managedClub:
-    | {id: string; name: string; clubPoolId: string | null; role: 'chairman' | 'director'}
+    | {id: string; name: string; clubPoolId: string | null; role: 'chairman' | 'director'; logo: string | null}
     | null;
   loadManagedClub: (userId: string) => Promise<void>;
 
