@@ -26,7 +26,6 @@ import {CrossContestStrip} from '@shell/components/home/CrossContestStrip';
 import {OffSeasonActions, PreSeasonActions, ReturningOffCycleActions} from '@shell/components/home/OffCycleActions';
 import {Insight} from '@shell/components/home/Insight';
 import {HomeInbox} from '@shell/components/home/HomeInbox';
-import {PoolModule} from '@shell/components/home/PoolModule';
 import {ContestCarousel} from '@shell/components/home/ContestCarousel';
 import {PartnerModule} from '@shell/components/home/PartnerModule';
 import {resolveHomeState} from '@shell/components/home/resolveHomeState';
@@ -340,15 +339,11 @@ export function HomeScreen() {
   // Contests set up for the upcoming season should see them, not just the
   // Create/Join action stack. visiblePools is already scoped to the active
   // competition (e.g. nfl_2026), so these ARE the upcoming-season Contests.
+  // Off-cycle (off-season / pre-season) contests now use the same swipe
+  // carousel as the in-cycle YOUR CONTESTS section, so the experience is
+  // consistent across all phases (per Tom, 2026-06-15).
   const offCycleContests = visiblePools.length > 0 ? (
-    <View style={styles.section}>
-      <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textTertiary}]}>
-        YOUR {LEXICON.contest.plural.toUpperCase()}
-      </Text>
-      {sortedVisiblePools.map(p => (
-        <PoolModule key={p.id} pool={p} />
-      ))}
-    </View>
+    <ContestCarousel pools={sortedVisiblePools} />
   ) : null;
 
   // Off-cycle Clubs: if the user's upcoming-season Contests carry valid Club
