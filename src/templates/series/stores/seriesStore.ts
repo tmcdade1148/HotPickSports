@@ -217,7 +217,7 @@ export const useSeriesStore = create<SeriesState>((set, get) => ({
       }
     }
 
-    const leaderboard = Array.from(latestByUser.values()).sort(
+    let leaderboard = Array.from(latestByUser.values()).sort(
       (a, b) => b.cumulative_points - a.cumulative_points,
     );
 
@@ -227,10 +227,17 @@ export const useSeriesStore = create<SeriesState>((set, get) => ({
     if (userIds.length > 0) {
       const {data: profiles} = await supabase
         .from('profiles')
-        .select('id, display_name')
+        .select('id, display_name, is_super_admin')
         .in('id', userIds);
 
       if (profiles) {
+        // Hidden super-admin members never appear on the ladder (2026-06-15).
+        const superAdmins = new Set(
+          profiles.filter((p: any) => p.is_super_admin).map((p: any) => p.id),
+        );
+        if (superAdmins.size > 0) {
+          leaderboard = leaderboard.filter(s => !superAdmins.has(s.user_id));
+        }
         for (const p of profiles) {
           if (p.display_name) {
             names[p.id] = p.display_name;
