@@ -618,7 +618,7 @@ export function SettingsScreen({route}: any) {
               <View style={styles.linkLeft}>
                 <Settings size={20} color={colors.primary} />
                 <Text style={[styles.linkText, {color: colors.textPrimary}]}>
-                  Competition: {activeSport?.shortName ?? activeSport?.name ?? '—'}
+                  Competition: {activeSport?.name ?? '—'}
                 </Text>
               </View>
               <ChevronRight size={18} color={colors.textSecondary} />
