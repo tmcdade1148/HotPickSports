@@ -11,6 +11,7 @@ import {
   ScrollView,
   Share,
   StyleSheet,
+  Switch,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -59,6 +60,11 @@ export function PoolSettingsScreen() {
   const poolMembers = useGlobalStore(s => s.poolMembers);
   const updatePoolSettings = useGlobalStore(s => s.updatePoolSettings);
   const archivePool = useGlobalStore(s => s.archivePool);
+  // Super-admin gate for the "designated public Contest" toggle. Only a
+  // platform super-admin can designate which Contest new users land in
+  // via the Join the Public Contest button (per Tom, 2026-06-15).
+  const userProfile = useGlobalStore(s => s.userProfile);
+  const isSuperAdmin = userProfile?.is_super_admin === true;
   // Current user's role in THIS Contest. Drives whether Gaffer-only
   // controls render. Admin = Organizer minus two (no promote/demote,
   // no archive) per the April 2026 spec.
@@ -99,10 +105,31 @@ export function PoolSettingsScreen() {
     return p?.owning_club_id ? s.partnersById?.[p.owning_club_id] : null;
   });
 
-  const pool = useMemo(
+  const poolFromStore = useMemo(
     () => userPools.find(p => p.id === poolId),
     [userPools, poolId],
   );
+  // Fallback fetch: a super-admin owns contests across competitions, but
+  // userPools only holds the ACTIVE competition's pools — so opening settings
+  // for a pool from another competition would miss. Fetch it directly by id so
+  // the screen (and the public toggle) is always reachable for a pool the
+  // caller can read under RLS.
+  const [fetchedPool, setFetchedPool] = useState<(typeof userPools)[number] | null>(null);
+  useEffect(() => {
+    if (poolFromStore || !poolId) {
+      setFetchedPool(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const {data} = await supabase.from('pools').select('*').eq('id', poolId).maybeSingle();
+      if (!cancelled && data) setFetchedPool(data as (typeof userPools)[number]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [poolFromStore, poolId]);
+  const pool = poolFromStore ?? fetchedPool ?? undefined;
 
   // Contest Settings stays HotPick-themed regardless of which Club(s)
   // the Contest is affiliated with. Per the 2026-05-26 product call,
@@ -151,6 +178,36 @@ export function PoolSettingsScreen() {
   // Tracks which Club is being removed from the roster. Must live with the
   // other hooks (above the `if (!pool)` early return) — never below it.
   const [removingPartnerId, setRemovingPartnerId] = useState<string | null>(null);
+  // Designated-public toggle (super-admin only). Mirrors pool.is_designated_public
+  // and flips optimistically; the RPC clears any prior designation in the
+  // same competition (one public Contest per competition).
+  const [designatedPublic, setDesignatedPublic] = useState(false);
+  const [designatingPublic, setDesignatingPublic] = useState(false);
+  useEffect(() => {
+    setDesignatedPublic(pool?.is_designated_public === true);
+  }, [pool?.is_designated_public]);
+
+  const handleToggleDesignatedPublic = async (next: boolean) => {
+    if (designatingPublic) return;
+    setDesignatingPublic(true);
+    setDesignatedPublic(next); // optimistic
+    const {error} = await supabase.rpc('set_designated_public_contest', {
+      p_pool_id: poolId,
+      p_designated: next,
+    });
+    setDesignatingPublic(false);
+    if (error) {
+      setDesignatedPublic(!next); // revert
+      Alert.alert('Could not update', error.message);
+      return;
+    }
+    Alert.alert(
+      next ? 'Public Contest set' : 'Public Contest cleared',
+      next
+        ? `New ${LEXICON.player.plural} who join the public ${LEXICON.contest.singular} will land in "${pool?.name}".`
+        : `"${pool?.name}" is no longer the public ${LEXICON.contest.singular}.`,
+    );
+  };
 
   const fetchCodes = useCallback(async () => {
     if (!poolId) return;
@@ -555,6 +612,35 @@ export function PoolSettingsScreen() {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Public Contest designation — super-admin only. The one Contest
+            per competition that new players land in via the Join the Public
+            Contest button on Home. Toggling here clears any prior designation
+            in the same competition (one public Contest per competition). */}
+        {isSuperAdmin && (
+          <>
+            <Text style={styles.sectionTitle}>Public {LEXICON.contest.singular}</Text>
+            <View style={styles.designatePublicRow}>
+              <View style={styles.designatePublicText}>
+                <Text style={styles.designatePublicLabel}>
+                  Make this the public {LEXICON.contest.singular}
+                </Text>
+                <Text style={styles.designatePublicHint}>
+                  New {LEXICON.player.plural} with no {LEXICON.contest.singular} can
+                  join this one from the Home screen. Only one public{' '}
+                  {LEXICON.contest.singular} per competition.
+                </Text>
+              </View>
+              <Switch
+                value={designatedPublic}
+                onValueChange={handleToggleDesignatedPublic}
+                disabled={designatingPublic}
+                trackColor={{false: colors.border, true: colors.primary}}
+                thumbColor={colors.surface}
+              />
+            </View>
+          </>
+        )}
 
         {/* Welcome Message — auto-posted to Chirps as the Gaffer
             when a new member joins. Sets Contest culture from the
@@ -1023,6 +1109,29 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginTop: spacing.lg,
     marginBottom: spacing.sm,
     paddingHorizontal: spacing.lg,
+  },
+
+  // Public Contest designation row (super-admin only).
+  designatePublicRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  designatePublicText: {
+    flex: 1,
+    paddingRight: spacing.md,
+  },
+  designatePublicLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  designatePublicHint: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
 
   // Admin intro tooltip — one-time per Contest.

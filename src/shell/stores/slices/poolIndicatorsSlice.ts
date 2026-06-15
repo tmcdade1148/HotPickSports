@@ -111,15 +111,18 @@ export const createPoolIndicatorsSlice = (set: Set): PoolIndicatorsSlice => ({
       return;
     }
     weekRankLatestTag = `${competition}::${week}`;
-    const {data: members} = await supabase
+    // Exclude hidden super-admin members so they don't count toward rank or
+    // member totals on the Pool Module card (2026-06-15).
+    const {data: membersRaw} = await supabase
       .from('pool_members')
-      .select('pool_id, user_id')
+      .select('pool_id, user_id, profiles!inner(is_super_admin)')
       .in('pool_id', poolIds)
       .eq('status', 'active');
-    if (!members) {
+    if (!membersRaw) {
       set({weekRankByPool: {}});
       return;
     }
+    const members = membersRaw.filter((r: any) => !r.profiles?.is_super_admin);
     const memberIds = [...new Set(members.map((r: any) => r.user_id))];
     if (memberIds.length === 0) {
       set({weekRankByPool: {}});

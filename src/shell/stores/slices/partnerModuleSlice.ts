@@ -161,7 +161,7 @@ export const createPartnerModuleSlice = (set: Set): PartnerModuleSlice => ({
     const [notifResult, readStateResult] = await Promise.all([
       supabase
         .from('partner_notifications')
-        .select('partner_id, sent_at')
+        .select('partner_id, sent_at, message')
         .in('partner_id', partnerIds)
         .order('sent_at', {ascending: false}),
       supabase
@@ -179,14 +179,18 @@ export const createPartnerModuleSlice = (set: Set): PartnerModuleSlice => ({
       lastReadByPartner.set(row.partner_id, row.last_read_at);
     }
 
-    const indicators: Record<string, {unread: number; mostRecentAt: string | null}> = {};
+    const indicators: Record<
+      string,
+      {unread: number; mostRecentAt: string | null; latestMessage: string | null}
+    > = {};
     for (const pid of partnerIds) {
-      indicators[pid] = {unread: 0, mostRecentAt: null};
+      indicators[pid] = {unread: 0, mostRecentAt: null, latestMessage: null};
     }
 
     for (const row of (notifResult.data ?? []) as Array<{
       partner_id: string;
       sent_at: string;
+      message: string | null;
     }>) {
       const cell = indicators[row.partner_id];
       if (!cell) continue;
@@ -194,8 +198,11 @@ export const createPartnerModuleSlice = (set: Set): PartnerModuleSlice => ({
       if (!lastRead || row.sent_at > lastRead) {
         cell.unread += 1;
       }
+      // Rows arrive newest-first, so the first one we see per partner is the
+      // latest — capture its text for the Home pill preview.
       if (!cell.mostRecentAt || row.sent_at > cell.mostRecentAt) {
         cell.mostRecentAt = row.sent_at;
+        cell.latestMessage = row.message ?? null;
       }
     }
 
@@ -214,7 +221,10 @@ export const createPartnerModuleSlice = (set: Set): PartnerModuleSlice => ({
       partnerIndicators: {
         ...state.partnerIndicators,
         [partnerId]: {
-          ...(state.partnerIndicators[partnerId] ?? {mostRecentAt: null}),
+          ...(state.partnerIndicators[partnerId] ?? {
+            mostRecentAt: null,
+            latestMessage: null,
+          }),
           unread: 0,
         },
       },

@@ -37,8 +37,8 @@ beforeEach(() => {
   // Reset relevant slice state.
   useGlobalStore.setState({
     partnerIndicators: {
-      'partner-1': {unread: 7, mostRecentAt: '2026-05-13T10:00:00Z'},
-      'partner-2': {unread: 2, mostRecentAt: '2026-05-13T11:00:00Z'},
+      'partner-1': {unread: 7, mostRecentAt: '2026-05-13T10:00:00Z', latestMessage: null},
+      'partner-2': {unread: 2, mostRecentAt: '2026-05-13T11:00:00Z', latestMessage: null},
     },
   });
 });
@@ -53,6 +53,7 @@ describe('markPartnerNotificationsRead optimistically clears indicator', () => {
     expect(after['partner-1']).toEqual({
       unread: 0,
       mostRecentAt: '2026-05-13T10:00:00Z',
+      latestMessage: null,
     });
   });
 
@@ -65,6 +66,7 @@ describe('markPartnerNotificationsRead optimistically clears indicator', () => {
     expect(after['partner-2']).toEqual({
       unread: 2,
       mostRecentAt: '2026-05-13T11:00:00Z',
+      latestMessage: null,
     });
   });
 
@@ -96,6 +98,7 @@ describe('markPartnerNotificationsRead optimistically clears indicator', () => {
     expect(after['partner-new']).toEqual({
       unread: 0,
       mostRecentAt: null,
+      latestMessage: null,
     });
   });
 });

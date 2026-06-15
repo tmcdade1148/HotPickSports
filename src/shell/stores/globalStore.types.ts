@@ -124,6 +124,9 @@ export interface GlobalState {
     userId: string,
     inviteCode: string,
   ) => Promise<{pool?: DbPool; error?: string; poolFull?: boolean}>;
+  joinPublicContest: (
+    userId: string,
+  ) => Promise<{pool?: DbPool; error?: string}>;
   loadPersistedPoolId: (competition: string) => Promise<void>;
   clearPoolState: () => void;
 
@@ -329,7 +332,10 @@ export interface GlobalState {
 
   // partnerIndicators — parallel to poolIndicators but keyed by partner_id.
   // Sourced from partner_notifications + partner_notification_read_state.
-  partnerIndicators: Record<string, {unread: number; mostRecentAt: string | null}>;
+  partnerIndicators: Record<
+    string,
+    {unread: number; mostRecentAt: string | null; latestMessage: string | null}
+  >;
   loadPartnerIndicators: (userId: string, partnerIds: string[]) => Promise<void>;
   /** Mark partner notifications read for this user/partner. Called on entry
    *  to PartnerRosterScreen. Clears the indicator on Home. */

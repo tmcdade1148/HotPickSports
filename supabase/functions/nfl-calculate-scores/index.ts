@@ -143,11 +143,13 @@ async function scoreWeek(competition: string, seasonYear: number, week: number) 
     if (hotPickPicks.length > 0) {
       const hotPickUserIds = hotPickPicks.map((p: any) => p.user_id);
 
-      // Fetch poolie_names
+      // Fetch poolie_names + super-admin flag. Super-admins are hidden members
+      // (2026-06-15) — never post their HotPick results to the public feed.
       const { data: profiles } = await supabase
-        .from("profiles").select("id, poolie_name, first_name")
+        .from("profiles").select("id, poolie_name, first_name, is_super_admin")
         .in("id", hotPickUserIds);
       const nameMap = new Map((profiles ?? []).map((p: any) => [p.id, p.poolie_name || p.first_name || "Someone"]));
+      const superAdminIds = new Set((profiles ?? []).filter((p: any) => p.is_super_admin).map((p: any) => p.id));
 
       // Fetch pool memberships
       const { data: pools } = await supabase
@@ -169,6 +171,7 @@ async function scoreWeek(competition: string, seasonYear: number, week: number) 
       // Post one message per user per pool
       const msgs: Promise<any>[] = [];
       for (const pick of hotPickPicks) {
+        if (superAdminIds.has(pick.user_id)) continue; // hidden super-admin
         const game = gameMap.get(pick.game_id);
         if (!game || !game.winner_team) continue;
         const agg = aggByUser.get(pick.user_id);

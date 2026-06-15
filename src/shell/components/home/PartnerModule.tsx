@@ -27,6 +27,7 @@ import {hexToRgba} from '@shared/utils/color';
 import {LogoMark} from './LogoMark';
 import {partnerInitials} from './teamColors';
 import {PerkIcon} from './PerkIcon';
+import {BroadcastPreview} from './BroadcastPreview';
 import {LEXICON} from '@shared/lexicon';
 
 const RECENT_WINDOW_MS = 60 * 60 * 1000;
@@ -132,6 +133,13 @@ export function PartnerModule({partnerId}: PartnerModuleProps) {
           {LEXICON.league.short.toUpperCase()} {LEXICON.perks.toUpperCase()}
         </Text>
       </View>
+      )}
+
+      {/* Latest Club broadcast preview — full text lives on the roster (which
+          this whole card opens). Display-only here so the card stays a single
+          tap target. */}
+      {unread > 0 && indicator?.latestMessage && (
+        <BroadcastPreview label={brandName} message={indicator.latestMessage} unread />
       )}
     </Pressable>
   );

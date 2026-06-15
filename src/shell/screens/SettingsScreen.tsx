@@ -45,7 +45,7 @@ import {spacing, borderRadius} from '@shared/theme';
 import {useColorScheme} from 'react-native';
 import type {BrandConfig} from '@shell/theme/types';
 import {HOTPICK_DEFAULTS, SEMANTIC_COLORS, SEMANTIC_COLORS_DARK, deriveDarkColors, isLightColor} from '@shell/theme/defaults';
-import {getEventsByPriority} from '@sports/registry';
+import {getEventsByPriority, getEventByCompetition} from '@sports/registry';
 import {LEXICON} from '@shared/lexicon';
 
 
@@ -430,6 +430,21 @@ export function SettingsScreen({route}: any) {
                         )}
                       </Text>
                     <View style={styles.poolMetaRow}>
+                      {/* Competition + PUBLIC denotation. The list is scoped to
+                          the active competition, but labelling each pill keeps
+                          it unambiguous which season a Contest belongs to. */}
+                      {!pool.is_global && (
+                        <Text style={[styles.roleBadge, {color: colors.textSecondary}, isBranded && {color: pillTextColor + 'AA'}]}>
+                          {getEventByCompetition(pool.competition)?.shortName ?? pool.competition}
+                          {' · '}
+                        </Text>
+                      )}
+                      {pool.is_public && (
+                        <Text style={[styles.roleBadge, {color: hotpick.primary, fontWeight: '800'}, isBranded && {color: pillTextColor}]}>
+                          {pool.is_designated_public ? 'PUBLIC ★' : 'PUBLIC'}
+                          {' · '}
+                        </Text>
+                      )}
                       {pool.is_suspended && (
                         <Text style={[styles.roleBadge, {color: colors.error, fontWeight: '800'}]}>
                           SUSPENDED ·{' '}
@@ -521,44 +536,48 @@ export function SettingsScreen({route}: any) {
             );
           })}
 
-          {/* Join Contest */}
-          <View style={styles.joinSection}>
-            <Text style={[styles.joinLabel, {color: colors.textPrimary}]}>Have an invite code?</Text>
-            <View style={styles.codeRow}>
-              <TextInput
-                style={[styles.codeInput, {borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surface}]}
-                placeholder="Enter code"
-                placeholderTextColor={colors.textSecondary}
-                value={inviteCode}
-                onChangeText={text => {
-                  setInviteCode(text.toUpperCase());
-                  if (joinError) setJoinError('');
-                }}
-                autoCapitalize="characters"
-                autoCorrect={false}
-                maxLength={12}
-                returnKeyType="go"
-                onSubmitEditing={handleJoinPool}
-              />
-              <TouchableOpacity
-                style={[
-                  styles.joinButton,
-                  {backgroundColor: colors.primary},
-                  (!inviteCode.trim() || joining) && styles.joinButtonDisabled,
-                ]}
-                onPress={handleJoinPool}
-                disabled={!inviteCode.trim() || joining}>
-                {joining ? (
-                  <ActivityIndicator size="small" color={colors.onPrimary} />
-                ) : (
-                  <Text style={styles.joinButtonText}>Join</Text>
-                )}
-              </TouchableOpacity>
+          {/* Join Contest — hidden for super-admins, who are creators-only
+              and can never join a contest (2026-06-15). The Create pill below
+              stays so they can still spin up public contests. */}
+          {!userProfile?.is_super_admin && (
+            <View style={styles.joinSection}>
+              <Text style={[styles.joinLabel, {color: colors.textPrimary}]}>Have an invite code?</Text>
+              <View style={styles.codeRow}>
+                <TextInput
+                  style={[styles.codeInput, {borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surface}]}
+                  placeholder="Enter code"
+                  placeholderTextColor={colors.textSecondary}
+                  value={inviteCode}
+                  onChangeText={text => {
+                    setInviteCode(text.toUpperCase());
+                    if (joinError) setJoinError('');
+                  }}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  maxLength={12}
+                  returnKeyType="go"
+                  onSubmitEditing={handleJoinPool}
+                />
+                <TouchableOpacity
+                  style={[
+                    styles.joinButton,
+                    {backgroundColor: colors.primary},
+                    (!inviteCode.trim() || joining) && styles.joinButtonDisabled,
+                  ]}
+                  onPress={handleJoinPool}
+                  disabled={!inviteCode.trim() || joining}>
+                  {joining ? (
+                    <ActivityIndicator size="small" color={colors.onPrimary} />
+                  ) : (
+                    <Text style={styles.joinButtonText}>Join</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+              {joinError ? (
+                <Text style={[styles.codeError, {color: colors.error}]}>{joinError}</Text>
+              ) : null}
             </View>
-            {joinError ? (
-              <Text style={[styles.codeError, {color: colors.error}]}>{joinError}</Text>
-            ) : null}
-          </View>
+          )}
 
           {/* Create Contest */}
           <TouchableOpacity

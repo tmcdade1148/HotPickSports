@@ -460,11 +460,13 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       get().currentWeek ||
       (typeof cfgMap.current_week === 'number' ? cfgMap.current_week : 1);
 
-    // Step 1: Get ACTIVE pool member user IDs + pool_start_date in parallel
+    // Step 1: Get ACTIVE pool member user IDs + pool_start_date in parallel.
+    // Super-admins are hidden members (2026-06-15) — exclude them from the
+    // ladder via the profiles join so they never appear or affect ranks.
     const [membersResult, poolResult] = await Promise.all([
       supabase
         .from('pool_members')
-        .select('user_id')
+        .select('user_id, profiles!inner(is_super_admin)')
         .eq('pool_id', poolId)
         .eq('status', 'active'),
       supabase
@@ -474,7 +476,9 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
         .single(),
     ]);
 
-    const memberIds = (membersResult.data ?? []).map(m => m.user_id);
+    const memberIds = (membersResult.data ?? [])
+      .filter((m: any) => !m.profiles?.is_super_admin)
+      .map((m: any) => m.user_id);
     if (memberIds.length === 0) {
       set({leaderboard: [], userNames: {}, isLoading: false});
       return;
@@ -588,11 +592,18 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
     }
 
     // Active pool members + pool_start_date (same scoping as fetchLeaderboard).
+    // Exclude hidden super-admin members from the podium.
     const [membersResult, poolResult] = await Promise.all([
-      supabase.from('pool_members').select('user_id').eq('pool_id', poolId).eq('status', 'active'),
+      supabase
+        .from('pool_members')
+        .select('user_id, profiles!inner(is_super_admin)')
+        .eq('pool_id', poolId)
+        .eq('status', 'active'),
       supabase.from('pools').select('pool_start_date').eq('id', poolId).single(),
     ]);
-    const memberIds = (membersResult.data ?? []).map(m => m.user_id);
+    const memberIds = (membersResult.data ?? [])
+      .filter((m: any) => !m.profiles?.is_super_admin)
+      .map((m: any) => m.user_id);
     if (memberIds.length === 0) {
       set({regularSeasonPodium: [], regularSeasonUserPoints: null});
       return;
@@ -701,18 +712,24 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       }
     }
 
-    // Step 1: Get ACTIVE pool member user IDs (never include removed/left)
+    // Step 1: Get ACTIVE pool member user IDs (never include removed/left).
+    // Exclude hidden super-admin members so they don't surface on the week ladder.
     const {data: members} = await supabase
       .from('pool_members')
-      .select('user_id')
+      .select('user_id, profiles!inner(is_super_admin)')
       .eq('pool_id', poolId)
       .eq('status', 'active');
 
-    const memberIds = (members ?? []).map(m => m.user_id);
+    const memberIds = (members ?? [])
+      .filter((m: any) => !m.profiles?.is_super_admin)
+      .map((m: any) => m.user_id);
     if (memberIds.length === 0) {
       set({weekLeaderboard: []});
       return;
     }
+    // Guard the unscored-picks pass below: the pick-submissions RPC returns all
+    // active members, so a super-admin who submitted picks could slip in.
+    const memberIdSet = new Set(memberIds);
 
     // Step 2: Fetch week totals for this week
     const {data: totals} = await supabase
@@ -799,6 +816,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
 
     // Add unscored users who have submitted picks (present in RPC but not yet scored)
     for (const sub of pickSubmissions ?? []) {
+      if (!memberIdSet.has(sub.user_id)) continue; // skip hidden super-admins
       if (!scoredUserIds.has(sub.user_id)) {
         const hp = hotPickByUser[sub.user_id];
         weekEntries.push({

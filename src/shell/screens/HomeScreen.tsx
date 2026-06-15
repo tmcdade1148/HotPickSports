@@ -19,6 +19,7 @@ import {SystemMessageSlot} from '@shell/components/home/SystemMessageSlot';
 import {HomeHeader} from '@shell/components/home/HomeHeader';
 import {IdentityBar} from '@shell/components/home/IdentityBar';
 import {ManagedLeagueModule} from '@shell/components/home/ManagedLeagueModule';
+import {JoinPublicContestButton} from '@shell/components/home/JoinPublicContestButton';
 import {StateHero} from '@shell/components/home/StateHero';
 import {HeroSkeleton} from '@shell/components/home/HeroSkeleton';
 import {CrossContestStrip} from '@shell/components/home/CrossContestStrip';
@@ -380,6 +381,12 @@ export function HomeScreen() {
             <HeroSkeleton />
           ))}
 
+        {/* HotPick super-admin broadcast banner — always sits ABOVE Your
+            Contests in every state (in-cycle and off-cycle), per the
+            2026-06-15 sender-routing model. Scoped to the hidden Platform
+            Pool; self-hides when there's nothing unread. */}
+        <HomeInbox />
+
         {/* Off-cycle layout per the OffseasonPreseasonHome spec
             (May 29, 2026): action stack → cross-Contest strip →
             Clubs teaser. The pool list + Join/Create-as-list-affordance
@@ -408,15 +415,13 @@ export function HomeScreen() {
 
         {showInsight && <Insight />}
 
-        {/* Unread-message banner — pulls broadcasts + moderator notes
-            across every pool (including the hidden Platform Pool that
-            carries platform-wide admin broadcasts). Self-hides when
-            there's nothing unread. */}
-        <HomeInbox />
-
         {/* Board Discovery Tile — routes partner board members (Chairman /
             Director) into League Tools. Self-hides when not on a board. */}
         <ManagedLeagueModule />
+
+        {/* Join-the-public-contest CTA for new users with no contests.
+            Self-hides once the user is in any pool. */}
+        <JoinPublicContestButton />
 
         {/* In-cycle YOUR CONTESTS section — replaced on off-cycle
             states (off_season_idle / pre_season_games) by the action
