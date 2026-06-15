@@ -432,7 +432,10 @@ export function HomeScreen() {
                 contest (Hard Rule #20). When the user has no visible pools we
                 still show the title + the Join/Create affordance below. */}
             {visiblePools.length > 0 ? (
-              <ContestCarousel pools={sortedVisiblePools} />
+              // Inside styles.section (which already provides the top gap) —
+              // drop the carousel's own margin so the space above YOUR CONTESTS
+              // matches the space above YOUR LEAGUES (no double margin).
+              <ContestCarousel pools={sortedVisiblePools} topMargin={false} />
             ) : (
               <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textTertiary}]}>
                 YOUR {LEXICON.contest.plural.toUpperCase()}
