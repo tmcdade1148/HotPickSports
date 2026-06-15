@@ -67,29 +67,30 @@ export function WeekLockStrip() {
       </Text>
       <View style={styles.tallyRow}>
         {dots.map(d => {
-          // Glyph encodes three signals at once:
-          //   "•"     = editable
-          //   "–"     = locked
-          //   color   = green / gray / flame for HotPick
-          //   bold    = the user has a pick on this game
-          const glyph = d.isLocked ? '–' : '•';
+          // One circular dot per game, sized to match the contest-carousel
+          // position dots. Encodes three signals:
+          //   color  = green editable / gray locked / flame HotPick
+          //   size   = HotPick is the slightly larger (highlighted) dot
+          //   filled = the user has a pick on this game (hollow = no pick yet)
           const color = d.isHotPick
             ? colors.primary
             : d.isLocked
             ? colors.textTertiary
             : colors.live;
+          const size = d.isHotPick ? 8 : 6;
+          const filled = d.hasPick || d.isHotPick;
           return (
-            <Text
+            <View
               key={d.gameId}
-              style={[
-                styles.tally,
-                {
-                  color,
-                  fontWeight: d.hasPick || d.isHotPick ? '800' : '500',
-                },
-              ]}>
-              {glyph}
-            </Text>
+              style={{
+                width: size,
+                height: size,
+                borderRadius: size / 2,
+                backgroundColor: filled ? color : 'transparent',
+                borderWidth: filled ? 0 : 1.5,
+                borderColor: color,
+              }}
+            />
           );
         })}
       </View>
@@ -111,13 +112,7 @@ const styles = StyleSheet.create({
   tallyRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 5,
     flexShrink: 1,
-  },
-  tally: {
-    fontSize: 14,
-    lineHeight: 16,
-    textAlign: 'center',
-    minWidth: 6,
   },
 });
