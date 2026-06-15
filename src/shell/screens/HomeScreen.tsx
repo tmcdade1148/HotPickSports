@@ -381,6 +381,12 @@ export function HomeScreen() {
             <HeroSkeleton />
           ))}
 
+        {/* HotPick super-admin broadcast banner — always sits ABOVE Your
+            Contests in every state (in-cycle and off-cycle), per the
+            2026-06-15 sender-routing model. Scoped to the hidden Platform
+            Pool; self-hides when there's nothing unread. */}
+        <HomeInbox />
+
         {/* Off-cycle layout per the OffseasonPreseasonHome spec
             (May 29, 2026): action stack → cross-Contest strip →
             Clubs teaser. The pool list + Join/Create-as-list-affordance
@@ -408,12 +414,6 @@ export function HomeScreen() {
         )}
 
         {showInsight && <Insight />}
-
-        {/* Unread-message banner — pulls broadcasts + moderator notes
-            across every pool (including the hidden Platform Pool that
-            carries platform-wide admin broadcasts). Self-hides when
-            there's nothing unread. */}
-        <HomeInbox />
 
         {/* Board Discovery Tile — routes partner board members (Chairman /
             Director) into League Tools. Self-hides when not on a board. */}

@@ -52,6 +52,7 @@ import {ordinalSuffix} from '@shared/utils/format';
 import type {DbPool} from '@shared/types/database';
 import {LogoMark} from './LogoMark';
 import {partnerInitials} from './teamColors';
+import {BroadcastPreview} from './BroadcastPreview';
 
 export interface PoolModuleProps {
   pool: DbPool;
@@ -220,6 +221,25 @@ export function PoolModule({pool}: PoolModuleProps) {
     pool.partner_id ? s.partnerIndicators?.[pool.partner_id] : undefined,
   );
   const legacyPartnerUnread = legacyPartnerIndicator?.unread ?? 0;
+
+  // Sender-routed broadcast previews (2026-06-15):
+  //   • Gaffer/Assistant broadcast for THIS contest → from recentBroadcasts
+  //     (Platform-pool super-admin broadcasts never appear here; they live in
+  //     the top-of-Home banner).
+  //   • Partner/Club broadcast → the Club this contest is affiliated with
+  //     (owning Club first, then legacy partner_id), from partnerIndicators.
+  const recentBroadcasts = useGlobalStore(s => s.recentBroadcasts);
+  const gafferBroadcast = useMemo(
+    () => (recentBroadcasts ?? []).find(b => b.poolId === pool.id) ?? null,
+    [recentBroadcasts, pool.id],
+  );
+  const pillPartnerId = pool.owning_club_id ?? pool.partner_id ?? null;
+  const pillPartner = useGlobalStore(s =>
+    pillPartnerId ? s.partnersById?.[pillPartnerId] : undefined,
+  );
+  const pillPartnerIndicator = useGlobalStore(s =>
+    pillPartnerId ? s.partnerIndicators?.[pillPartnerId] : undefined,
+  );
 
   // Authoritative multi-Club affiliations from globalStore. Loaded once
   // per HomeScreen mount in loadPoolAffiliations(allPoolIds).
@@ -544,6 +564,33 @@ export function PoolModule({pool}: PoolModuleProps) {
             </Pressable>
           </View>
         </View>
+
+        {/* Gaffer / Assistant broadcast preview for this Contest. Shows the
+            latest message text inline when unread; tap opens the Message
+            Center. HotPick-themed (Hard Rule #9). */}
+        {orgUnread > 0 && gafferBroadcast && (
+          <BroadcastPreview
+            label={`From the ${LEXICON.gaffer.short}`}
+            message={gafferBroadcast.message}
+            unread
+            onPress={() => navigation.navigate('MessageCenter')}
+            accessibilityLabel={`${LEXICON.gaffer.short} message: ${gafferBroadcast.message}, open Message Center`}
+          />
+        )}
+
+        {/* Partner / Club broadcast preview — the Club this Contest is
+            affiliated with. Tap opens that Club's roster (full thread). */}
+        {pillPartnerId &&
+          (pillPartnerIndicator?.unread ?? 0) > 0 &&
+          pillPartnerIndicator?.latestMessage && (
+            <BroadcastPreview
+              label={pillPartner?.name ?? LEXICON.league.short}
+              message={pillPartnerIndicator.latestMessage}
+              unread
+              onPress={() => goToPartnerRoster(pillPartner?.slug)}
+              accessibilityLabel={`${pillPartner?.name ?? LEXICON.league.short} message: ${pillPartnerIndicator.latestMessage}, open Club roster`}
+            />
+          )}
 
         {/* AFFILIATED — affiliation zone. Logo cluster + text scales with N.
             Each Club name is its own Pressable that navigates to that

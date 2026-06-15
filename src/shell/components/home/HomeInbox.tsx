@@ -1,22 +1,18 @@
-// HomeInbox — small card at the top of Home indicating unread messages.
+// HomeInbox — top-of-Home banner for HotPick SUPER-ADMIN broadcasts only.
 //
-// Architecture:
-//   - poolIds cached in component state, fetched once at mount (and
-//     refetched only when membership changes). Membership rarely
-//     shifts mid-session, so re-querying it on every Realtime tick
-//     was wasted work.
-//   - Realtime subscription is filtered to pool_id=in.(...) for the
-//     user's pools — was previously firing on every organizer_notifications
-//     INSERT platform-wide, including broadcasts to pools the user
-//     has nothing to do with.
-//   - The recompute path (on Realtime tick) only runs the two
-//     unread/read-state queries; it doesn't re-fetch membership.
+// Per the 2026-06-15 sender-routing model, the three broadcast sources each
+// have their own surface:
+//   • Super-admin (HotPick) broadcasts → THIS banner, always above Your Contests
+//   • Gaffer / Assistant Gaffer broadcasts → the relevant Contest pill
+//   • Partner / Club broadcasts → the Partners pill + affiliated Contest pills
 //
-// "Unread" = organizer_notifications rows with sent_at >
-// notification_read_state.last_read_at, scoped to pools the user is
-// an active member of (including the hidden Platform Pool, which
-// every user is auto-enrolled in — that's where Super Admin platform
-// broadcasts land).
+// Super-admin broadcasts land in the hidden Platform Pool (is_global +
+// is_hidden_from_users), which every user is auto-enrolled in. So this banner
+// scopes its unread/read-state queries to that ONE pool — Gaffer pool
+// broadcasts no longer surface here (they render on their own Contest pill).
+//
+// "Unread" = organizer_notifications rows on the Platform Pool with sent_at >
+// max(notification_read_state.last_read_at, joined_at).
 
 import React, {useCallback, useEffect, useState} from 'react';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
@@ -34,6 +30,12 @@ export function HomeInbox() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
   const user = useGlobalStore(s => s.user);
+  // The hidden Platform Pool is where super-admin "All Users" broadcasts land.
+  // This banner is scoped to it alone; Gaffer pool broadcasts render on the
+  // Contest pill instead.
+  const platformPoolId = useGlobalStore(
+    s => s.userPools.find(p => p.is_global && p.is_hidden_from_users)?.id ?? null,
+  );
 
   // Track join time per pool — a broadcast sent BEFORE the user joined a pool
   // is not "unread" for them (otherwise every new signup inherits old pool
@@ -64,13 +66,15 @@ export function HomeInbox() {
   }, [user?.id]);
 
   const recompute = useCallback(async () => {
-    if (!user?.id || !pools || pools.length === 0) {
+    // Scope to the Platform Pool only — this banner shows super-admin broadcasts.
+    const scoped = (pools ?? []).filter(p => p.pool_id === platformPoolId);
+    if (!user?.id || !platformPoolId || scoped.length === 0) {
       setUnread(0);
       setLatestPreview(null);
       return;
     }
-    const poolIds = pools.map(p => p.pool_id);
-    const joinedByPool = new Map(pools.map(p => [p.pool_id, p.joined_at]));
+    const poolIds = scoped.map(p => p.pool_id);
+    const joinedByPool = new Map(scoped.map(p => [p.pool_id, p.joined_at]));
     const thirtyDaysAgo = new Date(Date.now() - THIRTY_DAYS_MS).toISOString();
     const [{data: msgs}, {data: readState}] = await Promise.all([
       supabase
@@ -119,7 +123,7 @@ export function HomeInbox() {
     }
     setUnread(unreadCount);
     setLatestPreview(mostRecentUnread?.message ?? null);
-  }, [user?.id, pools]);
+  }, [user?.id, pools, platformPoolId]);
 
   useEffect(() => {
     recompute();
@@ -129,8 +133,7 @@ export function HomeInbox() {
   // postgres_changes filter must be a single comma-list inside
   // `pool_id=in.(...)`. Channel re-binds when poolIds changes.
   useEffect(() => {
-    if (!user?.id || !pools || pools.length === 0) return;
-    const inList = pools.map(p => p.pool_id).join(',');
+    if (!user?.id || !platformPoolId) return;
     const channel = supabase
       .channel(`home-inbox-${user.id}`)
       .on(
@@ -139,7 +142,7 @@ export function HomeInbox() {
           event: 'INSERT',
           schema: 'public',
           table: 'organizer_notifications',
-          filter: `pool_id=in.(${inList})`,
+          filter: `pool_id=eq.${platformPoolId}`,
         },
         () => recompute(),
       )
@@ -157,7 +160,7 @@ export function HomeInbox() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id, pools, recompute]);
+  }, [user?.id, platformPoolId, recompute]);
 
   if (unread === 0) return null;
 
@@ -173,13 +176,13 @@ export function HomeInbox() {
         },
       ]}
       accessibilityRole="button"
-      accessibilityLabel={`${unread} unread ${unread === 1 ? 'message' : 'messages'} — open Message Center`}>
+      accessibilityLabel={`${unread} new HotPick ${unread === 1 ? 'announcement' : 'announcements'} — open Message Center`}>
       <View style={[styles.iconWrap, {backgroundColor: colors.primary}]}>
         <Mail size={18} color={colors.onPrimary} strokeWidth={2.25} />
       </View>
       <View style={{flex: 1, minWidth: 0}}>
         <Text style={[bodyType.bold, {color: colors.primary, fontSize: 13}]}>
-          {unread} new {unread === 1 ? 'message' : 'messages'}
+          {unread === 1 ? 'HotPick announcement' : `${unread} HotPick announcements`}
         </Text>
         {latestPreview && (
           <Text
