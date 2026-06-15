@@ -116,6 +116,14 @@ function OffCycleActionStack({joinSubtitle}: {joinSubtitle: string}) {
 
   return (
     <View style={styles.stack}>
+      <ActionBtn
+        variant="orangeOutline"
+        title="See how it works"
+        subtitle="play a quick demo week"
+        icon={<Play size={20} color={colors.primary} strokeWidth={2.25} fill={colors.primary} />}
+        onPress={launchDemo}
+        accessibilityLabel="Play a quick demo week to see how it works"
+      />
       <View style={styles.pillRow}>
         <ContestActionPill
           Icon={KeyRound}
@@ -132,14 +140,6 @@ function OffCycleActionStack({joinSubtitle}: {joinSubtitle: string}) {
           accessibilityLabel="Create a new Contest and invite friends"
         />
       </View>
-      <ActionBtn
-        variant="orangeOutline"
-        title="See how it works"
-        subtitle="play a quick demo week"
-        icon={<Play size={20} color={colors.primary} strokeWidth={2.25} fill={colors.primary} />}
-        onPress={launchDemo}
-        accessibilityLabel="Play a quick demo week to see how it works"
-      />
     </View>
   );
 }
@@ -163,6 +163,14 @@ export function ReturningOffCycleActions() {
 
   return (
     <View style={styles.stack}>
+      <ActionBtn
+        variant="orangeOutline"
+        title="See how it works"
+        subtitle="play a quick demo week"
+        icon={<Play size={20} color={colors.primary} strokeWidth={2.25} fill={colors.primary} />}
+        onPress={launchDemo}
+        accessibilityLabel="Play a quick demo week to see how it works"
+      />
       <View style={styles.pillRow}>
         <ContestActionPill
           Icon={KeyRound}
@@ -179,14 +187,6 @@ export function ReturningOffCycleActions() {
           accessibilityLabel="Create a Contest and invite friends"
         />
       </View>
-      <ActionBtn
-        variant="orangeOutline"
-        title="See how it works"
-        subtitle="play a quick demo week"
-        icon={<Play size={20} color={colors.primary} strokeWidth={2.25} fill={colors.primary} />}
-        onPress={launchDemo}
-        accessibilityLabel="Play a quick demo week to see how it works"
-      />
     </View>
   );
 }
