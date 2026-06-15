@@ -573,60 +573,6 @@ export function SettingsScreen({route}: any) {
         </View>
       )}
 
-      {/* About & Legal section */}
-      <Text style={[styles.groupLabel, {color: colors.textSecondary}]}>About & Legal</Text>
-      <View style={[styles.groupCard, {backgroundColor: colors.surface}]}>
-        <TouchableOpacity
-          style={styles.groupRow}
-          onPress={() => navigation.navigate('Instructions')}>
-          <View style={styles.linkLeft}>
-            <BookOpen size={20} color={colors.primary} />
-            <Text style={[styles.linkText, {color: colors.textPrimary}]}>How HotPick Works</Text>
-          </View>
-          <ChevronRight size={18} color={colors.textSecondary} />
-        </TouchableOpacity>
-        <View style={[styles.groupDivider, {backgroundColor: colors.border}]} />
-        <TouchableOpacity
-          style={styles.groupRow}
-          onPress={() => navigation.navigate('About')}>
-          <View style={styles.linkLeft}>
-            <Info size={20} color={colors.primary} />
-            <Text style={[styles.linkText, {color: colors.textPrimary}]}>About HotPick Sports</Text>
-          </View>
-          <ChevronRight size={18} color={colors.textSecondary} />
-        </TouchableOpacity>
-        <View style={[styles.groupDivider, {backgroundColor: colors.border}]} />
-        <TouchableOpacity
-          style={styles.groupRow}
-          onPress={() => navigation.navigate('PrivacyPolicy')}>
-          <View style={styles.linkLeft}>
-            <Shield size={20} color={colors.primary} />
-            <Text style={[styles.linkText, {color: colors.textPrimary}]}>Privacy Policy</Text>
-          </View>
-          <ChevronRight size={18} color={colors.textSecondary} />
-        </TouchableOpacity>
-        <View style={[styles.groupDivider, {backgroundColor: colors.border}]} />
-        <TouchableOpacity
-          style={styles.groupRow}
-          onPress={() => navigation.navigate('TermsOfService')}>
-          <View style={styles.linkLeft}>
-            <FileText size={20} color={colors.primary} />
-            <Text style={[styles.linkText, {color: colors.textPrimary}]}>Terms of Service</Text>
-          </View>
-          <ChevronRight size={18} color={colors.textSecondary} />
-        </TouchableOpacity>
-        <View style={[styles.groupDivider, {backgroundColor: colors.border}]} />
-        <TouchableOpacity
-          style={styles.groupRow}
-          onPress={() => navigation.navigate('CommunityGuidelines')}>
-          <View style={styles.linkLeft}>
-            <MessageSquare size={20} color={colors.primary} />
-            <Text style={[styles.linkText, {color: colors.textPrimary}]}>Community Guidelines</Text>
-          </View>
-          <ChevronRight size={18} color={colors.textSecondary} />
-        </TouchableOpacity>
-      </View>
-
       {/* Admin section — the single home for all admin entry points.
           Visible to platform super_admins and/or Club managers. Each row
           is individually gated: the super-admin tools (HotPick Admin hub,
@@ -703,6 +649,60 @@ export function SettingsScreen({route}: any) {
           </View>
         </>
       )}
+
+      {/* About & Legal section */}
+      <Text style={[styles.groupLabel, {color: colors.textSecondary}]}>About & Legal</Text>
+      <View style={[styles.groupCard, {backgroundColor: colors.surface}]}>
+        <TouchableOpacity
+          style={styles.groupRow}
+          onPress={() => navigation.navigate('Instructions')}>
+          <View style={styles.linkLeft}>
+            <BookOpen size={20} color={colors.primary} />
+            <Text style={[styles.linkText, {color: colors.textPrimary}]}>How HotPick Works</Text>
+          </View>
+          <ChevronRight size={18} color={colors.textSecondary} />
+        </TouchableOpacity>
+        <View style={[styles.groupDivider, {backgroundColor: colors.border}]} />
+        <TouchableOpacity
+          style={styles.groupRow}
+          onPress={() => navigation.navigate('About')}>
+          <View style={styles.linkLeft}>
+            <Info size={20} color={colors.primary} />
+            <Text style={[styles.linkText, {color: colors.textPrimary}]}>About HotPick Sports</Text>
+          </View>
+          <ChevronRight size={18} color={colors.textSecondary} />
+        </TouchableOpacity>
+        <View style={[styles.groupDivider, {backgroundColor: colors.border}]} />
+        <TouchableOpacity
+          style={styles.groupRow}
+          onPress={() => navigation.navigate('PrivacyPolicy')}>
+          <View style={styles.linkLeft}>
+            <Shield size={20} color={colors.primary} />
+            <Text style={[styles.linkText, {color: colors.textPrimary}]}>Privacy Policy</Text>
+          </View>
+          <ChevronRight size={18} color={colors.textSecondary} />
+        </TouchableOpacity>
+        <View style={[styles.groupDivider, {backgroundColor: colors.border}]} />
+        <TouchableOpacity
+          style={styles.groupRow}
+          onPress={() => navigation.navigate('TermsOfService')}>
+          <View style={styles.linkLeft}>
+            <FileText size={20} color={colors.primary} />
+            <Text style={[styles.linkText, {color: colors.textPrimary}]}>Terms of Service</Text>
+          </View>
+          <ChevronRight size={18} color={colors.textSecondary} />
+        </TouchableOpacity>
+        <View style={[styles.groupDivider, {backgroundColor: colors.border}]} />
+        <TouchableOpacity
+          style={styles.groupRow}
+          onPress={() => navigation.navigate('CommunityGuidelines')}>
+          <View style={styles.linkLeft}>
+            <MessageSquare size={20} color={colors.primary} />
+            <Text style={[styles.linkText, {color: colors.textPrimary}]}>Community Guidelines</Text>
+          </View>
+          <ChevronRight size={18} color={colors.textSecondary} />
+        </TouchableOpacity>
+      </View>
 
       {/* Get Help — fires a mailto: to the support inbox. v1 fallback per
           the 2026-05-27 product call (deferred a fuller in-app ticket
