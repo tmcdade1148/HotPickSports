@@ -188,6 +188,9 @@ export function ProfileSetupScreen({navigation}: any) {
               selectedKey={selectedAvatar}
               onSelect={avatar => setSelectedAvatar(avatar.key)}
             />
+            <Text style={styles.hint}>
+              We'll have more avatars to choose from soon. Please stay tuned.
+            </Text>
           </View>
 
           {/* CTA */}
