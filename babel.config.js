@@ -1,5 +1,11 @@
 module.exports = {
-  presets: ['module:@react-native/babel-preset'],
+  // Expo SDK projects MUST use babel-preset-expo, not @react-native/babel-preset.
+  // The RN preset's transform-runtime injects a bare `require(...)` into Expo's
+  // injected prelude polyfills (e.g. web-streams-polyfill), which crashes the dev
+  // bundle at bootstrap: "[runtime not ready]: Property 'require' doesn't exist"
+  // (the require runtime isn't defined yet in the polyfill prelude). babel-preset-expo
+  // is polyfill-aware and also inlines process.env.EXPO_OS. See REFERENCE.md §24.
+  presets: ['babel-preset-expo'],
   plugins: [
     [
       'module-resolver',
@@ -14,6 +20,6 @@ module.exports = {
         },
       },
     ],
-    'react-native-reanimated/plugin', // must be last
+    'react-native-worklets/plugin', // must be last (Reanimated 4 / worklets)
   ],
 };
