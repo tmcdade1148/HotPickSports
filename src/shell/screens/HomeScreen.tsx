@@ -390,7 +390,7 @@ export function HomeScreen() {
             the action stack owns Create/Join, and the Clubs teaser
             shrinks to one line. RecruiterBand is silent in the spec,
             so we drop it from these states. */}
-        {homeState === 'off_season_idle' && (
+        {configLoaded && homeState === 'off_season_idle' && (
           <>
             {offCycleContests}
             {visiblePools.length > 0 ? <ReturningOffCycleActions /> : <OffSeasonActions />}
@@ -398,7 +398,7 @@ export function HomeScreen() {
             {offCycleClubs ?? <ClubsTeaser />}
           </>
         )}
-        {homeState === 'pre_season_games' && (
+        {configLoaded && homeState === 'pre_season_games' && (
           <>
             {/* Directly under the hero's kickoff countdown. */}
             <PreseasonPicksOpenLine />
@@ -422,7 +422,8 @@ export function HomeScreen() {
         {/* In-cycle YOUR CONTESTS section — replaced on off-cycle
             states (off_season_idle / pre_season_games) by the action
             stack + cross-Contest strip above. */}
-        {showPoolStack
+        {configLoaded
+          && showPoolStack
           && homeState !== 'off_season_idle'
           && homeState !== 'pre_season_games' && (
           <View style={styles.section}>
@@ -463,7 +464,8 @@ export function HomeScreen() {
           </View>
         )}
 
-        {showPartnerStack
+        {configLoaded
+          && showPartnerStack
           && homeState !== 'off_season_idle'
           && homeState !== 'pre_season_games' && (
           // In-cycle YOUR CLUBS section with the full Gaffer / Perks
