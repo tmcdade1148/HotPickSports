@@ -21,6 +21,7 @@ import {useTheme} from '@shell/theme/hooks';
 import {bodyType, spacing, borderRadius} from '@shared/theme';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
+import {ContestActionPill} from '@shell/components/ContestActionPill';
 
 // Shared demo launcher — enters the nfl_demo sandbox (snapshotting the prior
 // active selection), resets to a clean slate (fresh games + no picks, even if a
@@ -115,14 +116,22 @@ function OffCycleActionStack({joinSubtitle}: {joinSubtitle: string}) {
 
   return (
     <View style={styles.stack}>
-      <ActionBtn
-        variant="primary"
-        title="Create a Contest"
-        subtitle="and invite your friends"
-        icon={<Plus size={20} color={colors.onPrimary} strokeWidth={2.25} />}
-        onPress={() => navigation.navigate('CreatePool')}
-        accessibilityLabel="Create a new Contest and invite friends"
-      />
+      <View style={styles.pillRow}>
+        <ContestActionPill
+          Icon={KeyRound}
+          label="Join a Contest"
+          sublabel={joinSubtitle}
+          onPress={() => navigation.navigate('JoinPool')}
+          accessibilityLabel="Join a Contest with an invite code"
+        />
+        <ContestActionPill
+          Icon={Plus}
+          label="Create a Contest"
+          sublabel="and invite friends"
+          onPress={() => navigation.navigate('CreatePool')}
+          accessibilityLabel="Create a new Contest and invite friends"
+        />
+      </View>
       <ActionBtn
         variant="orangeOutline"
         title="See how it works"
@@ -130,14 +139,6 @@ function OffCycleActionStack({joinSubtitle}: {joinSubtitle: string}) {
         icon={<Play size={20} color={colors.primary} strokeWidth={2.25} fill={colors.primary} />}
         onPress={launchDemo}
         accessibilityLabel="Play a quick demo week to see how it works"
-      />
-      <ActionBtn
-        variant="neutralOutline"
-        title="Join a Contest"
-        subtitle={joinSubtitle}
-        icon={<KeyRound size={20} color={colors.textPrimary} strokeWidth={2.25} />}
-        onPress={() => navigation.navigate('JoinPool')}
-        accessibilityLabel="Join a Contest with an invite code"
       />
     </View>
   );
@@ -162,23 +163,21 @@ export function ReturningOffCycleActions() {
 
   return (
     <View style={styles.stack}>
-      <View style={styles.lightRow}>
-        <Pressable
-          onPress={() => navigation.navigate('CreatePool')}
-          style={({pressed}) => [styles.lightBtn, {borderColor: colors.border, opacity: pressed ? 0.7 : 1}]}
-          accessibilityRole="button"
-          accessibilityLabel="Create a Contest and invite friends">
-          <Plus size={18} color={colors.primary} strokeWidth={2.25} />
-          <Text style={[bodyType.bold, styles.lightLabel, {color: colors.textPrimary}]}>Create a Contest</Text>
-        </Pressable>
-        <Pressable
+      <View style={styles.pillRow}>
+        <ContestActionPill
+          Icon={KeyRound}
+          label="Join a Contest"
+          sublabel="with a code"
           onPress={() => navigation.navigate('JoinPool')}
-          style={({pressed}) => [styles.lightBtn, {borderColor: colors.border, opacity: pressed ? 0.7 : 1}]}
-          accessibilityRole="button"
-          accessibilityLabel="Join a Contest with an invite code">
-          <KeyRound size={18} color={colors.primary} strokeWidth={2.25} />
-          <Text style={[bodyType.bold, styles.lightLabel, {color: colors.textPrimary}]}>Join a Contest</Text>
-        </Pressable>
+          accessibilityLabel="Join a Contest with an invite code"
+        />
+        <ContestActionPill
+          Icon={Plus}
+          label="Create a Contest"
+          sublabel="and invite friends"
+          onPress={() => navigation.navigate('CreatePool')}
+          accessibilityLabel="Create a Contest and invite friends"
+        />
       </View>
       <ActionBtn
         variant="orangeOutline"
@@ -215,17 +214,6 @@ const styles = StyleSheet.create({
   labelWrap: {flex: 1, gap: 1},
   titleText: {fontSize: 16, letterSpacing: 0.2},
   subText:   {fontSize: 13, lineHeight: 17},
-  // Compact 'create / join another' row for returning users.
-  lightRow: {flexDirection: 'row', gap: spacing.sm},
-  lightBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.sm + 2,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1.5,
-  },
-  lightLabel: {fontSize: 14, letterSpacing: 0.2},
+  // Row holding the Join/Create pills (stack already pads horizontally).
+  pillRow: {flexDirection: 'row', gap: 10},
 });
