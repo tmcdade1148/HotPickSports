@@ -96,6 +96,7 @@ export function PoolMembersScreen() {
   // the indicators won't render for them anyway.
   const [notesByUser, setNotesByUser] = useState<Record<string, string>>({});
   const [editingMember, setEditingMember] = useState<MemberWithProfile | null>(null);
+  const [actionMember, setActionMember] = useState<MemberWithProfile | null>(null);
   const [editNoteText, setEditNoteText] = useState('');
   const [savingNote, setSavingNote] = useState(false);
 
@@ -217,35 +218,29 @@ export function PoolMembersScreen() {
     }
   }, [poolId, fetchPoolMembers]);
 
-  const handleMemberAction = useCallback(
-    (member: MemberWithProfile) => {
-      // No actions on self or on organizer
-      if (member.user_id === user?.id) return;
-      if (member.role === 'organizer') return;
-
-      // Admin can only remove members, not other admins
-      if (isAdmin && member.role === 'admin') return;
-
+  // Build the action list for a member. Rendered in a custom modal (below) —
+  // a native Alert can't be used here because Android caps alerts at 3 buttons
+  // and silently dropped the Cancel. Each confirm step is still its own alert.
+  const getMemberActions = useCallback(
+    (member: MemberWithProfile): {label: string; destructive?: boolean; onPress: () => void}[] => {
       const memberName = getDisplayName(member.profile ?? null);
-      const buttons: {text: string; onPress: () => void; style?: 'destructive' | 'cancel'}[] = [];
+      const actions: {label: string; destructive?: boolean; onPress: () => void}[] = [];
 
-      // Note — Gaffer + Admin both can read/write. Available before
-      // role mgmt actions so it's the most-frequent action sitting at
-      // the top of the sheet (per Gaffer Pass §4.3).
       const hasNote = !!notesByUser[member.user_id];
-      buttons.push({
-        text: hasNote ? 'Edit note' : 'Add note',
-        onPress: () => openNoteEditor(member),
+      actions.push({
+        label: hasNote ? 'Edit note' : 'Add note',
+        onPress: () => {
+          setActionMember(null);
+          openNoteEditor(member);
+        },
       });
 
-      // Organizer can promote/demote. Both transitions get a
-      // confirmation dialog that spells out what changes for the
-      // affected member — per Gaffer Pass §4.4.
       if (isOrganizer) {
         if (member.role === 'member') {
-          buttons.push({
-            text: `Promote to ${assistantLabel}`,
+          actions.push({
+            label: `Promote to ${assistantLabel}`,
             onPress: () => {
+              setActionMember(null);
               Alert.alert(
                 `Promote ${memberName} to ${assistantLabel}?`,
                 `${assistantLabel}s of this Contest can:\n` +
@@ -274,9 +269,10 @@ export function PoolMembersScreen() {
             },
           });
         } else if (member.role === 'admin') {
-          buttons.push({
-            text: `Demote to ${memberLabel}`,
+          actions.push({
+            label: `Demote to ${memberLabel}`,
             onPress: () => {
+              setActionMember(null);
               Alert.alert(
                 `Demote ${memberName} to ${memberLabel}?`,
                 "They'll lose access to:\n" +
@@ -305,11 +301,11 @@ export function PoolMembersScreen() {
         }
       }
 
-      // Remove (organizer can remove anyone except organizer; admin can remove members only)
-      buttons.push({
-        text: 'Remove from Contest',
-        style: 'destructive',
+      actions.push({
+        label: 'Remove from Contest',
+        destructive: true,
         onPress: () => {
+          setActionMember(null);
           Alert.alert(
             'Remove Member',
             `Remove ${memberName} from this Contest? They will no longer see Contest content.`,
@@ -330,22 +326,29 @@ export function PoolMembersScreen() {
         },
       });
 
-      buttons.push({text: 'Cancel', style: 'cancel', onPress: () => {}});
-
-      Alert.alert(memberName, `Role: ${roleLabel(member.role, isLeagueTier)}`, buttons);
+      return actions;
     },
     [
       poolId,
-      user?.id,
       isOrganizer,
-      isAdmin,
-      isLeagueTier,
       assistantLabel,
       memberLabel,
       updateMemberRole,
       removePoolMember,
       notesByUser,
+      openNoteEditor,
     ],
+  );
+
+  const handleMemberAction = useCallback(
+    (member: MemberWithProfile) => {
+      // No actions on self or on organizer; admin can't act on another admin.
+      if (member.user_id === user?.id) return;
+      if (member.role === 'organizer') return;
+      if (isAdmin && member.role === 'admin') return;
+      setActionMember(member);
+    },
+    [user?.id, isAdmin],
   );
 
   const renderMember = ({item}: {item: MemberWithProfile}) => {
@@ -528,6 +531,56 @@ export function PoolMembersScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Member action sheet — replaces the native Alert (Android capped it at
+          3 buttons and dropped Cancel). Always shows every available action
+          plus a clear Cancel. */}
+      <Modal
+        visible={actionMember !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setActionMember(null)}>
+        <View style={styles.modalBackdrop}>
+          <Pressable
+            style={styles.modalBackdropPress}
+            onPress={() => setActionMember(null)}
+          />
+          <View style={styles.actionCard}>
+            <Text style={styles.actionTitle} numberOfLines={1}>
+              {actionMember ? getDisplayName(actionMember.profile ?? null) : ''}
+            </Text>
+            <Text style={styles.actionSubtitle}>
+              {actionMember ? roleLabel(actionMember.role, isLeagueTier) : ''}
+            </Text>
+            <View style={styles.actionList}>
+              {actionMember &&
+                getMemberActions(actionMember).map(action => (
+                  <TouchableOpacity
+                    key={action.label}
+                    style={styles.actionRow}
+                    onPress={action.onPress}
+                    accessibilityRole="button"
+                    accessibilityLabel={action.label}>
+                    <Text
+                      style={[
+                        styles.actionRowText,
+                        action.destructive && styles.actionRowTextDestructive,
+                      ]}>
+                      {action.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+            </View>
+            <TouchableOpacity
+              style={styles.actionCancel}
+              onPress={() => setActionMember(null)}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel">
+              <Text style={styles.actionCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -649,6 +702,55 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
     gap: spacing.sm,
+  },
+  actionCard: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
+  },
+  actionTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.textPrimary,
+    textAlign: 'center',
+  },
+  actionSubtitle: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 2,
+    marginBottom: spacing.md,
+  },
+  actionList: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  actionRow: {
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    alignItems: 'center',
+  },
+  actionRowText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  actionRowTextDestructive: {
+    color: colors.error,
+  },
+  actionCancel: {
+    marginTop: spacing.md,
+    paddingVertical: 14,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+  },
+  actionCancelText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textSecondary,
   },
   noteHeader: {
     flexDirection: 'row',
