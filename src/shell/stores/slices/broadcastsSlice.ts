@@ -20,10 +20,10 @@ export const createBroadcastsSlice = (set: Set, get: Get): BroadcastsSlice => ({
     }
 
     const poolIds = userPools.map(p => p.id);
-    // 30-day window to match the HomeInbox unread badge (was 24h, which made
-    // the badge count messages the list couldn't show).
+    // 10-day window — matches the Message Center retention + HomeInbox badge so
+    // pill previews and unread counts age out together.
     const windowStart = new Date(
-      Date.now() - 30 * 24 * 60 * 60 * 1000,
+      Date.now() - 10 * 24 * 60 * 60 * 1000,
     ).toISOString();
 
     // Join times — a broadcast sent before the user joined a pool isn't theirs,

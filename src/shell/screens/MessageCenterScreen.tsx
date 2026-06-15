@@ -88,29 +88,32 @@ export function MessageCenterScreen() {
     }
     const items: MessageItem[] = [];
 
-    // 1. Fetch all broadcasts for user's pools (last 30 days)
-    const thirtyDaysAgo = new Date(
-      Date.now() - 30 * 24 * 60 * 60 * 1000,
+    // Messages time out of the Message Center after 10 days (per Tom,
+    // 2026-06-15). Kept in sync with the HomeInbox + recent-broadcasts
+    // unread windows so a message never counts as unread after it has
+    // aged out of this list.
+    const tenDaysAgo = new Date(
+      Date.now() - 10 * 24 * 60 * 60 * 1000,
     ).toISOString();
 
-    // 1. Fetch broadcasts for user's pools (last 30 days)
+    // 1. Fetch broadcasts for user's pools (last 10 days)
     const {data: broadcasts} = await supabase
       .from('organizer_notifications')
       .select('id, pool_id, message, sent_at, organizer_id, notification_type')
       .in('pool_id', poolIds)
       .eq('notification_type', 'broadcast')
-      .gte('sent_at', thirtyDaysAgo)
+      .gte('sent_at', tenDaysAgo)
       .order('sent_at', {ascending: false})
       .limit(50);
 
-    // 2. Fetch moderator notes targeted at this user
+    // 2. Fetch moderator notes targeted at this user (last 10 days)
     const {data: modNotes} = await supabase
       .from('organizer_notifications')
       .select('id, pool_id, message, sent_at, organizer_id, notification_type, recipient_user_ids')
       .in('pool_id', poolIds)
       .eq('notification_type', 'moderator_note')
       .contains('recipient_user_ids', [userId])
-      .gte('sent_at', thirtyDaysAgo)
+      .gte('sent_at', tenDaysAgo)
       .order('sent_at', {ascending: false})
       .limit(50);
 
@@ -214,15 +217,18 @@ export function MessageCenterScreen() {
           <View style={styles.messageContent}>
             <View style={styles.messageHeader}>
               <View style={styles.messageHeaderLeft}>
+                <Text style={[styles.fromLabel, {color: colors.textTertiary}]}>
+                  FROM:{' '}
+                </Text>
                 <Text
-                  style={[styles.typeBadge, {color: iconColor}]}
+                  style={[styles.fromName, {color: iconColor}]}
                   numberOfLines={1}>
-                  {isBroadcast ? 'Broadcast' : 'Moderator Note'}
+                  {item.senderName}
                 </Text>
                 <Text
                   style={[styles.poolLabel, {color: colors.textSecondary}]}
                   numberOfLines={1}>
-                  {item.poolName}
+                  {'  ·  '}{item.poolName}
                 </Text>
               </View>
               <Text style={[styles.timeLabel, {color: colors.textSecondary}]}>
@@ -231,9 +237,6 @@ export function MessageCenterScreen() {
             </View>
             <Text style={[styles.messageText, {color: colors.textPrimary}]}>
               {item.message}
-            </Text>
-            <Text style={[styles.senderLabel, {color: colors.textSecondary}]}>
-              — {item.senderName}
             </Text>
           </View>
         </View>
@@ -338,19 +341,24 @@ const styles = StyleSheet.create({
   messageHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
+    alignItems: 'baseline',
+    // Tight gap between the FROM line and the message body.
+    marginBottom: 1,
   },
   messageHeaderLeft: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
+    alignItems: 'baseline',
     flex: 1,
   },
-  typeBadge: {
-    fontSize: 12,
-    fontWeight: '700',
-    textTransform: 'uppercase',
+  fromLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.4,
+  },
+  fromName: {
+    fontSize: 14,
+    fontWeight: '800',
+    flexShrink: 1,
   },
   poolLabel: {
     fontSize: 12,
@@ -364,10 +372,6 @@ const styles = StyleSheet.create({
   messageText: {
     fontSize: 15,
     lineHeight: 21,
-    marginBottom: 4,
-  },
-  senderLabel: {
-    fontSize: 12,
   },
   centered: {
     flex: 1,
