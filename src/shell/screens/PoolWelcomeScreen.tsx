@@ -25,6 +25,7 @@ export function PoolWelcomeScreen({navigation}: any) {
   const styles = createStyles(colors);
   const user = useGlobalStore(s => s.user);
   const userProfile = useGlobalStore(s => s.userProfile);
+  const managedClub = useGlobalStore(s => s.managedClub);
   const pendingInviteCode = useGlobalStore(s => s.pendingInviteCode);
   const joinPool = useGlobalStore(s => s.joinPool);
   const setActiveSport = useGlobalStore(s => s.setActiveSport);
@@ -47,6 +48,9 @@ export function PoolWelcomeScreen({navigation}: any) {
 
   const displayName = getDisplayName(userProfile);
   const hasDeepLinkInvite = !!pendingInviteCode;
+  // Chairman or Director of a League (partner board) sees League-framed copy
+  // instead of the generic player welcome.
+  const isLeagueManager = !!managedClub;
 
   // Auto-join if there's a pending invite code. Re-resolve first as a safety net
   // in case LoadingScreen's async resolution hadn't landed before this mounted
@@ -169,8 +173,9 @@ export function PoolWelcomeScreen({navigation}: any) {
           <Text style={styles.welcomeEmoji}>{'\u{1F44B}'}</Text>
           <Text style={styles.title}>Welcome, {displayName}!</Text>
           <Text style={styles.subtitle}>
-            You're in the HotPick NFL 2026 Contest — compete with everyone on
-            the platform.
+            {isLeagueManager
+              ? "Welcome aboard. As Chairman, you sit at the top of your League. Underneath you, a Roster of Contests, every group that wanted to be Endorsed by your brand. You give those Players a Perk. They give you a room full of people who already chose your name. Broadcast to them whenever you've got something to say."
+              : "You're in the HotPick NFL 2026 Contest — compete with everyone on the platform."}
           </Text>
 
           <View style={styles.mechanic}>
