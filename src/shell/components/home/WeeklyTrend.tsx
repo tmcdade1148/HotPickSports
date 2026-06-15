@@ -368,7 +368,7 @@ const styles = StyleSheet.create({
   liveLead: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
     gap: 6,
     marginBottom: 6,
   },
@@ -395,11 +395,15 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
     gap: spacing.sm,
   },
   slot: {
     minWidth: 86,
+    // Lock every pill to the same footprint so the current week (which has
+    // no x/16 line until picks are set) matches the settled weeks. minHeight
+    // fits the two-line pills; justifyContent centers the shorter one.
+    minHeight: 68,
     paddingVertical: 8,
     paddingHorizontal: 10,
     borderRadius: borderRadius.md + 2,
@@ -408,6 +412,7 @@ const styles = StyleSheet.create({
     // (score + games-won) are right-justified to EACH OTHER inside
     // their own column below.
     alignItems: 'center',
+    justifyContent: 'center',
     // iOS compresses or hides flex children in a flex-end row when
     // the measured width is tight; lock each pill's footprint.
     flexShrink: 0,
