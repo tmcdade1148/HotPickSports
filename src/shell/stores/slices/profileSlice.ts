@@ -121,10 +121,15 @@ export const createProfileSlice = (set: Set, get: Get): ProfileSlice => ({
       return;
     }
 
-    // Land on whichever sandbox/sim the user can see (each beta user is
-    // whitelisted for exactly one). If they can see more than one (e.g. a
-    // super-admin), the first in the visible list wins; they can switch.
-    const sandbox = visible.find(c => isSandboxCompetition(c));
+    // Land on whichever sandbox/sim the user can see. Whitelisted testers/reviewers
+    // see exactly one (tester → nfl_2025_sim, Apple → simA, Google → simG). A
+    // super-admin sees them all, so PREFER the primary working sandbox
+    // (nfl_2025_sim) over the pinned reviewer envs (simA/simG, frozen at week 8) —
+    // otherwise the super-admin lands on a reviewer state. No-op for single-sandbox
+    // users. They can still switch via Settings → Competition.
+    const sandbox = visible.includes('nfl_2025_sim')
+      ? 'nfl_2025_sim'
+      : visible.find(c => isSandboxCompetition(c));
     if (!sandbox) return;
     if (current?.competition === sandbox) return;
     const sim = getAllEventsUnfiltered().find(e => e.competition === sandbox);

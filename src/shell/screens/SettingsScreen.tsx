@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   StyleSheet,
   LayoutAnimation,
+  Modal,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import {useNavigation} from '@react-navigation/native';
@@ -34,6 +35,7 @@ import {
   MessageSquare,
   Bell,
   HelpCircle,
+  Check,
 } from 'lucide-react-native';
 import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
@@ -43,7 +45,7 @@ import {spacing, borderRadius} from '@shared/theme';
 import {useColorScheme} from 'react-native';
 import type {BrandConfig} from '@shell/theme/types';
 import {HOTPICK_DEFAULTS, SEMANTIC_COLORS, SEMANTIC_COLORS_DARK, deriveDarkColors, isLightColor} from '@shell/theme/defaults';
-import {nflSeason, nflSeasonSim} from '@sports/nfl/config';
+import {getEventsByPriority} from '@sports/registry';
 import {LEXICON} from '@shared/lexicon';
 
 
@@ -69,6 +71,7 @@ export function SettingsScreen({route}: any) {
   // empty — count just doesn't render until Home loads.
   const userRankByPool = useGlobalStore(s => s.userRankByPool);
   const activeSport = useGlobalStore(s => s.activeSport);
+  const visibleCompetitions = useGlobalStore(s => s.visibleCompetitions);
   const setActiveSport = useGlobalStore(s => s.setActiveSport);
   const rawDefaultPoolId = useGlobalStore(s => s.defaultPoolId);
   const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
@@ -106,6 +109,7 @@ export function SettingsScreen({route}: any) {
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState('');
   const [poolsExpanded, setPoolsExpanded] = useState(expandPools);
+  const [compPickerVisible, setCompPickerVisible] = useState(false);
 
   const displayName = getDisplayName(userProfile);
 
@@ -664,28 +668,11 @@ export function SettingsScreen({route}: any) {
                 <View style={[styles.groupDivider, {backgroundColor: colors.border}]} />
                 <TouchableOpacity
                   style={styles.groupRow}
-                  onPress={() => {
-                const isSim = activeSport?.competition === 'nfl_2025_sim';
-                const target = isSim ? nflSeason : nflSeasonSim;
-                Alert.alert(
-                  'Switch Competition',
-                  `Switch to ${target.name}?\n\nCurrent: ${activeSport?.name ?? 'none'}`,
-                  [
-                    {text: 'Cancel', style: 'cancel'},
-                    {
-                      text: `Switch to ${target.shortName}`,
-                      onPress: () => {
-                        setActiveSport(target);
-                        Alert.alert('Switched', `Now using ${target.name}. Restart the app for a clean state.`);
-                      },
-                    },
-                  ],
-                );
-              }}>
+                  onPress={() => setCompPickerVisible(true)}>
               <View style={styles.linkLeft}>
                 <Settings size={20} color={colors.primary} />
                 <Text style={[styles.linkText, {color: colors.textPrimary}]}>
-                  Competition: {activeSport?.competition === 'nfl_2025_sim' ? 'SIM' : 'NFL 2026'}
+                  Competition: {activeSport?.shortName ?? activeSport?.name ?? '—'}
                 </Text>
               </View>
               <ChevronRight size={18} color={colors.textSecondary} />
@@ -755,6 +742,53 @@ export function SettingsScreen({route}: any) {
         <Trash2 size={16} color={colors.textSecondary} />
         <Text style={[styles.deleteText, {color: colors.textSecondary}]}>Delete Account</Text>
       </TouchableOpacity>
+
+      {/* Competition picker — every competition the user can see, with a check
+          on the active one. Replaces the old SIM ⇄ 2026 toggle so super-admins
+          can jump straight to any sim (nfl_2025_sim / simA / simG) or 2026. */}
+      <Modal
+        visible={compPickerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setCompPickerVisible(false)}>
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => setCompPickerVisible(false)}
+          style={styles.compModalScrim}>
+          <View style={[styles.compModalCard, {backgroundColor: colors.surface, borderColor: colors.border}]}>
+            <Text style={[styles.groupLabel, {color: colors.textSecondary, paddingHorizontal: spacing.lg, paddingTop: spacing.md}]}>
+              SWITCH COMPETITION
+            </Text>
+            <ScrollView>
+              {getEventsByPriority(visibleCompetitions).map(ev => {
+                const isActive = activeSport?.competition === ev.competition;
+                return (
+                  <TouchableOpacity
+                    key={ev.competition}
+                    style={styles.groupRow}
+                    onPress={() => {
+                      setCompPickerVisible(false);
+                      if (!isActive) {
+                        setActiveSport(ev);
+                        Alert.alert('Switched', `Now using ${ev.name}. Restart the app for a clean state.`);
+                      }
+                    }}>
+                    <View style={styles.linkLeft}>
+                      {isActive ? (
+                        <Check size={20} color={colors.primary} />
+                      ) : (
+                        <View style={styles.compCheckSpacer} />
+                      )}
+                      <Text style={[styles.linkText, {color: colors.textPrimary}]}>{ev.name}</Text>
+                    </View>
+                    <Text style={[styles.compModalSub, {color: colors.textSecondary}]}>{ev.competition}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </ScrollView>
     </View>
   );
@@ -1064,5 +1098,24 @@ const styles = StyleSheet.create({
   deleteText: {
     fontSize: 13,
     fontWeight: '400',
+  },
+  compModalScrim: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  compModalCard: {
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    paddingBottom: spacing.sm,
+    maxHeight: '70%',
+    overflow: 'hidden',
+  },
+  compCheckSpacer: {
+    width: 20,
+  },
+  compModalSub: {
+    fontSize: 12,
   },
 });
