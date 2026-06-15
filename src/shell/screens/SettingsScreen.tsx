@@ -433,7 +433,11 @@ export function SettingsScreen({route}: any) {
                       {/* Competition + PUBLIC denotation. The list is scoped to
                           the active competition, but labelling each pill keeps
                           it unambiguous which season a Contest belongs to. */}
-                      {!pool.is_global && (
+                      {/* Competition denotation — super-admin only. Regular
+                          players only ever see one competition's contests, so
+                          the label is clutter for them; it's useful only to a
+                          super-admin who manages contests across competitions. */}
+                      {!pool.is_global && userProfile?.is_super_admin && (
                         <Text style={[styles.roleBadge, {color: colors.textSecondary}, isBranded && {color: pillTextColor + 'AA'}]}>
                           {getEventByCompetition(pool.competition)?.shortName ?? pool.competition}
                           {' · '}
