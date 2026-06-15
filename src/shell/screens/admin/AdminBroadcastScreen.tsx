@@ -69,13 +69,14 @@ function AdminBroadcastScreenImpl() {
   }, []);
 
   const ageHours = lastSentAt ? (Date.now() - new Date(lastSentAt).getTime()) / 3600000 : Infinity;
-  const canSend = ageHours >= 24 && subject.trim().length > 0 && body.trim().length > 0 && !sending;
+  // Subject is optional; only the message body is required.
+  const canSend = ageHours >= 24 && body.trim().length > 0 && !sending;
   const waitHours = ageHours < 24 ? Math.ceil(24 - ageHours) : 0;
 
   const handleSend = () => {
     Alert.alert(
       'Send this broadcast?',
-      `Subject: ${subject.trim()}\n\nThis can't be undone. Recipients (${target}) will get a push notification and a Message Center entry.`,
+      `Subject: ${subject.trim() || '(none)'}\n\nThis can't be undone. Recipients (${target}) will get a push notification and a Message Center entry.`,
       [
         {text: 'Cancel', style: 'cancel'},
         {
@@ -137,7 +138,7 @@ function AdminBroadcastScreenImpl() {
           )}
 
           <Text style={[bodyType.regular, styles.label, {color: colors.textSecondary}]}>
-            Subject (push notification — 60 chars max)
+            Subject (optional — push title, 60 chars max)
           </Text>
           <TextInput
             value={subject}

@@ -42,12 +42,17 @@ Deno.serve(async (req: Request) => {
     const messageBody: string = (body.body ?? '').toString().trim();
     const target: string = (body.target ?? 'all').toString();
 
-    if (subject.length === 0 || subject.length > 60) {
-      return json({error: 'Subject must be 1-60 characters'}, 400);
+    // Subject is optional (push title only); body is required.
+    if (subject.length > 60) {
+      return json({error: 'Subject must be 60 characters or fewer'}, 400);
     }
     if (messageBody.length === 0 || messageBody.length > 280) {
       return json({error: 'Body must be 1-280 characters'}, 400);
     }
+    // Push needs a non-empty title; fall back to the brand name when no subject.
+    const pushTitle = subject.length > 0 ? subject : 'HotPick Sports';
+    // Message Center body: skip the blank subject line when there's no subject.
+    const composedMessage = subject.length > 0 ? `${subject}\n\n${messageBody}` : messageBody;
 
     // Pull both the last-send timestamp and the (optional) configurable cadence
     // in one query. Shared window: one timestamp across all targets + admins.
@@ -138,7 +143,7 @@ Deno.serve(async (req: Request) => {
         competition:       platformPool.competition,
         organizer_id:      callerId,
         notification_type: 'broadcast',
-        message:           `${subject}\n\n${messageBody}`,
+        message:           composedMessage,
         recipient_count:   userIds.length,
         sent_at:           nowIso,
       });
@@ -156,7 +161,7 @@ Deno.serve(async (req: Request) => {
         const rows = chunk.map(uid => ({
           user_id:           uid,
           notification_type: 'organizer_broadcast',
-          title:             subject,
+          title:             pushTitle,
           body:              messageBody,
         }));
         await admin.from('notification_queue').insert(rows);
