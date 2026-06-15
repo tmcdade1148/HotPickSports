@@ -29,9 +29,12 @@ import {PoolModule} from './PoolModule';
 
 interface ContestCarouselProps {
   pools: DbPool[];
+  /** Apply the carousel's own top margin. False when it's already inside a
+   *  section that provides the gap (avoids doubling the space). */
+  topMargin?: boolean;
 }
 
-export function ContestCarousel({pools}: ContestCarouselProps) {
+export function ContestCarousel({pools, topMargin = true}: ContestCarouselProps) {
   const {colors} = useTheme();
   const {width} = useWindowDimensions();
   const activePoolId = useGlobalStore(s => s.activePoolId);
@@ -65,7 +68,7 @@ export function ContestCarousel({pools}: ContestCarouselProps) {
   };
 
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, topMargin && {marginTop: spacing.lg}]}>
       <View style={styles.titleRow}>
         <Text style={[bodyType.bold, styles.title, {color: colors.textTertiary}]}>
           YOUR {LEXICON.contest.plural.toUpperCase()}
@@ -117,7 +120,7 @@ export function ContestCarousel({pools}: ContestCarouselProps) {
 }
 
 const styles = StyleSheet.create({
-  wrap: {marginTop: spacing.lg},
+  wrap: {},
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
