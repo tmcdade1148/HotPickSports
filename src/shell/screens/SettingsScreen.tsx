@@ -439,9 +439,12 @@ export function SettingsScreen({route}: any) {
                           {' · '}
                         </Text>
                       )}
-                      {pool.is_public && (
+                      {/* PUBLIC denotes the ONE designated public contest the
+                          super-admin switch controls — not the create-time
+                          is_public flag. Off switch → no badge → not public. */}
+                      {pool.is_designated_public && (
                         <Text style={[styles.roleBadge, {color: hotpick.primary, fontWeight: '800'}, isBranded && {color: pillTextColor}]}>
-                          {pool.is_designated_public ? 'PUBLIC ★' : 'PUBLIC'}
+                          PUBLIC
                           {' · '}
                         </Text>
                       )}
