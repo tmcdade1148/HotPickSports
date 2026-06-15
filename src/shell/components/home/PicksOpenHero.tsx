@@ -278,7 +278,7 @@ export function PicksOpenHero() {
         },
       ]}>
       {/* Stacked-tally week strip — one glyph per game in kickoff order.
-          Green "/" = pick still editable, gray "–" = locked, flame "/" =
+          Green "•" = pick still editable, gray "–" = locked, flame "•" =
           the user's HotPick game, bold weight = the user has a pick on
           that game. Replaces the binary PICKS OPEN / PICKS LOCKING label
           with a glanceable map of week progress. */}

@@ -1,4 +1,4 @@
-// Tally-slash week summary: one glyph per game in kickoff order, color
+// Tally-dot week summary: one glyph per game in kickoff order, color
 // + weight encode lock state / pick-set / HotPick.
 
 import React, {useMemo} from 'react';
@@ -49,7 +49,7 @@ export function WeekLockStrip() {
 
   const editableCount = dots.filter(d => !d.isLocked).length;
   const allLocked = editableCount === 0;
-  const label = allLocked ? 'PICKS LOCKED' : 'PICKS EDITABLE';
+  const label = allLocked ? 'LOCKED PICKS' : 'EDITABLE PICKS';
 
   return (
     <View
@@ -68,11 +68,11 @@ export function WeekLockStrip() {
       <View style={styles.tallyRow}>
         {dots.map(d => {
           // Glyph encodes three signals at once:
-          //   "/"     = editable
-          //   "-"     = locked
+          //   "•"     = editable
+          //   "–"     = locked
           //   color   = green / gray / flame for HotPick
           //   bold    = the user has a pick on this game
-          const glyph = d.isLocked ? '–' : '/';
+          const glyph = d.isLocked ? '–' : '•';
           const color = d.isHotPick
             ? colors.primary
             : d.isLocked
