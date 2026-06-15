@@ -61,6 +61,32 @@ Crash/error reporting is **scaffolded but inert** (PR #207, `src/shared/monitori
 - [ ] **Verify events flow** in a release/TestFlight build: trigger a test error and confirm it lands in the dashboard (check `release` = `hotpicksports@<version>` and the right `environment`).
 - [ ] *(Optional, robustness)* Harden `sentry.ts` to a **guarded `require()`** so a missing/stale `@sentry/react-native` install degrades to a no-op instead of red-screening Metro — the current static `import` bit us once during a stale `npm install`.
 
+## 7. Auth — email confirmation on signup
+
+**Context (2026-06-15):** A fresh email/password signup hit *"Could not accept terms"* on the
+age/TOS gate. Root cause: the Supabase project has **"Confirm email" ON**, so
+`supabase.auth.signUp()` returns a `user` but a **null session** until the email link is
+clicked. `EmailEntryScreen` only checks `if (data.user)` and walks the unauthenticated user
+straight into `runPostAuthFlow` → `ensureGlobalPoolMembership()` + `acceptTos()`, both of
+which call `authenticated`-only RPCs. As `anon` those fail (`permission denied for function
+rpc_accept_tos` / `auto_enroll_global_pools`). Same cause surfaces as *"Email not confirmed"*
+on sign-in and *"email rate limit exceeded"* on repeated signups (Supabase built-in SMTP cap).
+
+**Interim fix shipped (#1):** "Confirm email" turned OFF in the dashboard so signup returns an
+immediate session and the app flows through onboarding as-is. No verified emails at signup.
+
+- [ ] **(#2 — proper fix before public launch) Re-enable "Confirm email" and handle the
+      no-session case in-app.** After `supabase.auth.signUp()`, if `data.session` is null, do
+      **not** call `runPostAuthFlow`; instead route to a new **"Check your email to confirm"**
+      screen and handle the confirmation deep link (`hotpick://...`) to resume onboarding once
+      the session exists. Guards `EmailEntryScreen.tsx`.
+- [ ] **Custom SMTP before relying on confirmation emails.** Supabase's built-in email sender
+      is rate-limited (the "email rate limit exceeded" 429). Configure a real provider (Resend
+      — domain already needed for `send-broadcast-email`, see §1) so confirmation + password-reset
+      emails actually deliver at volume.
+- [ ] **Defensive UX regardless of toggle:** surface a clear message on a null-session signup
+      instead of the misleading *"Could not accept terms."*
+
 ---
 
 ## Deferred — NOT launch blockers (post-launch / Nov 2026)
