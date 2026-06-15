@@ -199,18 +199,30 @@ export const createProfileSlice = (set: Set, get: Get): ProfileSlice => ({
 
     if (data) {
       set({userProfile: data as DbProfile});
-      // Resolve "do you manage a Club?" alongside the profile load so
-      // Settings + ClubAdminScreen don't each refetch on mount.
-      get().loadManagedClub(userId).catch(() => {});
-      // Resolve which competitions this user can see (filters the
-      // sport switcher; beta-only competitions like nfl_2025_sim only
-      // surface for whitelisted testers). AWAITED so the beta force-
-      // land inside loadVisibleCompetitions runs before LoadingScreen
-      // proceeds to fetch pools / set activePoolId. Without the await,
-      // beta users get a brief NFL2026 activeSport + 2026 pool set
-      // active before the sport flips to sim, and the persisted 2026
-      // pool sticks. ~50-200ms latency cost on session boot.
-      await get().loadVisibleCompetitions().catch(() => {});
+      // Resolve "do you manage a Club?" AND which competitions this user can
+      // see before returning — both AWAITED (in parallel) so callers that
+      // route on the result have it ready.
+      //
+      // managedClub: onboarding (ProfileSetup / PoolWelcome) branches on
+      // whether the user is a League board member (Chairman/Director). A
+      // freshly-seeded Chairman's partner_members row attaches on signup, so
+      // we must let it resolve before ProfileSetup renders — otherwise they
+      // briefly fall through to the generic player welcome. Also saves
+      // Settings + ClubAdminScreen a refetch on mount.
+      //
+      // visibleCompetitions: filters the sport switcher; beta-only comps like
+      // nfl_2025_sim only surface for whitelisted testers. AWAITED so the beta
+      // force-land inside loadVisibleCompetitions runs before LoadingScreen
+      // proceeds to fetch pools / set activePoolId. Without it, beta users get
+      // a brief NFL2026 activeSport + 2026 pool active before the sport flips
+      // to sim, and the persisted 2026 pool sticks.
+      //
+      // Run together to keep the added latency to a single round-trip
+      // (~50-200ms on session boot); both swallow their own errors.
+      await Promise.all([
+        get().loadManagedClub(userId).catch(() => {}),
+        get().loadVisibleCompetitions().catch(() => {}),
+      ]);
       return data as DbProfile;
     }
     return null;
