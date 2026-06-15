@@ -45,7 +45,7 @@ export function JoinPublicContestButton() {
         />
       </View>
       <Text style={[bodyType.regular, styles.note, {color: colors.textSecondary}]}>
-        Jump into the open {LEXICON.contest.singular} and start making picks — or use an invite code below.
+        Jump into the open {LEXICON.contest.singular} and start making picks — or join with an invite code.
       </Text>
     </View>
   );

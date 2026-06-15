@@ -17,6 +17,7 @@ import {
 } from '@shell/services/pendingInvite';
 import {getDefaultEvent} from '@sports/registry';
 import {getDisplayName} from '@shared/utils/displayName';
+import {leagueWelcomeCopy} from '@shared/copy/leagueWelcome';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 
@@ -25,6 +26,7 @@ export function PoolWelcomeScreen({navigation}: any) {
   const styles = createStyles(colors);
   const user = useGlobalStore(s => s.user);
   const userProfile = useGlobalStore(s => s.userProfile);
+  const managedClub = useGlobalStore(s => s.managedClub);
   const pendingInviteCode = useGlobalStore(s => s.pendingInviteCode);
   const joinPool = useGlobalStore(s => s.joinPool);
   const setActiveSport = useGlobalStore(s => s.setActiveSport);
@@ -47,6 +49,12 @@ export function PoolWelcomeScreen({navigation}: any) {
 
   const displayName = getDisplayName(userProfile);
   const hasDeepLinkInvite = !!pendingInviteCode;
+  // Chairman or Director of a League (partner board). Their welcome now lives
+  // on ProfileSetup, so they skip this player-oriented page entirely (see the
+  // auto-forward effect below). leagueWelcome is kept only as a graceful
+  // fallback in case managedClub hasn't resolved by the time this renders.
+  const isLeagueManager = !!managedClub;
+  const leagueWelcome = leagueWelcomeCopy(managedClub?.role);
 
   // Auto-join if there's a pending invite code. Re-resolve first as a safety net
   // in case LoadingScreen's async resolution hadn't landed before this mounted
@@ -60,6 +68,16 @@ export function PoolWelcomeScreen({navigation}: any) {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // League board members (Chairman/Director) are welcomed on ProfileSetup, so
+  // they skip this player-oriented page. Once we know they manage a League and
+  // there's no invite code to consume, initialize and head straight to Home.
+  useEffect(() => {
+    if (isLeagueManager && !hasDeepLinkInvite && !joinedPool && !joining) {
+      initializeAndNavigate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLeagueManager, hasDeepLinkInvite]);
 
   const handleJoinWithCode = async (code: string) => {
     if (!code.trim() || !user?.id) return;
@@ -108,8 +126,9 @@ export function PoolWelcomeScreen({navigation}: any) {
     navigation.replace('Home');
   };
 
-  // Deep-link joining or successful join — show confirmation
-  if (hasDeepLinkInvite || joinedPool || joining) {
+  // Deep-link joining, successful join, or a League manager being forwarded
+  // to Home — show a loading/confirmation state instead of the player page.
+  if (hasDeepLinkInvite || joinedPool || joining || isLeagueManager) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.content}>
@@ -117,6 +136,11 @@ export function PoolWelcomeScreen({navigation}: any) {
             <>
               <ActivityIndicator size="large" color={colors.primary} />
               <Text style={styles.joiningText}>Joining your Contest...</Text>
+            </>
+          ) : isLeagueManager && !joinedPool && !joinError ? (
+            <>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={styles.joiningText}>Setting up your League…</Text>
             </>
           ) : joinError ? (
             <>
@@ -169,8 +193,8 @@ export function PoolWelcomeScreen({navigation}: any) {
           <Text style={styles.welcomeEmoji}>{'\u{1F44B}'}</Text>
           <Text style={styles.title}>Welcome, {displayName}!</Text>
           <Text style={styles.subtitle}>
-            You're in the HotPick NFL 2026 Contest — compete with everyone on
-            the platform.
+            {leagueWelcome ??
+              "You're in the HotPick NFL 2026 Contest — compete with everyone on the platform."}
           </Text>
 
           <View style={styles.mechanic}>

@@ -14,6 +14,7 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {AvatarSelector, SYSTEM_AVATARS} from '@shell/components/AvatarSelector';
+import {leagueWelcomeCopy} from '@shared/copy/leagueWelcome';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 import {
@@ -42,7 +43,12 @@ export function ProfileSetupScreen({navigation}: any) {
   const styles = createStyles(colors);
   const user = useGlobalStore(s => s.user);
   const userProfile = useGlobalStore(s => s.userProfile);
+  const managedClub = useGlobalStore(s => s.managedClub);
   const updateProfile = useGlobalStore(s => s.updateProfile);
+
+  // League board members (Chairman/Director) get their League welcome here,
+  // folded into onboarding — they don't see the separate player PoolWelcome.
+  const leagueWelcome = leagueWelcomeCopy(managedClub?.role);
 
   // Pre-fill from the profile — OAuth (Apple first-auth / Google) writes
   // first/last name via socialAuth.ts before this screen; email signups arrive
@@ -111,6 +117,9 @@ export function ProfileSetupScreen({navigation}: any) {
           keyboardShouldPersistTaps="handled">
           {/* Greeting */}
           <Text style={styles.greeting}>Welcome!</Text>
+          {leagueWelcome ? (
+            <Text style={styles.leagueWelcome}>{leagueWelcome}</Text>
+          ) : null}
           <Text style={styles.subtext}>
             Tell us your name, choose a Player Name, and pick an avatar to get started.
           </Text>
@@ -188,6 +197,9 @@ export function ProfileSetupScreen({navigation}: any) {
               selectedKey={selectedAvatar}
               onSelect={avatar => setSelectedAvatar(avatar.key)}
             />
+            <Text style={styles.hint}>
+              We'll have more avatars to choose from soon. Please stay tuned.
+            </Text>
           </View>
 
           {/* CTA */}
@@ -230,6 +242,12 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: spacing.xl,
     lineHeight: 21,
+  },
+  leagueWelcome: {
+    fontSize: 15,
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
+    lineHeight: 22,
   },
   section: {
     marginBottom: spacing.lg,

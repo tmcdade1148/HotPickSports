@@ -394,6 +394,9 @@ export function HomeScreen() {
           <>
             {offCycleContests}
             {visiblePools.length > 0 ? <ReturningOffCycleActions /> : <OffSeasonActions />}
+            {/* Public-contest CTA sits directly under Join/Create. Self-hides
+                once the user is in any pool / no public contest is set. */}
+            <JoinPublicContestButton />
             <CrossContestStrip />
             {offCycleClubs ?? <ClubsTeaser />}
           </>
@@ -404,6 +407,9 @@ export function HomeScreen() {
             <PreseasonPicksOpenLine />
             {offCycleContests}
             {visiblePools.length > 0 ? <ReturningOffCycleActions /> : <PreSeasonActions />}
+            {/* Public-contest CTA sits directly under Join/Create. Self-hides
+                once the user is in any pool / no public contest is set. */}
+            <JoinPublicContestButton />
             <CrossContestStrip />
             {offCycleClubs ?? <ClubsTeaser />}
           </>
@@ -416,8 +422,12 @@ export function HomeScreen() {
         <ManagedLeagueModule />
 
         {/* Join-the-public-contest CTA for new users with no contests.
-            Self-hides once the user is in any pool. */}
-        <JoinPublicContestButton />
+            Self-hides once the user is in any pool. On off-cycle states it's
+            rendered up under the Join/Create pills instead (see above), so
+            here it's gated to the remaining states to avoid double-rendering. */}
+        {homeState !== 'off_season_idle' && homeState !== 'pre_season_games' && (
+          <JoinPublicContestButton />
+        )}
 
         {/* In-cycle YOUR CONTESTS section — replaced on off-cycle
             states (off_season_idle / pre_season_games) by the action
