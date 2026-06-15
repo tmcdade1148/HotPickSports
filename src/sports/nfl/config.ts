@@ -15,7 +15,7 @@ export const nflSeason: SeasonConfig = {
   templateType: 'season',
   sport: 'football',
   name: 'NFL 2026-27 Season',
-  shortName: 'NFL',
+  shortName: 'NFL26',
   status: 'active',
   startDate: '2026-09-09',
   endDate: '2027-02-08',
@@ -117,7 +117,7 @@ export const nflSeasonSim: SeasonConfig = {
   ...nflSeason,
   competition: 'nfl_2025_sim',
   name: 'NFL 2025 SIM',
-  shortName: 'NFL SIM',
+  shortName: 'NFL25-S',
   status: 'active',
 };
 
@@ -133,7 +133,7 @@ export const nflSeasonSimA: SeasonConfig = {
   ...nflSeason,
   competition: 'nfl_2025_simA',
   name: 'NFL 2025 SIM A',
-  shortName: 'NFL SIM A',
+  shortName: 'NFL25-SA',
   status: 'active',
 };
 
@@ -141,6 +141,6 @@ export const nflSeasonSimG: SeasonConfig = {
   ...nflSeason,
   competition: 'nfl_2025_simG',
   name: 'NFL 2025 SIM G',
-  shortName: 'NFL SIM G',
+  shortName: 'NFL25-SG',
   status: 'active',
 };
