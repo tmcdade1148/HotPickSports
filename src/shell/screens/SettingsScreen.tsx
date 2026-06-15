@@ -521,44 +521,48 @@ export function SettingsScreen({route}: any) {
             );
           })}
 
-          {/* Join Contest */}
-          <View style={styles.joinSection}>
-            <Text style={[styles.joinLabel, {color: colors.textPrimary}]}>Have an invite code?</Text>
-            <View style={styles.codeRow}>
-              <TextInput
-                style={[styles.codeInput, {borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surface}]}
-                placeholder="Enter code"
-                placeholderTextColor={colors.textSecondary}
-                value={inviteCode}
-                onChangeText={text => {
-                  setInviteCode(text.toUpperCase());
-                  if (joinError) setJoinError('');
-                }}
-                autoCapitalize="characters"
-                autoCorrect={false}
-                maxLength={12}
-                returnKeyType="go"
-                onSubmitEditing={handleJoinPool}
-              />
-              <TouchableOpacity
-                style={[
-                  styles.joinButton,
-                  {backgroundColor: colors.primary},
-                  (!inviteCode.trim() || joining) && styles.joinButtonDisabled,
-                ]}
-                onPress={handleJoinPool}
-                disabled={!inviteCode.trim() || joining}>
-                {joining ? (
-                  <ActivityIndicator size="small" color={colors.onPrimary} />
-                ) : (
-                  <Text style={styles.joinButtonText}>Join</Text>
-                )}
-              </TouchableOpacity>
+          {/* Join Contest — hidden for super-admins, who are creators-only
+              and can never join a contest (2026-06-15). The Create pill below
+              stays so they can still spin up public contests. */}
+          {!userProfile?.is_super_admin && (
+            <View style={styles.joinSection}>
+              <Text style={[styles.joinLabel, {color: colors.textPrimary}]}>Have an invite code?</Text>
+              <View style={styles.codeRow}>
+                <TextInput
+                  style={[styles.codeInput, {borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surface}]}
+                  placeholder="Enter code"
+                  placeholderTextColor={colors.textSecondary}
+                  value={inviteCode}
+                  onChangeText={text => {
+                    setInviteCode(text.toUpperCase());
+                    if (joinError) setJoinError('');
+                  }}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  maxLength={12}
+                  returnKeyType="go"
+                  onSubmitEditing={handleJoinPool}
+                />
+                <TouchableOpacity
+                  style={[
+                    styles.joinButton,
+                    {backgroundColor: colors.primary},
+                    (!inviteCode.trim() || joining) && styles.joinButtonDisabled,
+                  ]}
+                  onPress={handleJoinPool}
+                  disabled={!inviteCode.trim() || joining}>
+                  {joining ? (
+                    <ActivityIndicator size="small" color={colors.onPrimary} />
+                  ) : (
+                    <Text style={styles.joinButtonText}>Join</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+              {joinError ? (
+                <Text style={[styles.codeError, {color: colors.error}]}>{joinError}</Text>
+              ) : null}
             </View>
-            {joinError ? (
-              <Text style={[styles.codeError, {color: colors.error}]}>{joinError}</Text>
-            ) : null}
-          </View>
+          )}
 
           {/* Create Contest */}
           <TouchableOpacity
