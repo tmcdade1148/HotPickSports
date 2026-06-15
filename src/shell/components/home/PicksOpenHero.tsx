@@ -43,6 +43,7 @@ export function PicksOpenHero() {
   const userHotPickGame  = useNFLStore(s => s.userHotPickGame);
   const weekFirstKickoff = useNFLStore(s => s.weekFirstKickoff);
   const weekState        = useNFLStore(s => s.weekState);
+  const currentPhase     = useNFLStore(s => s.currentPhase);
   const currentWeek      = useNFLStore(s => s.currentWeek);
   const liveScores       = useNFLStore(s => s.liveScores);
   const weekResult       = useNFLStore(s => s.weekResult);
@@ -268,6 +269,10 @@ export function PicksOpenHero() {
       })
     : null;
 
+  // Regular-season, full-size countdown only: stack a small "PICKS START
+  // LOCKING IN" label to the left of the big number (within the digit height).
+  const showLockingLabel = currentPhase === 'REGULAR' && timerSize === TIMER_FONT_FULL;
+
   return (
     <View
       style={[
@@ -302,51 +307,62 @@ export function PicksOpenHero() {
           Suppressed when the HotPick card is shown — there the countdown
           rides inline next to the kickoff time instead. */}
       {!hotPickIsLive && !hotPickIsFinal && !hotPickCardShown && (
-        sandboxCountdown ? (
-          // Frozen reviewer sandbox — always read "3 DAYS".
-          <Text
-            style={[
-              displayType.display,
-              styles.timer,
-              {
-                color: colors.textPrimary,
-                fontSize: timerSize,
-                lineHeight: Math.round(timerSize * 1.15),
-              },
-            ]}
-            numberOfLines={1}>
-            3
-            <Text style={{fontSize: timerSize * 0.4}}> DAYS</Text>
-          </Text>
-        ) : timer ? (
-          (() => {
-            // Single largest meaningful unit (app-wide rule): days → hours → minutes.
-            const su = singleUnit(timer.days, timer.hours, timer.minutes);
-            // Spelled-out unit (e.g. "6 DAYS") rather than a terse "6D".
-            const unitWord = `${su.unit}${su.value === 1 ? '' : 's'}`.toUpperCase();
-            return (
-              <Text
-                style={[
-                  displayType.display,
-                  styles.timer,
-                  {
-                    color: colors.textPrimary,
-                    fontSize: timerSize,
-                    lineHeight: Math.round(timerSize * 1.15),
-                  },
-                ]}
-                numberOfLines={1}>
-                {su.value}
-                <Text style={{fontSize: timerSize * 0.4}}> {unitWord}</Text>
-              </Text>
-            );
-          })()
-        ) : (
-          <Text
-            style={[bodyType.regular, styles.timerPlaceholder, {color: colors.textTertiary}]}>
-            Setting the clock…
-          </Text>
-        )
+        <View style={styles.timerRow}>
+          {showLockingLabel && (sandboxCountdown || timer) && (
+            <Text
+              style={[bodyType.bold, styles.lockingLabel, {color: colors.textSecondary}]}
+              numberOfLines={2}>
+              PICKS START{'\n'}LOCKING IN
+            </Text>
+          )}
+          {sandboxCountdown ? (
+            // Frozen reviewer sandbox — always read "3 DAYS".
+            <Text
+              style={[
+                displayType.display,
+                styles.timer,
+                styles.timerInRow,
+                {
+                  color: colors.textPrimary,
+                  fontSize: timerSize,
+                  lineHeight: Math.round(timerSize * 1.15),
+                },
+              ]}
+              numberOfLines={1}>
+              3
+              <Text style={{fontSize: timerSize * 0.4}}> DAYS</Text>
+            </Text>
+          ) : timer ? (
+            (() => {
+              // Single largest meaningful unit (app-wide rule): days → hours → minutes.
+              const su = singleUnit(timer.days, timer.hours, timer.minutes);
+              // Spelled-out unit (e.g. "6 DAYS") rather than a terse "6D".
+              const unitWord = `${su.unit}${su.value === 1 ? '' : 's'}`.toUpperCase();
+              return (
+                <Text
+                  style={[
+                    displayType.display,
+                    styles.timer,
+                    styles.timerInRow,
+                    {
+                      color: colors.textPrimary,
+                      fontSize: timerSize,
+                      lineHeight: Math.round(timerSize * 1.15),
+                    },
+                  ]}
+                  numberOfLines={1}>
+                  {su.value}
+                  <Text style={{fontSize: timerSize * 0.4}}> {unitWord}</Text>
+                </Text>
+              );
+            })()
+          ) : (
+            <Text
+              style={[bodyType.regular, styles.timerPlaceholder, {color: colors.textTertiary}]}>
+              Setting the clock…
+            </Text>
+          )}
+        </View>
       )}
 
       {/* HotPick game preview — only when a HotPick has been designated.
@@ -752,6 +768,25 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
     marginBottom: 18,
     textAlign: 'center',
+  },
+  // Row that holds the optional "PICKS START LOCKING IN" label to the left of
+  // the big countdown number. Carries the bottom margin so the number doesn't.
+  timerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginBottom: 18,
+  },
+  timerInRow: {
+    marginBottom: 0,
+  },
+  // Small enough that its two stacked lines fit within the digit's height.
+  lockingLabel: {
+    fontSize: 13,
+    lineHeight: 16,
+    letterSpacing: 0.5,
+    textAlign: 'right',
   },
   timerPlaceholder: {
     fontSize: 14,
