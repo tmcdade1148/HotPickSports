@@ -12,7 +12,10 @@ import {createClient} from 'jsr:@supabase/supabase-js@2';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = (Deno.env.get('SB_SECRET_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))!;
-const RATE_LIMIT_HOURS = 24;
+// Default cadence between platform-wide broadcasts. Overridable at runtime via
+// the competition_config global key `admin_broadcast_rate_limit_hours` (no
+// redeploy needed) — config-driven per the project's limits-in-config rule.
+const DEFAULT_RATE_LIMIT_HOURS = 24;
 
 Deno.serve(async (req: Request) => {
   try {
@@ -46,23 +49,35 @@ Deno.serve(async (req: Request) => {
       return json({error: 'Body must be 1-280 characters'}, 400);
     }
 
-    const {data: lastRow} = await admin
+    // Pull both the last-send timestamp and the (optional) configurable cadence
+    // in one query. Shared window: one timestamp across all targets + admins.
+    const {data: cfgRows} = await admin
       .from('competition_config')
-      .select('value, updated_at')
+      .select('key, value')
       .eq('competition', 'global')
-      .eq('key', 'last_admin_broadcast_at')
-      .maybeSingle();
-    if (lastRow?.value) {
-      const lastIso = typeof lastRow.value === 'string' ? lastRow.value : (lastRow.value as {iso?: string})?.iso;
+      .in('key', ['last_admin_broadcast_at', 'admin_broadcast_rate_limit_hours']);
+
+    let lastRowValue: unknown = null;
+    let rateLimitHours = DEFAULT_RATE_LIMIT_HOURS;
+    for (const r of (cfgRows ?? []) as {key: string; value: unknown}[]) {
+      if (r.key === 'last_admin_broadcast_at') lastRowValue = r.value;
+      else if (r.key === 'admin_broadcast_rate_limit_hours') {
+        const n = Number(typeof r.value === 'string' ? r.value.replace(/^"|"$/g, '') : r.value);
+        if (Number.isFinite(n) && n >= 0) rateLimitHours = n;
+      }
+    }
+
+    if (lastRowValue) {
+      const lastIso = typeof lastRowValue === 'string' ? lastRowValue : (lastRowValue as {iso?: string})?.iso;
       if (lastIso) {
         const lastMs = new Date(lastIso).getTime();
         const ageHours = (Date.now() - lastMs) / (1000 * 60 * 60);
-        if (ageHours < RATE_LIMIT_HOURS) {
-          const waitHours = Math.ceil(RATE_LIMIT_HOURS - ageHours);
+        if (ageHours < rateLimitHours) {
+          const waitHours = Math.ceil(rateLimitHours - ageHours);
           return json({
             error: 'RATE_LIMITED',
             wait_hours: waitHours,
-            next_available_at: new Date(lastMs + RATE_LIMIT_HOURS * 3600 * 1000).toISOString(),
+            next_available_at: new Date(lastMs + rateLimitHours * 3600 * 1000).toISOString(),
           }, 429);
         }
       }
