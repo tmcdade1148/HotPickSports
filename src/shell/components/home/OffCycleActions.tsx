@@ -155,22 +155,13 @@ export function PreSeasonActions() {
 // Lighter off-cycle actions for a RETURNING user (one who already has Contests
 // for the upcoming season — shown above this in the YOUR CONTESTS stack). They
 // don't need the big "Create a Contest" primary CTA, just a compact
-// create/join-another row — but we keep the demo.
+// create/join-another row. The "See how it works" demo is new-users-only, so
+// it's intentionally omitted here.
 export function ReturningOffCycleActions() {
   const navigation = useNavigation<any>();
-  const {colors} = useTheme();
-  const launchDemo = useLaunchDemo();
 
   return (
     <View style={styles.stack}>
-      <ActionBtn
-        variant="orangeOutline"
-        title="See how it works"
-        subtitle="play a quick demo week"
-        icon={<Play size={20} color={colors.primary} strokeWidth={2.25} fill={colors.primary} />}
-        onPress={launchDemo}
-        accessibilityLabel="Play a quick demo week to see how it works"
-      />
       <View style={styles.pillRow}>
         <ContestActionPill
           Icon={KeyRound}
