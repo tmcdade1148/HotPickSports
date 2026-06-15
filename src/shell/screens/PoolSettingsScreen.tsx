@@ -105,10 +105,31 @@ export function PoolSettingsScreen() {
     return p?.owning_club_id ? s.partnersById?.[p.owning_club_id] : null;
   });
 
-  const pool = useMemo(
+  const poolFromStore = useMemo(
     () => userPools.find(p => p.id === poolId),
     [userPools, poolId],
   );
+  // Fallback fetch: a super-admin owns contests across competitions, but
+  // userPools only holds the ACTIVE competition's pools — so opening settings
+  // for a pool from another competition would miss. Fetch it directly by id so
+  // the screen (and the public toggle) is always reachable for a pool the
+  // caller can read under RLS.
+  const [fetchedPool, setFetchedPool] = useState<(typeof userPools)[number] | null>(null);
+  useEffect(() => {
+    if (poolFromStore || !poolId) {
+      setFetchedPool(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const {data} = await supabase.from('pools').select('*').eq('id', poolId).maybeSingle();
+      if (!cancelled && data) setFetchedPool(data as (typeof userPools)[number]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [poolFromStore, poolId]);
+  const pool = poolFromStore ?? fetchedPool ?? undefined;
 
   // Contest Settings stays HotPick-themed regardless of which Club(s)
   // the Contest is affiliated with. Per the 2026-05-26 product call,

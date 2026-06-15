@@ -45,7 +45,7 @@ import {spacing, borderRadius} from '@shared/theme';
 import {useColorScheme} from 'react-native';
 import type {BrandConfig} from '@shell/theme/types';
 import {HOTPICK_DEFAULTS, SEMANTIC_COLORS, SEMANTIC_COLORS_DARK, deriveDarkColors, isLightColor} from '@shell/theme/defaults';
-import {getEventsByPriority} from '@sports/registry';
+import {getEventsByPriority, getEventByCompetition} from '@sports/registry';
 import {LEXICON} from '@shared/lexicon';
 
 
@@ -430,6 +430,21 @@ export function SettingsScreen({route}: any) {
                         )}
                       </Text>
                     <View style={styles.poolMetaRow}>
+                      {/* Competition + PUBLIC denotation. The list is scoped to
+                          the active competition, but labelling each pill keeps
+                          it unambiguous which season a Contest belongs to. */}
+                      {!pool.is_global && (
+                        <Text style={[styles.roleBadge, {color: colors.textSecondary}, isBranded && {color: pillTextColor + 'AA'}]}>
+                          {getEventByCompetition(pool.competition)?.shortName ?? pool.competition}
+                          {' · '}
+                        </Text>
+                      )}
+                      {pool.is_public && (
+                        <Text style={[styles.roleBadge, {color: hotpick.primary, fontWeight: '800'}, isBranded && {color: pillTextColor}]}>
+                          {pool.is_designated_public ? 'PUBLIC ★' : 'PUBLIC'}
+                          {' · '}
+                        </Text>
+                      )}
                       {pool.is_suspended && (
                         <Text style={[styles.roleBadge, {color: colors.error, fontWeight: '800'}]}>
                           SUSPENDED ·{' '}

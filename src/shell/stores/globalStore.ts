@@ -156,11 +156,23 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       const cached = get().poolsByCompetition[sport.competition] ?? [];
       set({activeSport: sport, userPools: cached});
     } else if (current.competition !== sport.competition) {
-      // User switching between sports — clear pool and restore cache
+      // User switching between sports — clear pool and restore cache. Clear
+      // visiblePools too: it's NOT competition-scoped on its own, so leaving
+      // the prior competition's value makes Settings/Home show stale contests
+      // (and PoolSettings then can't find them → "Contest not found").
       const cached = get().poolsByCompetition[sport.competition] ?? [];
-      set({activeSport: sport, userPools: cached, activePoolId: null});
+      set({
+        activeSport: sport,
+        userPools: cached,
+        visiblePools: [],
+        activePoolId: null,
+      });
       // Restore persisted pool selection for this competition
       get().loadPersistedPoolId(sport.competition);
+      // Refetch live so userPools + visiblePools reflect the new competition
+      // without an app restart.
+      const uid = get().user?.id;
+      if (uid) get().fetchUserPools(uid, sport.competition);
     } else {
       set({activeSport: sport});
     }
