@@ -50,7 +50,12 @@ export function PoolWelcomeScreen({navigation}: any) {
   const hasDeepLinkInvite = !!pendingInviteCode;
   // Chairman or Director of a League (partner board) sees League-framed copy
   // instead of the generic player welcome.
-  const isLeagueManager = !!managedClub;
+  const leagueWelcome =
+    managedClub?.role === 'chairman'
+      ? "Welcome aboard. As Chairman, you sit at the top of your League. Underneath you, a Roster of Contests, every group that wanted to be Endorsed by your brand. You give those Players a Perk. They give you a room full of people who already chose your name. Broadcast to them whenever you've got something to say."
+      : managedClub?.role === 'director'
+      ? "Welcome aboard. As Director, you're the Chairman's second, and the one who actually keeps the League running. The Roster of Contests ahead of you is every group that wanted to be Endorsed by your brand. You give those Players a Perk. They give you a room full of people who already chose your name. Broadcast to them whenever you've got something to say."
+      : null;
 
   // Auto-join if there's a pending invite code. Re-resolve first as a safety net
   // in case LoadingScreen's async resolution hadn't landed before this mounted
@@ -173,9 +178,8 @@ export function PoolWelcomeScreen({navigation}: any) {
           <Text style={styles.welcomeEmoji}>{'\u{1F44B}'}</Text>
           <Text style={styles.title}>Welcome, {displayName}!</Text>
           <Text style={styles.subtitle}>
-            {isLeagueManager
-              ? "Welcome aboard. As Chairman, you sit at the top of your League. Underneath you, a Roster of Contests, every group that wanted to be Endorsed by your brand. You give those Players a Perk. They give you a room full of people who already chose your name. Broadcast to them whenever you've got something to say."
-              : "You're in the HotPick NFL 2026 Contest — compete with everyone on the platform."}
+            {leagueWelcome ??
+              "You're in the HotPick NFL 2026 Contest — compete with everyone on the platform."}
           </Text>
 
           <View style={styles.mechanic}>
