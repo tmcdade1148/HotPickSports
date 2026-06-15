@@ -767,11 +767,27 @@ export function SettingsScreen({route}: any) {
                     key={ev.competition}
                     style={styles.groupRow}
                     onPress={() => {
-                      setCompPickerVisible(false);
-                      if (!isActive) {
-                        setActiveSport(ev);
-                        Alert.alert('Switched', `Now using ${ev.name}. Restart the app for a clean state.`);
+                      if (isActive) {
+                        setCompPickerVisible(false);
+                        return;
                       }
+                      // Confirm before switching — changing competition resets the
+                      // active view; don't do it on a stray tap.
+                      Alert.alert(
+                        'Switch Competition',
+                        `Switch to ${ev.name}?\n\nCurrent: ${activeSport?.name ?? 'none'}`,
+                        [
+                          {text: 'Cancel', style: 'cancel'},
+                          {
+                            text: 'Switch',
+                            onPress: () => {
+                              setCompPickerVisible(false);
+                              setActiveSport(ev);
+                              Alert.alert('Switched', `Now using ${ev.name}. Restart the app for a clean state.`);
+                            },
+                          },
+                        ],
+                      );
                     }}>
                     <View style={styles.linkLeft}>
                       {isActive ? (
