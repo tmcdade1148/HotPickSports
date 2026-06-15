@@ -3,7 +3,7 @@
 // in store loaders fired here so child modules can stay presentational.
 
 import React, {useCallback, useEffect, useMemo} from 'react';
-import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {ScrollView, StyleSheet, Text, View} from 'react-native';
 import {KeyRound, Plus} from 'lucide-react-native';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import {useGlobalStore} from '@shell/stores/globalStore';
@@ -12,7 +12,6 @@ import {isScheduledStatus} from '@sports/nfl/utils/gameStatus';
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {useTheme} from '@shell/theme/hooks';
 import {spacing, bodyType} from '@shared/theme';
-import {hexToRgba} from '@shared/utils/color';
 import {ordinalSuffix} from '@shared/utils/format';
 
 import {SystemMessageSlot} from '@shell/components/home/SystemMessageSlot';
@@ -27,6 +26,7 @@ import {OffSeasonActions, PreSeasonActions, ReturningOffCycleActions} from '@she
 import {Insight} from '@shell/components/home/Insight';
 import {HomeInbox} from '@shell/components/home/HomeInbox';
 import {ContestCarousel} from '@shell/components/home/ContestCarousel';
+import {ContestActionPill, contestActionPillStyles} from '@shell/components/ContestActionPill';
 import {PartnerModule} from '@shell/components/home/PartnerModule';
 import {resolveHomeState} from '@shell/components/home/resolveHomeState';
 import {LEXICON} from '@shared/lexicon';
@@ -437,55 +437,21 @@ export function HomeScreen() {
                 YOUR {LEXICON.contest.plural.toUpperCase()}
               </Text>
             )}
-            <View style={styles.poolActionsRow}>
-              <Pressable
+            <View style={contestActionPillStyles.row}>
+              <ContestActionPill
+                Icon={KeyRound}
+                label="Join a Contest"
+                sublabel="with invite code"
                 onPress={() => navigation.navigate('JoinPool')}
-                style={({pressed}) => [
-                  styles.poolActionBtn,
-                  {
-                    backgroundColor: hexToRgba(colors.ctaAccentOutline, 0.08),
-                    borderColor: colors.ctaAccentOutline,
-                    opacity: pressed ? 0.7 : 1,
-                  },
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel="Join a Contest with an invite code">
-                <KeyRound size={18} color={colors.ctaAccentOutline} strokeWidth={2.25} />
-                <View style={styles.poolActionLabel}>
-                  <Text
-                    style={[bodyType.bold, styles.poolActionPrimary, {color: colors.ctaAccentText}]}>
-                    Join a Contest
-                  </Text>
-                  <Text
-                    style={[bodyType.regular, styles.poolActionSecondary, {color: colors.textSecondary}]}>
-                    with invite code
-                  </Text>
-                </View>
-              </Pressable>
-              <Pressable
+                accessibilityLabel="Join a Contest with an invite code"
+              />
+              <ContestActionPill
+                Icon={Plus}
+                label="Create a Contest"
+                sublabel="and invite friends"
                 onPress={() => navigation.navigate('CreatePool')}
-                style={({pressed}) => [
-                  styles.poolActionBtn,
-                  {
-                    backgroundColor: hexToRgba(colors.ctaAccentOutline, 0.08),
-                    borderColor: colors.ctaAccentOutline,
-                    opacity: pressed ? 0.7 : 1,
-                  },
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel="Create a new Contest and invite friends">
-                <Plus size={18} color={colors.ctaAccentOutline} strokeWidth={2.25} />
-                <View style={styles.poolActionLabel}>
-                  <Text
-                    style={[bodyType.bold, styles.poolActionPrimary, {color: colors.ctaAccentText}]}>
-                    Create a Contest
-                  </Text>
-                  <Text
-                    style={[bodyType.regular, styles.poolActionSecondary, {color: colors.textSecondary}]}>
-                    and invite friends
-                  </Text>
-                </View>
-              </Pressable>
+                accessibilityLabel="Create a new Contest and invite friends"
+              />
             </View>
             {/* Onboarding explainer — only useful until the player is in more
                 than one Contest; drop it once they've got several. */}
@@ -612,38 +578,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     marginTop: 6,
     marginBottom: 6,
-  },
-  poolActionsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginHorizontal: spacing.lg,
-    marginTop: 4,
-  },
-  poolActionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    // Android RN occasionally keeps a previously-set borderStyle when
-    // the prop is omitted entirely. Set it explicitly so the button
-    // can't fall back to dashed.
-    borderStyle: 'solid',
-  },
-  poolActionLabel: {
-    flexShrink: 1,
-    minWidth: 0,
-  },
-  poolActionPrimary: {
-    fontSize: 14,
-    lineHeight: 17,
-  },
-  poolActionSecondary: {
-    fontSize: 11,
-    fontStyle: 'italic',
-    marginTop: 1,
   },
 });

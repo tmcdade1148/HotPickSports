@@ -2,12 +2,10 @@ import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   Alert,
   Linking,
   ScrollView,
-  ActivityIndicator,
   StyleSheet,
   LayoutAnimation,
   Modal,
@@ -17,6 +15,7 @@ import {useNavigation} from '@react-navigation/native';
 import {
   User,
   Plus,
+  KeyRound,
   LogOut,
   ChevronRight,
   ChevronDown,
@@ -46,6 +45,7 @@ import {useColorScheme} from 'react-native';
 import type {BrandConfig} from '@shell/theme/types';
 import {HOTPICK_DEFAULTS, SEMANTIC_COLORS, SEMANTIC_COLORS_DARK, deriveDarkColors, isLightColor} from '@shell/theme/defaults';
 import {getEventsByPriority, getEventByCompetition} from '@sports/registry';
+import {ContestActionPill, contestActionPillStyles} from '@shell/components/ContestActionPill';
 import {LEXICON} from '@shared/lexicon';
 
 
@@ -83,7 +83,6 @@ export function SettingsScreen({route}: any) {
     ?? userPools.find(p => !!(p.brand_config as any)?.is_branded)?.id
     ?? userPools[0]?.id
     ?? null;
-  const joinPool = useGlobalStore(s => s.joinPool);
   const signOut = useGlobalStore(s => s.signOut);
   const flaggedCounts = useGlobalStore(s => s.flaggedCounts);
 
@@ -105,9 +104,6 @@ export function SettingsScreen({route}: any) {
     onPrimary: '#FFFFFF',
   };
 
-  const [inviteCode, setInviteCode] = useState('');
-  const [joining, setJoining] = useState(false);
-  const [joinError, setJoinError] = useState('');
   const [poolsExpanded, setPoolsExpanded] = useState(expandPools);
   const [compPickerVisible, setCompPickerVisible] = useState(false);
 
@@ -130,35 +126,6 @@ export function SettingsScreen({route}: any) {
   const togglePools = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setPoolsExpanded(!poolsExpanded);
-  };
-
-  const handleJoinPool = async () => {
-    if (!user?.id) return;
-    const normalized = inviteCode.toUpperCase().replace(/[\s-]/g, '');
-    if (normalized.length < 6 || normalized.length > 12) {
-      setJoinError('Invite code must be 6–12 characters.');
-      return;
-    }
-    if (!/^[0-9A-Z]+$/.test(normalized)) {
-      setJoinError('Invite code can only contain letters and numbers.');
-      return;
-    }
-
-    setJoining(true);
-    setJoinError('');
-
-    const result = await joinPool(user.id, normalized);
-
-    if (result.pool) {
-      setInviteCode('');
-      setActivePoolId(result.pool.id);
-      Alert.alert('Joined!', `You've joined ${result.pool.name}`);
-    } else if (result.poolFull) {
-      setJoinError('This Contest is full and cannot accept new members.');
-    } else {
-      setJoinError(result.error ?? 'Invalid invite code or Contest is full.');
-    }
-    setJoining(false);
   };
 
   const handleCreatePool = () => {
@@ -543,59 +510,26 @@ export function SettingsScreen({route}: any) {
             );
           })}
 
-          {/* Join Contest — hidden for super-admins, who are creators-only
-              and can never join a contest (2026-06-15). The Create pill below
-              stays so they can still spin up public contests. */}
-          {!userProfile?.is_super_admin && (
-            <View style={styles.joinSection}>
-              <Text style={[styles.joinLabel, {color: colors.textPrimary}]}>Have an invite code?</Text>
-              <View style={styles.codeRow}>
-                <TextInput
-                  style={[styles.codeInput, {borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surface}]}
-                  placeholder="Enter code"
-                  placeholderTextColor={colors.textSecondary}
-                  value={inviteCode}
-                  onChangeText={text => {
-                    setInviteCode(text.toUpperCase());
-                    if (joinError) setJoinError('');
-                  }}
-                  autoCapitalize="characters"
-                  autoCorrect={false}
-                  maxLength={12}
-                  returnKeyType="go"
-                  onSubmitEditing={handleJoinPool}
-                />
-                <TouchableOpacity
-                  style={[
-                    styles.joinButton,
-                    {backgroundColor: colors.primary},
-                    (!inviteCode.trim() || joining) && styles.joinButtonDisabled,
-                  ]}
-                  onPress={handleJoinPool}
-                  disabled={!inviteCode.trim() || joining}>
-                  {joining ? (
-                    <ActivityIndicator size="small" color={colors.onPrimary} />
-                  ) : (
-                    <Text style={styles.joinButtonText}>Join</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-              {joinError ? (
-                <Text style={[styles.codeError, {color: colors.error}]}>{joinError}</Text>
-              ) : null}
-            </View>
-          )}
-
-          {/* Create Contest */}
-          <TouchableOpacity
-            style={[styles.createPoolButton, {backgroundColor: colors.surface, borderColor: colors.primary}]}
-            onPress={handleCreatePool}>
-            <Plus size={18} color={colors.primary} />
-            <View>
-              <Text style={[styles.createPoolText, {color: colors.primary}]}>Create a Contest</Text>
-              <Text style={[styles.createPoolSub, {color: colors.primary}]}>and invite friends</Text>
-            </View>
-          </TouchableOpacity>
+          {/* Join / Create pills — same affordance as the Home screen. Join is
+              hidden for super-admins (creators-only); Create always shows. */}
+          <View style={contestActionPillStyles.row}>
+            {!userProfile?.is_super_admin && (
+              <ContestActionPill
+                Icon={KeyRound}
+                label="Join a Contest"
+                sublabel="with invite code"
+                onPress={() => navigation.navigate('JoinPool')}
+                accessibilityLabel="Join a Contest with an invite code"
+              />
+            )}
+            <ContestActionPill
+              Icon={Plus}
+              label="Create a Contest"
+              sublabel="and invite friends"
+              onPress={handleCreatePool}
+              accessibilityLabel="Create a new Contest and invite friends"
+            />
+          </View>
         </View>
       )}
 
