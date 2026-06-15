@@ -64,6 +64,10 @@ interface SeasonState {
   allWeekGames: Record<number, DbSeasonGame[]>;
   weekPicks: DbSeasonPick[];
   leaderboard: SeasonLeaderboardEntry[];
+  /** Every active member's season total keyed by user_id, INCLUDING hidden
+   *  super-admins. Backs getUserScore so a user can always read their own
+   *  total even when excluded from the displayed `leaderboard`. */
+  allUserScores: Record<string, SeasonLeaderboardEntry>;
   weekLeaderboard: WeekLeaderboardEntry[];
   /** Which week the weekLeaderboard data is actually for. Differs from
    *  currentWeek during picks_open/locked — fetchWeekLeaderboard falls back
@@ -136,6 +140,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
   allWeekGames: {},
   weekPicks: [],
   leaderboard: [],
+  allUserScores: {},
   weekLeaderboard: [],
   weekLeaderboardDisplayedWeek: null,
   regularSeasonPodium: [],
@@ -193,6 +198,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
         allWeekGames: competitionChanged ? {} : state.allWeekGames,
         weekPicks: competitionChanged ? [] : state.weekPicks,
         leaderboard: [], // pool-scoped, always clear
+        allUserScores: {}, // pool-scoped, always clear
         weekLeaderboard: [], // pool-scoped, always clear
         weekLeaderboardDisplayedWeek: null,
         userNames: state.userNames, // user-level, preserve
@@ -461,8 +467,9 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       (typeof cfgMap.current_week === 'number' ? cfgMap.current_week : 1);
 
     // Step 1: Get ACTIVE pool member user IDs + pool_start_date in parallel.
-    // Super-admins are hidden members (2026-06-15) — exclude them from the
-    // ladder via the profiles join so they never appear or affect ranks.
+    // We fetch ALL active members (incl. super-admins) so each user can always
+    // read their OWN total — but super-admins are hidden from the displayed
+    // ladder below. (Hidden-member model, 2026-06-15.)
     const [membersResult, poolResult] = await Promise.all([
       supabase
         .from('pool_members')
@@ -476,11 +483,13 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
         .single(),
     ]);
 
-    const memberIds = (membersResult.data ?? [])
-      .filter((m: any) => !m.profiles?.is_super_admin)
-      .map((m: any) => m.user_id);
+    const memberRows = (membersResult.data ?? []) as any[];
+    const memberIds = memberRows.map(m => m.user_id);
+    const superAdminIds = new Set(
+      memberRows.filter(m => m.profiles?.is_super_admin).map(m => m.user_id),
+    );
     if (memberIds.length === 0) {
-      set({leaderboard: [], userNames: {}, isLoading: false});
+      set({leaderboard: [], allUserScores: {}, userNames: {}, isLoading: false});
       return;
     }
 
@@ -542,10 +551,15 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       entry.weekly_breakdown[row.week] = row.week_points;
     }
 
-    // Sort descending by total_points
-    const leaderboard = Object.values(byUser).sort(
-      (a, b) => b.total_points - a.total_points,
-    );
+    // Per-user map of EVERY member's total (incl. hidden super-admins) so a
+    // user can always read their own score via getUserScore — even when they're
+    // excluded from the displayed ladder.
+    const allUserScores = byUser;
+
+    // Displayed ladder excludes hidden super-admins.
+    const leaderboard = Object.values(byUser)
+      .filter(s => !superAdminIds.has(s.user_id))
+      .sort((a, b) => b.total_points - a.total_points);
 
     // Step 4: Fetch display names + avatars for all users on the leaderboard
     const userIds = leaderboard.map(s => s.user_id);
@@ -578,6 +592,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
 
     set({
       leaderboard,
+      allUserScores,
       userNames: names,
       userAvatars: avatars,
       isLoading: false,
@@ -903,8 +918,10 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
   },
 
   getUserScore: (userId: string) => {
-    const {leaderboard} = get();
-    return leaderboard.find(s => s.user_id === userId);
+    const {leaderboard, allUserScores} = get();
+    // Prefer the displayed ladder; fall back to the full per-user map so a
+    // hidden super-admin (excluded from the ladder) still reads their own total.
+    return leaderboard.find(s => s.user_id === userId) ?? allUserScores[userId];
   },
 
   subscribeToGameScores: () => {
