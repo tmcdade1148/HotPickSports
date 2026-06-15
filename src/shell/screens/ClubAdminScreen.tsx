@@ -45,6 +45,7 @@ import {bodyType, displayType, spacing, borderRadius} from '@shared/theme';
 import {formatRosterPass} from '@shared/utils/format';
 import {LEXICON} from '@shared/lexicon';
 import {DelegateManager} from '@shell/components/DelegateManager';
+import {PerkIcon, PERK_ICON_NAMES} from '@shell/components/home/PerkIcon';
 
 type PartnerRow = {
   id: string;
@@ -92,6 +93,7 @@ export function ClubAdminScreen() {
   // Local edit state per section. Save buttons only enabled when dirty.
   const [perkText, setPerkText] = useState('');
   const [perkIcon, setPerkIcon] = useState('');
+  const [iconPickerVisible, setIconPickerVisible] = useState(false);
   const [perkSaving, setPerkSaving] = useState(false);
 
   const [hoursText, setHoursText] = useState('');
@@ -438,14 +440,13 @@ export function ClubAdminScreen() {
               Shows on every Contest in your roster. Keep it specific and time-bound.
             </Text>
             <View style={styles.perkRow}>
-              <TextInput
-                style={[styles.perkIconInput, {color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.background}]}
-                value={perkIcon}
-                onChangeText={setPerkIcon}
-                placeholder="🎁"
-                placeholderTextColor={colors.textTertiary}
-                maxLength={16}
-              />
+              <Pressable
+                onPress={() => setIconPickerVisible(true)}
+                style={[styles.perkIconInput, styles.perkIconSwatch, {borderColor: colors.border, backgroundColor: colors.background}]}
+                accessibilityRole="button"
+                accessibilityLabel="Choose a perk icon">
+                <PerkIcon name={perkIcon} size={24} color={colors.textPrimary} />
+              </Pressable>
               <TextInput
                 style={[styles.perkInput, {color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.background}]}
                 value={perkText}
@@ -728,6 +729,54 @@ export function ClubAdminScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Perk icon picker — curated lucide glyphs (PerkIcon's set). Replaces
+          free-text icon entry so a Chairman picks from valid options. */}
+      <Modal
+        visible={iconPickerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIconPickerVisible(false)}>
+        <View style={styles.modalBackdrop}>
+          <Pressable
+            style={styles.modalBackdropPress}
+            onPress={() => setIconPickerVisible(false)}
+          />
+          <View style={[styles.modalCard, {backgroundColor: colors.surface}]}>
+            <Text style={[bodyType.bold, {fontSize: 16, color: colors.textPrimary}]}>
+              Choose a perk icon
+            </Text>
+            <View style={styles.iconGrid}>
+              {PERK_ICON_NAMES.map(name => {
+                const selected = perkIcon.trim().toLowerCase() === name;
+                return (
+                  <Pressable
+                    key={name}
+                    onPress={() => {
+                      setPerkIcon(name);
+                      setIconPickerVisible(false);
+                    }}
+                    style={[
+                      styles.iconOption,
+                      {borderColor: selected ? colors.primary : colors.border, backgroundColor: colors.background},
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Perk icon ${name}`}>
+                    <PerkIcon name={name} size={24} color={selected ? colors.primary : colors.textPrimary} />
+                  </Pressable>
+                );
+              })}
+            </View>
+            <View style={{flexDirection: 'row', justifyContent: 'flex-end', marginTop: spacing.sm}}>
+              <Pressable
+                onPress={() => setIconPickerVisible(false)}
+                style={{paddingVertical: spacing.sm, paddingHorizontal: spacing.lg}}>
+                <Text style={[bodyType.bold, {color: colors.textSecondary}]}>Cancel</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -801,6 +850,21 @@ const styles = StyleSheet.create({
     fontSize: 20,
     borderRadius: borderRadius.md,
     borderWidth: 1,
+  },
+  perkIconSwatch: {alignItems: 'center', justifyContent: 'center'},
+  iconGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  iconOption: {
+    width: 48,
+    height: 48,
+    borderRadius: borderRadius.md,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   perkInput: {
     flex: 1,
