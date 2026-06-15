@@ -27,6 +27,7 @@ import {OffSeasonActions, PreSeasonActions, ReturningOffCycleActions} from '@she
 import {Insight} from '@shell/components/home/Insight';
 import {HomeInbox} from '@shell/components/home/HomeInbox';
 import {PoolModule} from '@shell/components/home/PoolModule';
+import {ContestCarousel} from '@shell/components/home/ContestCarousel';
 import {PartnerModule} from '@shell/components/home/PartnerModule';
 import {resolveHomeState} from '@shell/components/home/resolveHomeState';
 import {LEXICON} from '@shared/lexicon';
@@ -430,16 +431,17 @@ export function HomeScreen() {
           && homeState !== 'off_season_idle'
           && homeState !== 'pre_season_games' && (
           <View style={styles.section}>
-            <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textTertiary}]}>
-              YOUR {LEXICON.contest.plural.toUpperCase()}
-            </Text>
-            {/* Pool cards only render when the user has visible pools.
-                The Join + Create buttons below are the always-present
-                affordance — they're the section's purpose for zero-pool
-                users browsing in off-season / pre-season explore mode. */}
-            {visiblePools.length > 0 && sortedVisiblePools.map(p => (
-              <PoolModule key={p.id} pool={p} />
-            ))}
+            {/* Swipe carousel: one contest card per swipe, dots track the
+                active/visible one (orange). Swiping sets the global active
+                contest (Hard Rule #20). When the user has no visible pools we
+                still show the title + the Join/Create affordance below. */}
+            {visiblePools.length > 0 ? (
+              <ContestCarousel pools={sortedVisiblePools} />
+            ) : (
+              <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textTertiary}]}>
+                YOUR {LEXICON.contest.plural.toUpperCase()}
+              </Text>
+            )}
             <View style={styles.poolActionsRow}>
               <Pressable
                 onPress={() => navigation.navigate('JoinPool')}
