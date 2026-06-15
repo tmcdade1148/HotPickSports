@@ -24,7 +24,9 @@ import {useTheme} from '@shell/theme/hooks';
 import {bodyType, spacing, borderRadius} from '@shared/theme';
 import {hexToRgba} from '@shared/utils/color';
 
-const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+// Matches the Message Center's 10-day retention so an aged-out message never
+// lingers as an unread count with nothing to open.
+const RETENTION_MS = 10 * 24 * 60 * 60 * 1000;
 
 export function HomeInbox() {
   const {colors} = useTheme();
@@ -75,13 +77,13 @@ export function HomeInbox() {
     }
     const poolIds = scoped.map(p => p.pool_id);
     const joinedByPool = new Map(scoped.map(p => [p.pool_id, p.joined_at]));
-    const thirtyDaysAgo = new Date(Date.now() - THIRTY_DAYS_MS).toISOString();
+    const windowStart = new Date(Date.now() - RETENTION_MS).toISOString();
     const [{data: msgs}, {data: readState}] = await Promise.all([
       supabase
         .from('organizer_notifications')
         .select('id, pool_id, message, sent_at, notification_type, recipient_user_ids')
         .in('pool_id', poolIds)
-        .gte('sent_at', thirtyDaysAgo)
+        .gte('sent_at', windowStart)
         .order('sent_at', {ascending: false})
         .limit(100),
       supabase
