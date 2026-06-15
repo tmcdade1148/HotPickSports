@@ -10,10 +10,10 @@
 //     only reflects status and enables/disables the buttons.
 
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {Alert, ScrollView, StyleSheet, Text, View, Pressable, ActivityIndicator} from 'react-native';
+import {Alert, LayoutAnimation, ScrollView, StyleSheet, Text, View, Pressable, ActivityIndicator} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
-import {ChevronLeft, ChevronRight, Check, CircleCheck, CircleAlert, CircleDashed, Lock, FastForward} from 'lucide-react-native';
+import {ChevronLeft, ChevronRight, ChevronDown, Check, CircleCheck, CircleAlert, CircleDashed, Lock, FastForward} from 'lucide-react-native';
 import {supabase} from '@shared/config/supabase';
 import {isSandboxCompetition} from '@shared/utils/competition';
 import {useTheme} from '@shell/theme/hooks';
@@ -120,6 +120,14 @@ function AdminSeasonControlImpl() {
   const [comps, setComps] = useState<CompRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  // Per-competition collapse state. Defaulted once per competition (open unless
+  // the season is complete); user toggles are preserved across realtime reloads.
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
+  const toggleExpanded = useCallback((competition: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpanded(prev => ({...prev, [competition]: !prev[competition]}));
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -147,6 +155,11 @@ function AdminSeasonControlImpl() {
       wrByKey[`${r.competition}#${r.week_number}`] = r as Readiness;
     }
 
+    // Order: nfl_2026 pinned to the top, SEASON_COMPLETE competitions at the
+    // bottom, everything else alphabetical in between.
+    const rank = (c: {competition: string; phase: string}) =>
+      c.competition === 'nfl_2026' ? 0 : c.phase === 'SEASON_COMPLETE' ? 2 : 1;
+
     const rows: CompRow[] = Object.entries(byComp)
       .map(([competition, v]) => ({
         competition,
@@ -156,9 +169,18 @@ function AdminSeasonControlImpl() {
         readiness: v.currentWeek != null ? wrByKey[`${competition}#${v.currentWeek}`] ?? null : null,
         nextReadiness: v.currentWeek != null ? wrByKey[`${competition}#${v.currentWeek + 1}`] ?? null : null,
       }))
-      .sort((a, b) => a.competition.localeCompare(b.competition));
+      .sort((a, b) => rank(a) - rank(b) || a.competition.localeCompare(b.competition));
 
     setComps(rows);
+    // Seed collapse defaults once per competition (open unless season complete);
+    // never clobber a toggle the user already made.
+    setExpanded(prev => {
+      const next = {...prev};
+      for (const row of rows) {
+        if (!(row.competition in next)) next[row.competition] = row.phase !== 'SEASON_COMPLETE';
+      }
+      return next;
+    });
     setLoading(false);
   }, []);
 
@@ -295,15 +317,33 @@ function AdminSeasonControlImpl() {
             // week's readiness (review #1) — not the current week's.
             const nextReady = isReady(comp.nextReadiness);
             const canAdvanceWeek = comp.weekState === 'complete' && nextReady && !isBusy;
+            const isComplete = comp.phase === 'SEASON_COMPLETE';
+            const isOpen = expanded[comp.competition] ?? !isComplete;
 
             return (
               <View
                 key={comp.competition}
                 style={[styles.card, {backgroundColor: colors.surface, borderColor: colors.border}]}>
-                <Text style={[bodyType.bold, styles.compName, {color: colors.textPrimary}]}>
-                  {comp.competition}
-                </Text>
+                {/* Collapsible header — tap to expand/collapse the module. */}
+                <Pressable
+                  onPress={() => toggleExpanded(comp.competition)}
+                  style={styles.cardHeader}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${comp.competition}, ${isOpen ? 'collapse' : 'expand'}`}>
+                  <Text style={[bodyType.bold, styles.compName, {color: colors.textPrimary}]}>
+                    {comp.competition}
+                  </Text>
+                  <Text style={[bodyType.regular, styles.headerPhase, {color: colors.textTertiary}]} numberOfLines={1}>
+                    {PHASE_LABEL[comp.phase] ?? comp.phase}
+                  </Text>
+                  {isOpen ? (
+                    <ChevronDown size={20} color={colors.textTertiary} />
+                  ) : (
+                    <ChevronRight size={20} color={colors.textTertiary} />
+                  )}
+                </Pressable>
 
+                {isOpen && (<>
                 {/* Phase sequence with the current one highlighted. */}
                 <View style={styles.seqWrap}>
                   {PHASE_ORDER.map(p => {
@@ -334,13 +374,20 @@ function AdminSeasonControlImpl() {
 
                 <Pressable
                   onPress={() => advancePhase(comp)}
-                  disabled={isBusy}
+                  disabled={isBusy || isComplete}
                   style={({pressed}) => [
                     styles.advanceBtn,
-                    {backgroundColor: colors.primary, opacity: isBusy ? 0.5 : pressed ? 0.85 : 1},
+                    {
+                      backgroundColor: isComplete ? colors.border : colors.primary,
+                      opacity: isBusy ? 0.5 : pressed && !isComplete ? 0.85 : 1,
+                    },
                   ]}>
                   {isBusy ? (
                     <ActivityIndicator size="small" color={colors.onPrimary} />
+                  ) : isComplete ? (
+                    <Text style={[bodyType.bold, styles.advanceText, {color: colors.textTertiary}]}>
+                      Season complete
+                    </Text>
                   ) : (
                     <>
                       <Text style={[bodyType.bold, styles.advanceText, {color: colors.onPrimary}]}>
@@ -432,6 +479,7 @@ function AdminSeasonControlImpl() {
                     </Text>
                   )}
                 </View>
+                </>)}
               </View>
             );
           })}
@@ -483,7 +531,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: spacing.sm,
   },
+  cardHeader: {flexDirection: 'row', alignItems: 'center', gap: spacing.sm},
   compName: {fontSize: 15, fontFamily: 'monospace'},
+  headerPhase: {fontSize: 12, flex: 1, textAlign: 'right'},
   seqWrap: {flexDirection: 'row', flexWrap: 'wrap', gap: 6},
   chip: {
     flexDirection: 'row',
