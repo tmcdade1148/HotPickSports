@@ -25,6 +25,9 @@ interface MessageItem {
   message: string;
   senderName: string;
   sentAt: string;
+  /** Platform-wide super-admin broadcast (from the hidden Platform Pool). The
+   *  header reads "FROM: HotPick Sports" with no @ contest. */
+  fromPlatform: boolean;
 }
 
 /**
@@ -74,10 +77,12 @@ export function MessageCenterScreen() {
 
     const poolIds: string[] = [];
     const nameMap: Record<string, string> = {};
+    const hiddenById: Record<string, boolean> = {};
     for (const r of ((memberRows ?? []) as unknown) as RawRow[]) {
       const p = Array.isArray(r.pools) ? r.pools[0] : r.pools;
       if (!p) continue;
       poolIds.push(p.id);
+      hiddenById[p.id] = p.is_hidden_from_users;
       nameMap[p.id] = p.is_hidden_from_users ? 'HotPick' : (p.name ?? 'Contest');
     }
 
@@ -141,14 +146,17 @@ export function MessageCenterScreen() {
     }
 
     for (const b of broadcasts ?? []) {
+      const fromPlatform = hiddenById[b.pool_id] === true;
       items.push({
         id: `bc-${b.id}`,
         type: 'broadcast',
         poolId: b.pool_id,
         poolName: nameMap[b.pool_id] ?? 'Contest',
         message: b.message,
-        senderName: senderNameMap[b.organizer_id] ?? 'Gaffer',
+        // Platform broadcasts are from HotPick itself, not a Gaffer.
+        senderName: fromPlatform ? 'HotPick Sports' : (senderNameMap[b.organizer_id] ?? 'Gaffer'),
         sentAt: b.sent_at,
+        fromPlatform,
       });
     }
 
@@ -161,6 +169,7 @@ export function MessageCenterScreen() {
         message: n.message,
         senderName: senderNameMap[n.organizer_id] ?? 'Moderator',
         sentAt: n.sent_at,
+        fromPlatform: false,
       });
     }
 
@@ -225,11 +234,13 @@ export function MessageCenterScreen() {
                   numberOfLines={1}>
                   {item.senderName}
                 </Text>
-                <Text
-                  style={[styles.poolLabel, {color: colors.textSecondary}]}
-                  numberOfLines={1}>
-                  {'  ·  '}{item.poolName}
-                </Text>
+                {!item.fromPlatform && (
+                  <Text
+                    style={[styles.poolLabel, {color: colors.textSecondary}]}
+                    numberOfLines={1}>
+                    {' @ '}{item.poolName}
+                  </Text>
+                )}
               </View>
               <Text style={[styles.timeLabel, {color: colors.textSecondary}]}>
                 {formatRelativeTime(item.sentAt)}
