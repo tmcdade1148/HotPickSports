@@ -124,6 +124,9 @@ export interface GlobalState {
     userId: string,
     inviteCode: string,
   ) => Promise<{pool?: DbPool; error?: string; poolFull?: boolean}>;
+  joinPublicContest: (
+    userId: string,
+  ) => Promise<{pool?: DbPool; error?: string}>;
   loadPersistedPoolId: (competition: string) => Promise<void>;
   clearPoolState: () => void;
 

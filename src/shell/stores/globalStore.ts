@@ -253,6 +253,26 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       }
     }
 
+    // Also surface contests this user OWNS but isn't a member of. In practice
+    // this is only super-admins, who are creators-only (not players) per the
+    // 2026-06-15 model — without this they'd own public contests they could
+    // never open in PoolSettings to manage the public designation. Owner role
+    // 'organizer' so the management surface renders.
+    const seen = new Set(pools.map(p => p.id));
+    const {data: ownedData} = await supabase
+      .from('pools')
+      .select('*')
+      .eq('organizer_id', userId)
+      .eq('competition', competition)
+      .eq('is_archived', false)
+      .is('deleted_at', null);
+    for (const owned of (ownedData ?? []) as DbPool[]) {
+      if (seen.has(owned.id)) continue;
+      seen.add(owned.id);
+      pools.push(owned);
+      roles[owned.id] = 'organizer';
+    }
+
     // Compute visible pools: hide global pools unless manually joined,
     // AND always hide pools flagged is_hidden_from_users (the analytics
     // Platform Pool — staff-only visibility per April 2026 spec).
@@ -386,6 +406,37 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     // Re-fetch pools from DB — picks up invite_code_used, manualGlobalJoins, etc.
     await get().fetchUserPools(userId, competition);
 
+    return {pool: typedPool};
+  },
+
+  // Join the designated public contest for the active competition — no invite
+  // code. Server (join_public_contest) finds the designated pool, blocks
+  // super-admins, and enforces member limits. Mirrors joinPool's post-join refresh.
+  joinPublicContest: async userId => {
+    const competition = get().activeSport?.competition;
+    if (!competition) {
+      return {error: 'No active competition.'};
+    }
+    const {data, error} = await supabase.rpc('join_public_contest', {
+      p_competition: competition,
+    });
+    if (error) {
+      return {error: error.message};
+    }
+    if (!data || data.error) {
+      const friendly: Record<string, string> = {
+        NO_PUBLIC_CONTEST: 'There is no public Contest open right now. Check back soon.',
+        ALREADY_MEMBER: "You're already in this Contest.",
+        pool_full: 'That Contest is full right now.',
+        SUPER_ADMIN_CANNOT_JOIN: 'Admin accounts create Contests; they do not join them.',
+      };
+      const code = data?.error as string | undefined;
+      return {error: (code && friendly[code]) ?? 'Could not join the public Contest.'};
+    }
+    const typedPool = data.pool as DbPool;
+    AsyncStorage.setItem(poolStorageKey(competition), typedPool.id);
+    set({activePoolId: typedPool.id});
+    await get().fetchUserPools(userId, competition);
     return {pool: typedPool};
   },
 

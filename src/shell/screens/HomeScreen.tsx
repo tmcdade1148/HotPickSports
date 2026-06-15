@@ -19,6 +19,7 @@ import {SystemMessageSlot} from '@shell/components/home/SystemMessageSlot';
 import {HomeHeader} from '@shell/components/home/HomeHeader';
 import {IdentityBar} from '@shell/components/home/IdentityBar';
 import {ManagedLeagueModule} from '@shell/components/home/ManagedLeagueModule';
+import {JoinPublicContestButton} from '@shell/components/home/JoinPublicContestButton';
 import {StateHero} from '@shell/components/home/StateHero';
 import {HeroSkeleton} from '@shell/components/home/HeroSkeleton';
 import {CrossContestStrip} from '@shell/components/home/CrossContestStrip';
@@ -417,6 +418,10 @@ export function HomeScreen() {
         {/* Board Discovery Tile — routes partner board members (Chairman /
             Director) into League Tools. Self-hides when not on a board. */}
         <ManagedLeagueModule />
+
+        {/* Join-the-public-contest CTA for new users with no contests.
+            Self-hides once the user is in any pool. */}
+        <JoinPublicContestButton />
 
         {/* In-cycle YOUR CONTESTS section — replaced on off-cycle
             states (off_season_idle / pre_season_games) by the action

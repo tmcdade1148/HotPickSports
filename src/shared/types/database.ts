@@ -60,6 +60,9 @@ export interface DbPool {
   organizer_id: string | null;
   invite_code: string | null;
   is_public: boolean;
+  // The one designated public contest per competition that new users can join
+  // from Home without an invite code (set by a super-admin).
+  is_designated_public?: boolean;
   is_global: boolean;
   is_founding_pool: boolean;
   member_limit: number | null;
