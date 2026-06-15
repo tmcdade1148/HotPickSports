@@ -63,6 +63,11 @@ const PERK_ICONS: Record<string, LucideIcon> = {
   wine: Wine,
 };
 
+// Ordered list of the curated perk-icon names, for pickers (e.g. the Chairman's
+// perk editor). Rendering any of these through <PerkIcon name={...}/> resolves
+// to the matching lucide glyph.
+export const PERK_ICON_NAMES: string[] = Object.keys(PERK_ICONS);
+
 export interface PerkIconProps {
   name: string | null | undefined;
   size: number;

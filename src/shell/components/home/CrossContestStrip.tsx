@@ -21,10 +21,10 @@ export function CrossContestStrip() {
         {backgroundColor: hexToRgba(colors.primary, 0.08)},
       ]}>
       <Text style={[bodyType.bold, styles.title, {color: colors.primary}]}>
-        One set of picks. Every Contest at once.
+        Pick once. Live everywhere.
       </Text>
       <Text style={[bodyType.regular, styles.body, {color: colors.primary}]}>
-        The same picks play in every Contest you're in, all at the same time.
+        One set of calls, tested in every Contest you're in at the same time. Be right in all of them or wrong in all of them.
       </Text>
     </View>
   );
