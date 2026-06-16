@@ -37,6 +37,7 @@ import {
   Ticket,
   Megaphone,
   Share2,
+  Eye,
 } from 'lucide-react-native';
 import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
@@ -513,6 +514,12 @@ export function ClubAdminScreen() {
                 </View>
               ))
             )}
+            <Pressable
+              onPress={() => navigation.navigate('PartnerRoster', {slug: partner.slug, preview: true})}
+              style={[styles.saveBtn, {backgroundColor: colors.primary, flexDirection: 'row', gap: 8}]}>
+              <Eye size={16} color={colors.onPrimary} />
+              <Text style={[bodyType.bold, {color: colors.onPrimary}]}>See Roster Page</Text>
+            </Pressable>
           </View>
 
           {/* Hours */}
