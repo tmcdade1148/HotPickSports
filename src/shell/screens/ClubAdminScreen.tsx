@@ -37,6 +37,7 @@ import {
   Ticket,
   Megaphone,
   Share2,
+  Eye,
 } from 'lucide-react-native';
 import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
@@ -45,7 +46,7 @@ import {bodyType, displayType, spacing, borderRadius} from '@shared/theme';
 import {formatRosterPass} from '@shared/utils/format';
 import {LEXICON} from '@shared/lexicon';
 import {DelegateManager} from '@shell/components/DelegateManager';
-import {PerkIcon, PERK_ICON_NAMES} from '@shell/components/home/PerkIcon';
+import {PerkIcon, PERK_EMOJI} from '@shell/components/home/PerkIcon';
 
 type PartnerRow = {
   id: string;
@@ -513,6 +514,12 @@ export function ClubAdminScreen() {
                 </View>
               ))
             )}
+            <Pressable
+              onPress={() => navigation.navigate('PartnerRoster', {slug: partner.slug, preview: true})}
+              style={[styles.saveBtn, {backgroundColor: colors.primary, flexDirection: 'row', gap: 8}]}>
+              <Eye size={16} color={colors.onPrimary} />
+              <Text style={[bodyType.bold, {color: colors.onPrimary}]}>See Roster Page</Text>
+            </Pressable>
           </View>
 
           {/* Hours */}
@@ -747,13 +754,13 @@ export function ClubAdminScreen() {
               Choose a perk icon
             </Text>
             <View style={styles.iconGrid}>
-              {PERK_ICON_NAMES.map(name => {
-                const selected = perkIcon.trim().toLowerCase() === name;
+              {PERK_EMOJI.map(emoji => {
+                const selected = perkIcon.trim() === emoji;
                 return (
                   <Pressable
-                    key={name}
+                    key={emoji}
                     onPress={() => {
-                      setPerkIcon(name);
+                      setPerkIcon(emoji);
                       setIconPickerVisible(false);
                     }}
                     style={[
@@ -761,8 +768,8 @@ export function ClubAdminScreen() {
                       {borderColor: selected ? colors.primary : colors.border, backgroundColor: colors.background},
                     ]}
                     accessibilityRole="button"
-                    accessibilityLabel={`Perk icon ${name}`}>
-                    <PerkIcon name={name} size={24} color={selected ? colors.primary : colors.textPrimary} />
+                    accessibilityLabel={`Perk icon ${emoji}`}>
+                    <PerkIcon name={emoji} size={24} color={colors.textPrimary} />
                   </Pressable>
                 );
               })}

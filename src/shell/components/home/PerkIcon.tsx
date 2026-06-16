@@ -68,6 +68,16 @@ const PERK_ICONS: Record<string, LucideIcon> = {
 // to the matching lucide glyph.
 export const PERK_ICON_NAMES: string[] = Object.keys(PERK_ICONS);
 
+// Curated full-color emoji for the perk picker. Emoji render natively in color
+// (PerkIcon's non-alpha branch), so these give a Chairman colorful perk icons
+// without any icon library. Food / drink / reward themed for a sports-bar perk.
+export const PERK_EMOJI: string[] = [
+  '🍺', '🍻', '🍷', '🍸', '🍹', '🍕',
+  '🍔', '🌮', '🌭', '🥪', '🍟', '🍗',
+  '🍩', '🍪', '☕', '🎁', '🎟️', '🏆',
+  '🥇', '⭐', '🔥', '🎉', '💸', '🏈',
+];
+
 export interface PerkIconProps {
   name: string | null | undefined;
   size: number;

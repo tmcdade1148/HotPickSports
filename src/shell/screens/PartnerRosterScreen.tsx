@@ -54,13 +54,17 @@ interface BroadcastRow {
   sent_at: string;
 }
 
-type Params = {PartnerRoster: {slug: string}};
+type Params = {PartnerRoster: {slug: string; preview?: boolean}};
 
 export function PartnerRosterScreen() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<Params, 'PartnerRoster'>>();
   const slug = route.params.slug;
+  // Preview mode: a Chairman/Director opening their own roster page from League
+  // Tools. They may not be a Player in any roster Contest, so skip the
+  // membership-scoped denial and render the public page as members see it.
+  const preview = route.params.preview ?? false;
 
   const userId           = useGlobalStore(s => s.user?.id);
   const visiblePools     = useGlobalStore(s => s.visiblePools);
@@ -154,8 +158,9 @@ export function PartnerRosterScreen() {
     );
   }
 
-  // Denial: user is not in any aligned pool (e.g. stale deep link)
-  if (alignedPools.length === 0) {
+  // Denial: user is not in any aligned pool (e.g. stale deep link). Skipped in
+  // preview mode — a Chairman previewing their own page need not be a member.
+  if (!preview && alignedPools.length === 0) {
     return (
       <DenialState
         title="You're not on this League's roster"
@@ -214,6 +219,15 @@ export function PartnerRosterScreen() {
             {partner.name.toUpperCase()}'S ROSTER
           </Text>
         </View>
+
+        {preview && (
+          <View style={[styles.notice, {backgroundColor: colors.surface, borderColor: colors.border}]}>
+            <Text style={[bodyType.bold, {color: colors.textPrimary}]}>Preview</Text>
+            <Text style={[bodyType.regular, styles.noticeBody, {color: colors.textSecondary}]}>
+              This is how your roster page looks to Players.
+            </Text>
+          </View>
+        )}
 
         {showTombstone && (
           <View style={[styles.notice, {backgroundColor: colors.surface, borderColor: colors.border}]}>
@@ -338,6 +352,11 @@ export function PartnerRosterScreen() {
               </Text>
             </Pressable>
           ))}
+          {preview && alignedPools.length === 0 && (
+            <Text style={[bodyType.regular, styles.emptyLine, {color: colors.textTertiary}]}>
+              Contests that join your roster show up here for their Players.
+            </Text>
+          )}
           <Text
             style={[bodyType.regular, styles.smackPlaceholder, {color: colors.textTertiary}]}>
             💬 Cross-Contest chat coming to your roster — stay tuned.
