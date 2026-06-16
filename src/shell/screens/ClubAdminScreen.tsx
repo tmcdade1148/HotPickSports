@@ -738,7 +738,7 @@ export function ClubAdminScreen() {
               <Text style={{fontWeight: '700'}}>support@hotpicksports.com</Text> to request changes.
             </Text>
           </View>
-          <View style={[styles.cardBlock, {backgroundColor: colors.surface, borderColor: colors.border}]}>
+          <View style={[styles.cardBlock, {backgroundColor: colors.surface, borderColor: colors.border, marginTop: spacing.md}]}>
             <Text style={[bodyType.bold, {color: colors.textPrimary, marginBottom: 4}]}>Analytics</Text>
             <Text style={[bodyType.regular, {color: colors.textSecondary, fontSize: 12, lineHeight: 17}]}>
               Coming soon — perk redemption tracking, broadcast open rates, Player activity.
@@ -873,7 +873,11 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
   },
   title: {fontSize: 16, letterSpacing: 0.5},
-  scroll: {padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md},
+  // Section spacing comes from sectionTitle margins (Settings-page model),
+  // not a scroll-level gap — a gap here would double the space between
+  // every section. Standalone cards without a preceding title set their
+  // own marginTop.
+  scroll: {padding: spacing.lg, paddingBottom: spacing.xxl},
 
   identityCard: {
     flexDirection: 'row',
