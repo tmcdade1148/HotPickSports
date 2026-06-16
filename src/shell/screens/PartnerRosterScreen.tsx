@@ -20,6 +20,8 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Linking,
+  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -195,6 +197,18 @@ export function PartnerRosterScreen() {
 
   const hours = partner.public_info?.hours?.trim() || null;
   const address = partner.public_info?.address?.trim() || null;
+  // Tapping the address opens the platform maps app (Apple Maps on iOS,
+  // the geo: handler — usually Google Maps — on Android).
+  const openMaps = () => {
+    if (!address) return;
+    const q = encodeURIComponent(address);
+    const url = Platform.select({
+      ios: `http://maps.apple.com/?q=${q}`,
+      android: `geo:0,0?q=${q}`,
+      default: `https://www.google.com/maps/search/?api=1&query=${q}`,
+    })!;
+    Linking.openURL(url).catch(() => {});
+  };
   // Editable in League Tools; falls back to the platform default.
   const redeemText =
     partner.public_info?.perk_redeem_text?.trim() ||
@@ -245,18 +259,33 @@ export function PartnerRosterScreen() {
             ]}>
             {partner.name.toUpperCase()}'S LEAGUE ROSTER
           </Text>
-          {address && (
-            <View style={styles.brandInfoRow}>
-              <MapPin size={13} color={colors.textSecondary} />
-              <Text style={[bodyType.regular, styles.brandInfoText, {color: colors.textSecondary}]}>
-                {address}
-              </Text>
+          {(address || hours) && (
+            <View style={styles.brandMeta}>
+              {address && (
+                <Pressable
+                  onPress={openMaps}
+                  hitSlop={6}
+                  style={({pressed}) => [styles.brandInfoRow, {opacity: pressed ? 0.6 : 1}]}
+                  accessibilityRole="link"
+                  accessibilityLabel={`Open ${address} in Maps`}>
+                  <MapPin size={13} color={partnerPrimary} />
+                  <Text
+                    style={[
+                      bodyType.regular,
+                      styles.brandInfoText,
+                      styles.brandAddressLink,
+                      {color: partnerPrimary},
+                    ]}>
+                    {address}
+                  </Text>
+                </Pressable>
+              )}
+              {hours && (
+                <Text style={[bodyType.regular, styles.brandInfoText, {color: colors.textSecondary}]}>
+                  {hours}
+                </Text>
+              )}
             </View>
-          )}
-          {hours && (
-            <Text style={[bodyType.regular, styles.brandHours, {color: colors.textSecondary}]}>
-              {hours}
-            </Text>
           )}
         </View>
 
@@ -540,10 +569,9 @@ const styles = StyleSheet.create({
     textAlign:  'center',
     lineHeight: displayType.size.h2 * 1.05,
   },
-  brandHours: {
-    fontSize:  13,
-    textAlign: 'center',
-    marginTop: spacing.xs,
+  brandMeta: {
+    alignItems: 'center',
+    gap:        2,
   },
   brandInfoRow: {
     flexDirection: 'row',
@@ -553,6 +581,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
   },
   brandInfoText: {fontSize: 13, textAlign: 'center', flexShrink: 1},
+  brandAddressLink: {textDecorationLine: 'underline'},
 
   notice: {
     marginHorizontal: spacing.lg,
