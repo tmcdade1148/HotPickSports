@@ -60,6 +60,7 @@ type PartnerRow = {
   club_pool_id: string | null;
   public_info: {
     hours?: string;
+    perk_redeem_text?: string;
     link?: {url?: string; label?: string};
     roster_page_message?: string;
   } | null;
@@ -96,6 +97,9 @@ export function ClubAdminScreen() {
   const [perkIcon, setPerkIcon] = useState('');
   const [iconPickerVisible, setIconPickerVisible] = useState(false);
   const [perkSaving, setPerkSaving] = useState(false);
+
+  const [redeemText, setRedeemText] = useState('');
+  const [redeemSaving, setRedeemSaving] = useState(false);
 
   const [hoursText, setHoursText] = useState('');
   const [hoursSaving, setHoursSaving] = useState(false);
@@ -139,6 +143,7 @@ export function ClubAdminScreen() {
     setPartner(row);
     setPerkText(row.perk_text ?? '');
     setPerkIcon(row.perk_icon ?? '');
+    setRedeemText(row.public_info?.perk_redeem_text ?? '');
     setHoursText(row.public_info?.hours ?? '');
     setLinkUrl(row.public_info?.link?.url ?? '');
     setLinkLabel(row.public_info?.link?.label ?? '');
@@ -467,6 +472,40 @@ export function ClubAdminScreen() {
               style={[styles.saveBtn, {backgroundColor: colors.primary}, perkSaving && {opacity: 0.6}]}>
               {perkSaving ? <ActivityIndicator size="small" color={colors.onPrimary} /> :
                 <Text style={[bodyType.bold, {color: colors.onPrimary}]}>Save Perk</Text>}
+            </Pressable>
+          </View>
+
+          {/* Perk redeem line — the instruction shown under the perk on the
+              roster page. Optional; blank falls back to the platform default. */}
+          <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textSecondary}]}>
+            HOW TO REDEEM
+          </Text>
+          <View style={[styles.cardBlock, {backgroundColor: colors.surface, borderColor: colors.border}]}>
+            <Text style={[bodyType.regular, styles.helper, {color: colors.textSecondary}]}>
+              The line under your perk that tells Players how to claim it. Leave blank to use the default.
+            </Text>
+            <TextInput
+              style={[styles.bigTextInput, {color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.background}]}
+              value={redeemText}
+              onChangeText={t => t.length <= 160 && setRedeemText(t)}
+              placeholder={`Show this screen to a ${partner.name} staff member to redeem.`}
+              placeholderTextColor={colors.textTertiary}
+              multiline
+              maxLength={160}
+            />
+            <Text style={[bodyType.regular, styles.charCount, {color: colors.textTertiary}]}>
+              {redeemText.length} / 160
+            </Text>
+            <Pressable
+              onPress={() => handleSavePublicInfo({perk_redeem_text: redeemText.trim() || null}, setRedeemSaving, 'Redeem instructions')}
+              disabled={redeemSaving || (partner.public_info?.perk_redeem_text ?? '') === redeemText}
+              style={[
+                styles.saveBtn,
+                {backgroundColor: colors.primary},
+                (redeemSaving || (partner.public_info?.perk_redeem_text ?? '') === redeemText) && {opacity: 0.5},
+              ]}>
+              {redeemSaving ? <ActivityIndicator size="small" color={colors.onPrimary} /> :
+                <Text style={[bodyType.bold, {color: colors.onPrimary}]}>Save Redeem Line</Text>}
             </Pressable>
           </View>
 

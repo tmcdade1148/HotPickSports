@@ -46,6 +46,11 @@ interface PartnerRow {
   perk_icon: string | null;
   brand_config: Record<string, unknown> | null;
   is_active: boolean;
+  public_info: {
+    hours?: string;
+    perk_redeem_text?: string;
+    [key: string]: unknown;
+  } | null;
 }
 
 interface BroadcastRow {
@@ -102,7 +107,7 @@ export function PartnerRosterScreen() {
 
       const {data: partnerData} = await supabase
         .from('partners')
-        .select('id, name, slug, perk_text, perk_icon, brand_config, is_active')
+        .select('id, name, slug, perk_text, perk_icon, brand_config, is_active, public_info')
         .eq('slug', slug)
         .maybeSingle();
       if (cancelled) return;
@@ -182,6 +187,12 @@ export function PartnerRosterScreen() {
     ? bc.primary_color
     : colors.primary;
 
+  const hours = partner.public_info?.hours?.trim() || null;
+  // Editable in League Tools; falls back to the platform default.
+  const redeemText =
+    partner.public_info?.perk_redeem_text?.trim() ||
+    `Show this screen to a ${partner.name} staff member to redeem.`;
+
   return (
     <SafeAreaView style={[styles.wrap, {backgroundColor: colors.background}]}>
       <View style={styles.header}>
@@ -195,6 +206,15 @@ export function PartnerRosterScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
+        {preview && (
+          <View style={[styles.notice, styles.noticeTop, {backgroundColor: colors.surface, borderColor: colors.border}]}>
+            <Text style={[bodyType.bold, {color: colors.textPrimary}]}>Preview</Text>
+            <Text style={[bodyType.regular, styles.noticeBody, {color: colors.textSecondary}]}>
+              This is how your roster page looks to Players.
+            </Text>
+          </View>
+        )}
+
         {/* Branded header */}
         <View
           style={[
@@ -216,8 +236,13 @@ export function PartnerRosterScreen() {
               styles.brandName,
               {color: colors.textPrimary},
             ]}>
-            {partner.name.toUpperCase()}'S ROSTER
+            {partner.name.toUpperCase()}'S LEAGUE ROSTER
           </Text>
+          {hours && (
+            <Text style={[bodyType.regular, styles.brandHours, {color: colors.textSecondary}]}>
+              {hours}
+            </Text>
+          )}
         </View>
 
         {preview && (
@@ -282,7 +307,7 @@ export function PartnerRosterScreen() {
               {partner.perk_text}
             </Text>
             <Text style={[bodyType.regular, styles.redeemHint, {color: colors.textSecondary}]}>
-              Show this screen to a {partner.name} staff member to redeem.
+              {redeemText}
             </Text>
           </View>
         )}
@@ -323,7 +348,7 @@ export function PartnerRosterScreen() {
             in partner color ties pool rows to the partner brand. */}
         <View style={styles.section}>
           <Text style={[bodyType.bold, styles.sectionLabel, {color: partnerPrimary}]}>
-            YOUR CONTESTS ON THIS ROSTER
+            {partner.name.toUpperCase()}'S CONTESTS
           </Text>
           {alignedPools.map(pool => (
             <Pressable
@@ -454,6 +479,11 @@ const styles = StyleSheet.create({
     textAlign:  'center',
     lineHeight: displayType.size.h2 * 1.05,
   },
+  brandHours: {
+    fontSize:  13,
+    textAlign: 'center',
+    marginTop: spacing.xs,
+  },
 
   notice: {
     marginHorizontal: spacing.lg,
@@ -462,6 +492,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     borderWidth: StyleSheet.hairlineWidth,
   },
+  noticeTop: {marginTop: spacing.xs, marginBottom: spacing.xs},
   noticeBody: {fontSize: 13, marginTop: 4},
 
   perkHero: {
