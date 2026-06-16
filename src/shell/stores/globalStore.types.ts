@@ -125,6 +125,9 @@ export interface GlobalState {
     upgradeRequired?: boolean;
     showWall?: 'pool_cap' | null;
   }>;
+  redeemCompCode: (
+    code: string,
+  ) => Promise<{ok?: true; label?: string | null; error?: string}>;
   joinPool: (
     userId: string,
     inviteCode: string,

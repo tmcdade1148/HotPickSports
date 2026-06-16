@@ -45,6 +45,36 @@ export function ProfileSetupScreen({navigation}: any) {
   const userProfile = useGlobalStore(s => s.userProfile);
   const managedClub = useGlobalStore(s => s.managedClub);
   const updateProfile = useGlobalStore(s => s.updateProfile);
+  const redeemCompCode = useGlobalStore(s => s.redeemCompCode);
+
+  // Optional founding-code redemption (§6d) — a welcome ritual + cohort tag.
+  // It does NOT gate anything; absence is fine. Decoupled from the required
+  // fields below so it never blocks "Let's Go".
+  const [compCode, setCompCode] = useState('');
+  const [redeemState, setRedeemState] =
+    useState<'idle' | 'redeeming' | 'redeemed' | 'error'>('idle');
+  const [redeemMsg, setRedeemMsg] = useState<string | null>(null);
+
+  const handleRedeem = async () => {
+    const code = compCode.trim();
+    if (code.length === 0) return;
+    setRedeemState('redeeming');
+    setRedeemMsg(null);
+    const result = await redeemCompCode(code);
+    if (result.ok) {
+      setRedeemState('redeemed');
+      setRedeemMsg(
+        result.label ? `Welcome aboard, ${result.label}.` : "You're set. Welcome aboard.",
+      );
+    } else {
+      setRedeemState('error');
+      setRedeemMsg(
+        result.error === 'ALREADY_REDEEMED'
+          ? 'That code has already been used.'
+          : "We didn't recognize that code. You can skip it — you're still all set.",
+      );
+    }
+  };
 
   // League board members (Chairman/Director) get their League welcome here,
   // folded into onboarding — they don't see the separate player PoolWelcome.
@@ -202,6 +232,60 @@ export function ProfileSetupScreen({navigation}: any) {
             </Text>
           </View>
 
+          {/* Founding code (optional, §6d) — welcome ritual + cohort tag. */}
+          <View style={styles.section}>
+            <Text style={styles.label}>Have a founding code?</Text>
+            <View style={styles.codeRow}>
+              <TextInput
+                style={[styles.input, styles.codeInput]}
+                placeholder="Optional"
+                placeholderTextColor={colors.textSecondary}
+                value={compCode}
+                onChangeText={text => {
+                  setCompCode(text);
+                  if (redeemState !== 'idle') {
+                    setRedeemState('idle');
+                    setRedeemMsg(null);
+                  }
+                }}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                editable={!saving && redeemState !== 'redeemed'}
+              />
+              <TouchableOpacity
+                style={[
+                  styles.codeButton,
+                  (compCode.trim().length === 0 ||
+                    redeemState === 'redeeming' ||
+                    redeemState === 'redeemed') &&
+                    styles.buttonDisabled,
+                ]}
+                onPress={handleRedeem}
+                disabled={
+                  compCode.trim().length === 0 ||
+                  redeemState === 'redeeming' ||
+                  redeemState === 'redeemed'
+                }>
+                {redeemState === 'redeeming' ? (
+                  <ActivityIndicator color={colors.onPrimary} />
+                ) : (
+                  <Text style={styles.codeButtonText}>
+                    {redeemState === 'redeemed' ? 'Applied' : 'Apply'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+            {redeemMsg ? (
+              <Text style={redeemState === 'redeemed' ? styles.available : styles.error}>
+                {redeemMsg}
+              </Text>
+            ) : (
+              <Text style={styles.hint}>
+                No code? No problem — it's optional.
+              </Text>
+            )}
+          </View>
+
           {/* CTA */}
           <TouchableOpacity
             style={[styles.button, !canSubmit && styles.buttonDisabled]}
@@ -272,6 +356,28 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   inputError: {
     borderColor: colors.error,
+  },
+  codeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  codeInput: {
+    flex: 1,
+  },
+  codeButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 88,
+  },
+  codeButtonText: {
+    color: colors.onPrimary,
+    fontSize: 15,
+    fontWeight: '700',
   },
   hint: {
     fontSize: 12,

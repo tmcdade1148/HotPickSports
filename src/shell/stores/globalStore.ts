@@ -17,6 +17,7 @@ import {createPartnerModuleSlice} from './slices/partnerModuleSlice';
 import {createPoolAdminSlice} from './slices/poolAdminSlice';
 import {createDemoSlice} from './slices/demoSlice';
 import {createProfileSlice} from './slices/profileSlice';
+import {FOUNDING_GAFFER_KEY} from '@shell/paywall/foundingGaffer';
 import type {GlobalState} from './globalStore.types';
 // Re-exported so existing consumers keep importing these from globalStore.
 export type {
@@ -364,6 +365,23 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     AsyncStorage.setItem(poolStorageKey(competition), typedPool.id);
 
     return {pool: typedPool, showWall};
+  },
+
+  // Founding comp code (spec §5b/§6d) — single-use redemption at onboarding.
+  // Cohort tracking only: it records membership in the cultivated cohort and
+  // does NOT change any cap (the universal founding_season_active flag does
+  // that). On success we persist a local flag so the founding-Gaffer cohort
+  // line can render later without re-querying (comp_codes is admin-RLS only).
+  redeemCompCode: async (code: string) => {
+    const {data, error} = await supabase.rpc('redeem_comp_code', {p_code: code});
+    if (error) {
+      return {error: error.message};
+    }
+    if (!data || data.error) {
+      return {error: (data?.error as string) ?? 'INVALID_CODE'};
+    }
+    AsyncStorage.setItem(FOUNDING_GAFFER_KEY, '1');
+    return {ok: true as const, label: (data.label as string | null) ?? null};
   },
 
   joinPool: async (userId, inviteCode) => {
