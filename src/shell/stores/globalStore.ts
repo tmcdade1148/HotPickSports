@@ -17,6 +17,7 @@ import {createPartnerModuleSlice} from './slices/partnerModuleSlice';
 import {createPoolAdminSlice} from './slices/poolAdminSlice';
 import {createDemoSlice} from './slices/demoSlice';
 import {createProfileSlice} from './slices/profileSlice';
+import {FOUNDING_GAFFER_KEY} from '@shell/paywall/foundingGaffer';
 import type {GlobalState} from './globalStore.types';
 // Re-exported so existing consumers keep importing these from globalStore.
 export type {
@@ -337,6 +338,9 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     }
 
     const typedPool = data.pool as DbPool;
+    // Facade paywall (spec §5a/§6b): when the new Contest is past the free
+    // pool-count cap, the server allows it (founding pass) and flags the wall.
+    const showWall = (data.show_wall as 'pool_cap' | null) ?? null;
 
     // Auto-select, add role, and add to both local list and competition cache.
     // IMPORTANT: also append to `visiblePools` — every pool-listing UI reads
@@ -360,7 +364,24 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     });
     AsyncStorage.setItem(poolStorageKey(competition), typedPool.id);
 
-    return {pool: typedPool};
+    return {pool: typedPool, showWall};
+  },
+
+  // Founding comp code (spec §5b/§6d) — single-use redemption at onboarding.
+  // Cohort tracking only: it records membership in the cultivated cohort and
+  // does NOT change any cap (the universal founding_season_active flag does
+  // that). On success we persist a local flag so the founding-Gaffer cohort
+  // line can render later without re-querying (comp_codes is admin-RLS only).
+  redeemCompCode: async (code: string) => {
+    const {data, error} = await supabase.rpc('redeem_comp_code', {p_code: code});
+    if (error) {
+      return {error: error.message};
+    }
+    if (!data || data.error) {
+      return {error: (data?.error as string) ?? 'INVALID_CODE'};
+    }
+    AsyncStorage.setItem(FOUNDING_GAFFER_KEY, '1');
+    return {ok: true as const, label: (data.label as string | null) ?? null};
   },
 
   joinPool: async (userId, inviteCode) => {
@@ -374,7 +395,9 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     }
 
     if (!data || data.error) {
-      if (data?.error === 'pool_full') {
+      // 'upgrade_required' is the facade's enforce-mode response (founding
+      // season off); 'pool_full' is the legacy code. Both mean "at cap".
+      if (data?.error === 'pool_full' || data?.error === 'upgrade_required') {
         return {error: 'pool_full', poolFull: true};
       }
       // Map the RPC's raw error codes to user-facing copy so internal
@@ -440,6 +463,8 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
         NO_PUBLIC_CONTEST: 'There is no public Contest open right now. Check back soon.',
         ALREADY_MEMBER: "You're already in this Contest.",
         pool_full: 'That Contest is full right now.',
+        // Facade enforce-mode equivalent of pool_full (founding season off).
+        upgrade_required: 'That Contest is full right now.',
         SUPER_ADMIN_CANNOT_JOIN: 'Admin accounts create Contests; they do not join them.',
       };
       const code = data?.error as string | undefined;

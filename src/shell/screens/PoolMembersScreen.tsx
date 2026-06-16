@@ -26,8 +26,15 @@ import {spacing, borderRadius} from '@shared/theme';
 import type {DbPoolMember, DbProfile} from '@shared/types/database';
 import {useTheme} from '@shell/theme';
 import {roleLabel} from '@shared/lexicon';
+import {FoundingWall, usePaywallConfig, useFoundingGafferFlag} from '@shell/paywall';
 
 type MemberWithProfile = DbPoolMember & {profile?: DbProfile};
+
+// Trigger A is Gaffer-side derived (no server write): the wall shows when a
+// Gaffer opens a Contest they run that's at/over its member cap. Shown once per
+// pool per app session — this module-level set survives remounts within a
+// session and resets on app restart.
+const seenMemberCapWall = new Set<string>();
 
 // RFC 4180-ish CSV cell escaping: wrap in quotes if the cell contains
 // a comma, quote, or newline; double any internal quotes.
@@ -82,6 +89,26 @@ export function PoolMembersScreen() {
   const isOrganizer = myRole === 'organizer';
   const isAdmin = myRole === 'admin';
   const canManage = isOrganizer || isAdmin;
+
+  // Trigger A (§6a) — derived founding wall for the Gaffer of an at-cap Contest.
+  const userPools = useGlobalStore(s => s.userPools);
+  const pool = userPools.find(p => p.id === poolId);
+  const {config: paywallConfig} = usePaywallConfig();
+  const isFoundingGaffer = useFoundingGafferFlag();
+  const [showFoundingWall, setShowFoundingWall] = useState(false);
+
+  useEffect(() => {
+    if (
+      isOrganizer &&
+      paywallConfig?.foundingSeasonActive &&
+      pool?.member_limit != null &&
+      poolMembers.length >= pool.member_limit &&
+      !seenMemberCapWall.has(poolId)
+    ) {
+      seenMemberCapWall.add(poolId);
+      setShowFoundingWall(true);
+    }
+  }, [isOrganizer, paywallConfig, pool?.member_limit, poolMembers.length, poolId]);
 
   // League tier: this pool is a League's own Club Pool, so roles read as
   // Chairman/Director rather than Gaffer/Assistant Gaffer. (The internal
@@ -581,6 +608,14 @@ export function PoolMembersScreen() {
           </View>
         </View>
       </Modal>
+
+      <FoundingWall
+        visible={showFoundingWall}
+        trigger="member_cap"
+        contestName={pool?.name}
+        isFoundingGaffer={isFoundingGaffer}
+        onClose={() => setShowFoundingWall(false)}
+      />
     </SafeAreaView>
   );
 }

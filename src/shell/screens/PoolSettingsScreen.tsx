@@ -37,6 +37,7 @@ import {normalizeRosterPass} from '@shared/utils/format';
 import {LEXICON, roleLabel} from '@shared/lexicon';
 import {BroadcastComposer} from '@shell/components/BroadcastComposer';
 import {DelegateManager} from '@shell/components/DelegateManager';
+import {usePaywallConfig} from '@shell/paywall';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 
@@ -55,6 +56,8 @@ export function PoolSettingsScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const poolId = route.params?.poolId as string;
+
+  const {config: paywallConfig} = usePaywallConfig();
 
   const userPools = useGlobalStore(s => s.userPools);
   const poolMembers = useGlobalStore(s => s.poolMembers);
@@ -588,6 +591,17 @@ export function PoolSettingsScreen() {
           </View>
         )}
 
+        {/* Founding-season reminder (§6c) — quiet, non-nagging. Shown while the
+            universal founding pass is active so the "paid is coming" expectation
+            sticks through repetition. */}
+        {paywallConfig?.foundingSeasonActive && (
+          <View style={styles.foundingNote}>
+            <Text style={styles.foundingNoteText}>
+              Founding Season · Free · Standard pricing returns next season.
+            </Text>
+          </View>
+        )}
+
         {/* Pool Name */}
         <Text style={styles.sectionTitle}>Contest Name</Text>
         <View style={styles.nameRow}>
@@ -1099,6 +1113,19 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: colors.textPrimary,
+  },
+  foundingNote: {
+    marginTop: spacing.md,
+    marginHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+  },
+  foundingNoteText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
   sectionTitle: {
     fontSize: 14,
