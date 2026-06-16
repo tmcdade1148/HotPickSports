@@ -1,6 +1,6 @@
 // ClubAdminScreen — dedicated home for a Club Manager (Partner Admin).
 //
-// Reachable from Settings → "Club Admin" when the user is the active
+// Reachable from Settings → "League Tools" when the user is the active
 // organizer of any pool that's flagged as a Club Pool
 // (`partners.club_pool_id = pool.id`). For a user managing multiple Clubs
 // in the future, the entry-point becomes a picker; for v1, exactly one
@@ -351,7 +351,7 @@ export function ClubAdminScreen() {
             <ChevronLeft color={colors.textPrimary} size={24} />
           </Pressable>
           <Text style={[displayType.display, styles.title, {color: colors.textPrimary}]}>
-            CLUB ADMIN
+            {LEXICON.leagueTools.toUpperCase()}
           </Text>
           <View style={{width: 24}} />
         </View>
@@ -372,7 +372,9 @@ export function ClubAdminScreen() {
             <ChevronLeft color={colors.textPrimary} size={24} />
           </Pressable>
           <Text style={[displayType.display, styles.title, {color: colors.textPrimary}]}>
-            CLUB ADMIN
+            {`${LEXICON.league.short} ${
+              managedClub?.role === 'chairman' ? LEXICON.chairman.short : LEXICON.director.short
+            }`.toUpperCase()}
           </Text>
           <View style={{width: 24}} />
         </View>
