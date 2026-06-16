@@ -92,13 +92,14 @@ export function usePaywallConfig(): {config: PaywallConfig | null; loading: bool
     inflight = inflight ?? fetchPaywallConfig();
     inflight
       .then(c => {
-        if (active) {
-          setConfig(c);
-          setLoading(false);
-        }
+        if (active) setConfig(c);
       })
+      // Swallow — config stays null and callers render nothing (the action
+      // already succeeded server-side). Avoids an unhandled rejection.
+      .catch(() => {})
       .finally(() => {
         inflight = null;
+        if (active) setLoading(false);
       });
     return () => {
       active = false;

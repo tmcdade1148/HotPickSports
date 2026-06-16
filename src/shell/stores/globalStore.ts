@@ -395,7 +395,9 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     }
 
     if (!data || data.error) {
-      if (data?.error === 'pool_full') {
+      // 'upgrade_required' is the facade's enforce-mode response (founding
+      // season off); 'pool_full' is the legacy code. Both mean "at cap".
+      if (data?.error === 'pool_full' || data?.error === 'upgrade_required') {
         return {error: 'pool_full', poolFull: true};
       }
       // Map the RPC's raw error codes to user-facing copy so internal
@@ -461,6 +463,8 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
         NO_PUBLIC_CONTEST: 'There is no public Contest open right now. Check back soon.',
         ALREADY_MEMBER: "You're already in this Contest.",
         pool_full: 'That Contest is full right now.',
+        // Facade enforce-mode equivalent of pool_full (founding season off).
+        upgrade_required: 'That Contest is full right now.',
         SUPER_ADMIN_CANNOT_JOIN: 'Admin accounts create Contests; they do not join them.',
       };
       const code = data?.error as string | undefined;

@@ -243,7 +243,10 @@ export function ProfileSetupScreen({navigation}: any) {
                 value={compCode}
                 onChangeText={text => {
                   setCompCode(text);
-                  if (redeemState !== 'idle') {
+                  // Clear a prior result on edit — but never interrupt an
+                  // in-flight redeem (that would re-enable Apply and allow a
+                  // duplicate call).
+                  if (redeemState === 'redeemed' || redeemState === 'error') {
                     setRedeemState('idle');
                     setRedeemMsg(null);
                   }
