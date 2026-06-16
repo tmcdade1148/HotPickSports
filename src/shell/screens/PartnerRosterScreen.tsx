@@ -18,21 +18,25 @@
 import React, {useEffect, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation, useRoute, type RouteProp} from '@react-navigation/native';
-import {ChevronLeft} from 'lucide-react-native';
+import {ChevronLeft, Copy, MapPin, Share2, Ticket} from 'lucide-react-native';
 import {PerkIcon} from '@shell/components/home/PerkIcon';
 import {useTheme} from '@shell/theme/hooks';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {supabase} from '@shared/config/supabase';
 import {PoweredByHotPick} from '@shell/components/PoweredByHotPick';
+import {formatRosterPass} from '@shared/utils/format';
 import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
 import type {DbPool} from '@shared/types/database';
 
@@ -46,8 +50,10 @@ interface PartnerRow {
   perk_icon: string | null;
   brand_config: Record<string, unknown> | null;
   is_active: boolean;
+  roster_pass: string;
   public_info: {
     hours?: string;
+    address?: string;
     perk_redeem_text?: string;
     [key: string]: unknown;
   } | null;
@@ -107,7 +113,7 @@ export function PartnerRosterScreen() {
 
       const {data: partnerData} = await supabase
         .from('partners')
-        .select('id, name, slug, perk_text, perk_icon, brand_config, is_active, public_info')
+        .select('id, name, slug, perk_text, perk_icon, brand_config, is_active, roster_pass, public_info')
         .eq('slug', slug)
         .maybeSingle();
       if (cancelled) return;
@@ -188,6 +194,7 @@ export function PartnerRosterScreen() {
     : colors.primary;
 
   const hours = partner.public_info?.hours?.trim() || null;
+  const address = partner.public_info?.address?.trim() || null;
   // Editable in League Tools; falls back to the platform default.
   const redeemText =
     partner.public_info?.perk_redeem_text?.trim() ||
@@ -238,21 +245,20 @@ export function PartnerRosterScreen() {
             ]}>
             {partner.name.toUpperCase()}'S LEAGUE ROSTER
           </Text>
+          {address && (
+            <View style={styles.brandInfoRow}>
+              <MapPin size={13} color={colors.textSecondary} />
+              <Text style={[bodyType.regular, styles.brandInfoText, {color: colors.textSecondary}]}>
+                {address}
+              </Text>
+            </View>
+          )}
           {hours && (
             <Text style={[bodyType.regular, styles.brandHours, {color: colors.textSecondary}]}>
               {hours}
             </Text>
           )}
         </View>
-
-        {preview && (
-          <View style={[styles.notice, {backgroundColor: colors.surface, borderColor: colors.border}]}>
-            <Text style={[bodyType.bold, {color: colors.textPrimary}]}>Preview</Text>
-            <Text style={[bodyType.regular, styles.noticeBody, {color: colors.textSecondary}]}>
-              This is how your roster page looks to Players.
-            </Text>
-          </View>
-        )}
 
         {showTombstone && (
           <View style={[styles.notice, {backgroundColor: colors.surface, borderColor: colors.border}]}>
@@ -388,6 +394,61 @@ export function PartnerRosterScreen() {
           </Text>
         </View>
 
+        {/* Invite a Contest — surfaces the Roster Pass so any Player on this
+            page can recruit an organizer to start a Contest under this League.
+            Shown only while the League is active. */}
+        {partner.is_active && (
+          <View style={styles.section}>
+            <Text style={[bodyType.bold, styles.sectionLabel, {color: partnerPrimary}]}>
+              RUN A CONTEST ON THIS ROSTER?
+            </Text>
+            <View
+              style={[
+                styles.inviteCard,
+                {backgroundColor: partnerPrimary + '14', borderColor: partnerPrimary},
+              ]}>
+              <View style={styles.passRow}>
+                <Ticket size={18} color={partnerPrimary} strokeWidth={2.25} />
+                <Text style={[displayType.display, styles.passText, {color: colors.textPrimary}]}>
+                  {formatRosterPass(partner.roster_pass)}
+                </Text>
+              </View>
+              <Text style={[bodyType.regular, styles.passHint, {color: colors.textSecondary}]}>
+                Know an organizer? Send them this Roster Pass. They paste it in
+                their Contest's Settings → Add/Edit Leagues to join {partner.name}'s roster.
+              </Text>
+              <View style={styles.passActions}>
+                <Pressable
+                  onPress={() => {
+                    Clipboard.setString(formatRosterPass(partner.roster_pass));
+                    Alert.alert('Copied', 'Roster Pass copied to clipboard.');
+                  }}
+                  style={[styles.inviteBtn, {borderColor: partnerPrimary}]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Copy Roster Pass">
+                  <Copy size={14} color={partnerPrimary} />
+                  <Text style={[bodyType.bold, styles.inviteBtnText, {color: partnerPrimary}]}>Copy</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    Share.share({
+                      message:
+                        `Add your HotPick Contest to ${partner.name}'s roster. ` +
+                        `Open Contest Settings → Add/Edit Leagues and enter pass: ` +
+                        `${formatRosterPass(partner.roster_pass)}`,
+                    }).catch(() => {});
+                  }}
+                  style={[styles.inviteBtn, {borderColor: partnerPrimary}]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Share Roster Pass">
+                  <Share2 size={14} color={partnerPrimary} />
+                  <Text style={[bodyType.bold, styles.inviteBtnText, {color: partnerPrimary}]}>Share</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        )}
+
         <View style={styles.footer}>
           <PoweredByHotPick />
         </View>
@@ -484,6 +545,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.xs,
   },
+  brandInfoRow: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    justifyContent: 'center',
+    gap:           4,
+    paddingHorizontal: spacing.sm,
+  },
+  brandInfoText: {fontSize: 13, textAlign: 'center', flexShrink: 1},
 
   notice: {
     marginHorizontal: spacing.lg,
@@ -556,6 +625,38 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     paddingHorizontal: spacing.xs,
   },
+
+  inviteCard: {
+    borderRadius: borderRadius.lg + 4,
+    borderWidth: 1,
+    padding: spacing.lg,
+    gap: spacing.sm,
+  },
+  passRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  passText: {
+    fontSize: displayType.size.h3,
+    letterSpacing: 2,
+  },
+  passHint: {fontSize: 13, lineHeight: 19},
+  passActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  inviteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+  },
+  inviteBtnText: {fontSize: 13},
 
   footer: {marginTop: spacing.xl, alignItems: 'center'},
 
