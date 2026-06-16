@@ -14,6 +14,7 @@ import {useGlobalStore} from '@shell/stores/globalStore';
 import {supabase} from '@shared/config/supabase';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
+import {FoundingWall} from '@shell/paywall';
 
 /**
  * CreatePoolScreen — Form to create a new pool for the active event.
@@ -32,6 +33,10 @@ export function CreatePoolScreen({navigation}: any) {
   const [poolName, setPoolName] = useState('');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Facade paywall (§6b): when a 2nd-or-later Contest is created during the
+  // founding season, the server allows it and flags the wall. The Contest
+  // already exists; the wall is informational, and dismissing it returns Home.
+  const [showFoundingWall, setShowFoundingWall] = useState(false);
 
   const doCreate = async () => {
     if (!user?.id || !activeSport?.competition) return;
@@ -55,6 +60,11 @@ export function CreatePoolScreen({navigation}: any) {
     setCreating(false);
 
     if (result.pool) {
+      if (result.showWall === 'pool_cap') {
+        // Contest is created; prime with the founding wall, then return on close.
+        setShowFoundingWall(true);
+        return;
+      }
       // Delay navigation to let the store update + HomeScreen re-render settle.
       // Without this, the JoinPoolModule unmount collides with the navigation
       // transition in Fabric's ShadowView diffing, causing a SIGSEGV.
@@ -133,6 +143,12 @@ export function CreatePoolScreen({navigation}: any) {
           </TouchableOpacity>
         </View>
       </View>
+
+      <FoundingWall
+        visible={showFoundingWall}
+        trigger="pool_cap"
+        onClose={() => navigation.goBack()}
+      />
     </KeyboardAvoidingView>
   );
 }

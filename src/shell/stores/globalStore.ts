@@ -337,6 +337,9 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     }
 
     const typedPool = data.pool as DbPool;
+    // Facade paywall (spec §5a/§6b): when the new Contest is past the free
+    // pool-count cap, the server allows it (founding pass) and flags the wall.
+    const showWall = (data.show_wall as 'pool_cap' | null) ?? null;
 
     // Auto-select, add role, and add to both local list and competition cache.
     // IMPORTANT: also append to `visiblePools` — every pool-listing UI reads
@@ -360,7 +363,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     });
     AsyncStorage.setItem(poolStorageKey(competition), typedPool.id);
 
-    return {pool: typedPool};
+    return {pool: typedPool, showWall};
   },
 
   joinPool: async (userId, inviteCode) => {

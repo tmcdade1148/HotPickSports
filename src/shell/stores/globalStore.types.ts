@@ -119,7 +119,12 @@ export interface GlobalState {
     competition: string;
     name: string;
     isPublic: boolean;
-  }) => Promise<{pool?: DbPool; error?: string; upgradeRequired?: boolean}>;
+  }) => Promise<{
+    pool?: DbPool;
+    error?: string;
+    upgradeRequired?: boolean;
+    showWall?: 'pool_cap' | null;
+  }>;
   joinPool: (
     userId: string,
     inviteCode: string,
