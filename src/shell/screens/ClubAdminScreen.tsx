@@ -60,6 +60,7 @@ type PartnerRow = {
   club_pool_id: string | null;
   public_info: {
     hours?: string;
+    address?: string;
     perk_redeem_text?: string;
     link?: {url?: string; label?: string};
     roster_page_message?: string;
@@ -100,6 +101,9 @@ export function ClubAdminScreen() {
 
   const [redeemText, setRedeemText] = useState('');
   const [redeemSaving, setRedeemSaving] = useState(false);
+
+  const [addressText, setAddressText] = useState('');
+  const [addressSaving, setAddressSaving] = useState(false);
 
   const [hoursText, setHoursText] = useState('');
   const [hoursSaving, setHoursSaving] = useState(false);
@@ -144,6 +148,7 @@ export function ClubAdminScreen() {
     setPerkText(row.perk_text ?? '');
     setPerkIcon(row.perk_icon ?? '');
     setRedeemText(row.public_info?.perk_redeem_text ?? '');
+    setAddressText(row.public_info?.address ?? '');
     setHoursText(row.public_info?.hours ?? '');
     setLinkUrl(row.public_info?.link?.url ?? '');
     setLinkLabel(row.public_info?.link?.label ?? '');
@@ -558,6 +563,36 @@ export function ClubAdminScreen() {
               style={[styles.saveBtn, {backgroundColor: colors.primary, flexDirection: 'row', gap: 8}]}>
               <Eye size={16} color={colors.onPrimary} />
               <Text style={[bodyType.bold, {color: colors.onPrimary}]}>See Roster Page</Text>
+            </Pressable>
+          </View>
+
+          {/* Address */}
+          <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textSecondary}]}>
+            ADDRESS
+          </Text>
+          <View style={[styles.cardBlock, {backgroundColor: colors.surface, borderColor: colors.border}]}>
+            <Text style={[bodyType.regular, styles.helper, {color: colors.textSecondary}]}>
+              Where can Players find you? Free-text — shows on your League page.
+            </Text>
+            <TextInput
+              style={[styles.bigTextInput, {color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.background}]}
+              value={addressText}
+              onChangeText={t => t.length <= 200 && setAddressText(t)}
+              placeholder="123 Main St, Buffalo, NY 14201"
+              placeholderTextColor={colors.textTertiary}
+              multiline
+              maxLength={200}
+            />
+            <Pressable
+              onPress={() => handleSavePublicInfo({address: addressText.trim() || null}, setAddressSaving, 'Address')}
+              disabled={addressSaving || (partner.public_info?.address ?? '') === addressText}
+              style={[
+                styles.saveBtn,
+                {backgroundColor: colors.primary},
+                (addressSaving || (partner.public_info?.address ?? '') === addressText) && {opacity: 0.5},
+              ]}>
+              {addressSaving ? <ActivityIndicator size="small" color={colors.onPrimary} /> :
+                <Text style={[bodyType.bold, {color: colors.onPrimary}]}>Save Address</Text>}
             </Pressable>
           </View>
 
