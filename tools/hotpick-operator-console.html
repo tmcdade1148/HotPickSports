@@ -318,8 +318,11 @@ const SUPABASE_ANON_KEY = 'sb_publishable_AaENLNqjJ8jNVHGdTGhOnA_WnHze2CH';
 
 // Session is held in the client's memory only (persistSession:false). Refreshing
 // the tab discards it and forces re-login — see spec "Login session not persisted".
+// autoRefreshToken:true keeps the in-memory access token renewed so a long
+// operator session doesn't expire mid-action (sim-operator would otherwise
+// reject the stale JWT with "Not authenticated").
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  auth: { persistSession: false, autoRefreshToken: true, detectSessionInUrl: false },
 });
 
 // Write-tier classification — DISPLAY ONLY in Phase 1. (Phase 2 enforces the
