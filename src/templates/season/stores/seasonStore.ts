@@ -64,9 +64,8 @@ interface SeasonState {
   allWeekGames: Record<number, DbSeasonGame[]>;
   weekPicks: DbSeasonPick[];
   leaderboard: SeasonLeaderboardEntry[];
-  /** Every active member's season total keyed by user_id, INCLUDING hidden
-   *  super-admins. Backs getUserScore so a user can always read their own
-   *  total even when excluded from the displayed `leaderboard`. */
+  /** Every active member's season total keyed by user_id. Backs getUserScore
+   *  so a user can always read their own total directly. */
   allUserScores: Record<string, SeasonLeaderboardEntry>;
   weekLeaderboard: WeekLeaderboardEntry[];
   /** Which week the weekLeaderboard data is actually for. Differs from
@@ -467,13 +466,11 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       (typeof cfgMap.current_week === 'number' ? cfgMap.current_week : 1);
 
     // Step 1: Get ACTIVE pool member user IDs + pool_start_date in parallel.
-    // We fetch ALL active members (incl. super-admins) so each user can always
-    // read their OWN total — but super-admins are hidden from the displayed
-    // ladder below. (Hidden-member model, 2026-06-15.)
+    // All active members appear on the ladder, including super-admins.
     const [membersResult, poolResult] = await Promise.all([
       supabase
         .from('pool_members')
-        .select('user_id, profiles!inner(is_super_admin)')
+        .select('user_id')
         .eq('pool_id', poolId)
         .eq('status', 'active'),
       supabase
@@ -485,9 +482,6 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
 
     const memberRows = (membersResult.data ?? []) as any[];
     const memberIds = memberRows.map(m => m.user_id);
-    const superAdminIds = new Set(
-      memberRows.filter(m => m.profiles?.is_super_admin).map(m => m.user_id),
-    );
     if (memberIds.length === 0) {
       set({leaderboard: [], allUserScores: {}, userNames: {}, isLoading: false});
       return;
@@ -551,14 +545,11 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       entry.weekly_breakdown[row.week] = row.week_points;
     }
 
-    // Per-user map of EVERY member's total (incl. hidden super-admins) so a
-    // user can always read their own score via getUserScore — even when they're
-    // excluded from the displayed ladder.
+    // Per-user map of every member's total so a user can always read their own
+    // score via getUserScore.
     const allUserScores = byUser;
 
-    // Displayed ladder excludes hidden super-admins.
     const leaderboard = Object.values(byUser)
-      .filter(s => !superAdminIds.has(s.user_id))
       .sort((a, b) => b.total_points - a.total_points);
 
     // Step 4: Fetch display names + avatars for all users on the leaderboard
@@ -607,18 +598,15 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
     }
 
     // Active pool members + pool_start_date (same scoping as fetchLeaderboard).
-    // Exclude hidden super-admin members from the podium.
     const [membersResult, poolResult] = await Promise.all([
       supabase
         .from('pool_members')
-        .select('user_id, profiles!inner(is_super_admin)')
+        .select('user_id')
         .eq('pool_id', poolId)
         .eq('status', 'active'),
       supabase.from('pools').select('pool_start_date').eq('id', poolId).single(),
     ]);
-    const memberIds = (membersResult.data ?? [])
-      .filter((m: any) => !m.profiles?.is_super_admin)
-      .map((m: any) => m.user_id);
+    const memberIds = (membersResult.data ?? []).map((m: any) => m.user_id);
     if (memberIds.length === 0) {
       set({regularSeasonPodium: [], regularSeasonUserPoints: null});
       return;
@@ -728,22 +716,19 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
     }
 
     // Step 1: Get ACTIVE pool member user IDs (never include removed/left).
-    // Exclude hidden super-admin members so they don't surface on the week ladder.
     const {data: members} = await supabase
       .from('pool_members')
-      .select('user_id, profiles!inner(is_super_admin)')
+      .select('user_id')
       .eq('pool_id', poolId)
       .eq('status', 'active');
 
-    const memberIds = (members ?? [])
-      .filter((m: any) => !m.profiles?.is_super_admin)
-      .map((m: any) => m.user_id);
+    const memberIds = (members ?? []).map((m: any) => m.user_id);
     if (memberIds.length === 0) {
       set({weekLeaderboard: []});
       return;
     }
-    // Guard the unscored-picks pass below: the pick-submissions RPC returns all
-    // active members, so a super-admin who submitted picks could slip in.
+    // The pick-submissions RPC returns all active members; constrain the
+    // unscored-picks pass below to this pool's membership.
     const memberIdSet = new Set(memberIds);
 
     // Step 2: Fetch week totals for this week
@@ -831,7 +816,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
 
     // Add unscored users who have submitted picks (present in RPC but not yet scored)
     for (const sub of pickSubmissions ?? []) {
-      if (!memberIdSet.has(sub.user_id)) continue; // skip hidden super-admins
+      if (!memberIdSet.has(sub.user_id)) continue; // constrain to pool members
       if (!scoredUserIds.has(sub.user_id)) {
         const hp = hotPickByUser[sub.user_id];
         weekEntries.push({
@@ -919,8 +904,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
 
   getUserScore: (userId: string) => {
     const {leaderboard, allUserScores} = get();
-    // Prefer the displayed ladder; fall back to the full per-user map so a
-    // hidden super-admin (excluded from the ladder) still reads their own total.
+    // Prefer the displayed ladder; fall back to the full per-user map.
     return leaderboard.find(s => s.user_id === userId) ?? allUserScores[userId];
   },
 
