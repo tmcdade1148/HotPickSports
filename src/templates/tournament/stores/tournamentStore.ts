@@ -228,7 +228,7 @@ export const useTournamentStore = create<TournamentState>((set, get) => ({
 
     const scores = (data as (DbTournamentUserTotal & {pool_members: unknown})[]) ?? [];
     // Strip the join artifact before storing
-    let cleanScores: DbTournamentUserTotal[] = scores.map(
+    const cleanScores: DbTournamentUserTotal[] = scores.map(
       ({pool_members: _pm, ...rest}) => rest,
     );
 
@@ -238,17 +238,10 @@ export const useTournamentStore = create<TournamentState>((set, get) => ({
     if (userIds.length > 0) {
       const {data: profiles} = await supabase
         .from('profiles')
-        .select('id, display_name, is_super_admin')
+        .select('id, display_name')
         .in('id', userIds);
 
       if (profiles) {
-        // Hidden super-admin members never appear on the ladder (2026-06-15).
-        const superAdmins = new Set(
-          profiles.filter((p: any) => p.is_super_admin).map((p: any) => p.id),
-        );
-        if (superAdmins.size > 0) {
-          cleanScores = cleanScores.filter(s => !superAdmins.has(s.user_id));
-        }
         for (const p of profiles) {
           if (p.display_name) {
             names[p.id] = p.display_name;
