@@ -121,6 +121,7 @@ const styles = StyleSheet.create({
   },
   nameLeft: {
     flex: 1,
+    maxWidth: '50%',
     minWidth: 0,
   },
 });
