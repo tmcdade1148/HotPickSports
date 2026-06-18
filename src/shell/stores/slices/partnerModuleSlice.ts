@@ -4,6 +4,7 @@
 // store's own set (no get needed). Pick<GlobalState> lets tsc verify the set.
 import type {StoreApi} from 'zustand';
 import {supabase} from '@shared/config/supabase';
+import {messageCenterWindowStartIso} from '@shared/config/notifications';
 import type {GlobalState} from '../globalStore.types';
 
 type Set = StoreApi<GlobalState>['setState'];
@@ -158,11 +159,15 @@ export const createPartnerModuleSlice = (set: Set): PartnerModuleSlice => ({
     }
 
     // Parallel queries (notifications + read-state) — never per-Module.
+    // Windowed to match the Message Center so a Club broadcast that has aged
+    // out of the inbox can't linger as an unread badge with nothing to open.
+    const windowStart = messageCenterWindowStartIso();
     const [notifResult, readStateResult] = await Promise.all([
       supabase
         .from('partner_notifications')
         .select('partner_id, sent_at, message')
         .in('partner_id', partnerIds)
+        .gte('sent_at', windowStart)
         .order('sent_at', {ascending: false}),
       supabase
         .from('partner_notification_read_state')
