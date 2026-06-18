@@ -2,7 +2,6 @@ import React, {useState} from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   ActivityIndicator,
   StyleSheet,
@@ -14,6 +13,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {supabase} from '@shared/config/supabase';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
+import {PasswordInput} from '@shared/components/PasswordInput';
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -71,7 +71,7 @@ export function ResetPasswordScreen({navigation}: any) {
             {MIN_PASSWORD_LENGTH} characters.
           </Text>
 
-          <TextInput
+          <PasswordInput
             style={[styles.input, error ? styles.inputError : null]}
             placeholder="New password"
             placeholderTextColor={colors.textSecondary}
@@ -80,7 +80,6 @@ export function ResetPasswordScreen({navigation}: any) {
               setPassword(text);
               if (error) setError('');
             }}
-            secureTextEntry
             autoCapitalize="none"
             autoCorrect={false}
             autoFocus
@@ -88,10 +87,10 @@ export function ResetPasswordScreen({navigation}: any) {
             textContentType="newPassword"
           />
 
-          <TextInput
+          <PasswordInput
+            containerStyle={styles.inputSpaced}
             style={[
               styles.input,
-              styles.inputSpaced,
               error && confirm.length > 0 ? styles.inputError : null,
             ]}
             placeholder="Confirm new password"
@@ -101,7 +100,6 @@ export function ResetPasswordScreen({navigation}: any) {
               setConfirm(text);
               if (error) setError('');
             }}
-            secureTextEntry
             autoCapitalize="none"
             autoCorrect={false}
             editable={!loading}

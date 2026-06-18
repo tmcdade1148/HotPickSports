@@ -406,6 +406,7 @@ export function MessageCenterScreen() {
               refreshing={refreshing}
               onRefresh={onRefresh}
               tintColor={colors.primary}
+              colors={[colors.primary]}
             />
           }
         />
