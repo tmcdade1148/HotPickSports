@@ -1,27 +1,21 @@
 // Two-row header for the Picks tab.
 //
 //   HOT PICK SPORTS                       [ NFL26 · W08 ]  ⚙
-//   TMCDADE                       Pick once. Play everywhere.
+//   TMCDADE
 //
 // Row 1 mirrors HomeHeader / PoolHeader (wordmark + period pill + gear).
-// Row 2 is IdentityBar-style on the left (poolie name, large/bold/italic,
-// auto-fit, capped at ⅓ of row width). On the right: the "Pick once.
-// Play everywhere." reminder that the PoolSwitcherBar used to carry.
+// Row 2 is the shared PlayerName (poolie name, left) — same treatment as Home.
 
-import React, {useState} from 'react';
+import React from 'react';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
 import {Settings} from 'lucide-react-native';
 import {useNavigation} from '@react-navigation/native';
 import {useTheme} from '@shell/theme/hooks';
-import {useGlobalStore} from '@shell/stores/globalStore';
 import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
 import {COMPACT_PERIOD_LENGTH} from './home/shortPeriod';
 import {usePeriodLabel} from './home/usePeriodLabel';
+import {PlayerName} from './PlayerName';
 
-const NAME_MAX_FONT  = 36;
-const NAME_MIN_FONT  = 12;
-const NAME_LINE      = 40;
-const NAME_RIGHT_PAD = 6;
 // Ceiling on OS accessibility font enlargement for the fixed-layout header row
 // (matches HomeHeader / PoolHeader). Tune on device.
 const HEADER_MAX_FONT_SCALE = 1.2;
@@ -29,21 +23,7 @@ const HEADER_MAX_FONT_SCALE = 1.2;
 export function PicksHeader() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
-  const userProfile = useGlobalStore(s => s.userProfile);
-  const poolieName  = userProfile?.poolie_name ?? '';
   const period = usePeriodLabel();
-  const display = (poolieName || '—').toUpperCase();
-
-  const [leftWidth, setLeftWidth] = useState(0);
-  const [naturalWidth, setNaturalWidth] = useState(0);
-  const usableWidth = Math.max(0, leftWidth - NAME_RIGHT_PAD);
-  const scale = naturalWidth > 0 && usableWidth > 0 && naturalWidth > usableWidth
-    ? usableWidth / naturalWidth
-    : 1;
-  const nameFontSize = Math.max(
-    NAME_MIN_FONT,
-    Math.min(NAME_MAX_FONT, Math.floor(NAME_MAX_FONT * scale)),
-  );
 
   return (
     <View>
@@ -78,40 +58,9 @@ export function PicksHeader() {
         </View>
       </View>
 
-      {/* Row 2 — poolie name (⅓ cap) + Pick once. Play everywhere. */}
+      {/* Row 2 — player name (shared treatment) */}
       <View style={styles.nameRow}>
-        <View style={styles.nameLeft} onLayout={e => setLeftWidth(e.nativeEvent.layout.width)}>
-          <Text
-            style={[
-              displayType.display,
-              styles.name,
-              {color: colors.textPrimary, fontSize: nameFontSize},
-            ]}
-            numberOfLines={1}
-            maxFontSizeMultiplier={HEADER_MAX_FONT_SCALE}>
-            {display}
-          </Text>
-          <Text
-            style={[displayType.display, styles.nameProbe, {fontSize: NAME_MAX_FONT}]}
-            numberOfLines={1}
-            onTextLayout={e => {
-              const w = e.nativeEvent.lines?.[0]?.width;
-              if (typeof w === 'number') setNaturalWidth(w);
-            }}
-            accessible={false}
-            importantForAccessibility="no-hide-descendants"
-            pointerEvents="none">
-            {display}
-          </Text>
-        </View>
-        <Text
-          style={[bodyType.regular, styles.tagline, {color: colors.textSecondary}]}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.8}
-          maxFontSizeMultiplier={HEADER_MAX_FONT_SCALE}>
-          Pick once. Play everywhere.
-        </Text>
+        <PlayerName style={styles.nameLeft} />
       </View>
     </View>
   );
@@ -124,7 +73,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
-    paddingBottom: spacing.xs,
+    paddingBottom: 0,
   },
   wordmarkRow: {
     flexDirection: 'row',
@@ -155,9 +104,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     fontStyle: 'italic',
   },
-  // Compact font for long off-cycle labels (OFFSEASON, PRESEASON,
-  // SEASON DONE, WK 18 DONE) — matches HomeHeader so the pill looks
-  // the same across every tab.
   pillTextCompact: {
     fontSize: 13,
     letterSpacing: 1.1,
@@ -170,32 +116,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xs,
+    paddingTop: 0,
     paddingBottom: spacing.sm,
-    gap: 12,
   },
   nameLeft: {
-    flexShrink: 0,
-    width: '33%',
-    minWidth: 0,
-  },
-  name: {
-    lineHeight: NAME_LINE,
-    paddingRight: NAME_RIGHT_PAD,
-  },
-  nameProbe: {
-    position: 'absolute',
-    top: 0,
-    // Off-screen so the opacity:0 measurement copy doesn't composite into a
-    // grey box on Android (see IdentityBar). Width is still measured.
-    left: -100000,
-    opacity: 0,
-    width: 10000,
-  },
-  tagline: {
     flex: 1,
-    textAlign: 'right',
-    fontStyle: 'italic',
-    fontSize: 13,
+    minWidth: 0,
   },
 });
