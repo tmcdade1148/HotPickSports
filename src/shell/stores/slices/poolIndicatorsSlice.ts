@@ -5,6 +5,7 @@
 // it was in globalStore.ts.
 import type {StoreApi} from 'zustand';
 import {supabase} from '@shared/config/supabase';
+import {messageCenterWindowStartIso} from '@shared/config/notifications';
 import type {GlobalState} from '../globalStore.types';
 
 type Set = StoreApi<GlobalState>['setState'];
@@ -37,11 +38,16 @@ export const createPoolIndicatorsSlice = (set: Set): PoolIndicatorsSlice => ({
 
     // One aggregated query across all pools — never N+1 per Module.
     // Counts organizer_notifications.sent_at > notification_read_state.last_read_at.
+    // Scoped to the SAME window the Message Center displays so the badge can
+    // never count a broadcast that has aged out of the inbox (and thus can't be
+    // opened to clear it). See @shared/config/notifications.
+    const windowStart = messageCenterWindowStartIso();
     const [unreadResult, readStateResult] = await Promise.all([
       supabase
         .from('organizer_notifications')
         .select('pool_id, sent_at')
         .in('pool_id', poolIds)
+        .gte('sent_at', windowStart)
         .order('sent_at', {ascending: false}),
       supabase
         .from('notification_read_state')

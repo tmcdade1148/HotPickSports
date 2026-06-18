@@ -2,6 +2,7 @@ import React, {useEffect, useState, useCallback} from 'react';
 import {
   View,
   Text,
+  Image,
   FlatList,
   TouchableOpacity,
   StyleSheet,
@@ -10,16 +11,17 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
-import {ChevronLeft, Megaphone, MessageCircle} from 'lucide-react-native';
+import {ChevronLeft, Megaphone, MessageCircle, Building2} from 'lucide-react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {formatRelativeTime} from '@shared/utils/format';
 import {supabase} from '@shared/config/supabase';
+import {messageCenterWindowStartIso} from '@shared/config/notifications';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 
 interface MessageItem {
   id: string;
-  type: 'broadcast' | 'moderator_note';
+  type: 'broadcast' | 'moderator_note' | 'partner_broadcast';
   poolId: string;
   poolName: string;
   message: string;
@@ -28,6 +30,9 @@ interface MessageItem {
   /** Platform-wide super-admin broadcast (from the hidden Platform Pool). The
    *  header reads "FROM: HotPick Sports" with no @ contest. */
   fromPlatform: boolean;
+  /** Club logo for a partner_broadcast, resolved from partnersById (never from
+   *  pool.brand_config — that's the lead-partner snapshot, wrong here). */
+  logoUrl?: string | null;
 }
 
 /**
@@ -93,32 +98,41 @@ export function MessageCenterScreen() {
     }
     const items: MessageItem[] = [];
 
-    // Messages time out of the Message Center after 10 days (per Tom,
-    // 2026-06-15). Kept in sync with the HomeInbox + recent-broadcasts
-    // unread windows so a message never counts as unread after it has
-    // aged out of this list.
-    const tenDaysAgo = new Date(
-      Date.now() - 10 * 24 * 60 * 60 * 1000,
-    ).toISOString();
+    // Messages time out of the Message Center after the shared window (per Tom,
+    // 2026-06-15). The same constant gates the HomeInbox banner and the Pool /
+    // Partner unread badges so a message never counts as unread after it has
+    // aged out of this list. Single source: @shared/config/notifications.
+    const windowStart = messageCenterWindowStartIso();
 
-    // 1. Fetch broadcasts for user's pools (last 10 days)
+    // 1. Fetch Gaffer/super-admin broadcasts for the user's pools.
     const {data: broadcasts} = await supabase
       .from('organizer_notifications')
       .select('id, pool_id, message, sent_at, organizer_id, notification_type')
       .in('pool_id', poolIds)
       .eq('notification_type', 'broadcast')
-      .gte('sent_at', tenDaysAgo)
+      .gte('sent_at', windowStart)
       .order('sent_at', {ascending: false})
       .limit(50);
 
-    // 2. Fetch moderator notes targeted at this user (last 10 days)
+    // 2. Fetch moderator notes targeted at this user.
     const {data: modNotes} = await supabase
       .from('organizer_notifications')
       .select('id, pool_id, message, sent_at, organizer_id, notification_type, recipient_user_ids')
       .in('pool_id', poolIds)
       .eq('notification_type', 'moderator_note')
       .contains('recipient_user_ids', [userId])
-      .gte('sent_at', tenDaysAgo)
+      .gte('sent_at', windowStart)
+      .order('sent_at', {ascending: false})
+      .limit(50);
+
+    // 3. Fetch Club (partner) broadcasts. RLS scopes partner_notifications to
+    //    partners aligned with any active pool the user belongs to, so no
+    //    explicit partner_id filter is needed here — the policy does it.
+    const {data: partnerBroadcasts} = await supabase
+      .from('partner_notifications')
+      .select('id, partner_id, message, sent_at, notification_type')
+      .eq('notification_type', 'broadcast')
+      .gte('sent_at', windowStart)
       .order('sent_at', {ascending: false})
       .limit(50);
 
@@ -173,6 +187,61 @@ export function MessageCenterScreen() {
       });
     }
 
+    // Resolve Club identity (name + logo) for partner broadcasts. Per the
+    // red-flag rule, partner identity is read from partnersById — NOT from
+    // pool.brand_config, which only holds the lead partner's snapshot. The
+    // store's partnersById is populated by Home's active/aligned partner loads;
+    // any partner_id missing there (cold nav straight to this screen) is
+    // back-filled with one direct partners query.
+    const partnerRows = partnerBroadcasts ?? [];
+    if (partnerRows.length > 0) {
+      const partnersById = useGlobalStore.getState().partnersById;
+      const neededIds = [...new Set(partnerRows.map(p => p.partner_id))];
+      const missingIds = neededIds.filter(id => !partnersById[id]);
+
+      const resolved: Record<string, {name: string; logoUrl: string | null}> = {};
+      for (const id of neededIds) {
+        const cached = partnersById[id];
+        if (cached) resolved[id] = {name: cached.name, logoUrl: cached.logo_url ?? null};
+      }
+      if (missingIds.length > 0) {
+        const {data: partnerData} = await supabase
+          .from('partners')
+          .select('id, name, brand_config')
+          .in('id', missingIds);
+        for (const row of (partnerData ?? []) as Array<{
+          id: string;
+          name: string;
+          brand_config: Record<string, any> | null;
+        }>) {
+          const bc = row.brand_config ?? {};
+          const logo = (bc.logo ?? {}) as Record<string, any>;
+          const logoUrl =
+            typeof logo.full === 'string' && logo.full.length > 0
+              ? logo.full
+              : typeof bc.logo_url === 'string' && bc.logo_url.length > 0
+                ? bc.logo_url
+                : null;
+          resolved[row.id] = {name: row.name, logoUrl};
+        }
+      }
+
+      for (const p of partnerRows) {
+        const club = resolved[p.partner_id];
+        items.push({
+          id: `pn-${p.id}`,
+          type: 'partner_broadcast',
+          poolId: '',
+          poolName: '',
+          message: p.message ?? '',
+          senderName: club?.name ?? 'Club',
+          sentAt: p.sent_at,
+          fromPlatform: false,
+          logoUrl: club?.logoUrl ?? null,
+        });
+      }
+    }
+
     // Sort all by date descending
     items.sort(
       (a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime(),
@@ -181,18 +250,41 @@ export function MessageCenterScreen() {
     setMessages(items);
     setLoading(false);
 
-    // Mark every pool the user is in as read up to now. Upsert one row
-    // per (user_id, pool_id); the HomeInbox banner subscribes to UPDATE
-    // events on this table so the unread count clears in real-time as
-    // soon as the upsert lands.
-    if (userId && poolIds.length > 0) {
+    // Mark everything in this inbox as read up to now. Two read-state tables,
+    // one per channel:
+    //   • notification_read_state         (user_id, pool_id)    — org/Gaffer
+    //   • partner_notification_read_state  (user_id, partner_id) — Club
+    // The Home badges + HomeInbox banner re-derive from these (HomeInbox also
+    // subscribes to UPDATEs), so the unread counts clear once the upserts land.
+    if (userId) {
       const nowIso = new Date().toISOString();
-      await supabase
-        .from('notification_read_state')
-        .upsert(
-          poolIds.map(pid => ({user_id: userId, pool_id: pid, last_read_at: nowIso})),
-          {onConflict: 'user_id,pool_id'},
+      // Supabase query builders are thenables (PromiseLike), not real Promises —
+      // type the array as PromiseLike so Promise.all accepts them.
+      const writes: PromiseLike<unknown>[] = [];
+      if (poolIds.length > 0) {
+        writes.push(
+          supabase
+            .from('notification_read_state')
+            .upsert(
+              poolIds.map(pid => ({user_id: userId, pool_id: pid, last_read_at: nowIso})),
+              {onConflict: 'user_id,pool_id'},
+            ),
         );
+      }
+      const partnerIds = [
+        ...new Set((partnerBroadcasts ?? []).map(p => p.partner_id)),
+      ];
+      if (partnerIds.length > 0) {
+        writes.push(
+          supabase
+            .from('partner_notification_read_state')
+            .upsert(
+              partnerIds.map(pid => ({user_id: userId, partner_id: pid, last_read_at: nowIso})),
+              {onConflict: 'user_id,partner_id'},
+            ),
+        );
+      }
+      await Promise.all(writes);
     }
   }, [userId]);
 
@@ -207,17 +299,32 @@ export function MessageCenterScreen() {
   };
 
   const renderItem = ({item}: {item: MessageItem}) => {
+    const isPartner = item.type === 'partner_broadcast';
     const isBroadcast = item.type === 'broadcast';
-    const iconColor = isBroadcast ? colors.secondary : colors.primary;
-    const iconBg = isBroadcast
+    // Club broadcasts read in the brand's neutral primary; org broadcasts in
+    // secondary; moderator notes in primary. (Club COLOR is never themed here
+    // per Hard Rule #25 — identity surfaces via name + logo only.)
+    const iconColor = isBroadcast || isPartner ? colors.secondary : colors.primary;
+    const iconBg = isBroadcast || isPartner
       ? colors.secondary + '20'
       : colors.primary + '20';
+    // Only org/Gaffer broadcasts and moderator notes carry an "@ contest"
+    // suffix. Platform broadcasts and Club broadcasts don't (no single pool).
+    const showPoolSuffix = !item.fromPlatform && !isPartner && !!item.poolName;
 
     return (
       <View style={[styles.messageCard, {backgroundColor: colors.surface}]}>
         <View style={styles.messageRow}>
           <View style={[styles.iconCircle, {backgroundColor: iconBg}]}>
-            {isBroadcast ? (
+            {isPartner && item.logoUrl ? (
+              <Image
+                source={{uri: item.logoUrl}}
+                style={styles.clubLogo}
+                resizeMode="contain"
+              />
+            ) : isPartner ? (
+              <Building2 size={18} color={iconColor} />
+            ) : isBroadcast ? (
               <Megaphone size={18} color={iconColor} />
             ) : (
               <MessageCircle size={18} color={iconColor} />
@@ -234,7 +341,7 @@ export function MessageCenterScreen() {
                   numberOfLines={1}>
                   {item.senderName}
                 </Text>
-                {!item.fromPlatform && (
+                {showPoolSuffix && (
                   <Text
                     style={[styles.poolLabel, {color: colors.textSecondary}]}
                     numberOfLines={1}>
@@ -346,6 +453,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 2,
+    overflow: 'hidden',
+  },
+  clubLogo: {
+    width: 28,
+    height: 28,
   },
   messageContent: {
     flex: 1,

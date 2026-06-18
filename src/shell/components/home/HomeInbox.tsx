@@ -23,10 +23,12 @@ import {useGlobalStore} from '@shell/stores/globalStore';
 import {useTheme} from '@shell/theme/hooks';
 import {bodyType, spacing, borderRadius} from '@shared/theme';
 import {hexToRgba} from '@shared/utils/color';
+import {MESSAGE_CENTER_WINDOW_MS} from '@shared/config/notifications';
 
-// Matches the Message Center's 10-day retention so an aged-out message never
-// lingers as an unread count with nothing to open.
-const RETENTION_MS = 10 * 24 * 60 * 60 * 1000;
+// Shared Message Center window so an aged-out message never lingers as an
+// unread count with nothing to open. Single source of truth in
+// @shared/config/notifications.
+const RETENTION_MS = MESSAGE_CENTER_WINDOW_MS;
 
 export function HomeInbox() {
   const {colors} = useTheme();
