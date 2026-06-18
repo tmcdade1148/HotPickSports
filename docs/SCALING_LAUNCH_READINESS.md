@@ -1,6 +1,8 @@
 # Scaling / Launch Readiness — handling ~600 concurrent users
 
-**Status:** Living checklist. Created 2026-06-18 after a Micro-instance resource-exhaustion blip during tester sessions (6 concurrent users). The app handled the testers fine — the blip was caused by **dashboard / AI-Assistant / MCP introspection + PostgREST schema reloads (from migrations)**, not user traffic. Real users don't run introspection, so the app's per-user footprint is small. This doc is about provisioning for 100× that.
+**Status:** Living checklist. Created 2026-06-18 after a resource-exhaustion blip during tester sessions (6 concurrent users). The project was on **Nano (0.5 GB RAM, shared CPU)** — the smallest tier — at the time, which made it easy to tip over. The app handled the testers fine; the blip was caused by **dashboard / AI-Assistant / MCP introspection + PostgREST schema reloads (from migrations)**, not user traffic. Real users don't run introspection, so the app's per-user footprint is small. This doc is about provisioning for 100× that.
+
+**Update 2026-06-18:** upgraded **Nano → Micro** (1 GB RAM, dedicated 2-core ARM; covered by the included $10 credit, no extra charge). That's the current baseline — fine for testing, still **not** sized for 600 concurrent (see §1).
 
 ---
 
@@ -12,10 +14,10 @@ The make-or-break levers for 600 concurrent are **compute size, Realtime capacit
 
 ## 1. Compute (the big lever) — REQUIRED before launch
 
-- Currently **Micro (~1 GB RAM, ~60 max connections)**. It was *swapping at idle* and hit IOwait 100% under introspection load.
-- For ~600 concurrent, **start at Large (8 GB)**, then **load-test and adjust** — do not guess the tier.
-- Each tier up raises RAM (cache, no swap), disk IOPS (kills the IOwait), `max_connections`, and PostgREST worker count.
-- Settings → **Compute and Disk**. Brief downtime on resize.
+- Test ran on **Nano (0.5 GB, shared CPU)** — swapping at idle, IOwait 100% under introspection load. Now on **Micro (1 GB, dedicated 2-core ARM, ~60 max connections)** — better, but still small.
+- For ~600 concurrent, **start at Large (8 GB, 2-core)**, then **load-test and adjust** — do not guess the tier. If the load test shows CPU saturation (not just memory/IO), step to **XL (16 GB, 4-core)**.
+- Tier costs (≈730 hrs/mo, minus the ~$10 credit): Small ~$15, Medium ~$60, **Large ~$110**, XL ~$210.
+- Each tier up raises RAM (cache, no swap), disk IOPS (kills the IOwait), `max_connections`, and PostgREST worker count. Resize is **Settings → Compute and Disk** → pick tier → confirm; it triggers a **brief restart (~1–2 min downtime)**, so do it in a low-traffic window. Bump shortly **before** go-live, not during the quiet pre-launch weeks, to avoid paying the higher rate early.
 - **Disk is fine** — 0.57 GB of 8 GB used (8%). Do **not** scale disk.
 - **Connections are fine** — peak 26/60. Users hit PostgREST/GoTrue (which pool internally); they do **not** each hold a Postgres connection. Only fix needed: ensure no server-side code opens raw `pg` connections per request — if any does, route via **Supavisor transaction mode (port 6543)**.
 
