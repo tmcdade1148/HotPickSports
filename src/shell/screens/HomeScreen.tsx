@@ -4,6 +4,7 @@
 
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {RefreshControl, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {KeyRound, Plus} from 'lucide-react-native';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import {useGlobalStore} from '@shell/stores/globalStore';
@@ -26,7 +27,7 @@ import {OffSeasonActions, PreSeasonActions, ReturningOffCycleActions} from '@she
 import {Insight} from '@shell/components/home/Insight';
 import {HomeInbox} from '@shell/components/home/HomeInbox';
 import {ContestCarousel} from '@shell/components/home/ContestCarousel';
-import {ContestActionPill, contestActionPillStyles} from '@shell/components/ContestActionPill';
+import {ContestActionPill} from '@shell/components/ContestActionPill';
 import {PartnerModule} from '@shell/components/home/PartnerModule';
 import {resolveHomeState} from '@shell/components/home/resolveHomeState';
 import {LEXICON} from '@shared/lexicon';
@@ -39,6 +40,7 @@ const HEADER_BG_ALPHA = 'E6';
 export function HomeScreen() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
 
   const userId       = useGlobalStore(s => s.user?.id);
   const visiblePools = useGlobalStore(s => s.visiblePools);
@@ -98,6 +100,14 @@ export function HomeScreen() {
   const showHero         = true;
   const showPoolStack    = true;
   const showPartnerStack = true;
+
+  // In-cycle = the regular YOUR CONTESTS / YOUR CLUBS layout (off-cycle states
+  // own their own action stacks). The locked Join/Create footer + the in-cycle
+  // sections share this gate.
+  const isInCycle =
+    configLoaded &&
+    homeState !== 'off_season_idle' &&
+    homeState !== 'pre_season_games';
 
   // ---------------------------------------------------------------------------
   // Partition pools for the Pool stack + Partner stack.
@@ -222,6 +232,9 @@ export function HomeScreen() {
   // Measured height of the translucent header overlay, used to pad the
   // ScrollView so content starts below it (and scrolls up under it).
   const [headerHeight, setHeaderHeight] = useState(0);
+  // Measured height of the translucent Join/Create footer (in-cycle only),
+  // used to pad the bottom of the ScrollView so content clears it.
+  const [footerHeight, setFooterHeight] = useState(0);
   const onRefresh = useCallback(async () => {
     if (!userId || !competition) return;
     setRefreshing(true);
@@ -403,7 +416,10 @@ export function HomeScreen() {
           scrolls visibly under it. Pad the content by the measured header
           height so nothing starts hidden, and offset the refresh spinner. */}
       <ScrollView
-        contentContainerStyle={[styles.scroll, {paddingTop: headerHeight}]}
+        contentContainerStyle={[
+          styles.scroll,
+          {paddingTop: headerHeight, paddingBottom: footerHeight + spacing.xxl},
+        ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -478,15 +494,13 @@ export function HomeScreen() {
         {/* In-cycle YOUR CONTESTS section — replaced on off-cycle
             states (off_season_idle / pre_season_games) by the action
             stack + cross-Contest strip above. */}
-        {configLoaded
-          && showPoolStack
-          && homeState !== 'off_season_idle'
-          && homeState !== 'pre_season_games' && (
+        {showPoolStack && isInCycle && (
           <View style={styles.section}>
             {/* Swipe carousel: one contest card per swipe, dots track the
                 active/visible one (orange). Swiping sets the global active
                 contest (Hard Rule #20). When the user has no visible pools we
-                still show the title + the Join/Create affordance below. */}
+                still show the title; the Join/Create affordance now lives in
+                the locked footer below. */}
             {visiblePools.length > 0 ? (
               // Inside styles.section (which already provides the top gap) —
               // drop the carousel's own margin so the space above YOUR CONTESTS
@@ -497,22 +511,6 @@ export function HomeScreen() {
                 YOUR {LEXICON.contest.plural.toUpperCase()}
               </Text>
             )}
-            <View style={contestActionPillStyles.row}>
-              <ContestActionPill
-                Icon={KeyRound}
-                label="Join a Contest"
-                sublabel="with invite code"
-                onPress={() => navigation.navigate('JoinPool')}
-                accessibilityLabel="Join a Contest with an invite code"
-              />
-              <ContestActionPill
-                Icon={Plus}
-                label="Create a Contest"
-                sublabel="and invite friends"
-                onPress={() => navigation.navigate('CreatePool')}
-                accessibilityLabel="Create a new Contest and invite friends"
-              />
-            </View>
             {/* Onboarding explainer — only useful until the player is in more
                 than one Contest; drop it once they've got several. */}
             {visiblePools.length <= 1 && (
@@ -555,6 +553,39 @@ export function HomeScreen() {
         <SystemMessageSlot />
         <IdentityBar />
       </View>
+
+      {/* Locked, translucent Join/Create footer — pinned to the bottom of Home
+          (in-cycle only) so content scrolls visibly under it, matching the
+          header. Off-cycle states keep their own action stacks. Bottom inset
+          clears the home indicator; padding is kept tight per Tom. */}
+      {showPoolStack && isInCycle && (
+        <View
+          style={[
+            styles.footerOverlay,
+            {
+              backgroundColor: colors.background + HEADER_BG_ALPHA,
+              paddingBottom: Math.max(insets.bottom, spacing.sm),
+            },
+          ]}
+          onLayout={e => setFooterHeight(e.nativeEvent.layout.height)}>
+          <View style={styles.footerRow}>
+            <ContestActionPill
+              Icon={KeyRound}
+              label="Join a Contest"
+              sublabel="with invite code"
+              onPress={() => navigation.navigate('JoinPool')}
+              accessibilityLabel="Join a Contest with an invite code"
+            />
+            <ContestActionPill
+              Icon={Plus}
+              label="Create a Contest"
+              sublabel="and invite friends"
+              onPress={() => navigation.navigate('CreatePool')}
+              accessibilityLabel="Create a new Contest and invite friends"
+            />
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -636,6 +667,22 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: 10,
     elevation: 10,
+  },
+  // Locked Join/Create footer — pinned to the bottom, translucent like the
+  // header. Tight vertical padding keeps the box snug.
+  footerOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    elevation: 10,
+    paddingTop: spacing.sm,
+    paddingHorizontal: spacing.lg,
+  },
+  footerRow: {
+    flexDirection: 'row',
+    gap: 10,
   },
   section: {marginTop: spacing.lg},
   sectionTitle: {
