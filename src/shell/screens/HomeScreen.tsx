@@ -391,6 +391,9 @@ export function HomeScreen() {
 
   return (
     <View style={[styles.wrap, {backgroundColor: colors.background}]}>
+      {/* Fixed header — content scrolls under it, matching the Chirp / Ladder
+          tabs (which render their PoolHeader as a fixed sibling). */}
+      <HomeHeader />
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
@@ -402,7 +405,6 @@ export function HomeScreen() {
             colors={[colors.primary]}
           />
         }>
-        <HomeHeader />
         <SystemMessageSlot />
         <IdentityBar />
         {showHero &&
