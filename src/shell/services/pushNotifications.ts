@@ -122,28 +122,42 @@ export async function registerForPushNotifications(
 /**
  * Upsert a push token into user_devices.
  * Re-activates a previously deactivated token if the same device is used again.
+ *
+ * The column names + values below must match the live `user_devices` schema
+ * exactly — earlier they didn't, and every write threw (silently, because the
+ * result wasn't inspected), which is why the table sat empty and no push ever
+ * delivered:
+ *   • `platform` is the token TRANSPORT, not the OS — the table CHECK allows
+ *     only 'expo' | 'apns' | 'fcm'. We always fetch an Expo push token here, so
+ *     it's 'expo'. Writing 'ios'/'android' violated the CHECK.
+ *   • the table has no `updated_at` column (it's `last_used_at`).
+ *   • the only unique index is on `push_token` alone (a token identifies a
+ *     device), so that's the conflict target — not (user_id, push_token).
  */
 async function upsertDeviceToken(userId: string, token: string): Promise<void> {
-  const platform = Platform.OS as 'ios' | 'android';
-
   const {error} = await supabase
     .from('user_devices')
     .upsert(
       {
         user_id: userId,
         push_token: token,
-        platform,
+        platform: 'expo',
         is_active: true,
-        updated_at: new Date().toISOString(),
+        last_used_at: new Date().toISOString(),
       },
-      {onConflict: 'user_id,push_token'},
-    );
+      {onConflict: 'push_token'},
+    )
+    // Chain .select() so an RLS/constraint failure throws (PGRST116 on zero
+    // rows) instead of silently returning success — per the CLAUDE.md
+    // silent-RLS-write guardrail. The throw is caught + logged by the caller.
+    .select('id')
+    .single();
 
   if (error) {
     console.error('[Push] Failed to upsert device token:', error.message);
-  } else {
-    console.log('[Push] Device token registered');
+    throw error;
   }
+  console.log('[Push] Device token registered');
 }
 
 /**
@@ -154,9 +168,10 @@ export async function deactivateDeviceTokens(userId: string): Promise<void> {
   const ready = await ensureModules();
   if (!ready || !Notifications || !Device) {
     // Fallback: deactivate all tokens for this user
+    // (no `updated_at` column on user_devices — that write threw silently).
     await supabase
       .from('user_devices')
-      .update({is_active: false, updated_at: new Date().toISOString()})
+      .update({is_active: false})
       .eq('user_id', userId);
     return;
   }
@@ -171,7 +186,7 @@ export async function deactivateDeviceTokens(userId: string): Promise<void> {
 
     await supabase
       .from('user_devices')
-      .update({is_active: false, updated_at: new Date().toISOString()})
+      .update({is_active: false})
       .eq('user_id', userId)
       .eq('push_token', tokenData.data);
 
@@ -180,7 +195,7 @@ export async function deactivateDeviceTokens(userId: string): Promise<void> {
     // If we can't get the token, deactivate all for this user
     await supabase
       .from('user_devices')
-      .update({is_active: false, updated_at: new Date().toISOString()})
+      .update({is_active: false})
       .eq('user_id', userId);
 
     console.log('[Push] All device tokens deactivated for user');
