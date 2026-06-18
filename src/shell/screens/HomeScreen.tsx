@@ -567,7 +567,9 @@ export function HomeScreen() {
         <View
           style={[
             styles.footerOverlay,
-            {paddingBottom: Math.max(insets.bottom, spacing.sm)},
+            // Sit lower on the screen: only a small clearance over the home
+            // indicator instead of the full safe-area inset.
+            {paddingBottom: Math.max(insets.bottom - spacing.md, spacing.xs)},
           ]}
           onLayout={e => setFooterHeight(e.nativeEvent.layout.height)}>
           <View style={styles.footerRow}>
@@ -673,14 +675,16 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   // Locked Join/Create footer — the bar itself is clear (no background); only
-  // the pills carry a translucent fill. Tight padding keeps the box snug.
+  // the pills carry a translucent fill. No `elevation` here: on Android an
+  // elevated View casts a rectangular shadow on its own (transparent) bounds —
+  // that was the "weird box" behind the pills. Sibling paint order (declared
+  // after the ScrollView) + zIndex keep it on top without a shadow.
   footerOverlay: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
     zIndex: 10,
-    elevation: 10,
     backgroundColor: 'transparent',
     paddingTop: spacing.sm,
     paddingHorizontal: spacing.lg,
