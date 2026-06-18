@@ -1,19 +1,21 @@
-// PlayerName — the player's poolie name, auto-fit and tappable (→ Profile),
-// rendered identically on the left of every header (Home / Picks / Ladder /
-// Chirps). Mirrors the IdentityBar name treatment so the player's identity reads
-// the same everywhere. Measures the available column width and the name's
-// natural rendered width, then scales fontSize to fit (no adjustsFontSizeToFit,
-// which clips on Android / is inconsistent for italics).
+// PlayerName — the player's poolie name, auto-fit, rendered identically on the
+// left of every header (Home / Picks / Ladder / Chirps). Mirrors the
+// IdentityBar name treatment so the player's identity reads the same
+// everywhere. Measures the available column width and the name's natural
+// rendered width, then scales fontSize to fit (no adjustsFontSizeToFit, which
+// clips on Android / is inconsistent for italics).
+//
+// It's a plain (non-interactive) label — profile access lives in Settings, so
+// the name doesn't navigate anywhere.
 
 import React, {useState} from 'react';
 import {
-  Pressable,
   StyleSheet,
   Text,
+  View,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import {useNavigation} from '@react-navigation/native';
 import {useTheme} from '@shell/theme/hooks';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {displayType} from '@shared/theme';
@@ -25,7 +27,6 @@ const NAME_RIGHT_PAD = 6;
 
 export function PlayerName({style}: {style?: StyleProp<ViewStyle>}) {
   const {colors} = useTheme();
-  const navigation = useNavigation<any>();
   const poolieName = useGlobalStore(s => s.userProfile?.poolie_name ?? '');
   const display = (poolieName || '—').toUpperCase();
 
@@ -42,13 +43,10 @@ export function PlayerName({style}: {style?: StyleProp<ViewStyle>}) {
   );
 
   return (
-    <Pressable
-      onPress={() => navigation.navigate('Profile')}
-      hitSlop={8}
+    <View
       style={style}
       onLayout={e => setColWidth(e.nativeEvent.layout.width)}
-      accessibilityRole="button"
-      accessibilityLabel={`Profile of ${poolieName || 'player'}`}>
+      accessibilityLabel={poolieName || 'player'}>
       <Text
         style={[displayType.display, styles.name, {color: colors.textPrimary, fontSize}]}
         numberOfLines={1}>
@@ -68,7 +66,7 @@ export function PlayerName({style}: {style?: StyleProp<ViewStyle>}) {
         pointerEvents="none">
         {display}
       </Text>
-    </Pressable>
+    </View>
   );
 }
 

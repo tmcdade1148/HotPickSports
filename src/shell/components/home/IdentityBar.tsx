@@ -2,8 +2,7 @@
 // Points pulses gray↔primary while the week is settling.
 
 import React, {useEffect, useMemo, useRef, useState} from 'react';
-import {Animated, Pressable, StyleSheet, Text, View} from 'react-native';
-import {useNavigation} from '@react-navigation/native';
+import {Animated, StyleSheet, Text, View} from 'react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
@@ -22,7 +21,6 @@ const NAME_RIGHT_PAD = 6;
 
 export function IdentityBar() {
   const {colors} = useTheme();
-  const navigation = useNavigation<any>();
 
   const userId      = useGlobalStore(s => s.user?.id);
   const userProfile = useGlobalStore(s => s.userProfile);
@@ -83,13 +81,10 @@ export function IdentityBar() {
 
   return (
     <View style={styles.container}>
-      <Pressable
-        onPress={() => navigation.navigate('Profile')}
-        hitSlop={8}
+      <View
         style={styles.left}
         onLayout={e => setLeftWidth(e.nativeEvent.layout.width)}
-        accessibilityRole="button"
-        accessibilityLabel={`Profile of ${poolieName || 'player'}`}>
+        accessibilityLabel={poolieName || 'player'}>
         <Text
           style={[
             displayType.display,
@@ -118,7 +113,7 @@ export function IdentityBar() {
           pointerEvents="none">
           {display}
         </Text>
-      </Pressable>
+      </View>
 
       <View style={styles.right}>
         <Animated.Text
