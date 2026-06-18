@@ -408,6 +408,13 @@ async function resetToOffSeason(admin: any, competition: string, callerId: strin
   await admin.from("season_user_totals").delete().eq("competition", competition);
   await admin.from("user_hardware").update({ is_visible: false }).eq("competition", competition);
 
+  // Reset every game back to a clean, pickable slate. Without this, games left
+  // 'final'/'in_progress' by the prior sim run survive the reset and the next
+  // week opens with un-pickable games. Mirrors the per-week reset in jumpToWeek.
+  await admin.from("season_games")
+    .update({ status: "scheduled", home_score: null, away_score: null, winner_team: null, is_finalized: false, current_period: null, game_clock: null })
+    .eq("competition", competition);
+
   await setConfig(admin, competition, "current_phase", "OFF_SEASON");
   await setConfig(admin, competition, "current_week", 1);
   await setConfig(admin, competition, "week_state", "idle");
