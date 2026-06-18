@@ -18,6 +18,7 @@ import {useAuth} from '@shared/hooks/useAuth';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {getDisplayName} from '@shared/utils/displayName';
 import {SMACK_REACTIONS} from '@shared/config/smackTalk';
+import {LEXICON, welcomeOpenerDefault} from '@shared/lexicon';
 import {spacing, borderRadius} from '@shared/theme';
 
 import type {DbSmackMessage, DbSmackReaction} from '@shared/types/database';
@@ -104,6 +105,27 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
   const markPoolAsRead = useGlobalStore(s => s.markPoolAsRead);
   const flatListRef = useRef<FlatList<DbSmackMessage>>(null);
 
+  // Gaffer (organizer) identity for this pool — drives the Gaffer badge and the
+  // one-time welcome-opener pre-fill. Select the primitives, not the pool
+  // object, so this doesn't churn renders.
+  const organizerId = useGlobalStore(
+    s =>
+      (s.userPools.find(p => p.id === poolId) ??
+        s.visiblePools.find(p => p.id === poolId))?.organizer_id ?? null,
+  );
+  const contestName = useGlobalStore(
+    s =>
+      (s.userPools.find(p => p.id === poolId) ??
+        s.visiblePools.find(p => p.id === poolId))?.name ?? '',
+  );
+  const isGaffer = !!user?.id && organizerId === user.id;
+
+  // True while the composer holds the pre-filled welcome opener (so sending it
+  // is tagged message_type='welcome', the one-time marker). Cleared once the
+  // Gaffer clears the field or sends.
+  const [isWelcomeDraft, setIsWelcomeDraft] = useState(false);
+  const welcomePrefillDone = useRef(false);
+
   // ── Load blocked users ─────────────────────────────────────────────
   useEffect(() => {
     if (!user?.id) return;
@@ -118,6 +140,31 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
     };
     loadBlocked();
   }, [user?.id]);
+
+  // ── Gaffer welcome-opener pre-fill ──────────────────────────────────
+  // Once per Contest: if the current user is the Gaffer and no 'welcome' row
+  // exists yet, pre-fill the composer with the default opener. The Gaffer sends
+  // as-is, edits, or clears. Lightweight exists-check; runs at most once.
+  useEffect(() => {
+    if (!isGaffer || !contestName || welcomePrefillDone.current) return;
+    welcomePrefillDone.current = true; // run the check at most once
+    let cancelled = false;
+    (async () => {
+      const {data} = await supabase
+        .from('smack_messages')
+        .select('id')
+        .eq('pool_id', poolId)
+        .eq('message_type', 'welcome')
+        .limit(1);
+      // Only pre-fill an empty composer (never clobber a message in progress).
+      if (cancelled || (data && data.length > 0) || newMessage.length > 0) return;
+      setNewMessage(welcomeOpenerDefault(contestName));
+      setIsWelcomeDraft(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isGaffer, contestName, poolId, newMessage]);
 
   // ── Fetch messages + reactions ──────────────────────────────────────
   useEffect(() => {
@@ -546,6 +593,9 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
       p_text: text,
       p_reply_to: replyTo?.id ?? null,
       p_mentions: mentions.map(m => m.userId),
+      // The pre-filled Gaffer opener is tagged 'welcome' (one-time marker);
+      // everything else is a normal 'user' chirp.
+      p_message_type: isWelcomeDraft ? 'welcome' : 'user',
     });
 
     if (sendError) {
@@ -555,6 +605,7 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
 
     setReplyTo(null);
     setMentions([]);
+    setIsWelcomeDraft(false);
     setSending(false);
   };
 
@@ -575,7 +626,11 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
     }
 
     // ── System message rendering ───────────────────────────────────
-    const isSystemMessage = (item as any).message_type !== 'user' || item.user_id === null;
+    // System posts (e.g. pick_lock) have a NULL author; everything authored by
+    // a real user — normal chirps AND the Gaffer's 'welcome' opener — renders as
+    // a chirp so the author + Gaffer badge show. (Keying off message_type !==
+    // 'user' here would render the opener as an anonymous "HotPick" system row.)
+    const isSystemMessage = item.user_id === null;
     if (isSystemMessage) {
       return (
         <View>
@@ -630,7 +685,12 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
             ) : (
               <>
                 {!isMe && (
-                  <Text style={styles.sender}>{item.author_name}</Text>
+                  <View style={styles.senderRow}>
+                    <Text style={styles.sender}>{item.author_name}</Text>
+                    {organizerId !== null && item.user_id === organizerId && (
+                      <Text style={styles.gafferBadge}>{LEXICON.gaffer.short}</Text>
+                    )}
+                  </View>
                 )}
                 <Text style={[styles.messageText, isMe && styles.messageTextMe]}>
                   {item.text}
@@ -774,7 +834,12 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
           placeholder="Talk trash..."
           placeholderTextColor={colors.textSecondary}
           value={newMessage}
-          onChangeText={setNewMessage}
+          onChangeText={t => {
+            setNewMessage(t);
+            // Clearing the field abandons the welcome opener; a fresh message
+            // is then a normal chirp, not the one-time 'welcome'.
+            if (t.trim().length === 0) setIsWelcomeDraft(false);
+          }}
           multiline
           maxLength={500}
           editable={!sending}
@@ -986,10 +1051,27 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontStyle: 'italic',
     color: colors.textSecondary,
   },
+  senderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
   sender: {
     fontSize: 11,
     fontWeight: '600',
     color: colors.textTertiary,
+    marginBottom: 2,
+  },
+  gafferBadge: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: colors.onPrimary,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+    overflow: 'hidden',
     marginBottom: 2,
   },
   messageText: {
