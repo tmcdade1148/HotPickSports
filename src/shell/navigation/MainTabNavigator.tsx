@@ -11,7 +11,7 @@ import {
   MessageCircle,
   Settings,
   Trophy,
-  Target,
+  Home,
 } from 'lucide-react-native';
 import {BottomTabBar} from '@react-navigation/bottom-tabs';
 import {HomeScreen} from '@shell/screens/HomeScreen';
@@ -598,9 +598,11 @@ export function MainTabNavigator() {
         name="HomeTab"
         component={HomeTab}
         options={{
+          // The raised center tab is Home. A Home glyph reads unambiguously as
+          // Home (the prior Target icon looked like an aim/target reticle).
           tabBarLabel: () => null,
           tabBarIcon: ({focused}) => (
-            <Target size={65} color={focused ? colors.primary : colors.textSecondary} strokeWidth={focused ? 2.5 : 1.5} style={{marginBottom: 0}} />
+            <Home size={56} color={focused ? colors.primary : colors.textSecondary} strokeWidth={focused ? 2.5 : 1.5} style={{marginBottom: 0}} />
           ),
         }}
       />

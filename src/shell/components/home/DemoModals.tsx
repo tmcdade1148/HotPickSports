@@ -10,7 +10,7 @@ import {Modal, Pressable, StyleSheet, Text, View} from 'react-native';
 import {BarChart3, Flame} from 'lucide-react-native';
 import {useTheme} from '@shell/theme';
 import {bodyType, displayType, spacing, borderRadius} from '@shared/theme';
-import {LEXICON} from '@shared/lexicon';
+import {LEXICON, scoringNeverNegative} from '@shared/lexicon';
 
 // ── HotPick points badge — mirrors the rank circle on SeasonMatchCard ──
 function HotPickBadge({rank}: {rank: number}) {
@@ -62,7 +62,7 @@ export function DemoIntroModal({visible, onClose}: {visible: boolean; onClose: (
           <View style={[styles.bullet, {backgroundColor: colors.secondary}]} />
           <Text style={[bodyType.regular, styles.ruleText, {color: colors.textPrimary}]}>
             Pick the winner of each game. Every correct pick is{' '}
-            <Text style={{fontWeight: '800'}}>+1 point</Text>. A wrong pick is 0 — never negative.
+            <Text style={{fontWeight: '800'}}>+1 point</Text>. {scoringNeverNegative}
           </Text>
         </View>
 

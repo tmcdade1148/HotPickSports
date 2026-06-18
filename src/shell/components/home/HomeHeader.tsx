@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
-    paddingBottom: spacing.xs,
+    paddingBottom: 0,
   },
   wordmarkRow: {
     flexDirection: 'row',

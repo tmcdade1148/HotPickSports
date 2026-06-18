@@ -171,6 +171,13 @@ export function welcomeOpenerDefault(contestName: string): string {
 }
 
 /**
+ * Scoring explainer — makes the HotPick exception explicit. A regular wrong pick
+ * is 0 (never a penalty); only the HotPick can lose points.
+ */
+export const scoringNeverNegative =
+  'Regular picks never cost you points — only your HotPick can swing negative.';
+
+/**
  * Affiliation line for a Contest affiliated with one or more Leagues. Scales
  * from 1 affiliation up — the visual footer truncates to a logo cluster
  * for 4+, this helper keeps the text variant readable:

@@ -13,6 +13,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {supabase} from '@shared/config/supabase';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
+import {PasswordInput} from '@shared/components/PasswordInput';
 import {runPostAuthFlow} from '@shell/services/postAuthFlow';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -182,8 +183,9 @@ export function EmailEntryScreen({navigation, route}: any) {
             textContentType="emailAddress"
           />
 
-          <TextInput
-            style={[styles.input, styles.inputSpaced]}
+          <PasswordInput
+            containerStyle={styles.inputSpaced}
+            style={styles.input}
             placeholder="Password"
             placeholderTextColor={colors.textSecondary}
             value={password}
@@ -191,7 +193,6 @@ export function EmailEntryScreen({navigation, route}: any) {
               setPassword(text);
               clearError();
             }}
-            secureTextEntry
             autoCapitalize="none"
             autoCorrect={false}
             autoComplete={mode === 'sign_up' ? 'password-new' : 'password'}
@@ -204,8 +205,9 @@ export function EmailEntryScreen({navigation, route}: any) {
           />
 
           {mode === 'sign_up' && (
-            <TextInput
-              style={[styles.input, styles.inputSpaced]}
+            <PasswordInput
+              containerStyle={styles.inputSpaced}
+              style={styles.input}
               placeholder="Confirm password"
               placeholderTextColor={colors.textSecondary}
               value={confirmPassword}
@@ -213,7 +215,6 @@ export function EmailEntryScreen({navigation, route}: any) {
                 setConfirmPassword(text);
                 clearError();
               }}
-              secureTextEntry
               autoCapitalize="none"
               autoCorrect={false}
               autoComplete="password-new"

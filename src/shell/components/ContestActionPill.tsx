@@ -25,6 +25,13 @@ interface ContestActionPillProps {
   accessibilityLabel?: string;
   /** Shows a spinner in place of the icon and blocks taps. */
   busy?: boolean;
+  /**
+   * Overrides the pill's fill. Used by the Home footer, which sits over a
+   * clear (transparent) bar — passing a translucent theme color here makes
+   * each pill a frosted panel with the page visible through/around it.
+   * Defaults to the subtle accent tint used everywhere else.
+   */
+  fillColor?: string;
 }
 
 export function ContestActionPill({
@@ -34,6 +41,7 @@ export function ContestActionPill({
   onPress,
   accessibilityLabel,
   busy = false,
+  fillColor,
 }: ContestActionPillProps) {
   const {colors} = useTheme();
   return (
@@ -43,7 +51,7 @@ export function ContestActionPill({
       style={({pressed}) => [
         styles.btn,
         {
-          backgroundColor: hexToRgba(colors.ctaAccentOutline, 0.08),
+          backgroundColor: fillColor ?? hexToRgba(colors.ctaAccentOutline, 0.08),
           borderColor: colors.ctaAccentOutline,
           opacity: pressed || busy ? 0.7 : 1,
         },
@@ -85,7 +93,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingVertical: 12,
+    paddingVertical: 8,
     paddingHorizontal: 14,
     borderRadius: 12,
     borderWidth: 1.5,
