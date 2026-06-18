@@ -21,6 +21,11 @@ import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
 import {COMPACT_PERIOD_LENGTH} from './shortPeriod';
 import {usePeriodLabel} from './usePeriodLabel';
 
+// Ceiling on OS accessibility font enlargement for the fixed-layout header row
+// (wordmark + period pill). Tune on a real device. Mirrored in PoolHeader /
+// PicksHeader so all three header rows behave identically.
+const HEADER_MAX_FONT_SCALE = 1.2;
+
 export function HomeHeader() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
@@ -32,10 +37,14 @@ export function HomeHeader() {
   return (
     <>
     <View style={styles.row}>
+      {/* maxFontSizeMultiplier caps OS font enlargement so the wordmark and
+          the period pill can't grow into each other at large accessibility
+          font settings. (adjustsFontSizeToFit is intentionally NOT used on the
+          italic pill — see the static-step comment below.) */}
       <View style={styles.wordmarkRow}>
-        <Text style={[displayType.display, styles.wordmark, {color: colors.primary}]}>HOT</Text>
-        <Text style={[displayType.display, styles.wordmark, {color: colors.textPrimary}]}>PICK</Text>
-        <Text style={[displayType.display, styles.wordmarkSmall, {color: colors.primary}]}> SPORTS</Text>
+        <Text maxFontSizeMultiplier={HEADER_MAX_FONT_SCALE} style={[displayType.display, styles.wordmark, {color: colors.primary}]}>HOT</Text>
+        <Text maxFontSizeMultiplier={HEADER_MAX_FONT_SCALE} style={[displayType.display, styles.wordmark, {color: colors.textPrimary}]}>PICK</Text>
+        <Text maxFontSizeMultiplier={HEADER_MAX_FONT_SCALE} style={[displayType.display, styles.wordmarkSmall, {color: colors.primary}]}> SPORTS</Text>
       </View>
       <View style={styles.rightCluster}>
         <View style={[styles.pill, {borderColor: colors.primary}]}>
@@ -48,6 +57,7 @@ export function HomeHeader() {
               to 13px. */}
           <Text
             numberOfLines={1}
+            maxFontSizeMultiplier={HEADER_MAX_FONT_SCALE}
             style={[
               bodyType.bold,
               period.length > COMPACT_PERIOD_LENGTH ? styles.pillTextCompact : styles.pillText,

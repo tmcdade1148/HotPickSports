@@ -21,6 +21,9 @@ const NAME_MAX_FONT  = 40;
 const NAME_MIN_FONT  = 12;
 const NAME_LINE      = 44;
 const NAME_RIGHT_PAD = 6;
+// Ceiling on OS accessibility font enlargement for the fixed-layout header row
+// (matches HomeHeader / PicksHeader). Tune on device.
+const HEADER_MAX_FONT_SCALE = 1.2;
 
 export function PoolHeader() {
   const {colors} = useTheme();
@@ -51,14 +54,15 @@ export function PoolHeader() {
       {/* Row 1 — HotPick wordmark + period pill + gear (HomeHeader shape) */}
       <View style={styles.topRow}>
         <View style={styles.wordmarkRow}>
-          <Text style={[displayType.display, styles.wordmark, {color: colors.primary}]}>HOT</Text>
-          <Text style={[displayType.display, styles.wordmark, {color: colors.textPrimary}]}>PICK</Text>
-          <Text style={[displayType.display, styles.wordmarkSmall, {color: colors.primary}]}> SPORTS</Text>
+          <Text maxFontSizeMultiplier={HEADER_MAX_FONT_SCALE} style={[displayType.display, styles.wordmark, {color: colors.primary}]}>HOT</Text>
+          <Text maxFontSizeMultiplier={HEADER_MAX_FONT_SCALE} style={[displayType.display, styles.wordmark, {color: colors.textPrimary}]}>PICK</Text>
+          <Text maxFontSizeMultiplier={HEADER_MAX_FONT_SCALE} style={[displayType.display, styles.wordmarkSmall, {color: colors.primary}]}> SPORTS</Text>
         </View>
         <View style={styles.rightCluster}>
           <View style={[styles.pill, {borderColor: colors.primary}]}>
             <Text
               numberOfLines={1}
+              maxFontSizeMultiplier={HEADER_MAX_FONT_SCALE}
               style={[
                 bodyType.bold,
                 period.length > COMPACT_PERIOD_LENGTH ? styles.pillTextCompact : styles.pillText,
@@ -87,7 +91,8 @@ export function PoolHeader() {
               styles.name,
               {color: colors.textPrimary, fontSize: nameFontSize},
             ]}
-            numberOfLines={1}>
+            numberOfLines={1}
+            maxFontSizeMultiplier={HEADER_MAX_FONT_SCALE}>
             {display}
           </Text>
           <Text

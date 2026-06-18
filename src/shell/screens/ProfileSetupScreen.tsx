@@ -50,12 +50,20 @@ export function ProfileSetupScreen({navigation}: any) {
   // Optional founding-code redemption (§6d) — a welcome ritual + cohort tag.
   // It does NOT gate anything; absence is fine. Decoupled from the required
   // fields below so it never blocks "Let's Go".
+  //
+  // DEACTIVATED for now: the founding-member moment is moving to the paywall
+  // (Organizer Paywall Facade) rather than onboarding. The field stays visible
+  // but inert, labeled "coming soon". The redeem_comp_code RPC + redeemCompCode
+  // store action remain wired, so flipping FOUNDING_CODE_ENABLED back to true
+  // restores it with no other changes.
+  const FOUNDING_CODE_ENABLED: boolean = false;
   const [compCode, setCompCode] = useState('');
   const [redeemState, setRedeemState] =
     useState<'idle' | 'redeeming' | 'redeemed' | 'error'>('idle');
   const [redeemMsg, setRedeemMsg] = useState<string | null>(null);
 
   const handleRedeem = async () => {
+    if (!FOUNDING_CODE_ENABLED) return;
     const code = compCode.trim();
     if (code.length === 0) return;
     setRedeemState('redeeming');
@@ -232,13 +240,23 @@ export function ProfileSetupScreen({navigation}: any) {
             </Text>
           </View>
 
-          {/* Founding code (optional, §6d) — welcome ritual + cohort tag. */}
+          {/* Founding code (§6d) — DEACTIVATED, shown as "coming soon".
+              Re-enable via FOUNDING_CODE_ENABLED above. */}
           <View style={styles.section}>
-            <Text style={styles.label}>Have a founding code?</Text>
+            <View style={styles.codeLabelRow}>
+              <Text style={[styles.label, styles.codeLabelText]}>Have a founding code?</Text>
+              {!FOUNDING_CODE_ENABLED && (
+                <Text style={styles.comingSoonBadge}>Coming soon</Text>
+              )}
+            </View>
             <View style={styles.codeRow}>
               <TextInput
-                style={[styles.input, styles.codeInput]}
-                placeholder="Optional"
+                style={[
+                  styles.input,
+                  styles.codeInput,
+                  !FOUNDING_CODE_ENABLED && styles.inputDisabled,
+                ]}
+                placeholder={FOUNDING_CODE_ENABLED ? 'Optional' : 'Coming soon'}
                 placeholderTextColor={colors.textSecondary}
                 value={compCode}
                 onChangeText={text => {
@@ -253,18 +271,20 @@ export function ProfileSetupScreen({navigation}: any) {
                 }}
                 autoCapitalize="characters"
                 autoCorrect={false}
-                editable={!saving && redeemState !== 'redeemed'}
+                editable={FOUNDING_CODE_ENABLED && !saving && redeemState !== 'redeemed'}
               />
               <TouchableOpacity
                 style={[
                   styles.codeButton,
-                  (compCode.trim().length === 0 ||
+                  (!FOUNDING_CODE_ENABLED ||
+                    compCode.trim().length === 0 ||
                     redeemState === 'redeeming' ||
                     redeemState === 'redeemed') &&
                     styles.buttonDisabled,
                 ]}
                 onPress={handleRedeem}
                 disabled={
+                  !FOUNDING_CODE_ENABLED ||
                   compCode.trim().length === 0 ||
                   redeemState === 'redeeming' ||
                   redeemState === 'redeemed'
@@ -278,13 +298,15 @@ export function ProfileSetupScreen({navigation}: any) {
                 )}
               </TouchableOpacity>
             </View>
-            {redeemMsg ? (
+            {FOUNDING_CODE_ENABLED && redeemMsg ? (
               <Text style={redeemState === 'redeemed' ? styles.available : styles.error}>
                 {redeemMsg}
               </Text>
             ) : (
               <Text style={styles.hint}>
-                No code? No problem — it's optional.
+                {FOUNDING_CODE_ENABLED
+                  ? "No code? No problem — it's optional."
+                  : 'Founding codes are coming soon.'}
               </Text>
             )}
           </View>
@@ -344,6 +366,30 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: '600',
     color: colors.textPrimary,
     marginBottom: spacing.xs,
+  },
+  codeLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  codeLabelText: {
+    marginBottom: 0,
+  },
+  comingSoonBadge: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.full,
+    overflow: 'hidden',
+  },
+  inputDisabled: {
+    opacity: 0.5,
   },
   required: {
     color: colors.error,
