@@ -31,6 +31,11 @@ import {PartnerModule} from '@shell/components/home/PartnerModule';
 import {resolveHomeState} from '@shell/components/home/resolveHomeState';
 import {LEXICON} from '@shared/lexicon';
 
+// Opacity (hex alpha) applied to the theme background behind the fixed header
+// so page content is faintly visible scrolling under it. 'E6' ≈ 90%; lower it
+// for more transparency. Appended to the 6-digit theme hex.
+const HEADER_BG_ALPHA = 'E6';
+
 export function HomeScreen() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
@@ -214,6 +219,9 @@ export function HomeScreen() {
   // Pull-to-refresh — reuses the same existing fetch actions as the focus
   // refetch above (no new fetch logic, no new Realtime subscriptions).
   const [refreshing, setRefreshing] = useState(false);
+  // Measured height of the translucent header overlay, used to pad the
+  // ScrollView so content starts below it (and scrolls up under it).
+  const [headerHeight, setHeaderHeight] = useState(0);
   const onRefresh = useCallback(async () => {
     if (!userId || !competition) return;
     setRefreshing(true);
@@ -391,15 +399,11 @@ export function HomeScreen() {
 
   return (
     <View style={[styles.wrap, {backgroundColor: colors.background}]}>
-      {/* Fixed header region — content scrolls under it, matching the Chirp /
-          Ladder tabs. The IdentityBar (player name + SEASON PTS) and the system
-          message slot stay pinned so the player's name and points are always
-          visible. */}
-      <HomeHeader />
-      <SystemMessageSlot />
-      <IdentityBar />
+      {/* The translucent header (below) overlays the ScrollView so content
+          scrolls visibly under it. Pad the content by the measured header
+          height so nothing starts hidden, and offset the refresh spinner. */}
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, {paddingTop: headerHeight}]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -407,6 +411,7 @@ export function HomeScreen() {
             onRefresh={onRefresh}
             tintColor={colors.primary}
             colors={[colors.primary]}
+            progressViewOffset={headerHeight}
           />
         }>
         {showHero &&
@@ -543,6 +548,13 @@ export function HomeScreen() {
           </View>
         )}
       </ScrollView>
+      <View
+        style={[styles.headerOverlay, {backgroundColor: colors.background + HEADER_BG_ALPHA}]}
+        onLayout={e => setHeaderHeight(e.nativeEvent.layout.height)}>
+        <HomeHeader />
+        <SystemMessageSlot />
+        <IdentityBar />
+      </View>
     </View>
   );
 }
@@ -617,6 +629,14 @@ const offCycleStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   wrap:    {flex: 1},
   scroll:  {paddingBottom: spacing.xxl},
+  headerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    elevation: 10,
+  },
   section: {marginTop: spacing.lg},
   sectionTitle: {
     fontSize: 11,
