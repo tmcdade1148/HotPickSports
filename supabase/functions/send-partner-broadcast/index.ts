@@ -31,14 +31,12 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-async function logFailure(action: string, ctx: Record<string, unknown>) {
-  try {
-    await supabase.from("admin_audit_log").insert({
-      action_type: "partner_broadcast_failed",
-      action_detail: action,
-      context_json: ctx,
-    });
-  } catch {}
+// Was inserting into admin_audit_log with columns that don't exist
+// (action_type / action_detail / context_json) and a disallowed `action`
+// value, inside an empty catch — so every failure was silently swallowed.
+// Log to stderr instead; the Edge Function logs are the record.
+function logFailure(action: string, ctx: Record<string, unknown>) {
+  console.error(`[send-partner-broadcast] ${action}`, JSON.stringify(ctx));
 }
 
 Deno.serve(async (req) => {
@@ -99,7 +97,7 @@ Deno.serve(async (req) => {
       .eq("partner_id", partnerId)
       .gte("sent_at", since);
     if (rateErr) {
-      await logFailure("rate_limit_check", { partnerId, err: rateErr.message });
+      logFailure("rate_limit_check", { partnerId, err: rateErr.message });
       return json({ error: "Internal error checking rate limit" }, 500);
     }
     if ((recentCount ?? 0) >= RATE_LIMIT_COUNT) {
@@ -120,7 +118,7 @@ Deno.serve(async (req) => {
     ]);
 
     if (legacyRes.error || affRes.error) {
-      await logFailure("resolve_pools", {
+      logFailure("resolve_pools", {
         partnerId,
         legacyErr: legacyRes.error?.message,
         affErr:    affRes.error?.message,
@@ -154,7 +152,7 @@ Deno.serve(async (req) => {
       .in("pool_id", poolIds)
       .eq("status", "active");
     if (memErr) {
-      await logFailure("resolve_members", { partnerId, err: memErr.message });
+      logFailure("resolve_members", { partnerId, err: memErr.message });
       return json({ error: "Internal error resolving members" }, 500);
     }
 
@@ -178,7 +176,7 @@ Deno.serve(async (req) => {
       .single();
 
     if (insertErr || !inserted) {
-      await logFailure("insert_partner_notification", {
+      logFailure("insert_partner_notification", {
         partnerId, err: insertErr?.message,
       });
       return json({ error: "Internal error recording broadcast" }, 500);
@@ -205,13 +203,19 @@ Deno.serve(async (req) => {
       }
     }
 
+    // notification_queue has no `deep_link` column (it lives in `data`), and
+    // 'broadcast_received' is neither an allowed queue type nor a
+    // notification_preferences toggle — the old rows errored (zero push) and
+    // would have bypassed the user's toggle. Use 'organizer_broadcast' (the
+    // shared broadcast push type the processor honors) and carry the deep link
+    // in `data`, which the processor forwards to Expo verbatim.
     const deepLink = `hotpick://partner/${partner.slug}/roster`;
     const queueRows = recipientIds.map(uid => ({
       user_id:           uid,
-      notification_type: "broadcast_received",
+      notification_type: "organizer_broadcast",
       title:             partner.name,
       body:              message,
-      deep_link:         deepLink,
+      data:              { deep_link: deepLink, kind: "partner_broadcast" },
     }));
 
     const { error: queueErr } = await supabase
@@ -219,7 +223,7 @@ Deno.serve(async (req) => {
       .insert(queueRows);
 
     if (queueErr) {
-      await logFailure("enqueue_push", {
+      logFailure("enqueue_push", {
         partnerId, broadcastId: inserted.id, err: queueErr.message,
       });
     }
@@ -230,7 +234,7 @@ Deno.serve(async (req) => {
     }, 200);
 
   } catch (err) {
-    await logFailure("unhandled_exception", {
+    logFailure("unhandled_exception", {
       message: err instanceof Error ? err.message : String(err),
     });
     return json({ error: "Internal error" }, 500);
