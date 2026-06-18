@@ -205,25 +205,33 @@ export const createPoolAdminSlice = (set: Set, get: Get): PoolAdminSlice => ({
       };
     }
 
-    // Fire broadcast email Edge Function (non-blocking — don't await)
-    const profile = get().userProfile;
-    const senderName =
-      profile?.first_name ?? profile?.poolie_name ?? 'Contest Gaffer';
+    // Broadcast email delivery is intentionally DISABLED for now. The
+    // send-broadcast-email Edge Function sends a real email to every active
+    // member; turning it on must be a deliberate launch decision (and it would
+    // bounce against the fake @hotpicksports.com test accounts). Until then,
+    // a Gaffer broadcast delivers only the in-app Message Center row written by
+    // broadcast_to_pool. Re-enable by flipping BROADCAST_EMAIL_ENABLED.
+    const BROADCAST_EMAIL_ENABLED = false;
+    if (BROADCAST_EMAIL_ENABLED) {
+      const profile = get().userProfile;
+      const senderName =
+        profile?.first_name ?? profile?.poolie_name ?? 'Contest Gaffer';
 
-    supabase.functions
-      .invoke('send-broadcast-email', {
-        body: {pool_id: poolId, message, sender_name: senderName},
-      })
-      .then(res => {
-        if (res.error) {
-          console.warn('[broadcast-email] Edge Function error:', res.error);
-        } else {
-          console.log('[broadcast-email] Emails dispatched:', res.data);
-        }
-      })
-      .catch(err => {
-        console.warn('[broadcast-email] Failed to invoke:', err);
-      });
+      supabase.functions
+        .invoke('send-broadcast-email', {
+          body: {pool_id: poolId, message, sender_name: senderName},
+        })
+        .then(res => {
+          if (res.error) {
+            console.warn('[broadcast-email] Edge Function error:', res.error);
+          } else {
+            console.log('[broadcast-email] Emails dispatched:', res.data);
+          }
+        })
+        .catch(err => {
+          console.warn('[broadcast-email] Failed to invoke:', err);
+        });
+    }
 
     // Refresh broadcasts so MessageCenter shows the new one
     get().fetchRecentBroadcasts();
