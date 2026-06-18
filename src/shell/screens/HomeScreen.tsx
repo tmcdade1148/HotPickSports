@@ -2,8 +2,8 @@
 // StateHero → Insight → Pool/Partner stacks). All Supabase reads live
 // in store loaders fired here so child modules can stay presentational.
 
-import React, {useCallback, useEffect, useMemo} from 'react';
-import {ScrollView, StyleSheet, Text, View} from 'react-native';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import {RefreshControl, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {KeyRound, Plus} from 'lucide-react-native';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import {useGlobalStore} from '@shell/stores/globalStore';
@@ -211,6 +211,35 @@ export function HomeScreen() {
     }, [userId, competition, currentWeek, allPoolIds, loadPoolIndicators, loadUserRankByPool]),
   );
 
+  // Pull-to-refresh — reuses the same existing fetch actions as the focus
+  // refetch above (no new fetch logic, no new Realtime subscriptions).
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    if (!userId || !competition) return;
+    setRefreshing(true);
+    try {
+      const nfl = useNFLStore.getState();
+      await Promise.allSettled([
+        nfl.fetchCompetitionConfig(),
+        ...(currentWeek > 0
+          ? [
+              nfl.fetchUserPickStatus(userId),
+              nfl.fetchUserHotPick(userId, currentWeek),
+              nfl.fetchLiveScores(),
+            ]
+          : []),
+        ...(allPoolIds.length > 0
+          ? [
+              loadPoolIndicators(userId, allPoolIds),
+              loadUserRankByPool(userId, allPoolIds),
+            ]
+          : []),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [userId, competition, currentWeek, allPoolIds, loadPoolIndicators, loadUserRankByPool]);
+
   useEffect(() => {
     if (!userId || !competition) return;
     loadLastWeekHotPick(userId, competition, currentWeek).catch(() => {});
@@ -364,7 +393,15 @@ export function HomeScreen() {
     <View style={[styles.wrap, {backgroundColor: colors.background}]}>
       <ScrollView
         contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }>
         <HomeHeader />
         <SystemMessageSlot />
         <IdentityBar />

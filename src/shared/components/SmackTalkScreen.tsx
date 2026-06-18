@@ -11,6 +11,7 @@ import {
   Modal,
   Pressable,
   Alert,
+  RefreshControl,
   StyleSheet,
 } from 'react-native';
 import {supabase} from '@shared/config/supabase';
@@ -104,6 +105,7 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
   const userProfile = useGlobalStore(s => s.userProfile);
   const markPoolAsRead = useGlobalStore(s => s.markPoolAsRead);
   const flatListRef = useRef<FlatList<DbSmackMessage>>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Gaffer (organizer) identity for this pool — drives the Gaffer badge and the
   // one-time welcome-opener pre-fill. Select the primitives, not the pool
@@ -369,6 +371,37 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
       setReplyCounts(prev => ({...prev, ...counts}));
     }
   };
+
+  // ── Pull-to-refresh — re-run the existing initial-load query (same fetch the
+  //    mount effect runs). No new Realtime subscription. ──────────────────────
+  const refreshMessages = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const {data} = await supabase
+        .from('smack_messages')
+        .select('*')
+        .eq('pool_id', poolId)
+        .is('reply_to', null)
+        .order('created_at', {ascending: false})
+        .limit(50);
+      if (data) {
+        const filtered = (data as DbSmackMessage[]).reverse().filter(
+          m => !blockedUserIds.has(m.user_id),
+        );
+        setMessages(filtered);
+        setHasOlderMessages(data.length === 50);
+        const msgIds = filtered.map(m => m.id);
+        if (msgIds.length > 0) {
+          await fetchReactions(msgIds);
+          await fetchReplyCounts(msgIds);
+        }
+      }
+    } finally {
+      setRefreshing(false);
+    }
+    // fetchReactions/fetchReplyCounts are stable component helpers.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [poolId, blockedUserIds]);
 
   // ── Toggle expanded replies for a message ──────────────────────────
   const toggleReplies = async (parentId: string) => {
@@ -773,6 +806,14 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
           keyExtractor={item => item.id}
           renderItem={renderMessage}
           contentContainerStyle={styles.list}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={refreshMessages}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
           // Dragging down on the message list closes the keyboard, the
           // standard iOS Messages gesture. "interactive" follows the finger;
           // "on-drag" closes on any drag — either works, interactive feels
