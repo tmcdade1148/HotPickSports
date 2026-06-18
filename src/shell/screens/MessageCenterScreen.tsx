@@ -258,7 +258,9 @@ export function MessageCenterScreen() {
     // subscribes to UPDATEs), so the unread counts clear once the upserts land.
     if (userId) {
       const nowIso = new Date().toISOString();
-      const writes: Promise<unknown>[] = [];
+      // Supabase query builders are thenables (PromiseLike), not real Promises —
+      // type the array as PromiseLike so Promise.all accepts them.
+      const writes: PromiseLike<unknown>[] = [];
       if (poolIds.length > 0) {
         writes.push(
           supabase
