@@ -391,9 +391,13 @@ export function HomeScreen() {
 
   return (
     <View style={[styles.wrap, {backgroundColor: colors.background}]}>
-      {/* Fixed header — content scrolls under it, matching the Chirp / Ladder
-          tabs (which render their PoolHeader as a fixed sibling). */}
+      {/* Fixed header region — content scrolls under it, matching the Chirp /
+          Ladder tabs. The IdentityBar (player name + SEASON PTS) and the system
+          message slot stay pinned so the player's name and points are always
+          visible. */}
       <HomeHeader />
+      <SystemMessageSlot />
+      <IdentityBar />
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
@@ -405,8 +409,6 @@ export function HomeScreen() {
             colors={[colors.primary]}
           />
         }>
-        <SystemMessageSlot />
-        <IdentityBar />
         {showHero &&
           (configLoaded ? (
             <StateHero state={homeState} />
