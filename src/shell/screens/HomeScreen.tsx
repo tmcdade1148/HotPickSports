@@ -37,6 +37,11 @@ import {LEXICON} from '@shared/lexicon';
 // for more transparency. Appended to the 6-digit theme hex.
 const HEADER_BG_ALPHA = 'E6';
 
+// The Home footer bar is fully clear (the page shows through it); only the
+// Join/Create pills carry a translucent frosted fill so they read as panels
+// floating over the content. 'CC' ≈ 80%; lower it for more transparency.
+const PILL_FILL_ALPHA = 'CC';
+
 export function HomeScreen() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
@@ -562,10 +567,7 @@ export function HomeScreen() {
         <View
           style={[
             styles.footerOverlay,
-            {
-              backgroundColor: colors.background + HEADER_BG_ALPHA,
-              paddingBottom: Math.max(insets.bottom, spacing.sm),
-            },
+            {paddingBottom: Math.max(insets.bottom, spacing.sm)},
           ]}
           onLayout={e => setFooterHeight(e.nativeEvent.layout.height)}>
           <View style={styles.footerRow}>
@@ -573,6 +575,7 @@ export function HomeScreen() {
               Icon={KeyRound}
               label="Join a Contest"
               sublabel="with invite code"
+              fillColor={colors.background + PILL_FILL_ALPHA}
               onPress={() => navigation.navigate('JoinPool')}
               accessibilityLabel="Join a Contest with an invite code"
             />
@@ -580,6 +583,7 @@ export function HomeScreen() {
               Icon={Plus}
               label="Create a Contest"
               sublabel="and invite friends"
+              fillColor={colors.background + PILL_FILL_ALPHA}
               onPress={() => navigation.navigate('CreatePool')}
               accessibilityLabel="Create a new Contest and invite friends"
             />
@@ -668,8 +672,8 @@ const styles = StyleSheet.create({
     zIndex: 10,
     elevation: 10,
   },
-  // Locked Join/Create footer — pinned to the bottom, translucent like the
-  // header. Tight vertical padding keeps the box snug.
+  // Locked Join/Create footer — the bar itself is clear (no background); only
+  // the pills carry a translucent fill. Tight padding keeps the box snug.
   footerOverlay: {
     position: 'absolute',
     bottom: 0,
@@ -677,6 +681,7 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: 10,
     elevation: 10,
+    backgroundColor: 'transparent',
     paddingTop: spacing.sm,
     paddingHorizontal: spacing.lg,
   },
