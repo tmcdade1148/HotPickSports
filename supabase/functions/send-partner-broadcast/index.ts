@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
 
     const { data: partner } = await supabase
       .from("partners")
-      .select("id, name, slug, is_active, perk_text, club_pool_id")
+      .select("id, name, slug, is_active, perk_text")
       .eq("id", partnerId)
       .maybeSingle();
 
@@ -182,26 +182,11 @@ Deno.serve(async (req) => {
       return json({ error: "Internal error recording broadcast" }, 500);
     }
 
-    // Mirror into organizer_notifications (Message Center) attached to
-    // the Club Pool when the partner runs one.
-    if (partner.club_pool_id) {
-      const { data: clubPool } = await supabase
-        .from("pools")
-        .select("competition")
-        .eq("id", partner.club_pool_id)
-        .maybeSingle();
-      if (clubPool?.competition) {
-        await supabase.from("organizer_notifications").insert({
-          pool_id:           partner.club_pool_id,
-          competition:       clubPool.competition,
-          organizer_id:      caller.id,
-          notification_type: "broadcast",
-          message:           `${partner.name}\n\n${message}`,
-          recipient_count:   recipientIds.length,
-          sent_at:           new Date().toISOString(),
-        });
-      }
-    }
+    // (Removed) The Club-Pool organizer_notifications mirror used to be the only
+    // Message Center path for partner broadcasts. The Message Center now reads
+    // partner_notifications directly (for all aligned-pool members, via the
+    // widened RLS in 20260618170000_partner_notifications_rls_affiliations.sql),
+    // so the mirror is redundant and would double-show for Club-Pool members.
 
     // notification_queue has no `deep_link` column (it lives in `data`), and
     // 'broadcast_received' is neither an allowed queue type nor a
