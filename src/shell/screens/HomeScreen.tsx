@@ -3,7 +3,7 @@
 // in store loaders fired here so child modules can stay presentational.
 
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
-import {RefreshControl, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {Platform, RefreshControl, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {KeyRound, Plus} from 'lucide-react-native';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
@@ -567,9 +567,15 @@ export function HomeScreen() {
         <View
           style={[
             styles.footerOverlay,
-            // Sit lower on the screen: only a small clearance over the home
-            // indicator instead of the full safe-area inset.
-            {paddingBottom: Math.max(insets.bottom - spacing.md, spacing.xs)},
+            // iOS sits lower (small clearance over the home indicator). Android
+            // keeps the original, roomier clearance — the trimmed iOS value put
+            // the pills too close to the bottom there.
+            {
+              paddingBottom: Platform.select({
+                ios: Math.max(insets.bottom - spacing.md, spacing.xs),
+                default: Math.max(insets.bottom, spacing.sm),
+              }),
+            },
           ]}
           onLayout={e => setFooterHeight(e.nativeEvent.layout.height)}>
           <View style={styles.footerRow}>
