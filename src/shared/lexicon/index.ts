@@ -159,6 +159,18 @@ export function leagueContestTagline(leagueName: string): string {
 }
 
 /**
+ * Default Gaffer-authored welcome opener pre-filled into the Chirp composer the
+ * first time a Contest's Gaffer opens Chirps with no welcome yet. The Gaffer
+ * sends it as-is or edits it. The word "Gaffer" is intentionally NOT in the copy
+ * — attribution is the Gaffer badge on the message.
+ *   welcomeOpenerDefault("Stella's Gang")
+ *     → "Welcome to Stella's Gang! I look forward to hearing from you here."
+ */
+export function welcomeOpenerDefault(contestName: string): string {
+  return `Welcome to ${contestName}! I look forward to hearing from you here.`;
+}
+
+/**
  * Affiliation line for a Contest affiliated with one or more Leagues. Scales
  * from 1 affiliation up — the visual footer truncates to a logo cluster
  * for 4+, this helper keeps the text variant readable:
