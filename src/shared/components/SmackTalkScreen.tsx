@@ -127,6 +127,11 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
   // Gaffer clears the field or sends.
   const [isWelcomeDraft, setIsWelcomeDraft] = useState(false);
   const welcomePrefillDone = useRef(false);
+  // Bumped on every optimistic reaction change. fetchReactions captures it and
+  // discards its result if it changed mid-flight — so a stale full-replace
+  // refetch can't briefly drop a reaction the user just added/removed before
+  // its own realtime echo lands (the echo fires a fresh fetch right after).
+  const reactionVersion = useRef(0);
 
   // ── Load blocked users ─────────────────────────────────────────────
   useEffect(() => {
@@ -314,10 +319,16 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
   };
 
   const fetchReactions = async (messageIds: string[]) => {
+    const version = reactionVersion.current;
     const {data} = await supabase
       .from('smack_reactions')
       .select('*')
       .in('message_id', messageIds);
+
+    // If the user toggled a reaction while this fetch was in flight, its result
+    // is stale — applying it would briefly clobber the optimistic state (the
+    // flicker). Drop it; the realtime echo of that toggle fires a fresh fetch.
+    if (reactionVersion.current !== version) return;
 
     if (data) {
       const byMessage: Record<string, DbSmackReaction[]> = {};
@@ -452,6 +463,9 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
   const handleReaction = async (messageId: string, emoji: string) => {
     if (!user?.id) return;
     setSelectedMessageId(null);
+    // Invalidate any reaction fetch already in flight so it can't overwrite the
+    // optimistic update below (see reactionVersion / fetchReactions).
+    reactionVersion.current += 1;
 
     // Check if user already reacted with this emoji
     const existing = (reactions[messageId] ?? []).find(
