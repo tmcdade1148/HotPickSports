@@ -25,15 +25,14 @@ async function ensureModules(): Promise<boolean> {
   isInitialized = true;
 
   try {
-    // Check if Expo native modules are linked before requiring.
-    // expo-notifications references ExpoGlobal.EventEmitter at load time —
-    // if the native module isn't linked, require() itself crashes.
-    const {NativeModules} = require('react-native');
-    if (!NativeModules.ExpoNotificationsEmitter && !NativeModules.ExpoPushTokenManager) {
-      console.log('[Push] Expo native modules not linked — skipping');
-      return false;
-    }
-
+    // Load the Expo modules. If the native module is genuinely unlinked the
+    // require() throws and is caught below (returning false). We deliberately do
+    // NOT pre-check NativeModules.ExpoNotificationsEmitter / ExpoPushTokenManager:
+    // under the New Architecture (Expo SDK 55) Expo modules register via
+    // expo-modules-core (JSI), not React Native's legacy NativeModules bridge, so
+    // those names are always undefined even when the module IS linked — which made
+    // this guard short-circuit registration on every iOS login (no prompt, no
+    // token, user_devices empty).
     Notifications = require('expo-notifications');
     Device = require('expo-device');
 
@@ -65,6 +64,7 @@ async function ensureModules(): Promise<boolean> {
 export async function registerForPushNotifications(
   userId: string,
 ): Promise<string | null> {
+  console.log('[Push] registerForPushNotifications: entry', {userId});
   const ready = await ensureModules();
   if (!ready || !Notifications || !Device) {
     console.log('[Push] Modules not available — skipping registration');
@@ -83,6 +83,7 @@ export async function registerForPushNotifications(
 
   // Request if not already granted
   if (existingStatus !== 'granted') {
+    console.log('[Push] requesting OS permission (existing status:', existingStatus, ')');
     const {status} = await Notifications.requestPermissionsAsync();
     finalStatus = status;
   }
