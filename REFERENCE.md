@@ -582,13 +582,19 @@ The dropdown-style `PoolSwitcherBar` is no longer used on Leaderboard / SmackTal
 
 Tokens live in `user_devices` table — never on `profiles`. One row per device. `is_active = false` on logout or delivery failure.
 
-**8 toggleable notification types per user** (enforced server-side before delivery):
-- `picks_open`, `picks_reminder`, `game_started`, `score_update`
-- `week_settled`, `hardware_awarded`, `smack_mention`, `broadcast_received`
+**8 toggleable notification types per user** (columns on `notification_preferences`, enforced server-side by `process-notification-queue`'s `PREF_COLUMN_MAP` before delivery):
+- `picks_deadline`, `score_posted`, `leaderboard_change`, `smacktalk_mention`
+- `smacktalk_reply`, `organizer_broadcast`, `streak_milestone`, `new_member_joined`
 
-**Delivery flow:** `notification_queue` table → `process-notification-queue` Edge Function (cron every 60s) → Expo push service.
+(The `notification_preferences` row also carries `user_id` + `updated_at`, which are not toggles.)
 
-**Broadcasts also send email:** `send-broadcast-email` Edge Function (non-blocking). Fetches pool member emails from `profiles`, sends individually via Resend API.
+**Delivery flow:** `notification_queue` table → `process-notification-queue` Edge Function (cron every 60s) → Expo push service. A queued row is skipped if the user has set the matching `notification_preferences` column to `false`.
+
+**Broadcasts** (both Gaffer/pool and Chairman/League) deliver two ways:
+- **In-app Message Center:** a row in `organizer_notifications` (Gaffer broadcasts) or `partner_notifications` (League broadcasts).
+- **Mobile push:** a `notification_queue` row with `notification_type = 'organizer_broadcast'` — the only broadcast type the processor's `PREF_COLUMN_MAP` honors, so the user's `organizer_broadcast` toggle gates both. `broadcast_to_pool` enqueues the Gaffer fan-out; `send-partner-broadcast` enqueues the League fan-out.
+
+**Broadcast email is currently DISABLED.** The `send-broadcast-email` Edge Function is still deployed (it remains in the §8 registry) but inert — the client gate `BROADCAST_EMAIL_ENABLED = false` (`poolAdminSlice.ts`) means it is never invoked. It is intended for post-launch re-enable once member emails are verified.
 
 **Rate limits (enforced by `check_notification_rate_limit()`):**
 - Max 3 broadcasts/day per pool
@@ -831,7 +837,11 @@ Template-agnostic `event_recaps` table. One row per pool per scoring period. Gen
                                 Partner section (Club Pool only: perk editor + partner
                                 broadcast composer; roster members: "Change roster")
   FlaggedMessagesScreen.tsx   ← Moderation queue: approve/remove, send notes
-  MessageCenterScreen.tsx     ← User inbox: broadcasts + moderator notes (30 days)
+  MessageCenterScreen.tsx     ← User inbox: Gaffer + League broadcasts + moderator notes
+                                (10-day window, MESSAGE_CENTER_WINDOW_MS in
+                                src/shared/config/notifications.ts). Reads organizer_notifications
+                                AND partner_notifications (League); read state tracked via
+                                notification_read_state + partner_notification_read_state.
   PartnerAdminScreen.tsx      ← Super admin only. Create partners, edit type/colors/logo
                                 library, create Club Pool. Pool ↔ partner alignment
                                 moved off this screen (see PartnerDirectoryScreen).
