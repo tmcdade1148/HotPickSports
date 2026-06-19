@@ -26,6 +26,11 @@ Deno.serve(async (req) => {
 
     if (!cfg.is_active) return json({ success: true, reason: "competition_inactive" }, 200);
 
+    const phase = String(cfg.current_phase ?? "").toUpperCase();
+    if (!["REGULAR", "PLAYOFFS", "SUPERBOWL"].includes(phase)) {
+      return json({ success: true, reason: "not_weekly_phase", phase }, 200);
+    }
+
     const currentWeek = Number(cfg.current_week ?? 1);
     const seasonYear = Number(cfg.season_year ?? 2026);
 
