@@ -22,10 +22,12 @@
  */
 import {Text, TextInput} from 'react-native';
 
-// The ceiling. 1.3 ≈ allow up to 130% of our designed size before clamping —
-// enough headroom for moderate large-text users without breaking fixed layouts.
-// Tune here; it's the single source of truth for the app-wide cap.
-export const MAX_FONT_SCALE = 1.3;
+// The ceiling. 1.2 ≈ allow up to 120% of our designed size before clamping. This
+// is a fixed-canvas design, so headroom past ~1.2 starts overflowing composed
+// layouts. Tune here; it's the single source of truth for the app-wide cap.
+// (Fixed single-line chrome — IdentityBar, the test banner, the Join/Create
+// pills — caps tighter still, at 1.1, via per-element maxFontSizeMultiplier.)
+export const MAX_FONT_SCALE = 1.2;
 
 function capFontScaling(Component: unknown): void {
   if (!Component) return;
