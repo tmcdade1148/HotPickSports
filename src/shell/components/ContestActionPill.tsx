@@ -100,6 +100,6 @@ const styles = StyleSheet.create({
     borderStyle: 'solid',
   },
   label: {flexShrink: 1, minWidth: 0},
-  primary: {fontSize: 14, lineHeight: 17},
-  secondary: {fontSize: 11, fontStyle: 'italic', marginTop: 1},
+  primary: {fontSize: 13, lineHeight: 16},
+  secondary: {fontSize: 10, fontStyle: 'italic', marginTop: 1},
 });

@@ -27,7 +27,7 @@ import {WeekLockStrip} from './WeekLockStrip';
 // out of the "needs a pick" pool entirely, so the denominator shrinks
 // as games lock.
 const PICKS_TOTAL_FALLBACK = 16;
-const TIMER_FONT_FULL = 50;
+const TIMER_FONT_FULL = 64;
 const TIMER_FONT_COMPACT = 25; // 0.5× per brief: shrinks once user has picks
 // Urgency buckets used by the contextual message picker.
 const URGENT_MINUTES = 6 * 60;   // under 6 hours → "not much time left"
@@ -271,7 +271,11 @@ export function PicksOpenHero() {
 
   // Regular-season, full-size countdown only: stack a small "PICKS START
   // LOCKING IN" label to the left of the big number (within the digit height).
-  const showLockingLabel = currentPhase === 'REGULAR' && timerSize === TIMER_FONT_FULL;
+  // Show the "PICKS START LOCKING IN" label next to the big countdown in the
+  // regular-season picks-open flow AND in the sandbox demo (which mirrors that
+  // flow but doesn't report currentPhase === 'REGULAR').
+  const showLockingLabel =
+    (currentPhase === 'REGULAR' || sandboxCountdown) && timerSize === TIMER_FONT_FULL;
 
   return (
     <View
