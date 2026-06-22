@@ -64,17 +64,11 @@ export function ContestActionPill({
         <Icon size={18} color={colors.ctaAccentOutline} strokeWidth={2.25} />
       )}
       <View style={styles.label}>
-        <Text
-          style={[bodyType.bold, styles.primary, {color: colors.ctaAccentText}]}
-          maxFontSizeMultiplier={1.1}
-          numberOfLines={1}>
+        <Text style={[bodyType.bold, styles.primary, {color: colors.ctaAccentText}]}>
           {label}
         </Text>
         {!!sublabel && (
-          <Text
-            style={[bodyType.regular, styles.secondary, {color: colors.textSecondary}]}
-            maxFontSizeMultiplier={1.1}
-            numberOfLines={1}>
+          <Text style={[bodyType.regular, styles.secondary, {color: colors.textSecondary}]}>
             {sublabel}
           </Text>
         )}

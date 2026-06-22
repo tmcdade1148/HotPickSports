@@ -82,10 +82,7 @@ export function HomeHeader() {
     {isTestAccount && (
       <View style={styles.testBannerWrap}>
         <View style={[styles.testBanner, {backgroundColor: colors.primary}]}>
-          <Text
-            style={[bodyType.bold, styles.testBannerText, {color: colors.onPrimary}]}
-            maxFontSizeMultiplier={1.1}
-            numberOfLines={1}>
+          <Text style={[bodyType.bold, styles.testBannerText, {color: colors.onPrimary}]}>
             🧪 Test Account — Sim Only
           </Text>
         </View>

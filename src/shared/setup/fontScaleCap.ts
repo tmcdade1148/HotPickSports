@@ -1,35 +1,29 @@
 /**
- * Global cap on OS font scaling.
+ * Disable OS font scaling app-wide.
  *
- * iOS "Larger Text" / Dynamic Type and Android font-size accessibility settings
- * scale every <Text> with no upper bound (iOS goes well past 3x). Unbounded, that
- * overflows fixed-height rows, buttons, tab-bar labels, and cards across the whole
- * app — which is what users with large display text were hitting. Previously only
- * the three header components capped `maxFontSizeMultiplier`; everything else was
- * unbounded.
+ * HotPick is a fixed-canvas design — big italic display type, auto-fit player
+ * names, big-number callouts, fixed-height cards, and lines that mix several
+ * font sizes. Honoring the OS "Larger Text" / Dynamic Type slider overflows and
+ * clips those layouts no matter how we cap the multiplier, and capping fights
+ * `adjustsFontSizeToFit` and the auto-fit probes. So we render at the DESIGNED
+ * sizes at every OS setting by defaulting `allowFontScaling = false` on Text and
+ * TextInput.
  *
- * This installs ONE app-wide ceiling on `Text` and `TextInput` so OS scaling can
- * still enlarge our type (accessibility), but only up to MAX_FONT_SCALE — past
- * that, layouts hold. Run once at startup (from index.js) before anything renders.
+ * Accessibility text scaling is instead offered through a dedicated, tested
+ * in-app control (Settings → Text size, fast-follow), decoupled from the
+ * unpredictable OS value.
  *
- * Per-element `maxFontSizeMultiplier` still wins: the wrap spreads incoming props
- * LAST, so an explicit value (e.g. the headers' tighter 1.2) overrides this
- * default. Pass `maxFontSizeMultiplier={0}` on a specific Text to opt out entirely.
+ * Per-element `allowFontScaling` still wins (props spread last), so a specific
+ * Text can opt back into OS scaling if ever needed.
  *
- * Mechanism: React 19 ignores `Component.defaultProps` for function components, so
- * we wrap the forwardRef render to inject the default (the version-safe approach),
- * with a defaultProps fallback for any other component shape.
+ * Mechanism: React 19 ignores `Component.defaultProps` for function components,
+ * so we wrap the forwardRef render to inject the default, with a defaultProps
+ * fallback for any other component shape. Installed once at startup (index.js)
+ * before anything renders.
  */
 import {Text, TextInput} from 'react-native';
 
-// The ceiling. 1.2 ≈ allow up to 120% of our designed size before clamping. This
-// is a fixed-canvas design, so headroom past ~1.2 starts overflowing composed
-// layouts. Tune here; it's the single source of truth for the app-wide cap.
-// (Fixed single-line chrome — IdentityBar, the test banner, the Join/Create
-// pills — caps tighter still, at 1.1, via per-element maxFontSizeMultiplier.)
-export const MAX_FONT_SCALE = 1.2;
-
-function capFontScaling(Component: unknown): void {
+function lockFontScaling(Component: unknown): void {
   if (!Component) return;
   const c = Component as {
     render?: (props: any, ref: any) => unknown;
@@ -37,25 +31,25 @@ function capFontScaling(Component: unknown): void {
   };
 
   // Primary path (React 19 safe): wrap the forwardRef render so every instance
-  // gets a default maxFontSizeMultiplier. Spreading `...props` last means an
-  // explicit prop on the element overrides this default.
+  // defaults to allowFontScaling=false. `...props` last means an explicit prop
+  // on the element overrides this default.
   if (typeof c.render === 'function') {
     const original = c.render;
     c.render = function (props: any, ref: any) {
-      return original.call(this, {maxFontSizeMultiplier: MAX_FONT_SCALE, ...props}, ref);
+      return original.call(this, {allowFontScaling: false, ...props}, ref);
     };
     return;
   }
 
   // Fallback for any other shape (older RN / class component).
-  c.defaultProps = {...(c.defaultProps ?? {}), maxFontSizeMultiplier: MAX_FONT_SCALE};
+  c.defaultProps = {...(c.defaultProps ?? {}), allowFontScaling: false};
 }
 
 /**
- * Install the global font-scale cap. Idempotent-ish: call exactly once at app
- * entry. (Calling twice would double-wrap render harmlessly, but don't.)
+ * Lock text to its designed size app-wide (ignore the OS text-scaling slider).
+ * Call exactly once at app entry, before anything renders.
  */
 export function installFontScaleCap(): void {
-  capFontScaling(Text);
-  capFontScaling(TextInput);
+  lockFontScaling(Text);
+  lockFontScaling(TextInput);
 }

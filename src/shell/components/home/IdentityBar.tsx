@@ -18,10 +18,6 @@ const NAME_MIN_FONT = 12;
 // the points number flush when both are top-aligned by the row.
 const NAME_LINE = POINTS_LINE;
 const NAME_RIGHT_PAD = 6;
-// The identity row is fixed two-column chrome with fixed line heights. The name
-// already auto-fits its WIDTH; cap OS font scaling tightly so it can't blow the
-// row's height / push SEASON PTS off-screen.
-const IDENTITY_FONT_SCALE = 1.1;
 
 export function IdentityBar() {
   const {colors} = useTheme();
@@ -95,22 +91,18 @@ export function IdentityBar() {
             styles.name,
             {color: colors.textPrimary, fontSize: nameFontSize},
           ]}
-          maxFontSizeMultiplier={IDENTITY_FONT_SCALE}
           numberOfLines={1}>
           {display}
         </Text>
         {/* Hidden sizing probe — renders the name at NAME_MAX_FONT with no
             width constraint (absolute, off-screen) so we can read its
-            natural rendered width and scale the visible text to fit. Must use
-            the SAME maxFontSizeMultiplier as the visible name above, or the
-            measured width and the rendered width disagree and auto-fit drifts. */}
+            natural rendered width and scale the visible text to fit. */}
         <Text
           style={[
             displayType.display,
             styles.nameProbe,
             {fontSize: NAME_MAX_FONT},
           ]}
-          maxFontSizeMultiplier={IDENTITY_FONT_SCALE}
           numberOfLines={1}
           onTextLayout={e => {
             const w = e.nativeEvent.lines?.[0]?.width;
@@ -130,13 +122,11 @@ export function IdentityBar() {
             styles.points,
             {color: pointsColor},
           ]}
-          maxFontSizeMultiplier={IDENTITY_FONT_SCALE}
           numberOfLines={1}>
           {seasonTotal.toLocaleString()}
         </Animated.Text>
         <Text
           style={[bodyType.bold, styles.pointsLabel, {color: colors.textTertiary}]}
-          maxFontSizeMultiplier={IDENTITY_FONT_SCALE}
           numberOfLines={1}>
           SEASON PTS
         </Text>
