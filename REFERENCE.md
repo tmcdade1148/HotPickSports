@@ -897,6 +897,11 @@ ROUND_OPENED, ROUND_CLOSED, ROUND_SCORED
 ### Do Not Build Before NFL Season 2 Launch
 Power-ups, career hardware, AI archetypes, tier system, pool discovery, pick-linked SmackTalk, exact score predictions, Super Bowl enhanced scoring UI (November 2026), playoff reset UI (November 2026), global leaderboard (post 500 users), AI SmackTalk observations, NHL/Tournament templates, white label billing (Stripe), acquisition source tagging, automated partner Instagram posts, admin analytics charts.
 
+### Accessibility — Font Scaling (decision, June 2026)
+OS "Larger Text" / Dynamic Type is **disabled app-wide**: `allowFontScaling = false` is defaulted on every `Text`/`TextInput` at startup (`src/shared/setup/fontScaleCap.ts`, installed from `index.js`). HotPick is a fixed-canvas design (big italic display type, auto-fit player names, big-number callouts, fixed-height cards, multi-size lines), so honoring the OS slider overflows/clips those layouts no matter how the multiplier is capped — and capping fights `adjustsFontSizeToFit` + the auto-fit measure-probes (a per-element-cap experiment was tried and reverted, PRs #319 → #321). The app therefore renders at its **designed sizes at every OS setting**. Per-element `allowFontScaling` still wins if a specific Text ever needs to opt back in.
+
+**Deferred to post-launch:** a dedicated **in-app Text-size control** (Settings → Text size), decoupled from the OS slider — built *together with* making the 2–3 highest-traffic screens (Home hero, identity row, pick flow) reflow gracefully. Scaling text *up* re-breaks the fixed layouts the same way the OS slider did, so a real "Large" option needs fluid screens first. A token ±10% slider was explicitly rejected (minimal accessibility benefit, re-break + high-blast-radius mechanism risk during launch).
+
 ---
 
 ## 21. Template Replication Notes (Series & Tournament)
