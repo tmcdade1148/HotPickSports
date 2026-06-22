@@ -27,6 +27,9 @@ import {WeekLockStrip} from './WeekLockStrip';
 // out of the "needs a pick" pool entirely, so the denominator shrinks
 // as games lock.
 const PICKS_TOTAL_FALLBACK = 16;
+// The countdown is already a large fixed-size callout; cap OS font scaling on it
+// tightly so it doesn't balloon and crowd the card at large display-text sizes.
+const HERO_COUNTDOWN_SCALE = 1.1;
 const TIMER_FONT_FULL = 50;
 const TIMER_FONT_COMPACT = 25; // 0.5× per brief: shrinks once user has picks
 // Urgency buckets used by the contextual message picker.
@@ -311,6 +314,7 @@ export function PicksOpenHero() {
           {showLockingLabel && (sandboxCountdown || timer) && (
             <Text
               style={[bodyType.bold, styles.lockingLabel, {color: colors.textSecondary}]}
+              maxFontSizeMultiplier={HERO_COUNTDOWN_SCALE}
               numberOfLines={2}>
               PICKS START{'\n'}LOCKING IN
             </Text>
@@ -328,6 +332,7 @@ export function PicksOpenHero() {
                   lineHeight: Math.round(timerSize * 1.15),
                 },
               ]}
+              maxFontSizeMultiplier={HERO_COUNTDOWN_SCALE}
               numberOfLines={1}>
               3
               <Text style={{fontSize: timerSize * 0.4}}> DAYS</Text>
@@ -350,6 +355,7 @@ export function PicksOpenHero() {
                       lineHeight: Math.round(timerSize * 1.15),
                     },
                   ]}
+                  maxFontSizeMultiplier={HERO_COUNTDOWN_SCALE}
                   numberOfLines={1}>
                   {su.value}
                   <Text style={{fontSize: timerSize * 0.4}}> {unitWord}</Text>

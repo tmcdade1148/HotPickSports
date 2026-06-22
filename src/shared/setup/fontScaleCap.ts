@@ -42,6 +42,14 @@ function capFontScaling(Component: unknown): void {
   if (typeof c.render === 'function') {
     const original = c.render;
     c.render = function (props: any, ref: any) {
+      // Skip Text that already auto-fits via adjustsFontSizeToFit. Forcing a
+      // maxFontSizeMultiplier onto such Text triggers a long-standing iOS bug
+      // where it shrinks toward minimumFontScale even at normal OS scale (the
+      // "text too small at normal size" regression). Those elements already
+      // bound their own size, so leave them untouched.
+      if (props && props.adjustsFontSizeToFit) {
+        return original.call(this, props, ref);
+      }
       return original.call(this, {maxFontSizeMultiplier: MAX_FONT_SCALE, ...props}, ref);
     };
     return;
