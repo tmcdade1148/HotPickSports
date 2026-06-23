@@ -268,7 +268,7 @@ export function WeeklyTrend() {
   if (slots.length === 0) return null;
 
   return (
-    <View style={styles.outer}>
+    <View style={[styles.outer, hasLiveGame && styles.outerLive]}>
       {hasLiveGame && (
         <View style={styles.liveLead}>
           <View style={styles.liveDotWrap}>
@@ -365,6 +365,12 @@ export function WeeklyTrend() {
 const styles = StyleSheet.create({
   outer: {
     marginTop: spacing.md,
+  },
+  // When the "GAMES IN PROGRESS" lead is shown, tighten the top gap to match
+  // the gap BELOW that label (liveLead.marginBottom = 6) so it sits evenly
+  // between "All your picks are in" above and the week-score pills below.
+  outerLive: {
+    marginTop: 6,
   },
   liveLead: {
     flexDirection: 'row',
