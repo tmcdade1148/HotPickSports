@@ -419,7 +419,7 @@ export function SeasonPicksScreen() {
           ) : (
             <View style={styles.widgetRow}>
               <View style={styles.widget}>
-                <Text style={styles.widgetLabel}>Weekly Ceiling</Text>
+                <Text style={styles.widgetLabel}>Week Ceiling</Text>
                 <View style={styles.widgetValueRow}>
                   <Text style={[
                     styles.widgetValue,
@@ -431,7 +431,7 @@ export function SeasonPicksScreen() {
                 </View>
               </View>
               <View style={styles.widget}>
-                <Text style={styles.widgetLabel}>Weekly Score</Text>
+                <Text style={styles.widgetLabel}>Week Score</Text>
                 <View style={styles.widgetValueRow}>
                   <Text style={[
                     styles.widgetValue,
