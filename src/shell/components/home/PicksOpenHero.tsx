@@ -21,6 +21,7 @@ import {fullTeamName} from './teamColors';
 import {buildWeekRecap} from './weekRecap';
 import {WeeklyTrend} from './WeeklyTrend';
 import {WeekLockStrip} from './WeekLockStrip';
+import {GamesTagFlame} from '@shared/components/GamesTagFlame';
 
 // Fallback denominator only — preferred source is
 // nflStore.totalGamesThisWeek, which is picksMade + scheduledUnpicked.
@@ -579,12 +580,11 @@ export function PicksOpenHero() {
         }}
         accessibilityRole="button"
         accessibilityLabel={`Go to games — ${ctaAccessibilityLabel}`}>
-        {/* Teal destination tag (colors.accentTeal #45615E) with a flame
-            icon — the flame is the universal HotPick signal so this reads
-            as "go to the picks/games surface." Teal fill carries the white
-            flame; the light-blue accent (#A5CCD9) is too pale for that. */}
+        {/* Teal destination tag (colors.accentTeal #45615E) with the
+            full-color HotPick flame brand mark — the universal HotPick signal
+            so this reads as "go to the picks/games surface." */}
         <View style={[styles.gamesTag, {backgroundColor: colors.accentTeal}]}>
-          <Flame size={22} color={colors.onPrimary} strokeWidth={2.5} />
+          <GamesTagFlame size={28} />
         </View>
 
         <View style={[
