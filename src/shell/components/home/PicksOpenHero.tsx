@@ -277,13 +277,12 @@ export function PicksOpenHero() {
       })
     : null;
 
-  // Regular-season, full-size countdown only: stack a small "PICKS START
-  // LOCKING IN" label to the left of the big number (within the digit height).
-  // Show the "PICKS START LOCKING IN" label next to the big countdown in the
+  // Lead-in label stacked to the left of the big number — "PICKS START
+  // CLOSING IN:" sized to match the unit suffix ("DAYS"). Shown in the
   // regular-season picks-open flow AND in the sandbox demo (which mirrors that
-  // flow but doesn't report currentPhase === 'REGULAR').
-  const showLockingLabel =
-    (currentPhase === 'REGULAR' || sandboxCountdown) && timerSize === TIMER_FONT_FULL;
+  // flow but doesn't report currentPhase === 'REGULAR'). Tracks timerSize, so
+  // it stays proportional in both the full and compact countdown sizes.
+  const showLockingLabel = currentPhase === 'REGULAR' || sandboxCountdown;
 
   return (
     <View
@@ -322,9 +321,17 @@ export function PicksOpenHero() {
         <View style={styles.timerRow}>
           {showLockingLabel && (sandboxCountdown || timer) && (
             <Text
-              style={[bodyType.bold, styles.lockingLabel, {color: colors.textSecondary}]}
-              numberOfLines={2}>
-              PICKS START{'\n'}LOCKING IN
+              style={[
+                displayType.display,
+                styles.lockingLabel,
+                {
+                  color: colors.textSecondary,
+                  fontSize: timerSize * 0.4,
+                  lineHeight: Math.round(timerSize * 0.4 * 1.15),
+                },
+              ]}
+              numberOfLines={3}>
+              PICKS START{'\n'}CLOSING IN:
             </Text>
           )}
           {sandboxCountdown ? (
@@ -793,10 +800,9 @@ const styles = StyleSheet.create({
   timerInRow: {
     marginBottom: 0,
   },
-  // Small enough that its two stacked lines fit within the digit's height.
+  // fontSize/lineHeight are applied per-render from timerSize so the label
+  // matches the unit suffix ("DAYS") in both the full and compact sizes.
   lockingLabel: {
-    fontSize: 13,
-    lineHeight: 16,
     letterSpacing: 0.5,
     textAlign: 'right',
   },
