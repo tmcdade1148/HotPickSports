@@ -278,7 +278,7 @@ export function PicksOpenHero() {
     : null;
 
   // Lead-in label stacked to the left of the big number — "PICKS START
-  // CLOSING IN:" sized to match the unit suffix ("DAYS"). Shown in the
+  // LOCKING IN:" sized to match the unit suffix ("DAYS"). Shown in the
   // regular-season picks-open flow AND in the sandbox demo (which mirrors that
   // flow but doesn't report currentPhase === 'REGULAR'). Tracks timerSize, so
   // it stays proportional in both the full and compact countdown sizes.
@@ -331,7 +331,7 @@ export function PicksOpenHero() {
                 },
               ]}
               numberOfLines={3}>
-              PICKS START{'\n'}CLOSING IN:
+              PICKS START{'\n'}LOCKING IN:
             </Text>
           )}
           {sandboxCountdown ? (
