@@ -37,7 +37,11 @@ export function Insight({text}: InsightProps) {
 const styles = StyleSheet.create({
   wrap: {
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.xs,
+    // Top padding keeps a little air below the hero; no bottom padding so
+    // the gap down to YOUR CONTESTS is just the section's own marginTop —
+    // matching the YOUR CONTESTS → YOUR LEAGUES gap.
+    paddingTop: spacing.xs,
+    paddingBottom: 0,
     alignItems: 'center',
   },
   text: {

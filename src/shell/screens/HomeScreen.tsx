@@ -699,7 +699,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
   },
-  section: {marginTop: spacing.lg},
+  section: {marginTop: spacing.md},
   sectionTitle: {
     fontSize: 11,
     letterSpacing: 1.8,
