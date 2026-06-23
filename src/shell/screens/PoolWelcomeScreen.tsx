@@ -122,7 +122,9 @@ export function PoolWelcomeScreen({navigation}: any) {
     }
     subscribeSmackUnread();
 
-    navigation.replace('Home');
+    // reset, not replace — clears the onboarding/Welcome screens beneath Home so
+    // a back-gesture/swipe can't pop back to the login screen (looked like sign-out).
+    navigation.reset({index: 0, routes: [{name: 'Home'}]});
   };
 
   // Deep-link joining, successful join, or a League manager being forwarded

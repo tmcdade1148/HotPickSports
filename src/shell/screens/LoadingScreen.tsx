@@ -177,7 +177,10 @@ export function LoadingScreen({navigation}: any) {
 
         subscribeSmackUnread();
         BootSplash.hide({fade: true}).catch(() => {});
-        navigation.replace('Home');
+        // reset, not replace — guarantees Home is the only route so a
+        // back-gesture/swipe can't reach an auth screen (matches the auth/
+        // onboarding terminals in postAuthFlow + PoolWelcome).
+        navigation.reset({index: 0, routes: [{name: 'Home'}]});
       })
       .catch(() => {
         if (didNavigate.current) return;
