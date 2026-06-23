@@ -38,11 +38,16 @@ Deno.serve(async (req) => {
   try {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
     const SERVICE_KEY = (Deno.env.get('SB_SECRET_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')) ?? '';
-    const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+    // Caller-client key: the PUBLISHABLE key, NOT the legacy anon JWT — Supabase
+    // disabled legacy API keys, so the anon key as `apikey` is now rejected.
+    // Public + RLS still applies via the forwarded user JWT. Env-preferred,
+    // with the public literal as a fallback.
+    const PUBLISHABLE_KEY =
+      Deno.env.get('SB_PUBLISHABLE_KEY') ?? 'sb_publishable_AaENLNqjJ8jNVHGdTGhOnA_WnHze2CH';
 
     // Resolve the caller from their JWT (passed by supabase.functions.invoke).
     const authHeader = req.headers.get('Authorization') ?? '';
-    const authClient = createClient(SUPABASE_URL, ANON_KEY, {
+    const authClient = createClient(SUPABASE_URL, PUBLISHABLE_KEY, {
       global: {headers: {Authorization: authHeader}},
       auth: {persistSession: false},
     });

@@ -31,7 +31,13 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = (Deno.env.get("SB_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"))!;
-const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+// Caller-client key: the PUBLISHABLE key, NOT the legacy anon JWT — Supabase has
+// disabled legacy API keys, so a client using the anon key as `apikey` is rejected
+// ("legacy API keys are disabled"). Publishable keys are public and RLS still
+// applies via the forwarded user JWT, so auth.getUser() + the super-admin gate
+// work exactly as before. Env-preferred, with the public literal as a fallback.
+const PUBLISHABLE_KEY =
+  Deno.env.get("SB_PUBLISHABLE_KEY") ?? "sb_publishable_AaENLNqjJ8jNVHGdTGhOnA_WnHze2CH";
 
 // Hardcoded sandbox allowlist — defence in depth. Never config-driven (spec §2).
 const SIM_ALLOWLIST = ["nfl_2025_sim", "nfl_2025_simA", "nfl_2025_simG", "nfl_demo"];
@@ -81,7 +87,7 @@ Deno.serve(async (req: Request) => {
 
     // Caller client carries the user JWT — used for getUser() and for SECURITY
     // DEFINER RPCs that self-check auth.uid().
-    const caller = createClient(SUPABASE_URL, ANON_KEY, { global: { headers: { Authorization: authHeader } } });
+    const caller = createClient(SUPABASE_URL, PUBLISHABLE_KEY, { global: { headers: { Authorization: authHeader } } });
     // Service-role client for direct sandbox-table writes (bypasses RLS).
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
