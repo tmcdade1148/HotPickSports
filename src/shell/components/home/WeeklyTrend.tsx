@@ -13,6 +13,7 @@ import {useTheme} from '@shell/theme/hooks';
 import {displayType, bodyType, monoType, spacing, borderRadius} from '@shared/theme';
 import {hexToRgba} from '@shared/utils/color';
 import {isFinalStatus, isLiveStatus} from '@sports/nfl/utils/gameStatus';
+import {computeLiveWeekEarned} from '@sports/nfl/utils/liveWeekScore';
 
 interface WeekSlot {
   week: number;
@@ -116,51 +117,10 @@ export function WeeklyTrend() {
   // Mirrors the server-side scoring shape so the display estimate
   // converges with the authoritative settled total. This is for display
   // only — Rule #3's "server-side scoring" still owns the recorded value.
-  const live = useMemo(() => {
-    if (weekPicks.length === 0 || games.length === 0) {
-      return {
-        earned: weekResult?.weekPoints ?? null,
-        correctPicks: weekResult?.correctPicks ?? null,
-        totalPicks: weekResult?.totalPicks ?? null,
-      };
-    }
-    const gameById = new Map(games.map(g => [g.game_id, g]));
-    let total = 0;
-    let correct = 0;
-    let counted = 0; // picks with a known outcome (live winning + final)
-    for (const pick of weekPicks) {
-      const game = gameById.get(pick.game_id);
-      if (!game) continue;
-      const rank = game.frozen_rank ?? game.rank ?? 1;
-      const value = pick.is_hotpick ? rank : 1;
-      const score = liveScores[pick.game_id];
-      if (!score) continue;
-      const pickedHome = pick.picked_team === game.home_team;
-      const userScore = pickedHome ? score.homeScore : score.awayScore;
-      const oppScore  = pickedHome ? score.awayScore : score.homeScore;
-      if (isFinalStatus(score.status)) {
-        counted += 1;
-        const isCorrect = userScore > oppScore;
-        if (isCorrect) correct += 1;
-        total += isCorrect ? value : pick.is_hotpick ? -rank : 0;
-      } else if (isLiveStatus(score.status)) {
-        if (userScore > oppScore) {
-          correct += 1; // running win (mirrors UI of "games won so far")
-          counted += 1;
-          total += value;
-        } else if (userScore < oppScore) {
-          counted += 1;
-          if (pick.is_hotpick) total -= rank;
-        }
-      }
-      // scheduled / pre-game contributes 0
-    }
-    return {
-      earned: total,
-      correctPicks: correct,
-      totalPicks: counted || weekPicks.length,
-    };
-  }, [weekPicks, games, liveScores, weekResult]);
+  const live = useMemo(
+    () => computeLiveWeekEarned(weekPicks, games, liveScores, weekResult),
+    [weekPicks, games, liveScores, weekResult],
+  );
   const liveEarned = live.earned;
 
   const slots: WeekSlot[] = useMemo(() => {
