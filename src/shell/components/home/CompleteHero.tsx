@@ -17,6 +17,7 @@ import {fullTeamName} from './teamColors';
 import {buildWeekRecap} from './weekRecap';
 import {WeeklyTrend} from './WeeklyTrend';
 import {WeekLockStrip} from './WeekLockStrip';
+import {GamesTagFlame} from '@shared/components/GamesTagFlame';
 
 export function CompleteHero() {
   const {colors} = useTheme();
@@ -213,7 +214,7 @@ export function CompleteHero() {
         accessibilityRole="button"
         accessibilityLabel={`Go to games — Week ${currentWeek} complete, review your picks`}>
         <View style={[styles.gamesTag, {backgroundColor: colors.accentTeal}]}>
-          <Flame size={22} color={colors.onPrimary} strokeWidth={2.5} />
+          <GamesTagFlame size={28} />
         </View>
         <View style={styles.ctaBody}>
           <View style={styles.ctaLabel}>
