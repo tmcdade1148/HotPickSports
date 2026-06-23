@@ -131,8 +131,10 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   container: {
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
+    // Tightened top + bottom: shrinks the gap up to the player name and down
+    // to the WEEK X / flame / pick-count line on the Picks screen.
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.sm,
     gap: CHIP_GAP,
   },
   chip: {

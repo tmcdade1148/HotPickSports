@@ -118,7 +118,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
     paddingTop: 0,
-    paddingBottom: spacing.sm,
+    // Tightened so the player name sits closer to the week pills below.
+    paddingBottom: spacing.xs,
   },
   nameLeft: {
     flex: 1,
