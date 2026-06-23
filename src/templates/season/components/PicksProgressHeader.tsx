@@ -93,7 +93,9 @@ export function PicksProgressHeader({
 const createStyles = (colors: any) => StyleSheet.create({
   container: {
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
+    // Tightened top so this WEEK X / flame / pick-count line sits closer to
+    // the week pills above it.
+    paddingTop: spacing.sm,
     paddingBottom: spacing.sm,
   },
   titleRow: {

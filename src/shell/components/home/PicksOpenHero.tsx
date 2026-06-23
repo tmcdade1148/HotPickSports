@@ -580,10 +580,10 @@ export function PicksOpenHero() {
         }}
         accessibilityRole="button"
         accessibilityLabel={`Go to games — ${ctaAccessibilityLabel}`}>
-        {/* Teal destination tag (colors.accentTeal #45615E) with the
-            full-color HotPick flame brand mark — the universal HotPick signal
-            so this reads as "go to the picks/games surface." */}
-        <View style={[styles.gamesTag, {backgroundColor: colors.accentTeal}]}>
+        {/* HotPick light-blue destination tag (colors.highlight #A5CCD9) with
+            the full-color HotPick flame brand mark — the universal HotPick
+            signal so this reads as "go to the picks/games surface." */}
+        <View style={[styles.gamesTag, {backgroundColor: colors.highlight}]}>
           <GamesTagFlame size={28} />
         </View>
 
@@ -826,9 +826,9 @@ const styles = StyleSheet.create({
     shadowOffset: {width: 0, height: 8},
     elevation: 6,
   },
-  // Left 1/6 of the button — solid teal strip (colors.accentTeal #45615E,
-  // applied inline) so the white destination content reads. The light-blue
-  // brand accent (#A5CCD9) is too pale to carry white content.
+  // Left 1/6 of the button — solid HotPick light-blue strip (colors.highlight
+  // #A5CCD9, applied inline). It backs the full-color flame brand mark, so the
+  // pale fill is fine here (it no longer needs to carry white content).
   gamesTag: {
     flex: 1,
     alignItems: 'center',
