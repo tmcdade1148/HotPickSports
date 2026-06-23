@@ -240,9 +240,16 @@ async function advanceGameDay(admin: any, competition: string) {
     const wave = earliestWave(inProgress)!;
     const ids = inProgress.filter((g: any) => detectWave(g.kickoff_at) === wave).map((g: any) => g.game_id);
     await finalizeWaveGames(admin, competition, ids, srcMap);
+    // Score INCREMENTALLY after each wave — not only at all-final — so
+    // season_user_totals (and the realtime-subscribed Weekly Score widget)
+    // ticks up as games finalize, mirroring production's live scorer
+    // (nfl-calculate-scores → upsert_season_week_scores). scoreWeek counts only
+    // games already FINAL (`ilike status %final%`), so a partial week scores
+    // correctly and the upsert is idempotent as later waves land.
+    await scoreWeek(admin, competition, year, week, phase);
     const { data: after } = await admin.from("season_games").select("status").eq("competition", competition).eq("season_year", year).eq("week", week);
     const allFinal = (after ?? []).every((g: any) => norm(g.status).includes("final"));
-    if (allFinal) { await setConfig(admin, competition, "week_state", "settling"); await scoreWeek(admin, competition, year, week, phase); }
+    if (allFinal) { await setConfig(admin, competition, "week_state", "settling"); }
     return json({ success: true, action: "advance_game_day", did: "final", wave, allFinal, state: await getConfig(admin, competition) }, 200);
   }
 
