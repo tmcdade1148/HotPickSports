@@ -23,7 +23,13 @@ export function isFinalStatus(status: string | null | undefined): boolean {
 
 export function isLiveStatus(status: string | null | undefined): boolean {
   const s = normalizeGameStatus(status);
-  return s === 'in_progress' || s === 'live' || s === 'in progress';
+  return (
+    s === 'in_progress' ||
+    s === 'status_in_progress' ||
+    s === 'live' ||
+    s === 'status_live' ||
+    s === 'in progress'
+  );
 }
 
 /** Game has either started or finished — i.e. its pick has locked. */

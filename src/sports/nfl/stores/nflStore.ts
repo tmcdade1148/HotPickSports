@@ -1,6 +1,7 @@
 import {create} from 'zustand';
 import {supabase} from '@shared/config/supabase';
 import {isSandboxCompetition} from '@shared/utils/competition';
+import {isLockedStatus, isLiveStatus} from '@sports/nfl/utils/gameStatus';
 import type {DbSeasonPick, DbSeasonGame} from '@shared/types/database';
 
 // ---------------------------------------------------------------------------
@@ -653,17 +654,30 @@ export const useNFLStore = create<NFLState>((set, get) => ({
    */
   fetchLiveScores: async () => {
     const {competition, currentWeek} = get();
+    // Fetch the whole week and filter live/final client-side via the normalized
+    // status predicate — NOT a server-side `.in('status', [...])`. Postgres `IN`
+    // on text is case-SENSITIVE, and the two writers disagree on casing: the
+    // ESPN importer writes UPPERCASE (`IN_PROGRESS`/`FINAL`) while the
+    // sim-operator Edge Function writes lowercase (`in_progress`/`final`). An
+    // uppercase filter silently dropped every sim row, so each fetch (fired on
+    // every competition_config change) wiped the live/final HotPick state and
+    // the card reverted to a scheduled-looking-but-with-scores limbo. A week is
+    // ~16 rows, so filtering in JS is cheap and casing-proof.
     const {data} = await supabase
       .from('season_games')
       .select('game_id, home_score, away_score, current_period, game_clock, status')
       .eq('competition', competition)
-      .eq('week', currentWeek)
-      .in('status', ['IN_PROGRESS', 'LIVE', 'FINAL', 'COMPLETED', 'STATUS_FINAL']);
+      .eq('week', currentWeek);
 
     if (get().currentWeek !== currentWeek || get().competition !== competition) return;
 
     const scores: Record<string, GameScore> = {};
     for (const row of data ?? []) {
+      // Only live/final games belong in liveScores — scheduled games stay out
+      // (their pick is still editable). isLockedStatus handles every casing
+      // variant (in_progress / IN_PROGRESS / status_in_progress, final / FINAL
+      // / status_final, etc.).
+      if (!isLockedStatus(row.status)) continue;
       scores[row.game_id] = {
         homeScore: row.home_score ?? 0,
         awayScore: row.away_score ?? 0,
@@ -756,12 +770,8 @@ export const useNFLStore = create<NFLState>((set, get) => ({
           set(nextState);
           // When the last in-progress game goes final, refresh the next scheduled kickoff
           // so the kickoff pill can show a gap countdown to the next wave.
-          const wasAnyLive = Object.values(prevScores).some(
-            s => s.status === 'in_progress' || s.status === 'live',
-          );
-          const isAnyLive = Object.values(updatedScores).some(
-            s => s.status === 'in_progress' || s.status === 'live',
-          );
+          const wasAnyLive = Object.values(prevScores).some(s => isLiveStatus(s.status));
+          const isAnyLive = Object.values(updatedScores).some(s => isLiveStatus(s.status));
           if (wasAnyLive && !isAnyLive) {
             get().fetchNextKickoff();
           }
