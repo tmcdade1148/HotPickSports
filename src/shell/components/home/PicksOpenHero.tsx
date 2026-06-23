@@ -789,12 +789,14 @@ const styles = StyleSheet.create({
   },
   // Row that holds the optional "PICKS START LOCKING IN" label to the left of
   // the big countdown number. Carries the bottom margin so the number doesn't.
+  // marginBottom matches confirmLine.marginTop (10) so the gap above the CTA
+  // equals the gap below it (CTA → picks-status line).
   timerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    marginBottom: 18,
+    marginBottom: 10,
   },
   timerInRow: {
     marginBottom: 0,
