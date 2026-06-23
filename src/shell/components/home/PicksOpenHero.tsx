@@ -27,8 +27,10 @@ import {WeekLockStrip} from './WeekLockStrip';
 // out of the "needs a pick" pool entirely, so the denominator shrinks
 // as games lock.
 const PICKS_TOTAL_FALLBACK = 16;
-const TIMER_FONT_FULL = 64;
-const TIMER_FONT_COMPACT = 25; // 0.5× per brief: shrinks once user has picks
+// Countdown is a single fixed size — it no longer switches on pick state.
+// The earlier full↔compact switch fired late in hydration and visibly
+// flashed (see timerSize below).
+const TIMER_FONT_COMPACT = 25;
 // Urgency buckets used by the contextual message picker.
 const URGENT_MINUTES = 6 * 60;   // under 6 hours → "not much time left"
 const TIGHT_MINUTES  = 24 * 60;  // under 24 hours → "tight"
@@ -38,7 +40,6 @@ export function PicksOpenHero() {
   const navigation = useNavigation<any>();
 
   const userPickCount    = useNFLStore(s => s.userPickCount);
-  const pickStatusLoaded = useNFLStore(s => s.pickStatusLoaded);
   const totalGamesThisWeek = useNFLStore(s => s.totalGamesThisWeek);
   const userHotPick      = useNFLStore(s => s.userHotPick);
   const userHotPickGame  = useNFLStore(s => s.userHotPickGame);
@@ -97,7 +98,6 @@ export function PicksOpenHero() {
   const picksTotal =
     totalGamesThisWeek > 0 ? totalGamesThisWeek : PICKS_TOTAL_FALLBACK;
   const hotPickDesignated = userHotPick != null;
-  const hasAnyPicks = picksSet > 0;
 
   // Countdown target: HotPick game if known (else first kickoff).
   // Equality compared at minute granularity to absorb server drift.
@@ -147,14 +147,10 @@ export function PicksOpenHero() {
     kickedOff: isLockingWave,
   });
 
-  // Hold the countdown at compact size until pick data has loaded. Otherwise
-  // the default userPickCount of 0 renders the full 64px for a frame, then
-  // collapses to compact the instant fetchUserPickStatus reveals the user
-  // already has picks — the "flash then disappear" the timer used to do. With
-  // this gate a pick-having user stays compact throughout, and a genuine
-  // 0-pick user grows compact → full once (intentional emphasis), never shrinks.
-  const timerSize =
-    pickStatusLoaded && !hasAnyPicks ? TIMER_FONT_FULL : TIMER_FONT_COMPACT;
+  // Single fixed size — locked to compact per design call. This previously
+  // switched (full when no picks → compact once picks made), but the switch
+  // fired late in hydration and visibly flashed. A constant can't flash.
+  const timerSize = TIMER_FONT_COMPACT;
 
   // Simple confirmation line below the CTA — independent of the
   // urgency-tinted contextual message above. Mostly factual; flips to
