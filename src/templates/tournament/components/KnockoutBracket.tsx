@@ -1,5 +1,6 @@
 import React from 'react';
-import {View, Text, ScrollView, StyleSheet} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {View, ScrollView, StyleSheet} from 'react-native';
 import type {TournamentConfig, KnockoutRoundConfig} from '@shared/types/templates';
 import type {DbTournamentMatch} from '@shared/types/database';
 import {spacing, borderRadius} from '@shared/theme';

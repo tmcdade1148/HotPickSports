@@ -6,7 +6,8 @@
 // shared ContestActionPill so it matches the Join/Create pills elsewhere.
 
 import React, {useState} from 'react';
-import {Alert, StyleSheet, Text, View} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {Alert, StyleSheet, View} from 'react-native';
 import {Users} from 'lucide-react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useGlobalStore} from '@shell/stores/globalStore';

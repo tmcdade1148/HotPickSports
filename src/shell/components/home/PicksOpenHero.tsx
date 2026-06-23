@@ -4,7 +4,8 @@
 // progress (picks remaining, HotPick designated, games kicked off).
 
 import React, {useEffect, useMemo, useRef, useState} from 'react';
-import {Animated, Pressable, StyleSheet, Text, View} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {Animated, Pressable, StyleSheet, View} from 'react-native';
 import {ArrowRight, Flame} from 'lucide-react-native';
 import {useNavigation} from '@react-navigation/native';
 import {useTheme} from '@shell/theme/hooks';
@@ -657,7 +658,6 @@ export function PicksOpenHero() {
     </View>
   );
 }
-
 
 /**
  * Pick the right copy for the picks-open hero based on the user's state.

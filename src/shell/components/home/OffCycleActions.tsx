@@ -14,7 +14,8 @@
 // (title + subtitle), trailing arrow.
 
 import React from 'react';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {Pressable, StyleSheet, View} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {ArrowRight, KeyRound, Play, Plus} from 'lucide-react-native';
 import {useTheme} from '@shell/theme/hooks';

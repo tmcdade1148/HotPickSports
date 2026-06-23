@@ -1,10 +1,9 @@
 import React, {useEffect, useCallback, useState} from 'react';
+import {Text, TextInput} from '@shared/components/AppText';
 import {
   View,
-  Text,
   FlatList,
   TouchableOpacity,
-  TextInput,
   Modal,
   Pressable,
   Alert,

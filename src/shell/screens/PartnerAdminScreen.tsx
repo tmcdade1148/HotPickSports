@@ -1,8 +1,7 @@
 import React, {useState, useEffect, useCallback} from 'react';
+import {Text, TextInput} from '@shared/components/AppText';
 import {
   View,
-  Text,
-  TextInput,
   TouchableOpacity,
   Alert,
   ScrollView,
@@ -59,7 +58,6 @@ import {
   uploadPartnerImage,
 } from './partnerAdmin/assetUtils';
 import {createStyles} from './partnerAdmin/styles';
-
 
 export function PartnerAdminScreen() {
   const {colors} = useTheme();

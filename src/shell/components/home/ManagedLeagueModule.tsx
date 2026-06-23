@@ -12,7 +12,8 @@
 // nowhere on this tile. User-facing nouns come from @shared/lexicon (Rule #9).
 
 import React from 'react';
-import {Image, Pressable, StyleSheet, Text, View} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {Image, Pressable, StyleSheet, View} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {Shield, ChevronRight} from 'lucide-react-native';
 import {useTheme} from '@shell/theme/hooks';

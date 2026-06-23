@@ -10,7 +10,8 @@
 //     only reflects status and enables/disables the buttons.
 
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {Alert, LayoutAnimation, ScrollView, StyleSheet, Text, View, Pressable, ActivityIndicator} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {Alert, LayoutAnimation, ScrollView, StyleSheet, View, Pressable, ActivityIndicator} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import {ChevronLeft, ChevronRight, ChevronDown, Check, CircleCheck, CircleAlert, CircleDashed, Lock, FastForward} from 'lucide-react-native';

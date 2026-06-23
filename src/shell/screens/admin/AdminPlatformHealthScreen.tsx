@@ -3,7 +3,8 @@
 // no data, no charts.
 
 import React from 'react';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {Pressable, StyleSheet, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import {ChevronLeft, Activity} from 'lucide-react-native';

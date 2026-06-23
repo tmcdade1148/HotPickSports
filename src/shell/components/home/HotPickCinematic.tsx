@@ -9,7 +9,8 @@
 //   - Bottom-left "Your pick · TEAM" / live score readout
 
 import React from 'react';
-import {StyleSheet, Text, View, type ViewStyle} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {StyleSheet, View, type ViewStyle} from 'react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {displayType, bodyType, monoType, spacing, borderRadius} from '@shared/theme';
 

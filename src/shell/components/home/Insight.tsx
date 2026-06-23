@@ -2,7 +2,8 @@
 // least one HotPick attempt has been settled.
 
 import React from 'react';
-import {StyleSheet, Text, View} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {StyleSheet, View} from 'react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {bodyType, spacing} from '@shared/theme';

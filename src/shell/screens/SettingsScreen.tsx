@@ -1,7 +1,7 @@
 import React, {useState, useEffect} from 'react';
+import {Text} from '@shared/components/AppText';
 import {
   View,
-  Text,
   TouchableOpacity,
   Alert,
   Linking,
@@ -47,7 +47,6 @@ import {HOTPICK_DEFAULTS, SEMANTIC_COLORS, SEMANTIC_COLORS_DARK, deriveDarkColor
 import {getEventsByPriority, getEventByCompetition} from '@sports/registry';
 import {ContestActionPill, contestActionPillStyles} from '@shell/components/ContestActionPill';
 import {LEXICON} from '@shared/lexicon';
-
 
 export function SettingsScreen({route}: any) {
   const navigation = useNavigation<any>();

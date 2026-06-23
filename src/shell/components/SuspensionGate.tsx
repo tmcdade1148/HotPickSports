@@ -6,7 +6,8 @@
 // They can still tap "Email Support" to open mailto:support@…
 
 import React from 'react';
-import {Linking, Pressable, StyleSheet, Text, View} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {Linking, Pressable, StyleSheet, View} from 'react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {useTheme} from '@shell/theme/hooks';
 import {bodyType, displayType, spacing, borderRadius} from '@shared/theme';

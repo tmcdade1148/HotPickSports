@@ -8,7 +8,8 @@
 // Contest is created against the real competition, not nfl_demo.
 
 import React, {useEffect, useMemo, useState} from 'react';
-import {ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {ActivityIndicator, Pressable, ScrollView, StyleSheet, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import {ArrowRight, Flame, Plus, RotateCcw} from 'lucide-react-native';

@@ -28,7 +28,8 @@
 // so the fallback path stays correct for single-Club pools.
 
 import React, {useMemo} from 'react';
-import {Image, Pressable, StyleSheet, Text, View} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {Image, Pressable, StyleSheet, View} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {
   BadgeCheck,

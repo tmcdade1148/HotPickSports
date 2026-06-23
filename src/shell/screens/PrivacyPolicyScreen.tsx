@@ -1,5 +1,9 @@
 import React from 'react';
-import {View, Text, ScrollView, StyleSheet, TouchableOpacity} from 'react-native';
+import {View, ScrollView, StyleSheet, TouchableOpacity} from 'react-native';
+// Legal carve-out: this screen KEEPS OS font scaling on (accessibility for
+// dense legal copy). LegalText is aliased to Text so every `<Text>` here —
+// helpers, header, footer — scales; the ScrollView absorbs the extra height.
+import {LegalText as Text} from '@shared/components/AppText';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {ArrowLeft} from 'lucide-react-native';
 import {spacing} from '@shared/theme';

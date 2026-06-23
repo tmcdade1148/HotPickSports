@@ -1,5 +1,6 @@
 import React from 'react';
-import {View, Text, TouchableOpacity, Alert, StyleSheet} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {View, TouchableOpacity, Alert, StyleSheet} from 'react-native';
 import {Lock} from 'lucide-react-native';
 import {HotPickFlame} from '@shared/components/HotPickFlame';
 import type {SeasonConfig} from '@shared/types/templates';

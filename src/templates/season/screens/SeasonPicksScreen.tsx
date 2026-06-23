@@ -1,5 +1,6 @@
 import React, {useEffect, useCallback, useMemo, useRef, useState} from 'react';
-import {View, Text, SectionList, ActivityIndicator, Alert, StyleSheet, TouchableOpacity} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {View, SectionList, ActivityIndicator, Alert, StyleSheet, TouchableOpacity} from 'react-native';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import {BarChart3} from 'lucide-react-native';
 import {useSeasonStore} from '../stores/seasonStore';

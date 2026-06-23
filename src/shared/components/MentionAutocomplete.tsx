@@ -1,5 +1,6 @@
 import React, {useEffect, useState} from 'react';
-import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {View, TouchableOpacity, StyleSheet} from 'react-native';
 import {supabase} from '@shared/config/supabase';
 import {spacing} from '@shared/theme';
 import {useTheme} from '@shell/theme';

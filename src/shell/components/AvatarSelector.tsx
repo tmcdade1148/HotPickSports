@@ -1,9 +1,9 @@
 import React from 'react';
+import {Text} from '@shared/components/AppText';
 import {
   View,
   TouchableOpacity,
   ScrollView,
-  Text,
   StyleSheet,
   Alert,
 } from 'react-native';

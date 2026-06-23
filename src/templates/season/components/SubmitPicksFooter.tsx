@@ -5,7 +5,8 @@
 // (now-removed) tab-bar slot variant.
 
 import React from 'react';
-import {StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {StyleSheet, TouchableOpacity, View} from 'react-native';
 import {CheckCircle, Clock, Flame, Lock, Target} from 'lucide-react-native';
 import {useTheme} from '@shell/theme';
 import {useSeasonSubmitState} from '@templates/season/hooks/useSeasonSubmitState';

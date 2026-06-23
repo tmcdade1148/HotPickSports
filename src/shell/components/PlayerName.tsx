@@ -9,9 +9,9 @@
 // the name doesn't navigate anywhere.
 
 import React, {useState} from 'react';
+import {Text} from '@shared/components/AppText';
 import {
   StyleSheet,
-  Text,
   View,
   type StyleProp,
   type ViewStyle,

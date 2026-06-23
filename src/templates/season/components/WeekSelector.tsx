@@ -1,5 +1,6 @@
 import React, {useRef, useEffect} from 'react';
-import {ScrollView, TouchableOpacity, Text, View, StyleSheet} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {ScrollView, TouchableOpacity, View, StyleSheet} from 'react-native';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 

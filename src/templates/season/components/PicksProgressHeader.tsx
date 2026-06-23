@@ -1,5 +1,6 @@
 import React from 'react';
-import {View, Text, StyleSheet} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {View, StyleSheet} from 'react-native';
 import {HotPickFlame} from '@shared/components/HotPickFlame';
 import {spacing} from '@shared/theme';
 import {useTheme} from '@shell/theme';

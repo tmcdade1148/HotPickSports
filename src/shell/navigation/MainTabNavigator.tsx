@@ -1,6 +1,12 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {supabase} from '@shared/config/supabase';
-import {View, Text, Image, StyleSheet, TouchableOpacity} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {
+  supabase} from '@shared/config/supabase';
+import {View,
+  Image,
+  StyleSheet,
+  TouchableOpacity,
+} from 'react-native';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import type {BottomTabBarProps} from '@react-navigation/bottom-tabs';
 import {useNavigation} from '@react-navigation/native';

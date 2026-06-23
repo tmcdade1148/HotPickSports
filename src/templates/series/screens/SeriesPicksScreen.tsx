@@ -1,5 +1,6 @@
 import React, {useEffect} from 'react';
-import {View, Text, FlatList, ActivityIndicator, StyleSheet} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {View, FlatList, ActivityIndicator, StyleSheet} from 'react-native';
 import {useSeriesStore} from '../stores/seriesStore';
 import {RoundSelector} from '../components/RoundSelector';
 import {SeriesMatchupCard} from '../components/SeriesMatchupCard';
