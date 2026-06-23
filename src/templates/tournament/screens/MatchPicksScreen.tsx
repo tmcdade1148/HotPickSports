@@ -1,5 +1,6 @@
 import React, {useEffect} from 'react';
-import {View, Text, FlatList, ActivityIndicator, StyleSheet} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {View, FlatList, ActivityIndicator, StyleSheet} from 'react-native';
 import {useTournamentStore} from '../stores/tournamentStore';
 import {MatchPickCard} from '../components/MatchPickCard';
 import {useAuth} from '@shared/hooks/useAuth';

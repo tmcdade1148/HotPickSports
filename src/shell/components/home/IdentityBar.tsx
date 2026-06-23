@@ -2,7 +2,8 @@
 // Points pulses gray↔primary while the week is settling.
 
 import React, {useEffect, useMemo, useRef, useState} from 'react';
-import {Animated, StyleSheet, Text, View} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {Animated, StyleSheet, View} from 'react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';

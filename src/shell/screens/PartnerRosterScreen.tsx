@@ -16,6 +16,7 @@
 //   • user no longer in any aligned pool → denial + Home button
 
 import React, {useEffect, useMemo, useState} from 'react';
+import {Text} from '@shared/components/AppText';
 import {
   ActivityIndicator,
   Alert,
@@ -26,7 +27,6 @@ import {
   ScrollView,
   Share,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';

@@ -11,10 +11,10 @@
 // carousel in HomeScreen, not here.
 
 import React, {useEffect, useMemo, useRef} from 'react';
+import {Text} from '@shared/components/AppText';
 import {
   FlatList,
   StyleSheet,
-  Text,
   View,
   useWindowDimensions,
   type NativeScrollEvent,

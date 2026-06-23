@@ -1,5 +1,6 @@
 import React from 'react';
-import {View, Text, StyleSheet} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {View, StyleSheet} from 'react-native';
 import {SYSTEM_AVATARS} from '@shell/components/AvatarSelector';
 import {useTheme} from '@shell/theme';
 

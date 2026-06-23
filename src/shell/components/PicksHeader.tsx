@@ -7,7 +7,8 @@
 // Row 2 is the shared PlayerName (poolie name, left) — same treatment as Home.
 
 import React from 'react';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {Pressable, StyleSheet, View} from 'react-native';
 import {Settings} from 'lucide-react-native';
 import {useNavigation} from '@react-navigation/native';
 import {useTheme} from '@shell/theme/hooks';

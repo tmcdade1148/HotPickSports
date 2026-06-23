@@ -13,7 +13,8 @@
 // Every action writes an admin_audit_log entry before mutating state.
 
 import React, {useCallback, useEffect, useState} from 'react';
-import {ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import {ChevronLeft, RefreshCw} from 'lucide-react-native';

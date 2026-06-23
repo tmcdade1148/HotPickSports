@@ -13,7 +13,8 @@
 //   - the user has dismissed the most recent one
 
 import React, {useCallback, useEffect, useState} from 'react';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {Pressable, StyleSheet, View} from 'react-native';
 import {Flame, ChevronRight} from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useTheme} from '@shell/theme/hooks';

@@ -1,5 +1,6 @@
 import React from 'react';
-import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {View, TouchableOpacity, StyleSheet} from 'react-native';
 import type {TournamentConfig} from '@shared/types/templates';
 import type {DbTournamentMatch} from '@shared/types/database';
 import {spacing, borderRadius} from '@shared/theme';

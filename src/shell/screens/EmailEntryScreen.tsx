@@ -1,7 +1,6 @@
 import React, {useState} from 'react';
+import {Text, TextInput} from '@shared/components/AppText';
 import {
-  Text,
-  TextInput,
   TouchableOpacity,
   ActivityIndicator,
   StyleSheet,

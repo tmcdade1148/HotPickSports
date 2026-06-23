@@ -9,7 +9,8 @@
 // popup just states the rule.
 
 import React from 'react';
-import {Modal, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {Modal, Pressable, ScrollView, StyleSheet, View} from 'react-native';
 import {X} from 'lucide-react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {bodyType, displayType, spacing, borderRadius} from '@shared/theme';

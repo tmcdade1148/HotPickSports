@@ -1,5 +1,6 @@
 import React, {useEffect} from 'react';
-import {View, Text, ScrollView, ActivityIndicator, StyleSheet} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {View, ScrollView, ActivityIndicator, StyleSheet} from 'react-native';
 import {useSeriesStore} from '../stores/seriesStore';
 import {SeriesProgress} from '../components/SeriesProgress';
 import {useAuth} from '@shared/hooks/useAuth';

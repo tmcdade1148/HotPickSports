@@ -13,6 +13,7 @@
 // they force-land on it after next cold start. Removal hides it again.
 
 import React, {useCallback, useEffect, useState} from 'react';
+import {Text, TextInput} from '@shared/components/AppText';
 import {
   ActivityIndicator,
   Alert,
@@ -21,8 +22,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';

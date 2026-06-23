@@ -9,7 +9,8 @@
 // rare enough that we can defer a dedicated detail screen.
 
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
-import {ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View} from 'react-native';
+import {Text, TextInput} from '@shared/components/AppText';
+import {ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import {ChevronLeft} from 'lucide-react-native';
@@ -167,7 +168,6 @@ function AdminPoolManagementScreenImpl() {
     buttons.push({text: 'Cancel', style: 'cancel'});
     Alert.alert(p.name ?? '—', `${p.competition} · ${p.member_count} members`, buttons);
   };
-
 
   return (
     <SafeAreaView style={[styles.shell, {backgroundColor: colors.background}]} edges={['top']}>

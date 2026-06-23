@@ -1,5 +1,6 @@
 import React, {useEffect} from 'react';
-import {View, Text, ActivityIndicator, StyleSheet} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {View, ActivityIndicator, StyleSheet} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {PoolSwitcherBar} from '@shell/components/PoolSwitcherBar';

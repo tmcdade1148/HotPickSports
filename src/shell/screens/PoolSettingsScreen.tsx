@@ -1,8 +1,7 @@
 import React, {useState, useMemo, useEffect, useCallback} from 'react';
+import {Text, TextInput} from '@shared/components/AppText';
 import {
   View,
-  Text,
-  TextInput,
   TouchableOpacity,
   Alert,
   ActivityIndicator,

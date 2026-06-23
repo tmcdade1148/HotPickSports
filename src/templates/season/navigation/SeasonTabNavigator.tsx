@@ -1,8 +1,9 @@
 import React, {useEffect, useState} from 'react';
-import {useNFLStore} from '@sports/nfl/stores/nflStore';
+import {Text} from '@shared/components/AppText';
+import {
+  useNFLStore} from '@sports/nfl/stores/nflStore';
 import {
   View,
-  Text,
   TouchableOpacity,
   Modal,
   ScrollView,

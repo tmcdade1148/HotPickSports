@@ -7,7 +7,8 @@
 // so it reads as a soft callout, not a separate component.
 
 import React from 'react';
-import {StyleSheet, Text, View} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {StyleSheet, View} from 'react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {bodyType, spacing, borderRadius} from '@shared/theme';
 import {hexToRgba} from '@shared/utils/color';

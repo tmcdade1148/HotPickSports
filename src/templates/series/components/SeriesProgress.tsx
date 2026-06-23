@@ -1,5 +1,6 @@
 import React from 'react';
-import {View, Text, StyleSheet} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {View, StyleSheet} from 'react-native';
 import type {SeriesConfig} from '@shared/types/templates';
 import {spacing, borderRadius} from '@shared/theme';
 import {useSeriesStore} from '../stores/seriesStore';

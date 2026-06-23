@@ -15,7 +15,8 @@
 // max(notification_read_state.last_read_at, joined_at).
 
 import React, {useCallback, useEffect, useState} from 'react';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {Pressable, StyleSheet, View} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {Mail, ChevronRight} from 'lucide-react-native';
 import {supabase} from '@shared/config/supabase';

@@ -10,7 +10,8 @@
 // in case routing somehow lands here without the gate.
 
 import React, {useEffect, useState} from 'react';
-import {ScrollView, StyleSheet, Text, View, Pressable} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {ScrollView, StyleSheet, View, Pressable} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import {ChevronLeft, AlertTriangle, Megaphone, Activity, Shield, Target, ChevronRight, Building, Users, CalendarClock} from 'lucide-react-native';

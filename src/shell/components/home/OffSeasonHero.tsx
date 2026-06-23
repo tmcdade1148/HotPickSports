@@ -13,7 +13,8 @@
 // strip + Clubs teaser, so this component owns only the hero block.
 
 import React from 'react';
-import {StyleSheet, Text, View} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {StyleSheet, View} from 'react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {displayType, bodyType, spacing} from '@shared/theme';

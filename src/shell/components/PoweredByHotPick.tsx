@@ -1,5 +1,6 @@
 import React from 'react';
-import {View, Image, Text, StyleSheet} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {View, Image, StyleSheet} from 'react-native';
 import {useBrand, useTheme} from '@shell/theme';
 
 /**

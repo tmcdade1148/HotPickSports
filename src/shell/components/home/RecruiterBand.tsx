@@ -17,7 +17,8 @@
 // marketing-site work.)
 
 import React from 'react';
-import {Pressable, Share, StyleSheet, Text, View} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {Pressable, Share, StyleSheet, View} from 'react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {bodyType, spacing, borderRadius} from '@shared/theme';

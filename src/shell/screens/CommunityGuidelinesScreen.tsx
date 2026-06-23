@@ -1,5 +1,6 @@
 import React from 'react';
-import {View, Text, StyleSheet, ScrollView, TouchableOpacity} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {View, StyleSheet, ScrollView, TouchableOpacity} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {ChevronLeft} from 'lucide-react-native';
 import {useNavigation} from '@react-navigation/native';

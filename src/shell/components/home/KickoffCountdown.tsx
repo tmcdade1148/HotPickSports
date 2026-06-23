@@ -6,7 +6,8 @@
 // off-cycle phases. Targets season_opener_date (via nflStore).
 
 import React from 'react';
-import {StyleSheet, Text, View} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {StyleSheet, View} from 'react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useGlobalStore} from '@shell/stores/globalStore';

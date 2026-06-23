@@ -2,7 +2,8 @@
 // + weight encode lock state / pick-set / HotPick.
 
 import React, {useMemo} from 'react';
-import {StyleSheet, Text, View} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {StyleSheet, View} from 'react-native';
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {isLockedStatus} from '@sports/nfl/utils/gameStatus';

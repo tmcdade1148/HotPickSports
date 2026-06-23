@@ -6,7 +6,8 @@
 // Both are HotPick-themed (Hard Rule #25) and use the lexicon (Hard Rule §22).
 
 import React from 'react';
-import {Modal, Pressable, StyleSheet, Text, View} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {Modal, Pressable, StyleSheet, View} from 'react-native';
 import {BarChart3, Flame} from 'lucide-react-native';
 import {useTheme} from '@shell/theme';
 import {bodyType, displayType, spacing, borderRadius} from '@shared/theme';

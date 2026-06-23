@@ -1,5 +1,6 @@
 import React, {useEffect} from 'react';
-import {View, Text, ScrollView, ActivityIndicator, StyleSheet} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {View, ScrollView, ActivityIndicator, StyleSheet} from 'react-native';
 import {useTournamentStore} from '../stores/tournamentStore';
 import {TournamentProgress} from '../components/TournamentProgress';
 import {KnockoutBracket} from '../components/KnockoutBracket';

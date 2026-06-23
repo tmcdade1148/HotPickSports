@@ -1,5 +1,6 @@
 import React from 'react';
-import {Modal, View, Text, TouchableOpacity, StyleSheet} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {Modal, View, TouchableOpacity, StyleSheet} from 'react-native';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 import {LEXICON} from '@shared/lexicon';

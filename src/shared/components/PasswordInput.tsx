@@ -6,9 +6,9 @@
 // secureTextEntry.
 
 import React, {useState} from 'react';
+import {TextInput} from '@shared/components/AppText';
 import {
   View,
-  TextInput,
   Pressable,
   StyleSheet,
   type TextInputProps,

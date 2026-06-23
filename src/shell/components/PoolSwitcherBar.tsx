@@ -10,9 +10,9 @@
  *   <PoolSwitcherBar mode="picks" />       — shows "Pick once" message
  */
 import React, {useState} from 'react';
+import {Text} from '@shared/components/AppText';
 import {
   View,
-  Text,
   Image,
   StyleSheet,
   TouchableOpacity,

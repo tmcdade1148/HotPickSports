@@ -1,5 +1,6 @@
 import React from 'react';
-import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {View, TouchableOpacity, StyleSheet} from 'react-native';
 import {useTournamentStore} from '../stores/tournamentStore';
 import {spacing} from '@shared/theme';
 import {useTheme} from '@shell/theme';

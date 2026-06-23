@@ -1,7 +1,7 @@
 import React, {useEffect, useState, useRef, useCallback} from 'react';
+import {Text} from '@shared/components/AppText';
 import {
   View,
-  Text,
   ScrollView,
   ActivityIndicator,
   TouchableOpacity,

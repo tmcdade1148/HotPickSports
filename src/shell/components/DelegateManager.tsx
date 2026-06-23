@@ -9,13 +9,12 @@
 // claim trigger). Pending rows render with a "Pending" badge.
 
 import React, {useCallback, useEffect, useState} from 'react';
+import {Text, TextInput} from '@shared/components/AppText';
 import {
   ActivityIndicator,
   Alert,
   Pressable,
   StyleSheet,
-  Text,
-  TextInput,
   View,
 } from 'react-native';
 import {Clock, UserPlus, X} from 'lucide-react-native';

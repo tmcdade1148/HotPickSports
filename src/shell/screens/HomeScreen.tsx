@@ -3,7 +3,8 @@
 // in store loaders fired here so child modules can stay presentational.
 
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
-import {Platform, RefreshControl, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {Platform, RefreshControl, ScrollView, StyleSheet, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {KeyRound, Plus} from 'lucide-react-native';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
@@ -605,7 +606,6 @@ export function HomeScreen() {
 // ----------------------------------------------------------------------
 // Off-cycle inline helpers per the OffseasonPreseasonHome spec.
 // ----------------------------------------------------------------------
-
 
 /** Pre-season line stating when Week 1 picks open (from season_picks_open_at).
  *  Sits under the kickoff countdown. Hidden until the date is loaded. */

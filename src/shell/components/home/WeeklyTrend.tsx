@@ -2,7 +2,8 @@
 // pulses while the week is settling; past weeks render with a Lock glyph.
 
 import React, {useCallback, useEffect, useMemo, useRef} from 'react';
-import {Animated, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {Animated, StyleSheet, TouchableOpacity, View} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {Lock} from 'lucide-react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
