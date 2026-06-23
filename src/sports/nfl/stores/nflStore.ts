@@ -81,6 +81,11 @@ interface NFLState {
   weekFirstKickoff: Date | null;
   userPickCount: number;
   totalGamesThisWeek: number;
+  /** False until fetchUserPickStatus resolves for the current week. Lets the
+   *  hero hold the countdown at compact size instead of flashing the full
+   *  64px (default userPickCount is 0) and then collapsing once pick data
+   *  hydrates and reveals the user already has picks. */
+  pickStatusLoaded: boolean;
 
   // Standings data (for StandingsBadge)
   userSeasonTotal: number;
@@ -145,6 +150,7 @@ export const useNFLStore = create<NFLState>((set, get) => ({
   weekFirstKickoff: null,
   userPickCount: 0,
   totalGamesThisWeek: 0,
+  pickStatusLoaded: false,
 
   // Standings data (for StandingsBadge)
   userSeasonTotal: 0,
@@ -182,6 +188,7 @@ export const useNFLStore = create<NFLState>((set, get) => ({
         weekFirstKickoff: null,
         userPickCount: 0,
         totalGamesThisWeek: 0,
+        pickStatusLoaded: false,
         userSeasonTotal: 0,
         userPoolRank: null,
         activePoolMemberCount: 0,
@@ -460,6 +467,7 @@ export const useNFLStore = create<NFLState>((set, get) => ({
     set({
       userPickCount: pickCount,
       totalGamesThisWeek: pickCount + scheduledUnpickedCount,
+      pickStatusLoaded: true,
     });
   },
 
@@ -811,6 +819,7 @@ export const useNFLStore = create<NFLState>((set, get) => ({
               userHotPick: null,
               userHotPickGame: null,
               userPickCount: 0,
+              pickStatusLoaded: false,
               weekResult: null,
               poolStandings: [],
               weekFirstKickoff: null,

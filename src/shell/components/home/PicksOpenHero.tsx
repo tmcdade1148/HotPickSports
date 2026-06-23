@@ -38,6 +38,7 @@ export function PicksOpenHero() {
   const navigation = useNavigation<any>();
 
   const userPickCount    = useNFLStore(s => s.userPickCount);
+  const pickStatusLoaded = useNFLStore(s => s.pickStatusLoaded);
   const totalGamesThisWeek = useNFLStore(s => s.totalGamesThisWeek);
   const userHotPick      = useNFLStore(s => s.userHotPick);
   const userHotPickGame  = useNFLStore(s => s.userHotPickGame);
@@ -146,7 +147,14 @@ export function PicksOpenHero() {
     kickedOff: isLockingWave,
   });
 
-  const timerSize = hasAnyPicks ? TIMER_FONT_COMPACT : TIMER_FONT_FULL;
+  // Hold the countdown at compact size until pick data has loaded. Otherwise
+  // the default userPickCount of 0 renders the full 64px for a frame, then
+  // collapses to compact the instant fetchUserPickStatus reveals the user
+  // already has picks — the "flash then disappear" the timer used to do. With
+  // this gate a pick-having user stays compact throughout, and a genuine
+  // 0-pick user grows compact → full once (intentional emphasis), never shrinks.
+  const timerSize =
+    pickStatusLoaded && !hasAnyPicks ? TIMER_FONT_FULL : TIMER_FONT_COMPACT;
 
   // Simple confirmation line below the CTA — independent of the
   // urgency-tinted contextual message above. Mostly factual; flips to
