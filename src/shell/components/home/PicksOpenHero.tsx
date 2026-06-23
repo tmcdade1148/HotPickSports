@@ -584,7 +584,7 @@ export function PicksOpenHero() {
             the full-color HotPick flame brand mark — the universal HotPick
             signal so this reads as "go to the picks/games surface." */}
         <View style={[styles.gamesTag, {backgroundColor: colors.highlight}]}>
-          <GamesTagFlame size={28} />
+          <GamesTagFlame size={44} />
         </View>
 
         <View style={[

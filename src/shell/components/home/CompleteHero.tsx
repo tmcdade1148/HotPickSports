@@ -214,7 +214,7 @@ export function CompleteHero() {
         accessibilityRole="button"
         accessibilityLabel={`Go to games — Week ${currentWeek} complete, review your picks`}>
         <View style={[styles.gamesTag, {backgroundColor: colors.highlight}]}>
-          <GamesTagFlame size={28} />
+          <GamesTagFlame size={44} />
         </View>
         <View style={styles.ctaBody}>
           <View style={styles.ctaLabel}>
