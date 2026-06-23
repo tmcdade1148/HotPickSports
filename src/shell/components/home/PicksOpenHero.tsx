@@ -190,6 +190,14 @@ export function PicksOpenHero() {
   const missedGames = Math.max(0, picksTotal - picksSet);
   const isPartial = picksSet > 0 && !allPicks;
 
+  // The "You can VIEW or" lead-in (a 2nd CTA line) only renders in the dimmed
+  // all-done state before any kickoff. When present, the arrow bottom-aligns
+  // with the main label line (flex-end); otherwise the label is a single line
+  // and the arrow must CENTER with it. weekComplete uses its own top-aligned
+  // 2-line layout (lead-in below the label).
+  const hasLeadIn =
+    allPicks && hotPickDesignated && !isLockingWave && !allGamesLocked && !weekComplete;
+
   const picksConfirm = allPicks
     ? 'All picks set'
     : `${picksSet} of ${picksTotal} picks set`;
@@ -589,15 +597,17 @@ export function PicksOpenHero() {
 
         <View style={[
           styles.ctaBody,
-          (allPicks && hotPickDesignated && !isLockingWave && !allGamesLocked) || weekComplete
-            ? styles.ctaBodyTight
-            : null,
-          weekComplete ? styles.ctaBodyTopAligned : null,
+          hasLeadIn || weekComplete ? styles.ctaBodyTight : null,
+          weekComplete
+            ? styles.ctaBodyTopAligned
+            : !hasLeadIn
+              ? styles.ctaBodyCentered
+              : null,
         ]}>
           <View style={styles.ctaLabel}>
             {/* "You can VIEW or" lead-in only in the dimmed all-done state
                 before any kickoff — suppressed once games start locking. */}
-            {allPicks && hotPickDesignated && !isLockingWave && !allGamesLocked && !weekComplete && (
+            {hasLeadIn && (
               <Text style={[bodyType.regular, styles.ctaLeadIn, {color: colors.onPrimary}]}>
                 You can <Text style={bodyType.bold}>VIEW</Text> or
               </Text>
@@ -859,6 +869,12 @@ const styles = StyleSheet.create({
   // bottom (smaller follow-on).
   ctaBodyTopAligned: {
     alignItems: 'flex-start',
+  },
+  // Single-line label (no lead-in): center the label block with the arrow so
+  // text + arrow share a vertical center. (Base flex-end is only for the
+  // two-line lead-in state, where the arrow tracks the bottom/main line.)
+  ctaBodyCentered: {
+    alignItems: 'center',
   },
   // flexShrink lets adjustsFontSizeToFit kick in when the label is the
   // long "SOME PICKS ARE STILL EDITABLE" copy. Without this the Text
