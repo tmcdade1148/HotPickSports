@@ -195,7 +195,7 @@ export function PicksOpenHero() {
     ? 'HotPick designated'
     : 'HotPick still needed';
   const confirmLine = isPartial
-    ? `You still need to pick ${missedGames} game${missedGames === 1 ? '' : 's'} before they kick off`
+    ? `You still have ${missedGames} pick${missedGames === 1 ? '' : 's'} to make`
     : allPicks && hotPickDesignated
     ? "All your picks are in and your HotPick is locked."
     : `${picksConfirm} · ${hotPickConfirm}`;
