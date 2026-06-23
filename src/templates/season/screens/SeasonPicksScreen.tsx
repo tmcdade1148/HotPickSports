@@ -12,7 +12,8 @@ import {useAuth} from '@shared/hooks/useAuth';
 import {spacing, borderRadius} from '@shared/theme';
 import type {DbSeasonGame} from '@shared/types/database';
 import {useTheme} from '@shell/theme';
-import {useNFLStore} from '@sports/nfl/stores/nflStore';
+import {useNFLStore, type GameScore} from '@sports/nfl/stores/nflStore';
+import {computeLiveWeekEarned} from '@sports/nfl/utils/liveWeekScore';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {supabase} from '@shared/config/supabase';
 import {DemoIntroModal, DemoScoreModal} from '@shell/components/home/DemoModals';
@@ -205,6 +206,38 @@ export function SeasonPicksScreen() {
     return total;
   })();
 
+  // Week Score display value. The server-settled total (weekEarned) is
+  // authoritative, but the sim only writes it at settle — so for the IN-PROGRESS
+  // week we show a live running estimate computed from the week's own game rows
+  // (same logic as the Home weekly pills), which populates and updates as games
+  // finalize. Past weeks (browsed) always use the settled server value. Built
+  // from `games` (kept fresh by subscribeToGameScores), so it doesn't depend on
+  // the Home screen having populated nflStore.liveScores.
+  const liveScoresFromGames = useMemo(() => {
+    const m: Record<string, GameScore> = {};
+    for (const g of games) {
+      m[g.game_id] = {
+        homeScore: g.home_score ?? 0,
+        awayScore: g.away_score ?? 0,
+        status: (g.status ?? '').toLowerCase(),
+        currentPeriod: null,
+        gameClock: null,
+      };
+    }
+    return m;
+  }, [games]);
+  const liveWeekEarned = useMemo(
+    () => computeLiveWeekEarned(weekPicks, games, liveScoresFromGames, null).earned,
+    [weekPicks, games, liveScoresFromGames],
+  );
+  const isLiveWeek = currentWeek === dbCurrentWeek;
+  const anyGameStarted = useMemo(() => games.some(hasStarted), [games]);
+  // In-progress week with ≥1 game started → live running estimate; otherwise the
+  // settled server value (so it reads "—" before kickoff and for past weeks until
+  // a real score exists).
+  const displayWeekScore =
+    isLiveWeek && anyGameStarted ? liveWeekEarned ?? weekEarned : weekEarned;
+
   // Keep the viewing week in sync with the league's current week, but DON'T
   // yank the user off a week they've navigated back to. On first mount we land
   // on the live week. After that we only follow the league forward when the
@@ -395,7 +428,7 @@ export function SeasonPicksScreen() {
           />
 
           {/* Score widgets */}
-          {allGamesFinal && weekEarned != null ? (
+          {allGamesFinal && displayWeekScore != null ? (
             <View style={styles.widgetRow}>
               <View style={styles.widgetFull}>
                 <Text style={styles.widgetLabelFinal}>
@@ -404,13 +437,13 @@ export function SeasonPicksScreen() {
                 <View style={styles.widgetValueRow}>
                   <Text style={[
                     styles.widgetValue,
-                    {color: weekEarned >= 0 ? colors.success : colors.error},
+                    {color: displayWeekScore >= 0 ? colors.success : colors.error},
                   ]}>
-                    {weekEarned >= 0 ? '+' : ''}{weekEarned}
+                    {displayWeekScore >= 0 ? '+' : ''}{displayWeekScore}
                   </Text>
                   <Text style={[
                     styles.widgetPts,
-                    {color: weekEarned >= 0 ? colors.success : colors.error},
+                    {color: displayWeekScore >= 0 ? colors.success : colors.error},
                   ]}>pts</Text>
                   <Text style={styles.widgetTarget}>/{potentialWeekScore} ceiling pts</Text>
                 </View>
@@ -435,14 +468,14 @@ export function SeasonPicksScreen() {
                 <View style={styles.widgetValueRow}>
                   <Text style={[
                     styles.widgetValue,
-                    weekEarned != null && weekEarned > 0 && {color: colors.success},
-                    weekEarned != null && weekEarned < 0 && {color: colors.error},
+                    displayWeekScore != null && displayWeekScore > 0 && {color: colors.success},
+                    displayWeekScore != null && displayWeekScore < 0 && {color: colors.error},
                   ]}>
-                    {weekEarned == null
+                    {displayWeekScore == null
                       ? '—'
-                      : weekEarned > 0
-                        ? `+${weekEarned}`
-                        : `${weekEarned}`}
+                      : displayWeekScore > 0
+                        ? `+${displayWeekScore}`
+                        : `${displayWeekScore}`}
                   </Text>
                   <Text style={styles.widgetPts}>pts</Text>
                 </View>
