@@ -118,6 +118,12 @@ export function IdentityBar() {
 
       <View style={styles.right}>
         <Animated.Text
+          // Animated.Text can't route through the @shared/components/AppText
+          // wrapper (it's Animated.createAnimatedComponent of RN's Text), so the
+          // font-scaling lock must be set explicitly here — otherwise the
+          // SEASON PTS number scales with the OS font-size slider while the rest
+          // of the bar (locked via the wrapper) does not.
+          allowFontScaling={false}
           style={[
             displayType.display,
             styles.points,

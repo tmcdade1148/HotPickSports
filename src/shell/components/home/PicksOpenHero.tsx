@@ -417,6 +417,9 @@ export function PicksOpenHero() {
               </Text>
               {hotPickIsLive && (
                 <Animated.Text
+                  // Animated.Text bypasses the @shared/components/AppText
+                  // wrapper, so lock font-scaling explicitly here.
+                  allowFontScaling={false}
                   style={[
                     bodyType.bold,
                     styles.hotPickLiveLabel,
