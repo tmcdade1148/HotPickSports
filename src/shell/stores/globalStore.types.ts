@@ -280,6 +280,16 @@ export interface GlobalState {
   recentWeeks: Array<{week: number; total: number; correctPicks: number; totalPicks: number}>;
   loadRecentWeeks: (userId: string, competition: string) => Promise<void>;
 
+  // The user's TRUE season points total — user-scoped (no pool), summed from
+  // their own season_user_totals for the active phase (REGULAR vs playoffs),
+  // excluding the in-progress week. Backs the IdentityBar SEASON PTS headline.
+  // Deliberately NOT the pool-scoped seasonStore leaderboard: that one is
+  // wiped + refetched on every pool switch (causing a 0-flash) and is scoped
+  // to a pool's start date, which is wrong for a user-level identity stat
+  // (CLAUDE.md rule #2 — scores belong to the user, not the pool).
+  seasonTotal: number | null;
+  loadSeasonTotal: (userId: string, competition: string) => Promise<void>;
+
   // Season-long HotPick hit rate — aggregated across every settled week
   // the user has played. `hits` = weeks where is_hotpick_correct is
   // true; `total` = settled weeks with a HotPick designated.

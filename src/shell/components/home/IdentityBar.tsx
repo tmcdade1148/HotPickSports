@@ -8,7 +8,6 @@ import {useTheme} from '@shell/theme/hooks';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {isFinalStatus} from '@sports/nfl/utils/gameStatus';
-import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {displayType, bodyType, spacing} from '@shared/theme';
 
 const POINTS_FONT = 36;
@@ -23,12 +22,14 @@ const NAME_RIGHT_PAD = 6;
 export function IdentityBar() {
   const {colors} = useTheme();
 
-  const userId      = useGlobalStore(s => s.user?.id);
   const userProfile = useGlobalStore(s => s.userProfile);
   const poolieName  = userProfile?.poolie_name ?? '';
-  const seasonTotal = useSeasonStore(
-    s => (userId ? s.getUserScore(userId)?.total_points : undefined) ?? 0,
-  );
+  // User-scoped season total — independent of the active pool, so it doesn't
+  // flash to 0 when swiping the Contest carousel (the seasonStore leaderboard
+  // is pool-scoped and gets wiped + refetched on every pool switch). Loaded in
+  // HomeScreen via loadSeasonTotal. null = not loaded yet → render nothing
+  // rather than a misleading 0.
+  const seasonTotal = useGlobalStore(s => s.seasonTotal);
 
   // When every game in the current week is final, the week total has
   // just been rolled into the season total — pulse the SEASON PTS
@@ -130,7 +131,7 @@ export function IdentityBar() {
             {color: pointsColor},
           ]}
           numberOfLines={1}>
-          {seasonTotal.toLocaleString()}
+          {seasonTotal == null ? '—' : seasonTotal.toLocaleString()}
         </Animated.Text>
         <Text
           style={[bodyType.bold, styles.pointsLabel, {color: colors.textTertiary}]}

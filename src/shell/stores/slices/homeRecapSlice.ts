@@ -12,15 +12,62 @@ type HomeRecapSlice = Pick<
   | 'lastWeekHotPick'
   | 'recentWeeks'
   | 'hotPickHitRate'
+  | 'seasonTotal'
   | 'loadHotPickHitRate'
   | 'loadLastWeekHotPick'
   | 'loadRecentWeeks'
+  | 'loadSeasonTotal'
 >;
 
 export const createHomeRecapSlice = (set: Set): HomeRecapSlice => ({
   lastWeekHotPick: null,
   recentWeeks: [],
   hotPickHitRate: null,
+  seasonTotal: null,
+
+  loadSeasonTotal: async (userId, competition) => {
+    // User-scoped season total — mirrors seasonStore.fetchLeaderboard's
+    // per-user aggregation (sum of week_points for the active phase, current
+    // in-progress week excluded) but WITHOUT the pool member / pool_start_date
+    // filter, so it's the user's true season total independent of any pool.
+    // Phase + week state come from competition_config (never hardcoded).
+    const {data: cfgRows} = await supabase
+      .from('competition_config')
+      .select('key, value')
+      .eq('competition', competition)
+      .in('key', ['current_phase', 'week_state', 'current_week']);
+    const cfg = Object.fromEntries(
+      (cfgRows ?? []).map((r: any) => [r.key, r.value]),
+    );
+    const currentPhase =
+      typeof cfg.current_phase === 'string' ? cfg.current_phase : 'REGULAR';
+    const isPlayoffs = currentPhase !== 'REGULAR';
+    const weekState =
+      typeof cfg.week_state === 'string' ? cfg.week_state : null;
+    const weekInProgress =
+      weekState === 'picks_open' || weekState === 'locked' || weekState === 'live';
+    const currentWeek =
+      typeof cfg.current_week === 'number' ? cfg.current_week : 1;
+
+    // Regular season and playoffs are separate leaderboards — scope the total
+    // to whichever phase is active, matching the pool leaderboard's behavior.
+    let query = supabase
+      .from('season_user_totals')
+      .select('week, week_points')
+      .eq('user_id', userId)
+      .eq('competition', competition);
+    query = isPlayoffs ? query.neq('phase', 'REGULAR') : query.eq('phase', 'REGULAR');
+
+    const {data} = await query;
+    const rows = (data ?? []) as Array<{week: number; week_points: number | null}>;
+    // Season total only reflects fully settled weeks — exclude the current
+    // week while its games are still in progress (same rule as the leaderboard).
+    const total = rows.reduce((sum, r) => {
+      if (weekInProgress && r.week === currentWeek) return sum;
+      return sum + (r.week_points ?? 0);
+    }, 0);
+    set({seasonTotal: total});
+  },
   loadHotPickHitRate: async (userId, competition) => {
     // Weeks with is_hotpick_correct = null had no HotPick attempt and
     // don't count toward numerator or denominator.
