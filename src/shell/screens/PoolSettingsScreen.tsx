@@ -513,11 +513,17 @@ export function PoolSettingsScreen() {
   const submitShare = async () => {
     if (!shareEdit) return;
     const {text} = shareEdit;
-    setShareEdit(null);
+    // Present the share sheet BEFORE closing the modal. Closing first
+    // unmounts the <Modal>, and on iOS presenting the native share sheet
+    // while that modal is animating out is a presentation conflict — the
+    // sheet has no stable view controller to present from and silently
+    // never appears. Share first, then dismiss in `finally`.
     try {
       await Share.share({message: text});
     } catch {
-      // user cancelled
+      // user cancelled or the share sheet failed to present
+    } finally {
+      setShareEdit(null);
     }
   };
 
