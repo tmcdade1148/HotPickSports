@@ -59,6 +59,7 @@ export function HomeScreen() {
 
   const loadLastWeekHotPick   = useGlobalStore(s => s.loadLastWeekHotPick);
   const loadRecentWeeks       = useGlobalStore(s => s.loadRecentWeeks);
+  const loadSeasonTotal       = useGlobalStore(s => s.loadSeasonTotal);
   const loadHotPickHitRate    = useGlobalStore(s => s.loadHotPickHitRate);
   const loadPoolIndicators    = useGlobalStore(s => s.loadPoolIndicators);
   const loadUserRankByPool    = useGlobalStore(s => s.loadUserRankByPool);
@@ -271,8 +272,9 @@ export function HomeScreen() {
     if (!userId || !competition) return;
     loadLastWeekHotPick(userId, competition, currentWeek).catch(() => {});
     loadRecentWeeks(userId, competition).catch(() => {});
+    loadSeasonTotal(userId, competition).catch(() => {});
     loadHotPickHitRate(userId, competition).catch(() => {});
-  }, [userId, competition, currentWeek, loadLastWeekHotPick, loadRecentWeeks, loadHotPickHitRate]);
+  }, [userId, competition, currentWeek, loadLastWeekHotPick, loadRecentWeeks, loadSeasonTotal, loadHotPickHitRate]);
 
   useEffect(() => {
     if (!userId) return;
@@ -374,6 +376,7 @@ export function HomeScreen() {
     const tick = () => {
       fetchSeasonLeaderboard().catch(() => {});
       loadRecentWeeks(userId, competition).catch(() => {});
+      loadSeasonTotal(userId, competition).catch(() => {});
       loadHotPickHitRate(userId, competition).catch(() => {});
       fetchWeekResult(userId, currentWeek).catch(() => {});
     };
@@ -387,6 +390,7 @@ export function HomeScreen() {
     currentWeek,
     fetchSeasonLeaderboard,
     loadRecentWeeks,
+    loadSeasonTotal,
     loadHotPickHitRate,
     fetchWeekResult,
   ]);
@@ -699,7 +703,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
   },
-  section: {marginTop: spacing.lg},
+  section: {marginTop: spacing.md},
   sectionTitle: {
     fontSize: 11,
     letterSpacing: 1.8,
