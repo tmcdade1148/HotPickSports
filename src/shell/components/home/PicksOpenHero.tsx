@@ -27,8 +27,10 @@ import {WeekLockStrip} from './WeekLockStrip';
 // out of the "needs a pick" pool entirely, so the denominator shrinks
 // as games lock.
 const PICKS_TOTAL_FALLBACK = 16;
-const TIMER_FONT_FULL = 64;
-const TIMER_FONT_COMPACT = 25; // 0.5× per brief: shrinks once user has picks
+// Countdown is a single fixed size — it no longer switches on pick state.
+// The earlier full↔compact switch fired late in hydration and visibly
+// flashed (see timerSize below).
+const TIMER_FONT_COMPACT = 25;
 // Urgency buckets used by the contextual message picker.
 const URGENT_MINUTES = 6 * 60;   // under 6 hours → "not much time left"
 const TIGHT_MINUTES  = 24 * 60;  // under 24 hours → "tight"
@@ -96,7 +98,6 @@ export function PicksOpenHero() {
   const picksTotal =
     totalGamesThisWeek > 0 ? totalGamesThisWeek : PICKS_TOTAL_FALLBACK;
   const hotPickDesignated = userHotPick != null;
-  const hasAnyPicks = picksSet > 0;
 
   // Countdown target: HotPick game if known (else first kickoff).
   // Equality compared at minute granularity to absorb server drift.
@@ -146,7 +147,10 @@ export function PicksOpenHero() {
     kickedOff: isLockingWave,
   });
 
-  const timerSize = hasAnyPicks ? TIMER_FONT_COMPACT : TIMER_FONT_FULL;
+  // Single fixed size — locked to compact per design call. This previously
+  // switched (full when no picks → compact once picks made), but the switch
+  // fired late in hydration and visibly flashed. A constant can't flash.
+  const timerSize = TIMER_FONT_COMPACT;
 
   // Simple confirmation line below the CTA — independent of the
   // urgency-tinted contextual message above. Mostly factual; flips to
@@ -269,13 +273,12 @@ export function PicksOpenHero() {
       })
     : null;
 
-  // Regular-season, full-size countdown only: stack a small "PICKS START
-  // LOCKING IN" label to the left of the big number (within the digit height).
-  // Show the "PICKS START LOCKING IN" label next to the big countdown in the
+  // Lead-in label stacked to the left of the big number — "PICKS START
+  // LOCKING IN:" sized to match the unit suffix ("DAYS"). Shown in the
   // regular-season picks-open flow AND in the sandbox demo (which mirrors that
-  // flow but doesn't report currentPhase === 'REGULAR').
-  const showLockingLabel =
-    (currentPhase === 'REGULAR' || sandboxCountdown) && timerSize === TIMER_FONT_FULL;
+  // flow but doesn't report currentPhase === 'REGULAR'). Tracks timerSize, so
+  // it stays proportional in both the full and compact countdown sizes.
+  const showLockingLabel = currentPhase === 'REGULAR' || sandboxCountdown;
 
   return (
     <View
@@ -314,9 +317,17 @@ export function PicksOpenHero() {
         <View style={styles.timerRow}>
           {showLockingLabel && (sandboxCountdown || timer) && (
             <Text
-              style={[bodyType.bold, styles.lockingLabel, {color: colors.textSecondary}]}
-              numberOfLines={2}>
-              PICKS START{'\n'}LOCKING IN
+              style={[
+                displayType.display,
+                styles.lockingLabel,
+                {
+                  color: colors.textSecondary,
+                  fontSize: timerSize * 0.4,
+                  lineHeight: Math.round(timerSize * 0.4 * 1.15),
+                },
+              ]}
+              numberOfLines={3}>
+              PICKS START{'\n'}LOCKING IN:
             </Text>
           )}
           {sandboxCountdown ? (
@@ -785,10 +796,9 @@ const styles = StyleSheet.create({
   timerInRow: {
     marginBottom: 0,
   },
-  // Small enough that its two stacked lines fit within the digit's height.
+  // fontSize/lineHeight are applied per-render from timerSize so the label
+  // matches the unit suffix ("DAYS") in both the full and compact sizes.
   lockingLabel: {
-    fontSize: 13,
-    lineHeight: 16,
     letterSpacing: 0.5,
     textAlign: 'right',
   },
