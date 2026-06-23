@@ -20,6 +20,7 @@ export function SettlingHero() {
 
   const weekResult         = useNFLStore(s => s.weekResult);
   const currentPhase       = useNFLStore(s => s.currentPhase);
+  const currentWeek        = useNFLStore(s => s.currentWeek);
   const pathBackNarrative  = useNFLStore(s => s.pathBackNarrative);
 
   const greeting = getContextGreeting(currentPhase, 'settling', 0, null);
@@ -31,23 +32,27 @@ export function SettlingHero() {
       <Text style={[bodyType.regular, styles.salutation, {color: colors.textSecondary}]}>
         {greeting}
       </Text>
-      <Text style={[bodyType.bold, styles.eyebrow, {color: colors.textPrimary}]}>
-        SETTLING
+      <Text style={[bodyType.bold, styles.eyebrow, {color: colors.textTertiary}]}>
+        RESULTS
       </Text>
 
       <View style={[styles.resultCard, {backgroundColor: colors.surfaceElevated, borderColor: colors.border}]}>
         <Text style={[bodyType.bold, styles.resultLabel, {color: colors.textSecondary}]}>
-          This week
+          Week {currentWeek} Score
         </Text>
         <View style={styles.resultRow}>
           <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.6}
             style={[
               displayType.display,
               monoType.regular,
               {
-                fontSize: displayType.size.display3,
+                flexShrink: 1,
+                fontSize: displayType.size.display2,
                 color: isPositive ? colors.success : colors.error,
-                lineHeight: displayType.size.display3 * 0.88,
+                lineHeight: displayType.size.display2,
               },
             ]}>
             {isPositive ? '+' : ''}{points}
@@ -91,15 +96,17 @@ export function SettlingHero() {
 const styles = StyleSheet.create({
   wrap:        {paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.lg, gap: spacing.md},
   salutation:  {fontSize: 13},
-  eyebrow:     {fontSize: 11, letterSpacing: 2},
+  // Matches the "YOUR CONTESTS" section title (fontSize 11 / letterSpacing 1.8
+  // / textTertiary) so RESULTS reads as a section header, not a status word.
+  eyebrow:     {fontSize: 11, letterSpacing: 1.8},
   resultCard: {
     padding: spacing.lg,
     borderRadius: borderRadius.lg + 4,
     borderWidth: StyleSheet.hairlineWidth,
   },
   resultLabel: {fontSize: 11, letterSpacing: 2, marginBottom: spacing.sm},
-  resultRow:   {flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm},
-  ptsLabel:    {fontSize: 24, paddingBottom: 12},
+  resultRow:   {flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm},
+  ptsLabel:    {fontSize: 24},
   detail:      {fontSize: 13, marginTop: spacing.sm},
   narrative:   {fontSize: 14, marginTop: spacing.sm, lineHeight: 20},
   cta: {

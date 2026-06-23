@@ -38,6 +38,8 @@ export function useSeasonSubmitState(): SeasonSubmitState {
   const hotPickCount   = useSeasonStore(s => s.getHotPickCount());
   const pickCount      = useSeasonStore(s => s.getPickCount());
   const currentWeek    = useNFLStore(s => s.currentWeek);
+  const weekState      = useNFLStore(s => s.weekState);
+  const viewedWeek     = useSeasonStore(s => s.currentWeek);
 
   const isDemo = config?.competition === DEMO_COMPETITION;
   const [demoSubmitting, setDemoSubmitting] = useState(false);
@@ -57,8 +59,18 @@ export function useSeasonSubmitState(): SeasonSubmitState {
     return false;
   });
 
+  // Picks are editable ONLY in the picks_open / live window of the CURRENT week
+  // (mirrors SeasonPicksScreen.picksAreOpen). Outside it — weekState
+  // locked/settling/complete, or browsing a past/future week — every pick is
+  // locked even when the game rows still read 'scheduled' (e.g. the sim's
+  // 'locked' state before kickoff, where lock_at may be unset). Within 'live',
+  // allGamesLocked still covers the case where every game has kicked off.
+  const picksWindowOpen =
+    (weekState === 'picks_open' || weekState === 'live') && viewedWeek === currentWeek;
+  const fullyLocked = !picksWindowOpen || allGamesLocked;
+
   const state: PicksSubmitState = (() => {
-    if (allGamesLocked) return 'locked';
+    if (fullyLocked) return 'locked';
     if (demoSubmitting) return 'submitted';
     if (isWeekComplete) return 'submitted';
     if (pickCount === 0) return 'no_picks';
