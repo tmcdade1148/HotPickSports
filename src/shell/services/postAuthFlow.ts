@@ -136,5 +136,9 @@ export async function runPostAuthFlow({
   // Register push token for returning users (non-blocking)
   registerForPushNotifications(user.id).catch(() => {});
 
-  navigation.replace('Home');
+  // reset (not replace) so Welcome/EmailEntry/onboarding screens are cleared
+  // from the stack. With replace, the stack ended up [Welcome, Home] (Welcome
+  // was reached via navigate), so an Android back-gesture / iOS edge-swipe from
+  // Home popped back to Welcome and looked like a sign-out.
+  navigation.reset({index: 0, routes: [{name: 'Home'}]});
 }

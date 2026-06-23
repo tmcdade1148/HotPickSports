@@ -30,7 +30,10 @@ export function TosVersionGateScreen({navigation, route}: any) {
         if (isNewUser) {
           navigation.replace('ProfileSetup');
         } else {
-          navigation.replace('Home');
+          // reset, not replace — this gate is reached via replace from
+          // [Welcome, …], so replace would leave Welcome beneath Home and a
+          // back-gesture/swipe would pop to the login screen (looks like sign-out).
+          navigation.reset({index: 0, routes: [{name: 'Home'}]});
         }
       } else {
         Alert.alert('Error', 'Could not accept terms. Please try again.');

@@ -99,7 +99,9 @@ export function DemoResultScreen() {
       // non-critical
     }
     exitDemo();
-    navigation.navigate('Home');
+    // reset, not navigate — clears the demo/onboarding + Welcome screens
+    // beneath Home so a back-gesture/swipe can't pop back to the login screen.
+    navigation.reset({index: 0, routes: [{name: 'Home'}]});
   };
   const handleTryAgain = async () => {
     // Wipe the previous run (server picks + scores), clear the local reveal,
