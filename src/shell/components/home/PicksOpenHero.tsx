@@ -181,22 +181,14 @@ export function PicksOpenHero() {
     ctaLabel = "YOU'RE MISSING A FEW PICKS";
     ctaAccessibilityLabel = "You're missing a few picks";
   } else if (allPicks && hotPickDesignated) {
-    ctaLabel = 'REVIEW PICKS / SEE GAMES';
-    ctaAccessibilityLabel = 'Review your picks or see the games';
+    ctaLabel = 'VIEW OR REVISE YOUR PICKS';
+    ctaAccessibilityLabel = 'View or revise your picks';
   } else if (picksSet > 0) {
     ctaLabel = 'FINISH YOUR PICKS';
     ctaAccessibilityLabel = 'Finish your picks';
   }
   const missedGames = Math.max(0, picksTotal - picksSet);
   const isPartial = picksSet > 0 && !allPicks;
-
-  // The "You can VIEW or" lead-in (a 2nd CTA line) only renders in the dimmed
-  // all-done state before any kickoff. When present, the arrow bottom-aligns
-  // with the main label line (flex-end); otherwise the label is a single line
-  // and the arrow must CENTER with it. weekComplete uses its own top-aligned
-  // 2-line layout (lead-in below the label).
-  const hasLeadIn =
-    allPicks && hotPickDesignated && !isLockingWave && !allGamesLocked && !weekComplete;
 
   const picksConfirm = allPicks
     ? 'All picks set'
@@ -613,21 +605,10 @@ export function PicksOpenHero() {
 
         <View style={[
           styles.ctaBody,
-          hasLeadIn || weekComplete ? styles.ctaBodyTight : null,
-          weekComplete
-            ? styles.ctaBodyTopAligned
-            : !hasLeadIn
-              ? styles.ctaBodyCentered
-              : null,
+          weekComplete ? styles.ctaBodyTight : null,
+          weekComplete ? styles.ctaBodyTopAligned : styles.ctaBodyCentered,
         ]}>
           <View style={styles.ctaLabel}>
-            {/* "You can VIEW or" lead-in only in the dimmed all-done state
-                before any kickoff — suppressed once games start locking. */}
-            {hasLeadIn && (
-              <Text style={[bodyType.regular, styles.ctaLeadIn, {color: colors.onPrimary}]}>
-                You can <Text style={bodyType.bold}>VIEW</Text> or
-              </Text>
-            )}
             <Text
               style={[displayType.display, styles.ctaText, {color: colors.onPrimary}]}
               numberOfLines={1}
@@ -635,8 +616,8 @@ export function PicksOpenHero() {
               minimumFontScale={0.55}>
               {ctaLabel}
             </Text>
-            {/* Week-complete follow-up — smaller italic line under the main
-                label, mirroring the lead-in pattern but stacked below. */}
+            {/* Week-complete follow-up — a small italic line stacked below the
+                main label (e.g. "see how it played out" under "WEEK 8 COMPLETE"). */}
             {weekComplete && (
               <Text style={[bodyType.regular, styles.ctaFollowOn, {color: colors.onPrimary}]}>
                 see how it played out
@@ -911,15 +892,8 @@ const styles = StyleSheet.create({
     minWidth: 0,
     alignItems: 'center',
   },
-  ctaLeadIn: {
-    fontSize: 10,
-    lineHeight: 11,
-    fontStyle: 'italic',
-    opacity: 0.78,
-    marginBottom: -1,
-  },
-  // Same small italic styling as the lead-in but stacks below the main
-  // label (e.g. "see how it played out" under "WEEK 8 COMPLETE").
+  // Small italic line stacked below the main label (e.g. "see how it
+  // played out" under "WEEK 8 COMPLETE").
   ctaFollowOn: {
     fontSize: 10,
     lineHeight: 11,
