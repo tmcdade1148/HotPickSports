@@ -169,18 +169,30 @@ describe('scorePicks — combined / edge cases', () => {
     expect(userAggs[0]).toMatchObject({week_points: 9, correct_picks: 2, total_picks: 2});
   });
 
-  it('skips picks whose game is not final / has no winner (not counted)', () => {
+  it('scores a TIE (final game, no winner) as a loss — not skipped', () => {
+    // A null winner_team on a game that IS in the map (i.e. final) is a tie, which
+    // counts as a loss: a non-HotPick tie is 0 pts but still a counted pick.
     const games = new Map([
-      ['g1', game(null, 5)], // not decided
+      ['g1', game(null, 5)], // final, tied
       ['g2', game('SF', 3)],
     ]);
     const {userAggs, pickResults, scoredUserIds} = scorePicks(games, [
-      pick({user_id: 'u1', game_id: 'g1', picked_team: 'KC'}), // skipped
+      pick({user_id: 'u1', game_id: 'g1', picked_team: 'KC'}), // tie → loss, 0 pts, counted
       pick({user_id: 'u1', game_id: 'g2', picked_team: 'SF'}), // +1
     ]);
-    expect(userAggs[0]).toMatchObject({week_points: 1, total_picks: 1});
-    expect(pickResults).toHaveLength(1);
+    expect(userAggs[0]).toMatchObject({week_points: 1, total_picks: 2});
+    expect(pickResults).toHaveLength(2);
+    expect(pickResults.find(r => r.game_id === 'g1')).toMatchObject({is_correct: false, points: 0});
     expect(scoredUserIds.has('u1')).toBe(true);
+  });
+
+  it('scores a HotPick on a TIE as a loss of -rank', () => {
+    const games = new Map([['g1', game(null, 7)]]); // final, tied
+    const {userAggs, pickResults} = scorePicks(games, [
+      pick({user_id: 'u1', game_id: 'g1', picked_team: 'KC', is_hotpick: true}), // tie → -7
+    ]);
+    expect(userAggs[0]).toMatchObject({week_points: -7, total_picks: 1, is_hotpick_correct: false});
+    expect(pickResults[0]).toMatchObject({is_correct: false, points: -7});
   });
 
   it('backfills a zero-row for a user whose only picked game is not final yet', () => {

@@ -325,20 +325,20 @@ async function scoreWeek(admin: any, competition: string, year: number, week: nu
   for (const p of picks ?? []) {
     const g: any = gameMap.get(p.game_id);
     if (!g) continue;
-    const isTie = g.winner === null;
-    const isWin = !isTie && p.picked_team === g.winner;
+    // gameMap holds only FINAL games. A null winner is a TIE → scored as a LOSS
+    // (isWin false): non-HotPick → 0, HotPick → -rank. Matches _shared/scoring.ts.
+    const isWin = g.winner !== null && p.picked_team === g.winner;
     const agg = byUser.get(p.user_id) ?? { user_id: p.user_id, week_points: 0, correct_picks: 0, total_picks: 0, is_hotpick_correct: null, hotpick_rank: null };
     agg.total_picks += 1;
     let pickPoints = 0;
     if (p.is_hotpick) {
       agg.hotpick_rank = g.rank;
       if (isWin) { pickPoints = g.rank; agg.week_points += g.rank; agg.correct_picks += 1; agg.is_hotpick_correct = true; }
-      else if (!isTie) { pickPoints = -g.rank; agg.week_points -= g.rank; agg.is_hotpick_correct = false; }
+      else { pickPoints = -g.rank; agg.week_points -= g.rank; agg.is_hotpick_correct = false; }
     } else if (isWin) {
       pickPoints = 1; agg.week_points += 1; agg.correct_picks += 1;
     }
-    // Skip ties (no winner) — matches production, which leaves those picks unscored.
-    if (!isTie) pickResults.push({ user_id: p.user_id, game_id: p.game_id, is_correct: isWin, points: pickPoints });
+    pickResults.push({ user_id: p.user_id, game_id: p.game_id, is_correct: isWin, points: pickPoints });
     byUser.set(p.user_id, agg);
   }
 
