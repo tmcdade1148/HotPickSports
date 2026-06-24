@@ -409,7 +409,7 @@ const STAGE_INFO = {
 const REFRESH_MS = 30000;
 // Bump on each console change so you can confirm the loaded file is current
 // (file:// caching otherwise hides updates). Shown next to the wordmark.
-const CONSOLE_BUILD = 'build 2026-06-24.5 · cta-copy';
+const CONSOLE_BUILD = 'build 2026-06-24.6 · confirm-line';
 document.getElementById('build-stamp').textContent = CONSOLE_BUILD;
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -964,14 +964,14 @@ const HOME_SCREEN_SPECS = {
       '"Locked & loaded."  — final minutes',
       '"Bold call — your HotPick is the first game."',
     ],
-    elements: ['HotPick card: matchup + inline kickoff countdown', 'Confirm line: "All your picks are in and your HotPick is locked."'],
+    elements: ['HotPick card: matchup + inline kickoff countdown', 'Confirm line: "All your picks are in — revise anytime before kickoff." (→ "…and locked." once all games lock)'],
     cta: 'MAKE YOUR PICKS → FINISH YOUR PICKS → VIEW OR REVISE YOUR PICKS' },
 
   locked: { title: 'LOCKED (pencils-down preview)',
     note: 'Same hero as PICKS OPEN — this beat is near-instant in production (see the locked note in Controls / Timeline).',
     eyebrow: 'EDITABLE PICKS  /  LOCKED PICKS',
     headlines: ['"Feeling good about your HotPick?"', '"Picks are set."', '"Locked & loaded."'],
-    elements: ['HotPick card with kickoff countdown', 'Confirm line: "All your picks are in and your HotPick is locked."'],
+    elements: ['HotPick card with kickoff countdown', 'Confirm line: "All your picks are in — revise anytime before kickoff." (→ "…and locked." once all games lock)'],
     cta: 'VIEW OR REVISE YOUR PICKS' },
 
   live: { title: 'LIVE',

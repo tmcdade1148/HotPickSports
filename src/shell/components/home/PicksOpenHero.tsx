@@ -199,7 +199,9 @@ export function PicksOpenHero() {
   const confirmLine = isPartial
     ? `You still have ${missedGames} pick${missedGames === 1 ? '' : 's'} to make`
     : allPicks && hotPickDesignated
-    ? "All your picks are in and your HotPick is locked."
+    ? allGamesLocked
+      ? 'All your picks are in and locked.'
+      : 'All your picks are in — revise anytime before kickoff.'
     : `${picksConfirm} · ${hotPickConfirm}`;
 
   // HotPick game preview — surfaces the actual matchup + kickoff once the
