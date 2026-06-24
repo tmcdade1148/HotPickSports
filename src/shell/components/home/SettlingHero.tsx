@@ -13,6 +13,7 @@ import {useTheme} from '@shell/theme/hooks';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {displayType, bodyType, monoType, spacing, borderRadius} from '@shared/theme';
 import {getContextGreeting} from './salutation';
+import {buildWeekRecap} from './weekRecap';
 
 export function SettlingHero() {
   const {colors} = useTheme();
@@ -33,13 +34,10 @@ export function SettlingHero() {
         {greeting}
       </Text>
       <Text style={[bodyType.bold, styles.eyebrow, {color: colors.textTertiary}]}>
-        RESULTS
+        YOUR WEEK {currentWeek} RESULT
       </Text>
 
       <View style={[styles.resultCard, {backgroundColor: colors.surfaceElevated, borderColor: colors.border}]}>
-        <Text style={[bodyType.bold, styles.resultLabel, {color: colors.textSecondary}]}>
-          Week {currentWeek} Score
-        </Text>
         <View style={styles.resultRow}>
           <Text
             numberOfLines={1}
@@ -62,11 +60,9 @@ export function SettlingHero() {
           </Text>
         </View>
 
-        {weekResult?.hotPickCorrect != null && (
+        {weekResult && (
           <Text style={[bodyType.regular, styles.detail, {color: colors.textSecondary}]}>
-            HotPick {weekResult.hotPickCorrect ? 'hit' : 'missed'}
-            {' · '}
-            {weekResult.correctPicks}/{weekResult.totalPicks} games
+            {buildWeekRecap(weekResult)}
           </Text>
         )}
 
@@ -97,14 +93,13 @@ const styles = StyleSheet.create({
   wrap:        {paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.lg, gap: spacing.md},
   salutation:  {fontSize: 26},
   // Matches the "YOUR CONTESTS" section title (fontSize 11 / letterSpacing 1.8
-  // / textTertiary) so RESULTS reads as a section header, not a status word.
+  // / textTertiary) so the result title reads as a section header.
   eyebrow:     {fontSize: 11, letterSpacing: 1.8},
   resultCard: {
     padding: spacing.lg,
     borderRadius: borderRadius.lg + 4,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  resultLabel: {fontSize: 11, letterSpacing: 2, marginBottom: spacing.sm},
   resultRow:   {flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm},
   ptsLabel:    {fontSize: 24},
   detail:      {fontSize: 13, marginTop: spacing.sm},
