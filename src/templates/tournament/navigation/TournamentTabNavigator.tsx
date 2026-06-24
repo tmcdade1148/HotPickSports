@@ -47,7 +47,9 @@ function PicksNavigator() {
 
 function SmackTalkTab() {
   const poolId = useTournamentStore(s => s.poolId);
-  return <SmackTalkScreen poolId={poolId} />;
+  // key={poolId} → remount per pool so the composer draft + welcome-prefill
+  // guard don't leak across pools.
+  return <SmackTalkScreen key={poolId} poolId={poolId} />;
 }
 
 // ---------------------------------------------------------------------------
