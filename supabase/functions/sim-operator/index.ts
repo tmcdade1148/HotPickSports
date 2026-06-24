@@ -318,6 +318,10 @@ async function scoreWeek(admin: any, competition: string, year: number, week: nu
     .select("user_id, game_id, picked_team, is_hotpick").eq("competition", competition).eq("season_year", year).eq("week", week);
 
   const byUser = new Map<string, any>();
+  // Per-pick results written back to season_picks (points + is_correct), mirroring
+  // production's nfl-calculate-scores. Without this the per-game points next to
+  // FINAL on the picks cards never render in the sim (season_picks.points stays null).
+  const pickResults: any[] = [];
   for (const p of picks ?? []) {
     const g: any = gameMap.get(p.game_id);
     if (!g) continue;
@@ -325,14 +329,24 @@ async function scoreWeek(admin: any, competition: string, year: number, week: nu
     const isWin = !isTie && p.picked_team === g.winner;
     const agg = byUser.get(p.user_id) ?? { user_id: p.user_id, week_points: 0, correct_picks: 0, total_picks: 0, is_hotpick_correct: null, hotpick_rank: null };
     agg.total_picks += 1;
+    let pickPoints = 0;
     if (p.is_hotpick) {
       agg.hotpick_rank = g.rank;
-      if (isWin) { agg.week_points += g.rank; agg.correct_picks += 1; agg.is_hotpick_correct = true; }
-      else if (!isTie) { agg.week_points -= g.rank; agg.is_hotpick_correct = false; }
+      if (isWin) { pickPoints = g.rank; agg.week_points += g.rank; agg.correct_picks += 1; agg.is_hotpick_correct = true; }
+      else if (!isTie) { pickPoints = -g.rank; agg.week_points -= g.rank; agg.is_hotpick_correct = false; }
     } else if (isWin) {
-      agg.week_points += 1; agg.correct_picks += 1;
+      pickPoints = 1; agg.week_points += 1; agg.correct_picks += 1;
     }
+    // Skip ties (no winner) — matches production, which leaves those picks unscored.
+    if (!isTie) pickResults.push({ user_id: p.user_id, game_id: p.game_id, is_correct: isWin, points: pickPoints });
     byUser.set(p.user_id, agg);
+  }
+
+  // Write per-pick results back to season_picks via the same RPC production uses.
+  if (pickResults.length) {
+    await admin.rpc("apply_season_pick_results", {
+      p_competition: competition, p_season_year: year, p_week: week, p_results: pickResults,
+    });
   }
 
   const rows = Array.from(byUser.values()).map((u: any) => ({
