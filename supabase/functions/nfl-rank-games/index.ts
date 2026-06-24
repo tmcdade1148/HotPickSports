@@ -70,6 +70,11 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     competition = body.competition ?? "nfl_2026";
     const force = Boolean(body.force);
+    // silent: skip the "picks locked" SmackTalk broadcast. Used when re-ranking
+    // PAST weeks during an odds backfill so we don't spam pools with backdated
+    // lock messages. Live weekly cron passes no `silent`, so its behavior is
+    // unchanged.
+    const silent = Boolean(body.silent);
 
     const { data: configRows } = await supabase
       .from("competition_config").select("key, value").eq("competition", competition);
@@ -116,8 +121,10 @@ Deno.serve(async (req) => {
     }
 
     // ── SmackTalk: post "picks locked" to all pools with per-pool counts ──
-    const { data: pools } = await supabase
-      .from("pools").select("id").eq("competition", competition).eq("is_archived", false);
+    const { data: pools } = silent
+      ? { data: [] as { id: string }[] }
+      : await supabase
+          .from("pools").select("id").eq("competition", competition).eq("is_archived", false);
 
     if (pools && pools.length > 0) {
       // Count distinct users who submitted picks this week
