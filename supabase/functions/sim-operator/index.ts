@@ -49,13 +49,19 @@ const SOURCE_COMPETITION = "nfl_2025";
 const VALID_ACTIONS = ["advance_week_state", "advance_game_day", "advance_phase", "jump_to_week", "reset_to_off_season", "auto_pick_tom"];
 
 // NFL kickoff slots ("waves") derived from kickoff_at — matches tools/sim-runner.mjs.
-const WAVE_ORDER = ["thursday", "sunday1", "sunday4", "snf", "mnf", "other"];
+// Ordered chronologically: the Sunday-morning international game (~9:30am ET,
+// 13:30 UTC) kicks off BEFORE the 1pm slate, so "sunday_am" comes before "sunday1".
+const WAVE_ORDER = ["thursday", "sunday_am", "sunday1", "sunday4", "snf", "mnf", "other"];
 function detectWave(kickoffAt: string | null): string {
   if (!kickoffAt) return "other";
   const d = new Date(kickoffAt);
   const day = d.getUTCDay(), hour = d.getUTCHours();
   if (day === 4 && hour >= 17) return "thursday";
   if (day === 5 && hour < 4) return "thursday";
+  // Sunday morning international game: Sunday (day 0) before the 1pm ET slate
+  // (17:00 UTC). Without this it fell through to "other" (last), so the
+  // earliest game of the day kicked off dead last — after MNF.
+  if (day === 0 && hour >= 4 && hour < 17) return "sunday_am";
   if (day === 0 && hour >= 17 && hour < 20) return "sunday1";
   if (day === 0 && hour >= 20 && hour < 23) return "sunday4";
   if (day === 0 && hour >= 23) return "snf";
