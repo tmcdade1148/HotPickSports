@@ -1,8 +1,9 @@
 name: CI
 
 # Runs on every PR into main and on pushes to main. Spins up a fresh
-# machine, installs dependencies, then runs the two fast, deterministic
-# checks: a full TypeScript typecheck and the locked lexicon test.
+# machine, installs dependencies, then runs the fast, deterministic checks:
+# a full TypeScript typecheck, the Jest suite (incl. the locked lexicon test),
+# ESLint, and the Home Screen copy <-> Operator Console drift guard.
 #
 # workflow_dispatch allows running the checks on demand from the Actions tab
 # (pick any branch). Useful when a PR opened by an automation/integration token
@@ -45,3 +46,10 @@ jobs:
       # Deno edge functions are excluded via .eslintignore.
       - name: Lint
         run: npx eslint .
+
+      # Doc-sync guard: the Operator Console (tools/hotpick-operator-console.html)
+      # hand-mirrors the app's Home Screen copy. Fails if a salutation/headline the
+      # console shows no longer exists in src/shell/components/home/* (drift).
+      # Zero-dependency Node script — see tools/check-home-spec-sync.mjs.
+      - name: Home Screen copy sync (console <-> app)
+        run: node tools/check-home-spec-sync.mjs
