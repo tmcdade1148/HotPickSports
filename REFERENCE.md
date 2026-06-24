@@ -540,7 +540,7 @@ Since the v3 redesign, `picks_open` / `locked` / `live` all render **one** hero 
 - *No HotPick yet:* "Make your picks. First game kicks off in:" · "{n} of {total} picks in — you still need a HotPick. First kickoff in:" · "You've missed kickoff but it's not too late to pick some real winners."
 - *HotPick set:* "Feeling good about your HotPick?" (calm) · "Picks are set." (tightening) · "Locked & loaded." (final minutes) · "Bold call — your HotPick is the first game."
 
-> The Operator Console's "Home Screen Spec Preview" mirrors this copy; `tools/check-home-spec-sync.mjs` guards against drift. There is no shared source — keep both in sync by hand.
+> The Operator Console's Home Screen Spec Preview mirrors this same copy; `tools/check-home-spec-sync.mjs` guards both this section and that snapshot against drift. There is no shared source — re-sync by hand after any copy change.
 
 ### Join Pool Module
 - Shown when user has no visible private pool

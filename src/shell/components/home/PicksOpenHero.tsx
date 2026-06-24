@@ -696,9 +696,9 @@ export function PicksOpenHero() {
  * HotPick is designated the countdown moves inline into the HotPick card, so
  * those strings stand alone with no "kicks off in:" lead-in.
  *
- * SYNC: the Operator Console (tools/hotpick-operator-console.html) hand-mirrors
- * these headlines in its Home Screen Spec Preview. If you change copy here,
- * update that snapshot and run `node tools/check-home-spec-sync.mjs`.
+ * SYNC: the Operator Console (tools/hotpick-operator-console.html) AND
+ * REFERENCE.md §11 hand-mirror these headlines. If you change copy here,
+ * update both and run `node tools/check-home-spec-sync.mjs` (it guards both).
  */
 function buildContextualMessage(opts: {
   picksSet: number;
