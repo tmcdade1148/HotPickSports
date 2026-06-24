@@ -168,7 +168,10 @@ function SmackTalkTab() {
   return (
     <SafeAreaView style={{flex: 1, backgroundColor: colors.background}} edges={['top']}>
       <PoolHeader />
-      <SmackTalkScreen poolId={smackPoolId} />
+      {/* key={smackPoolId} → remount on pool switch so the composer draft and
+          the one-time welcome-prefill guard reset per pool. Without it the
+          first pool's welcome opener leaks into every other pool's composer. */}
+      <SmackTalkScreen key={smackPoolId} poolId={smackPoolId} />
     </SafeAreaView>
   );
 }

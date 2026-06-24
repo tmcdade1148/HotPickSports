@@ -49,7 +49,9 @@ const ICON_MAP: Record<string, React.ComponentType<any>> = {
 
 function SmackTalkTab() {
   const poolId = useSeasonStore(s => s.poolId);
-  return <SmackTalkScreen poolId={poolId} />;
+  // key={poolId} → remount per pool so the composer draft + welcome-prefill
+  // guard don't leak across pools.
+  return <SmackTalkScreen key={poolId} poolId={poolId} />;
 }
 
 // ---------------------------------------------------------------------------

@@ -794,14 +794,17 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
 
   return (
     // KAV notes:
-    //   behavior="padding" + keyboardVerticalOffset=0 is correct for a KAV
-    //   that lives inside a tab screen. The KAV's bottom edge already sits
-    //   above the tab bar, so RN's padding math (keyboard_height -
-    //   tab_bar_height + verticalOffset) only needs offset=0. Any positive
-    //   offset shows up as a literal white gap between input and keyboard.
+    //   iOS: behavior="padding" + keyboardVerticalOffset=0 — the KAV's bottom
+    //   edge already sits above the tab bar, so RN's padding math only needs
+    //   offset=0; any positive offset shows as a white gap above the keyboard.
+    //   Android: Expo SDK 55 enables edge-to-edge by default, which makes the
+    //   manifest's windowSoftInputMode="adjustResize" ineffective — so a
+    //   behavior={undefined} KAV is a no-op and the keyboard covers the input.
+    //   "height" makes the KAV shrink to the space above the keyboard, lifting
+    //   the composer into view.
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={0}>
       {messages.length === 0 ? (
         // Tap-to-dismiss: when the chat is empty there's no FlatList to
