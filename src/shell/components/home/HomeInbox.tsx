@@ -71,7 +71,7 @@ export function HomeInbox() {
         .eq('user_id', user.id)
         .eq('status', 'active');
       if (cancelled) return;
-      const rows = (data ?? []) as Array<{
+      const rows = (data ?? []) as unknown as Array<{
         pool_id: string;
         joined_at: string | null;
         pools: {is_global: boolean; is_hidden_from_users: boolean} | null;
