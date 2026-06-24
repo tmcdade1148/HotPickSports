@@ -440,6 +440,13 @@ export function HomeScreen() {
             progressViewOffset={headerHeight}
           />
         }>
+        {/* HotPick super-admin broadcast banner — sits at the very top of the
+            scroll, directly under the SEASON PTS header row and ABOVE the first
+            module (the hero), in every state. Resolves the hidden Platform Pool
+            independent of the active competition; self-hides when nothing's
+            unread. */}
+        <HomeInbox />
+
         {showHero &&
           (configLoaded ? (
             <StateHero state={homeState} />
@@ -448,12 +455,6 @@ export function HomeScreen() {
             // the default-state (Week 1 picks-open) hero on a cold launch.
             <HeroSkeleton />
           ))}
-
-        {/* HotPick super-admin broadcast banner — always sits ABOVE Your
-            Contests in every state (in-cycle and off-cycle), per the
-            2026-06-15 sender-routing model. Scoped to the hidden Platform
-            Pool; self-hides when there's nothing unread. */}
-        <HomeInbox />
 
         {/* Off-cycle layout per the OffseasonPreseasonHome spec
             (May 29, 2026): action stack → cross-Contest strip →

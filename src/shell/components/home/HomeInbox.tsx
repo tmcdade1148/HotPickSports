@@ -35,12 +35,14 @@ export function HomeInbox() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
   const user = useGlobalStore(s => s.user);
+
   // The hidden Platform Pool is where super-admin "All Users" broadcasts land.
-  // This banner is scoped to it alone; Gaffer pool broadcasts render on the
-  // Contest pill instead.
-  const platformPoolId = useGlobalStore(
-    s => s.userPools.find(p => p.is_global && p.is_hidden_from_users)?.id ?? null,
-  );
+  // It lives on the nfl_2026 competition, but this banner must surface
+  // platform-wide announcements no matter which competition the user is
+  // currently viewing — so we resolve it from the user's FULL membership set
+  // below (competition-independent), NOT from the competition-scoped
+  // globalStore.userPools (which omits it on any other competition/sim).
+  const [platformPoolId, setPlatformPoolId] = useState<string | null>(null);
 
   // Track join time per pool — a broadcast sent BEFORE the user joined a pool
   // is not "unread" for them (otherwise every new signup inherits old pool
@@ -52,20 +54,33 @@ export function HomeInbox() {
   // Load membership once when the user changes. The user's set of
   // active pool memberships is stable mid-session — membership joins/
   // leaves go through dedicated screens, not the Home Realtime path.
+  // NOT competition-scoped: we pull every active membership and locate the
+  // global+hidden Platform Pool from the joined flags, so the banner works
+  // regardless of the active sport/competition.
   useEffect(() => {
     let cancelled = false;
     if (!user?.id) {
       setPools(null);
+      setPlatformPoolId(null);
       return;
     }
     (async () => {
       const {data} = await supabase
         .from('pool_members')
-        .select('pool_id, joined_at')
+        .select('pool_id, joined_at, pools!inner(is_global, is_hidden_from_users)')
         .eq('user_id', user.id)
         .eq('status', 'active');
       if (cancelled) return;
-      setPools((data ?? []) as {pool_id: string; joined_at: string | null}[]);
+      const rows = (data ?? []) as Array<{
+        pool_id: string;
+        joined_at: string | null;
+        pools: {is_global: boolean; is_hidden_from_users: boolean} | null;
+      }>;
+      setPools(rows.map(r => ({pool_id: r.pool_id, joined_at: r.joined_at})));
+      const platform = rows.find(
+        r => r.pools?.is_global && r.pools?.is_hidden_from_users,
+      );
+      setPlatformPoolId(platform?.pool_id ?? null);
     })();
     return () => { cancelled = true; };
   }, [user?.id]);
