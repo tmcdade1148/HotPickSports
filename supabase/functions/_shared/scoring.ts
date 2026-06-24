@@ -103,7 +103,9 @@ function emptyAgg(user_id: string): UserAgg {
  *   • Non-HotPick loss → 0
  *   • HotPick win → +rank (×2 if double_down), correct_picks +1, is_hotpick_correct=true
  *   • HotPick loss → −rank, is_hotpick_correct=false (only if not already true)
- *   • Picks whose game isn't final / has no winner are skipped (not counted)
+ *   • A TIE (final game with no winner_team) is scored as a LOSS — non-HotPick → 0,
+ *     HotPick → −rank. It is NOT skipped.
+ *   • Picks whose game isn't final yet (absent from gameMap) are skipped (not counted)
  */
 export function scorePicks(gameMap: Map<string, ScoreGame>, picks: ScorePick[]): ScoreResult {
   const aggByUser = new Map<string, UserAgg>();
@@ -111,9 +113,13 @@ export function scorePicks(gameMap: Map<string, ScoreGame>, picks: ScorePick[]):
 
   for (const p of picks) {
     const game = gameMap.get(p.game_id);
-    if (!game || !game.winner_team) continue;
+    // gameMap holds only FINAL games (the caller filters by status). A pick whose
+    // game isn't final yet is absent from the map → skip it (it gets the zero-row
+    // backfill below). A final game WITH a null winner_team is a genuine tie, which
+    // is scored as a loss (isWin === false), not skipped.
+    if (!game) continue;
 
-    const isWin = p.picked_team === game.winner_team;
+    const isWin = !!game.winner_team && p.picked_team === game.winner_team;
     const isHotpick = !!p.is_hotpick;
     const isDoubleDown = p.power_up === 'double_down';
     const rank = game.effectiveRank;
