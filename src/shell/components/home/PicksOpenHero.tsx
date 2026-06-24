@@ -808,6 +808,11 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
     marginBottom: 18,
     textAlign: 'center',
+    // Android clips/compresses the big italic-800 number inside the tight
+    // lineHeight because of its default font padding (iOS lets it overflow), so
+    // the countdown looked un-enlarged on Android. includeFontPadding:false is
+    // Android-only (ignored on iOS) and gives the glyph its full height.
+    includeFontPadding: false,
   },
   // Row that holds the optional "PICKS START LOCKING IN" label to the left of
   // the big countdown number. Carries the bottom margin so the number doesn't.
@@ -834,6 +839,10 @@ const styles = StyleSheet.create({
   lockingLabel: {
     letterSpacing: 0.5,
     textAlign: 'right',
+    // Same Android fix as styles.timer: drop the default font padding so the
+    // lead-in scales with the enlarged countdown instead of being clipped by
+    // the tight per-render lineHeight. No-op on iOS.
+    includeFontPadding: false,
   },
   timerPlaceholder: {
     fontSize: 14,
