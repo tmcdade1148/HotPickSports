@@ -77,6 +77,7 @@ export function HomeScreen() {
   const fetchHighestRankedGame = useNFLStore(s => s.fetchHighestRankedGame);
   const fetchSeasonUserPicks   = useSeasonStore(s => s.fetchUserPicks);
   const fetchSeasonWeekGames   = useSeasonStore(s => s.fetchWeekGames);
+  const setSeasonViewedWeek    = useSeasonStore(s => s.setCurrentWeek);
   const fetchSeasonLeaderboard = useSeasonStore(s => s.fetchLeaderboard);
   const seasonInitialize       = useSeasonStore(s => s.initialize);
   const seasonConfig           = useSeasonStore(s => s.config);
@@ -350,8 +351,16 @@ export function HomeScreen() {
   useEffect(() => {
     if (!userId || currentWeek <= 0) return;
     fetchSeasonUserPicks(userId, currentWeek).catch(() => {});
-    fetchSeasonWeekGames(currentWeek).catch(() => {});
-  }, [userId, currentWeek, fetchSeasonUserPicks, fetchSeasonWeekGames, seasonConfig]);
+    // Point seasonStore at the live week BEFORE fetching: fetchWeekGames only
+    // swaps the visible `games` when seasonStore.currentWeek === week (it's
+    // scoped to the viewed week for the Picks screen). At a week rollover
+    // nflStore.currentWeek advances but seasonStore.currentWeek lags, so the
+    // swap was skipped and the Home hero kept rendering last week's final games
+    // (showing "WEEK N COMPLETE" / "LOCKED PICKS" at the top of a fresh week).
+    // force:true also bypasses the per-week cache so a stale entry can't win.
+    setSeasonViewedWeek(currentWeek);
+    fetchSeasonWeekGames(currentWeek, true).catch(() => {});
+  }, [userId, currentWeek, fetchSeasonUserPicks, fetchSeasonWeekGames, setSeasonViewedWeek, seasonConfig]);
 
   useEffect(() => {
     if (!seasonConfig) return;
