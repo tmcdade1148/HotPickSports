@@ -125,17 +125,22 @@ export function CompleteHero() {
               </Text>
             </View>
             <View style={styles.hotPickTeamRow}>
-              <Text
-                style={[
-                  displayType.display,
-                  styles.hotPickMatchup,
-                  {color: colors.textPrimary, flexShrink: 1},
-                ]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.55}>
-                {pickedTeam || userHotPick.picked_team}
-              </Text>
+              {/* flex:1 wrapper so adjustsFontSizeToFit measures against a
+                  definite width — avoids the iOS row mis-measure that shrank
+                  the team name to the minimum even when it fit. */}
+              <View style={styles.hotPickMatchupWrap}>
+                <Text
+                  style={[
+                    displayType.display,
+                    styles.hotPickMatchup,
+                    {color: colors.textPrimary},
+                  ]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.7}>
+                  {pickedTeam || userHotPick.picked_team}
+                </Text>
+              </View>
               {hotPickValue != null && (
                 <View
                   style={[
@@ -312,6 +317,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  hotPickMatchupWrap: {
+    flex: 1,
+    minWidth: 0,
   },
   hotPickMatchup: {
     fontSize: 16,

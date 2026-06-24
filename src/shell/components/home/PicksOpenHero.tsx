@@ -444,17 +444,24 @@ export function PicksOpenHero() {
               )}
             </View>
             <View style={styles.hotPickTeamRow}>
-              <Text
-                style={[
-                  displayType.display,
-                  styles.hotPickMatchup,
-                  {color: colors.textPrimary, flexShrink: 1},
-                ]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.55}>
-                {pickedTeam || `${awayTeam} @ ${homeTeam}`}
-              </Text>
+              {/* flex:1 wrapper so adjustsFontSizeToFit measures against a
+                  definite width. On iOS, adjustsFontSizeToFit + flexShrink
+                  directly on a Text in a row mis-measures and shrinks the name
+                  to the minimum even when it fits — which made the team name
+                  tiny/unreadable. */}
+              <View style={styles.hotPickMatchupWrap}>
+                <Text
+                  style={[
+                    displayType.display,
+                    styles.hotPickMatchup,
+                    {color: colors.textPrimary},
+                  ]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.7}>
+                  {pickedTeam || `${awayTeam} @ ${homeTeam}`}
+                </Text>
+              </View>
               {hotPickValue != null && (
                 <Animated.View
                   style={[
@@ -952,6 +959,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  hotPickMatchupWrap: {
+    flex: 1,
+    minWidth: 0,
   },
   hotPickMatchup: {
     fontSize: 16,
