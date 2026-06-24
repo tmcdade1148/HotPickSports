@@ -32,6 +32,7 @@ export function WeekLockStrip() {
   const weekPicks    = useSeasonStore(s => s.weekPicks);
   const liveScores   = useNFLStore(s => s.liveScores);
   const userHotPick  = useNFLStore(s => s.userHotPick);
+  const weekState    = useNFLStore(s => s.weekState);
 
   // Width available to the dot row, measured at layout. Until it's known we
   // fall back to MAX_DOT (correct for short slates; a packed week corrects on
@@ -40,6 +41,10 @@ export function WeekLockStrip() {
   const onTallyLayout = (e: LayoutChangeEvent) =>
     setRowWidth(e.nativeEvent.layout.width);
 
+  // In picks_open the week hasn't started, so nothing is locked yet — weekState
+  // is the authority. Guards against stale week-rollover games keeping last
+  // week's locked status (which would mislabel a fresh week as "LOCKED PICKS").
+  const picksOpen = weekState === 'picks_open';
   const dots: DotState[] = useMemo(() => {
     if (games.length === 0) return [];
     const pickByGame = new Map(weekPicks.map(p => [p.game_id, p]));
@@ -51,7 +56,7 @@ export function WeekLockStrip() {
       })
       .map(g => {
         const status = liveScores[g.game_id]?.status ?? g.status ?? '';
-        const isLocked = isLockedStatus(status);
+        const isLocked = !picksOpen && isLockedStatus(status);
         const pick = pickByGame.get(g.game_id);
         return {
           gameId: g.game_id,
@@ -60,7 +65,7 @@ export function WeekLockStrip() {
           isHotPick: pick?.is_hotpick === true,
         };
       });
-  }, [games, weekPicks, liveScores]);
+  }, [games, weekPicks, liveScores, picksOpen]);
 
   if (dots.length === 0) return null;
 
