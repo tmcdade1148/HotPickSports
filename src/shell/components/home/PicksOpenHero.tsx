@@ -81,7 +81,14 @@ export function PicksOpenHero() {
   // week (seasonGames), not just liveScores — otherwise the early
   // Thursday-Night-Final-only case false-fires weekComplete.
   const {allGamesLocked, weekComplete} = useMemo(() => {
-    if (seasonGames.length === 0) return {allGamesLocked: false, weekComplete: false};
+    // In picks_open the week hasn't started — nothing is locked or complete.
+    // weekState is the authority (same guard as isLockingWave above). Without
+    // this, last week's still-cached final games (seasonGames lags the week
+    // rollover) make the hero render "WEEK N COMPLETE" at the top of a fresh
+    // picks_open week.
+    if (isPicksOpenState || seasonGames.length === 0) {
+      return {allGamesLocked: false, weekComplete: false};
+    }
     let locked = true;
     let allFinal = true;
     for (const g of seasonGames) {
@@ -90,7 +97,7 @@ export function PicksOpenHero() {
       if (!(isLiveStatus(status) || isFinalStatus(status))) locked = false;
     }
     return {allGamesLocked: locked, weekComplete: allFinal};
-  }, [seasonGames, liveScores]);
+  }, [isPicksOpenState, seasonGames, liveScores]);
 
   const picksSet = userPickCount ?? 0;
   // Effective denominator — picks already made plus games still scheduled
