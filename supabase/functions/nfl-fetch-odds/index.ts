@@ -70,11 +70,26 @@ Deno.serve(async (req) => {
       return json({ error: "Missing ODDS_API_KEY" }, 500);
     }
 
-    const oddsRes = await fetch(
-      `https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?apiKey=${oddsApiKey}&regions=us&markets=spreads,h2h&oddsFormat=american`
-    );
+    // Opt-in historical backfill: when a `snapshot_date` (ISO-8601) is passed the
+    // function hits The Odds API *historical* endpoint, which returns the odds
+    // snapshot at-or-before that instant. Used to backfill past weeks (e.g. the
+    // nfl_2025_sim sandbox) where the live endpoint returns nothing because the
+    // games are over. Requires the Historical Odds add-on on the Odds API plan;
+    // without it the endpoint returns 401/403, surfaced here as "Odds API error".
+    // The live cron (nfl_2026) passes no snapshot_date, so its path is unchanged.
+    const snapshotDate = typeof body.snapshot_date === "string" ? body.snapshot_date : null;
+    const oddsUrl = snapshotDate
+      ? `https://api.the-odds-api.com/v4/historical/sports/americanfootball_nfl/odds?apiKey=${oddsApiKey}&regions=us&markets=spreads,h2h&oddsFormat=american&date=${encodeURIComponent(snapshotDate)}`
+      : `https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?apiKey=${oddsApiKey}&regions=us&markets=spreads,h2h&oddsFormat=american`;
+    const oddsRes = await fetch(oddsUrl);
     if (!oddsRes.ok) throw new Error(`Odds API error ${oddsRes.status}`);
-    const oddsData = await oddsRes.json();
+    const oddsJson = await oddsRes.json();
+    // Historical responses wrap the games array under `.data` (with timestamp
+    // metadata); the live endpoint returns the array directly.
+    const oddsData = snapshotDate ? (oddsJson?.data ?? []) : oddsJson;
+    const snapshotMeta = snapshotDate
+      ? { requested: snapshotDate, returned: oddsJson?.timestamp ?? null }
+      : null;
 
     let updated = 0, skipped = 0, preserved = 0;
     const errors: string[] = [];
@@ -128,6 +143,7 @@ Deno.serve(async (req) => {
     });
 
     return json({ success: true, competition, season_year: seasonYear, week, updated, skipped, preserved, total: games.length, errors,
+      snapshot: snapshotMeta,
       apiUsage: { used: oddsRes.headers.get("x-requests-used"), remaining: oddsRes.headers.get("x-requests-remaining") } }, 200);
   } catch (err) {
     if (week) await markReadiness(competition, week, { odds_status: "failed", odds_error: String(err), odds_at: new Date().toISOString() });
