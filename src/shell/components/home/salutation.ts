@@ -14,6 +14,10 @@
 // Picks now lock per-game at each game's kickoff. The "last call" copy
 // keys off `firstKickoff` (first game of the week) — once that's within
 // 24h, at least some picks are about to lock individually.
+//
+// SYNC: the Operator Console (tools/hotpick-operator-console.html) hand-mirrors
+// this copy in its Home Screen Spec Preview. If you change a salutation here,
+// update that snapshot and run `node tools/check-home-spec-sync.mjs`.
 
 export function getContextGreeting(
   phase: string | null,

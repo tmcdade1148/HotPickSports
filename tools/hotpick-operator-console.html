@@ -409,7 +409,7 @@ const STAGE_INFO = {
 const REFRESH_MS = 30000;
 // Bump on each console change so you can confirm the loaded file is current
 // (file:// caching otherwise hides updates). Shown next to the wordmark.
-const CONSOLE_BUILD = 'build 2026-06-24.3 · home-spec-sync';
+const CONSOLE_BUILD = 'build 2026-06-24.4 · spec-sync-guard';
 document.getElementById('build-stamp').textContent = CONSOLE_BUILD;
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -992,7 +992,7 @@ const HOME_SCREEN_SPECS = {
 
   complete: { title: 'COMPLETE (between weeks)',
     note: 'CompleteHero — its own recap copy, not a salutation pool.',
-    headlines: ['"You sit {ordinal} in {pool}."', '"↑ / ↓ N from last week"', 'Brand-voice week recap (HotPick hit/miss · net points · picks correct)'],
+    headlines: ['"You sit {ordinal} in {pool}."', 'Rank delta — ↑ / ↓ N from last week', 'Brand-voice week recap (HotPick hit/miss · net points · picks correct)'],
     elements: ['Standing + rank delta', 'HotPick hit/miss recap + value', 'Season trend strip'],
     cta: 'WEEK N COMPLETE · review your picks' },
 };
