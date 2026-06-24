@@ -404,7 +404,7 @@ export function PicksOpenHero() {
               backgroundColor: hexToRgba(pillTint, 0.08),
               borderColor: pillTint,
               borderWidth: hotPickIsLive ? 2 : 1,
-              // Frame stays opaque — only the "LIVE" label pulses now.
+              // Frame stays opaque — only the eyebrow ("YOUR HOTPICK IS LIVE") pulses.
             },
           ]}>
           <Pressable
@@ -424,21 +424,24 @@ export function PicksOpenHero() {
           </View>
           <View style={styles.hotPickBody}>
             <View style={styles.hotPickHeaderRow}>
-              <Text style={[bodyType.bold, styles.hotPickEyebrow, {color: pillTint}]}>
-                YOUR HOTPICK
-              </Text>
-              {hotPickIsLive && (
+              {hotPickIsLive ? (
+                // Whole eyebrow reads "YOUR HOTPICK IS LIVE" and pulses, with
+                // LIVE a touch larger. Animated.Text bypasses the
+                // @shared/components/AppText wrapper, so lock font-scaling here.
                 <Animated.Text
-                  // Animated.Text bypasses the @shared/components/AppText
-                  // wrapper, so lock font-scaling explicitly here.
                   allowFontScaling={false}
                   style={[
                     bodyType.bold,
-                    styles.hotPickLiveLabel,
+                    styles.hotPickEyebrow,
                     {color: colors.win, opacity: pulse},
                   ]}>
-                  LIVE
+                  YOUR HOTPICK IS{' '}
+                  <Text style={[bodyType.bold, styles.hotPickLiveWord]}>LIVE</Text>
                 </Animated.Text>
+              ) : (
+                <Text style={[bodyType.bold, styles.hotPickEyebrow, {color: pillTint}]}>
+                  YOUR HOTPICK
+                </Text>
               )}
               {hotPickIsFinal && (
                 <Text style={[bodyType.bold, styles.hotPickFinalLabel, {color: colors.loss}]}>
@@ -473,9 +476,8 @@ export function PicksOpenHero() {
                       backgroundColor: hexToRgba(pillTint, 0.18),
                       borderColor: pillTint,
                       borderWidth: hotPickIsLive ? 2 : 1,
-                      // Value pill stays opaque — pulse is isolated to
-                      // the "LIVE" label so the points number stays
-                      // legible.
+                      // Value pill stays opaque — pulse is isolated to the
+                      // eyebrow line so the points number stays legible.
                     },
                   ]}
                   accessible
@@ -941,8 +943,8 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 1.4,
   },
-  hotPickLiveLabel: {
-    fontSize: 10,
+  hotPickLiveWord: {
+    fontSize: 13,
     letterSpacing: 1.4,
   },
   // FINAL is 1.5× the eyebrow size, sits right next to YOUR HOTPICK.
