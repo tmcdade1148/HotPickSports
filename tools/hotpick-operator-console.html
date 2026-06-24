@@ -409,7 +409,7 @@ const STAGE_INFO = {
 const REFRESH_MS = 30000;
 // Bump on each console change so you can confirm the loaded file is current
 // (file:// caching otherwise hides updates). Shown next to the wordmark.
-const CONSOLE_BUILD = 'build 2026-06-24.2 · locked-preview';
+const CONSOLE_BUILD = 'build 2026-06-24.3 · home-spec-sync';
 document.getElementById('build-stamp').textContent = CONSOLE_BUILD;
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -938,31 +938,63 @@ async function renderLeaderboard() {
     </tr></thead><tbody>${rows}</tbody></table>`;
 }
 
-// ---- Home Screen Spec Preview (static reference; mirrors REFERENCE.md §11) ----
+// ---- Home Screen Spec Preview ----
+// Mirrors the LIVE app copy in src/shell/components/home/*, NOT the legacy
+// REFERENCE.md §11 salutation table. Key fact: picks_open / locked / live all
+// render ONE hero in the app — PicksOpenHero (StateHero.tsx:86-88) — whose prompt
+// is buildContextualMessage() and whose eyebrow is EDITABLE/LOCKED PICKS
+// (WeekLockStrip). settling uses the getContextGreeting() salutation pool;
+// complete renders CompleteHero (its own recap copy, no salutation pool). There's
+// no shared source with the app — re-sync by hand if that copy changes.
 const HOME_SCREEN_SPECS = {
   idle: { title: 'IDLE (off-cycle)',
-    salutations: ['"Nothing today."', '"Rest day."', '"Back at it soon."'],
+    note: 'Off-cycle phases each render their own hero (OffSeason / PreSeason / bridge) — exact copy varies by phase.',
+    salutations: ['"Nothing today"', '"Rest day"', '"Back at it soon"'],
     elements: ['Calm salutation', '0 pts season total', 'Join/create pool CTA', 'SmackTalk pointer'],
     absent: ['No countdown', 'No live data'], cta: 'Join or create a pool' },
+
   picks_open: { title: 'PICKS OPEN',
-    salutations: ['"Picks are open."', '"Your move."', '"Clock\'s running."'],
-    salutationsLate: ['"Last call."', '"Closing time."', '"You sure about this?"'],
-    elements: ['Countdown to kickoff', 'HotPick game preview', 'Social pressure: "X of Y poolies locked in"'],
-    cta: 'Tap to set picks' },
-  locked: { title: 'LOCKED (waiting)',
-    salutations: ['"On record. No edits."', '"Said what you said."', '"Locked in."'],
-    elements: ['Waiting state — picks are in', 'Games have not started yet'], cta: 'View your picks' },
+    note: 'Unified editable-picks hero (PicksOpenHero). The prompt is contextual — it shifts with your picks, HotPick, and time left.',
+    eyebrow: 'EDITABLE PICKS',
+    headlines: [
+      '"Make your picks. First game kicks off in:"  — no picks yet',
+      '"{n} of {total} picks in — you still need a HotPick. First kickoff in:"',
+      '"Feeling good about your HotPick?"  — all picks in + HotPick set',
+      '"Picks are set."  — deadline tightening',
+      '"Locked & loaded."  — final minutes',
+      '"Bold call — your HotPick is the first game."',
+    ],
+    elements: ['HotPick card: matchup + inline kickoff countdown', 'Confirm line: "All your picks are in and your HotPick is locked."'],
+    cta: 'MAKE YOUR PICKS → FINISH YOUR PICKS → REVIEW PICKS / SEE GAMES' },
+
+  locked: { title: 'LOCKED (pencils-down preview)',
+    note: 'Same hero as PICKS OPEN — this beat is near-instant in production (see the locked note in Controls / Timeline).',
+    eyebrow: 'EDITABLE PICKS  /  LOCKED PICKS',
+    headlines: ['"Feeling good about your HotPick?"', '"Picks are set."', '"Locked & loaded."'],
+    elements: ['HotPick card with kickoff countdown', 'Confirm line: "All your picks are in and your HotPick is locked."'],
+    cta: 'REVIEW PICKS / SEE GAMES' },
+
   live: { title: 'LIVE',
-    salutations: ['"It\'s happening."', '"Too late to change anything."'],
-    elements: ['HotPick game: teams + live score', 'Current point impact ("+6 if this holds")', 'Pool rank delta'],
-    cta: 'Tap to view live game' },
+    note: 'Same unified hero (PicksOpenHero). Picks for games that have NOT kicked off stay editable; the prompt + eyebrow react wave by wave.',
+    eyebrow: 'EDITABLE PICKS  →  LOCKED PICKS (once all your games lock)',
+    headlines: [
+      '"Feeling good about your HotPick?"  — your HotPick game hasn\'t started yet',
+      '"You\'ve missed kickoff but it\'s not too late to pick some real winners."  — kicked off, no picks',
+      '"{n}/{total} done. Finish up."',
+    ],
+    elements: ['Live score on in-progress games + "GAME IN PROGRESS"', 'HotPick live point impact', 'HotPick card shows live rank value'],
+    cta: 'GO TO THE GAMES' },
+
   settling: { title: 'SETTLING',
-    salutations: ['"The record doesn\'t lie."', '"It\'s official."'],
+    note: 'SettlingHero — greeting comes from the getContextGreeting() salutation pool.',
+    salutations: ['"The record doesn\'t lie"', '"It\'s official"', '"Week closed"'],
     elements: ['Weekly result: net points', 'Rank movement with named players', 'SmackTalk CTA'], cta: 'See the damage' },
+
   complete: { title: 'COMPLETE (between weeks)',
-    salutations: ['"Nothing today."', '"Rest day."', '"Back at it soon."'],
-    elements: ['Season standings as a race ("47 pts behind 1st. 9 weeks left.")', 'Mini sparkline of season trajectory'],
-    cta: 'View season standings' },
+    note: 'CompleteHero — its own recap copy, not a salutation pool.',
+    headlines: ['"You sit {ordinal} in {pool}."', '"↑ / ↓ N from last week"', 'Brand-voice week recap (HotPick hit/miss · net points · picks correct)'],
+    elements: ['Standing + rank delta', 'HotPick hit/miss recap + value', 'Season trend strip'],
+    cta: 'WEEK N COMPLETE · review your picks' },
 };
 
 function renderHomeScreenSpec() {
@@ -977,6 +1009,12 @@ function renderHomeScreenSpec() {
   if (phaseForcesIdle && cfg('week_state') && cfg('week_state') !== 'idle') {
     html += `<div class="hs-warn">Phase <strong>${phase}</strong> is outside the weekly cycle —
       <code>week_state="${cfg('week_state')}"</code> is ignored; the app shows the idle card.</div>`;
+  }
+  if (spec.note) html += `<div class="hs-line hs-line-absent" style="font-style:italic;margin:2px 0 6px;">${spec.note}</div>`;
+  if (spec.eyebrow) { html += `<div class="hs-section">Eyebrow</div><div class="hs-line">${spec.eyebrow}</div>`; }
+  if (spec.headlines) {
+    html += `<div class="hs-section">Headline (contextual — one of)</div>`;
+    spec.headlines.forEach(h => html += `<div class="hs-quote">${h}</div>`);
   }
   if (spec.salutations) {
     html += `<div class="hs-section">Salutation (any of)</div>`;
