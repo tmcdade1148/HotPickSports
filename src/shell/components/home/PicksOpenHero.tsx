@@ -444,11 +444,12 @@ export function PicksOpenHero() {
               )}
             </View>
             <View style={styles.hotPickTeamRow}>
-              {/* flex:1 wrapper so adjustsFontSizeToFit measures against a
-                  definite width. On iOS, adjustsFontSizeToFit + flexShrink
-                  directly on a Text in a row mis-measures and shrinks the name
-                  to the minimum even when it fits — which made the team name
-                  tiny/unreadable. */}
+              {/* flex:1 wrapper gives the name a definite width to fill and
+                  ellipsize against. We deliberately DON'T use
+                  adjustsFontSizeToFit here: on iOS it mis-measures inside a
+                  row and shrinks the team name to the minimum even when it
+                  fits, rendering it tiny/unreadable. Full size + tail
+                  ellipsis is the reliable behavior. */}
               <View style={styles.hotPickMatchupWrap}>
                 <Text
                   style={[
@@ -457,8 +458,7 @@ export function PicksOpenHero() {
                     {color: colors.textPrimary},
                   ]}
                   numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.7}>
+                  ellipsizeMode="tail">
                   {pickedTeam || `${awayTeam} @ ${homeTeam}`}
                 </Text>
               </View>
