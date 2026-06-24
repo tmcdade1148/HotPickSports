@@ -95,7 +95,7 @@ export function SettlingHero() {
 
 const styles = StyleSheet.create({
   wrap:        {paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.lg, gap: spacing.md},
-  salutation:  {fontSize: 13},
+  salutation:  {fontSize: 26},
   // Matches the "YOUR CONTESTS" section title (fontSize 11 / letterSpacing 1.8
   // / textTertiary) so RESULTS reads as a section header, not a status word.
   eyebrow:     {fontSize: 11, letterSpacing: 1.8},
