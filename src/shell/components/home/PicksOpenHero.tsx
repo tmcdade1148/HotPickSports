@@ -32,7 +32,7 @@ const PICKS_TOTAL_FALLBACK = 16;
 // Countdown is a single fixed size — it no longer switches on pick state.
 // The earlier full↔compact switch fired late in hydration and visibly
 // flashed (see timerSize below).
-const TIMER_FONT_COMPACT = 25;
+const TIMER_FONT_COMPACT = 38;
 // Urgency buckets used by the contextual message picker.
 const URGENT_MINUTES = 6 * 60;   // under 6 hours → "not much time left"
 const TIGHT_MINUTES  = 24 * 60;  // under 24 hours → "tight"
@@ -326,19 +326,28 @@ export function PicksOpenHero() {
       {!hotPickIsLive && !hotPickIsFinal && !hotPickCardShown && (
         <View style={styles.timerRow}>
           {showLockingLabel && (sandboxCountdown || timer) && (
-            <Text
-              style={[
-                displayType.display,
-                styles.lockingLabel,
-                {
-                  color: colors.textSecondary,
-                  fontSize: timerSize * 0.4,
-                  lineHeight: Math.round(timerSize * 0.4 * 1.15),
-                },
-              ]}
-              numberOfLines={3}>
-              PICKS START{'\n'}LOCKING IN:
-            </Text>
+            // Two stacked single-line Texts rather than one Text with a "\n" +
+            // numberOfLines: on Android the multi-line variant clipped the second
+            // line ("LOCKING IN:"), showing only "PICKS START". flexShrink:0 keeps
+            // the column from being squeezed by the big number beside it.
+            <View style={styles.lockingLabelWrap}>
+              {['PICKS START', 'LOCKING IN:'].map(line => (
+                <Text
+                  key={line}
+                  style={[
+                    displayType.display,
+                    styles.lockingLabel,
+                    {
+                      color: colors.textSecondary,
+                      fontSize: timerSize * 0.4,
+                      lineHeight: Math.round(timerSize * 0.4 * 1.2),
+                    },
+                  ]}
+                  numberOfLines={1}>
+                  {line}
+                </Text>
+              ))}
+            </View>
           )}
           {sandboxCountdown ? (
             // Frozen reviewer sandbox — always read "3 DAYS".
@@ -820,6 +829,12 @@ const styles = StyleSheet.create({
   },
   // fontSize/lineHeight are applied per-render from timerSize so the label
   // matches the unit suffix ("DAYS") in both the full and compact sizes.
+  // Column wrapper for the two-line lead-in. flexShrink:0 so the big number
+  // beside it can't squeeze the label and force a clip/wrap on Android.
+  lockingLabelWrap: {
+    flexShrink: 0,
+    alignItems: 'flex-end',
+  },
   lockingLabel: {
     letterSpacing: 0.5,
     textAlign: 'right',
