@@ -84,7 +84,7 @@ interface SeasonState {
 
   initialize: (config: SeasonConfig, poolId: string, forceWeek?: number) => Promise<void>;
   setCurrentWeek: (week: number) => void;
-  fetchWeekGames: (week: number) => Promise<void>;
+  fetchWeekGames: (week: number, force?: boolean) => Promise<void>;
   fetchUserPicks: (userId: string, week: number) => Promise<void>;
   savePick: (params: {
     userId: string;
@@ -225,7 +225,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
 
   setWeekComplete: (val: boolean) => set({isWeekComplete: val}),
 
-  fetchWeekGames: async (week: number) => {
+  fetchWeekGames: async (week: number, force = false) => {
     const {config} = get();
     if (!config) {
       // No config yet → never leave the screen stuck on its spinner.
@@ -239,7 +239,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       const s = (g.status ?? '').toUpperCase();
       return s === 'IN_PROGRESS' || s === 'LIVE';
     });
-    if (cached && !hasLiveGame) {
+    if (!force && cached && !hasLiveGame) {
       set({games: cached, isLoading: false});
       return;
     }
@@ -358,8 +358,19 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
     );
 
     if (error) {
-      console.error('[savePick] ERROR:', error.message, error.details, error.hint, JSON.stringify(error));
-      set({weekPicks: prevWeekPicks, saveError: error.message});
+      // "Picks are locked for this game" (enforce_pick_lock, P0001) is EXPECTED:
+      // the game locked between render and tap (status went live/final, or its
+      // kickoff passed). Don't shout it in the console — show a friendly message
+      // and force-refetch the week so the now-locked card updates and can't be
+      // tapped again (closes the stale-state gap before realtime catches up).
+      if (/picks are locked/i.test(error.message ?? '')) {
+        console.warn('[savePick] game locked before save:', error.message);
+        set({weekPicks: prevWeekPicks, saveError: "That game just locked — your pick wasn't saved."});
+        get().fetchWeekGames(currentWeek, true);
+      } else {
+        console.error('[savePick] ERROR:', error.message, error.details, error.hint, JSON.stringify(error));
+        set({weekPicks: prevWeekPicks, saveError: error.message});
+      }
     }
 
     set({isSaving: false});
