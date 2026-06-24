@@ -195,6 +195,10 @@
   .picks-made { font-size: 11px; padding: 0 8px 2px 18px; }
   .picks-made.yes { color: #1b9a06; }
   .picks-made.no { color: #8A97AA; }
+  /* Game-day wave sub-steps shown under the "live" chip in Controls */
+  .wave-step { font-size: 11px; padding: 1px 8px 1px 22px; color: #8A97AA; font-family: ui-monospace, Menlo, monospace; }
+  .wave-step.done { color: #1b9a06; }
+  .wave-step.cur  { color: #F5620F; font-weight: 700; }
 
   /* ---- Phase 2: Stage banner (NOW PLAYING) ---- */
   .stage-banner { margin: 12px 0; padding: 12px 14px; border-radius: 8px; background: #161C26; border: 1px solid #2C3A52; border-left: 4px solid #F5620F; }
@@ -356,14 +360,19 @@ const REVIEWER_COMPS = ['nfl_2025_simA', 'nfl_2025_simG'];
 const PHASE_SEQUENCE = ['OFF_SEASON', 'PRE_SEASON', 'REGULAR', 'REGULAR_COMPLETE', 'PLAYOFFS', 'SUPERBOWL_INTRO', 'SUPERBOWL', 'SEASON_COMPLETE'];
 function isWritable(comp) { return SIM_ALLOWLIST.includes(comp); }
 
-// NFL kickoff slots ("waves") — mirrors sim-operator + tools/sim-runner.mjs.
-const WAVE_ORDER = ['thursday', 'sunday1', 'sunday4', 'snf', 'mnf', 'other'];
-const WAVE_LABEL = { thursday: 'Thursday', sunday1: 'Sunday 1pm', sunday4: 'Sunday 4pm', snf: 'SNF', mnf: 'MNF', other: 'Other slot' };
+// NFL kickoff slots ("waves") — mirrors sim-operator detectWave + tools/sim-runner.mjs,
+// including the Sunday-morning international slot ("sunday_am") so this ladder lines
+// up with what advance_game_day actually walks.
+const WAVE_ORDER = ['thursday', 'sunday_am', 'sunday1', 'sunday4', 'snf', 'mnf', 'other'];
+const WAVE_LABEL = { thursday: 'Thursday', sunday_am: 'Sunday AM', sunday1: 'Sunday 1pm', sunday4: 'Sunday 4pm', snf: 'SNF', mnf: 'MNF', other: 'Other slot' };
 function detectWave(kickoffAt) {
   if (!kickoffAt) return 'other';
   const d = new Date(kickoffAt), day = d.getUTCDay(), hour = d.getUTCHours();
   if (day === 4 && hour >= 17) return 'thursday';
   if (day === 5 && hour < 4) return 'thursday';
+  // Sunday-morning international game (~9:30am ET / 13:30 UTC) kicks off before
+  // the 1pm slate — matches sim-operator so the wave ladder ordering is correct.
+  if (day === 0 && hour >= 4 && hour < 17) return 'sunday_am';
   if (day === 0 && hour >= 17 && hour < 20) return 'sunday1';
   if (day === 0 && hour >= 20 && hour < 23) return 'sunday4';
   if (day === 0 && hour >= 23) return 'snf';
@@ -399,7 +408,7 @@ const STAGE_INFO = {
 const REFRESH_MS = 30000;
 // Bump on each console change so you can confirm the loaded file is current
 // (file:// caching otherwise hides updates). Shown next to the wordmark.
-const CONSOLE_BUILD = 'build 2026-06-12.1 · game-day';
+const CONSOLE_BUILD = 'build 2026-06-24.1 · wave-ladder';
 document.getElementById('build-stamp').textContent = CONSOLE_BUILD;
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -576,9 +585,11 @@ async function refreshAll() {
     renderStateBar();
     renderProdBanner();
     await fetchMyPicksThisWeek();
+    // renderGames sets lastGames first — the timeline + controls read it to build
+    // the game-day wave ladder, so games must be fresh before they render.
+    await renderGames();
     await Promise.all([
       renderReadinessAndTimeline(),
-      renderGames(),
       renderLeaderboard(),
     ]);
     renderHomeScreenSpec();
@@ -709,10 +720,36 @@ function renderReadinessGate(week, r) {
   el.innerHTML = html;
 }
 
+// Game-day wave ladder — the kickoff + final sub-steps the live window walks
+// through, derived from the current week's games (lastGames). Display ONLY: the
+// engine (sim-operator advance_game_day) is strictly sequential, so status is
+// read from the live game rows, never written here. Shared by the timeline and
+// the controls so both show the same ladder the single NEXT button walks.
+//   curKey = the one sub-step NEXT will run next — computed exactly like
+//   gameDayNextLabel(): finish the live wave first, else kick off the next
+//   scheduled wave (null => nothing on the clock, or everything is final).
+function waveLadder() {
+  const games = lastGames || [];
+  const waves = WAVE_ORDER.filter(w => games.some(g => detectWave(g.kickoff_at) === w));
+  const liveWave  = waves.find(w => games.some(g => detectWave(g.kickoff_at) === w && gameStatusClass(g.status) === 'live'));
+  const schedWave = waves.find(w => games.some(g => detectWave(g.kickoff_at) === w && gameStatusClass(g.status) === 'scheduled'));
+  const curKey = liveWave ? `${liveWave}:final` : schedWave ? `${schedWave}:kickoff` : null;
+
+  const steps = [];
+  for (const w of waves) {
+    const wg = games.filter(g => detectWave(g.kickoff_at) === w);
+    const started  = wg.some(g => gameStatusClass(g.status) !== 'scheduled'); // kicked off
+    const allFinal = wg.every(g => gameStatusClass(g.status) === 'final');
+    steps.push({ key: `${w}:kickoff`, label: `${WAVE_LABEL[w]} — kickoff`, done: started });
+    steps.push({ key: `${w}:final`,   label: `${WAVE_LABEL[w]} — final`,   done: allFinal });
+  }
+  return { steps, curKey };
+}
+
 function renderTimeline(ws, r) {
-  // Readiness stages (prep pipeline) then week-state stages. State stages compare
-  // their position to the CURRENT week_state: PAST -> green ✓, CURRENT -> yellow
-  // (in progress / you are here), FUTURE -> grey. Nothing not-yet-reached is green.
+  // Readiness stages (prep pipeline) then the in-week walk. The live window is
+  // expanded into the per-wave game-day ladder (kickoff/final). PAST -> green ✓,
+  // CURRENT -> "you are here", FUTURE -> grey ○. Nothing not-yet-reached is green.
   const okR = (s) => normStatus(s) === 'ok';
   const hasR = !!r;
   const WS_POS = { picks_open: 1, locked: 2, live: 3, settling: 4, complete: 5 };
@@ -724,27 +761,40 @@ function renderTimeline(ws, r) {
     { label: 'Odds fetched',   ok: hasR && okR(r.odds_status),  at: r && r.odds_at },
     { label: 'Ranks frozen',   ok: hasR && okR(r.ranks_status), at: r && r.ranks_at },
   ];
-  const states = [
-    { label: 'Picks open · picks_open', pos: 1 },
-    { label: 'Picks locked / Kickoff · locked', pos: 2 },
-    { label: 'Live · live', pos: 3 },
-    { label: 'Scores settling · settling', pos: 4 },
-    { label: 'Week complete · complete', pos: 5 },
-  ];
   const row = (cls, icon, label, elapsed) =>
     `<div class="checkpoint ${cls}"><span class="cp-icon">${icon}</span><span class="cp-label">${label}</span><span class="cp-elapsed">${elapsed || ''}</span></div>`;
+  // Macro week-state row: done if we're past it, current if we're on it.
+  const macro = (label, pos) =>
+    curPos === 0 ? row('pending', '○', label, '')
+    : pos < curPos ? row('done', '✓', label, '')
+    : pos === curPos ? row('current', '▶', label, at ? timeAgo(at) : '')
+    : row('pending', '○', label, '');
 
   let html = '';
   for (const s of readiness) {
     html += s.ok ? row('done', '✓', s.label, s.at ? timeAgo(s.at) : '')
                  : row('pending', hasR ? '○' : '–', s.label, '');
   }
-  for (const s of states) {
-    if (curPos === 0) { html += row('pending', '○', s.label, ''); continue; }
-    if (s.pos < curPos) html += row('done', '✓', s.label, '');
-    else if (s.pos === curPos) html += row('current', '▶', s.label, at ? timeAgo(at) : '');
-    else html += row('pending', '○', s.label, '');
+
+  html += macro('Picks open · picks_open', 1);
+  html += macro('Picks locked · locked', 2);
+
+  // Live window = the game-day wave ladder. Only the wave on the clock lights up,
+  // and only once we're actually live; at locked it previews as all-pending.
+  const { steps, curKey } = waveLadder();
+  if (steps.length) {
+    for (const st of steps) {
+      if (st.done) html += row('done', '✓', st.label, '');
+      else if (ws === 'live' && st.key === curKey) html += row('current', '▶', st.label, at ? timeAgo(at) : '');
+      else html += row('pending', '○', st.label, '');
+    }
+  } else {
+    html += macro('Live · live', 3); // games not loaded yet — fall back to one row
   }
+
+  html += macro('Scores settling · settling', 4);
+  html += macro('Week complete · complete', 5);
+
   document.getElementById('checkpoint-list').innerHTML = html;
 }
 function stateAt(key) { return lastConfig[key] && lastConfig[key].updated_at; }
@@ -999,6 +1049,7 @@ function renderControls() {
   let html = '';
 
   html += `<div class="ctl-group"><div class="ctl-label">Week ${week} state</div>`;
+  const { steps: waveSteps, curKey: waveCurKey } = waveLadder();
   CYCLE_STATES.forEach(st => {
     const cur = ws === st;
     let line = `<div class="state-chip ${cur ? 'cur' : ''}">${cur ? '▶ ' : ''}${st}</div>`;
@@ -1007,6 +1058,16 @@ function renderControls() {
       line += myPicksThisWeek
         ? `<div class="picks-made yes">✓ Your picks are in for week ${week}</div>`
         : (autoPickBeforeStep ? `<div class="picks-made no">Auto-pick will run on NEXT</div>` : '');
+    }
+    // Under "live", expand the game-day wave ladder (kickoff + final per wave)
+    // during the game-day window so it's clear which wave NEXT will act on. The
+    // single NEXT button walks it — these rows are display only.
+    if (st === 'live' && (ws === 'locked' || ws === 'live') && waveSteps.length) {
+      for (const wstep of waveSteps) {
+        const isCur = ws === 'live' && wstep.key === waveCurKey;
+        const icon = wstep.done ? '✓' : isCur ? '▶' : '○';
+        line += `<div class="wave-step ${wstep.done ? 'done' : isCur ? 'cur' : ''}">${icon} ${wstep.label}</div>`;
+      }
     }
     html += line;
   });
