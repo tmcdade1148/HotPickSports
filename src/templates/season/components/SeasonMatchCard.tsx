@@ -223,9 +223,9 @@ export function SeasonMatchCard({
                 existingPick.points < 0 && styles.pointsEarnedNegative,
               ]}>
                 {existingPick.points > 0
-                  ? `\u2713 Correct +${existingPick.points} pts`
+                  ? `+${existingPick.points} pt${existingPick.points === 1 ? '' : 's'}`
                   : existingPick.points < 0
-                    ? `\u2717 Incorrect \u2212${Math.abs(existingPick.points)} pts`
+                    ? `\u2212${Math.abs(existingPick.points)} pt${Math.abs(existingPick.points) === 1 ? '' : 's'}`
                     : '0 pts'}
               </Text>
             )}
@@ -443,8 +443,10 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.error,
   },
   pointsEarnedInline: {
+    // Match FINAL exactly: same size, weight, and italic styling.
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '900',
+    fontStyle: 'italic',
     color: colors.textSecondary,
   },
   headerSpacer: {
