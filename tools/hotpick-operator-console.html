@@ -120,6 +120,7 @@
   .cp-icon { width: 18px; text-align: center; flex-shrink: 0; font-size: 13px; }
   .cp-label { flex: 1; font-size: 13px; }
   .cp-elapsed { font-size: 10px; color: #8A97AA; font-variant-numeric: tabular-nums; }
+  .cp-note { font-size: 10px; color: #8A97AA; padding: 0 0 5px 26px; line-height: 1.35; opacity: 0.9; }
   .checkpoint.done .cp-label { color: #1b9a06; }
   .checkpoint.current { background: rgba(245,200,66,0.12); border-radius: 4px; }
   .checkpoint.current .cp-label { color: #F5C842; font-weight: 700; }
@@ -400,7 +401,7 @@ let myPicksThisWeek = false;
 const STAGE_INFO = {
   idle:       { name: 'IDLE (off-cycle)', desc: 'Calm salutation · 0 pts · join/create CTA · SmackTalk pointer' },
   picks_open: { name: 'PICKS OPEN',       desc: 'Countdown to kickoff · HotPick preview · "X of Y locked in"' },
-  locked:     { name: 'LOCKED',           desc: 'Picks are in · games have not started' },
+  locked:     { name: 'LOCKED',           desc: 'Board frozen (pencils-down preview) · picks lock per game at kickoff · brief in production' },
   live:       { name: 'LIVE',             desc: 'HotPick live score · point impact · pool rank delta' },
   settling:   { name: 'SETTLING',         desc: 'Weekly result · net points · rank movement · SmackTalk CTA' },
   complete:   { name: 'COMPLETE',         desc: 'Season standings as a race · mini sparkline' },
@@ -408,7 +409,7 @@ const STAGE_INFO = {
 const REFRESH_MS = 30000;
 // Bump on each console change so you can confirm the loaded file is current
 // (file:// caching otherwise hides updates). Shown next to the wordmark.
-const CONSOLE_BUILD = 'build 2026-06-24.1 · wave-ladder';
+const CONSOLE_BUILD = 'build 2026-06-24.2 · locked-preview';
 document.getElementById('build-stamp').textContent = CONSOLE_BUILD;
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -777,7 +778,10 @@ function renderTimeline(ws, r) {
   }
 
   html += macro('Picks open · picks_open', 1);
-  html += macro('Picks locked · locked', 2);
+  html += macro('Picks locked (preview only) · locked', 2);
+  // 'locked' is the app's pencils-down beat (the board freezes), NOT a per-pick
+  // lock. The real locks land per game at each kickoff in the wave ladder below.
+  html += `<div class="cp-note">App freezes the board in this beat, but picks lock per game at each kickoff below — near-instant in production.</div>`;
 
   // Live window = the game-day wave ladder. Only the wave on the clock lights up,
   // and only once we're actually live; at locked it previews as all-pending.
@@ -1071,6 +1075,12 @@ function renderControls() {
     }
     html += line;
   });
+
+  // 'locked' freezes the whole board in the app, but it's a cosmetic pencils-down
+  // beat — the real pick locks land per game at each kickoff (wave ladder above).
+  if (ws === 'locked') {
+    html += `<div class="ctl-disabled-note" style="margin-top:6px;">Pencils-down preview — the app freezes the board here, but picks lock per game at each kickoff. NEXT kicks one off.</div>`;
+  }
 
   if (!inCycle) {
     html += `<div class="ctl-disabled-note">Off-cycle phase — advance to REGULAR / PLAYOFFS / SUPERBOWL below to run a week.</div>`;
