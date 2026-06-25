@@ -26,11 +26,14 @@ eng flow (PR → preview → ship/OTA). **Claude** = a well-scoped follow-up Cla
 
 ### 🚫 Items that block launch (fix before the `nfl_2026` season opens)
 
-1. **[T0-1] No `nfl_2026` pick can ever be saved.** The pick-lock trigger compares game status to
-   lowercase `'scheduled'`, but the live importer wrote all **318** `nfl_2026` games as uppercase
-   `'SCHEDULED'`. Every pick insert/update on the live season is rejected with "Picks are locked."
-   The app is unplayable for the real season until this one-character mismatch is fixed. **Verified live.**
-   *(It passed all testing because the simulators write lowercase status, which the trigger accepts.)*
+1. ✅ **[T0-1] RESOLVED 2026-06-25 — No `nfl_2026` pick could be saved.** The pick-lock trigger compared game
+   status to lowercase `'scheduled'`, but the live importer wrote all **318** `nfl_2026` games as uppercase
+   `'SCHEDULED'`, so every pick insert/update was rejected with "Picks are locked." **Fixed** by making the trigger
+   comparison case-insensitive (`lower(status) <> 'scheduled'`) — applied live (after a manual backup) as migration
+   `20260625162854_fix_enforce_pick_lock_status_case` and verified (uppercase `SCHEDULED` now allows picks;
+   `IN_PROGRESS`/`FINAL` still lock; no data rows changed). See T0-1 below.
+
+**No open launch blockers remain.** (T0-2 is Tier 0 by severity but dormant until the playoffs — see "can wait".)
 
 ### ⏳ Items that can wait (do NOT block the September launch — but track them)
 
@@ -58,7 +61,14 @@ eng flow (PR → preview → ship/OTA). **Claude** = a well-scoped follow-up Cla
 ## Tier 0 — can corrupt a score or stall a live week
 
 ### T0-1 · `enforce_pick_lock` rejects every pick on the live `nfl_2026` season (status case mismatch)
-**Owner: Tom** (live-prod migration — backup + approval) · **Status: OPEN — LAUNCH BLOCKER**
+**Owner: Tom** (applied by Claude) · **Status: ✅ RESOLVED 2026-06-25**
+
+> **✅ Resolution (2026-06-25):** Fixed by making the status comparison case-insensitive
+> (`lower(game_record.status) <> 'scheduled'`), preserving the per-game `lock_at` check and the exact RAISE messages.
+> A manual Supabase backup was taken first; applied to the live DB via `apply_migration` as
+> **`20260625162854_fix_enforce_pick_lock_status_case`** (committed under `supabase/migrations/`). Verified live: the
+> function body now uses `lower(...)`, trigger `check_pick_lock` is still enabled, and a non-mutating logic check
+> confirms uppercase `SCHEDULED` is allowed while `IN_PROGRESS`/`FINAL` still lock. No data rows were modified.
 
 - **Location:**
   - Live Postgres fn `public.enforce_pick_lock()` (trigger `check_pick_lock` on `season_picks`, **verified enabled**,
