@@ -12,8 +12,10 @@ const supabase = createClient(
  * Pre-computes aggregate pick stats per game per pool into game_pick_stats.
  * Game cards read from this table — never from season_picks directly.
  *
- * PRIVACY GATE: Only computes stats for games with status 'live' or any FINAL variant.
- * Games in status 'scheduled' are NEVER included — picks are sealed until kickoff.
+ * PRIVACY GATE: Only computes stats for games that have kicked off — any in-progress
+ * variant (UPPERCASE 'IN_PROGRESS' from the ESPN importer/updater, lowercase
+ * 'in_progress' from the simulator) or any FINAL variant, matched case-insensitively
+ * via ILIKE. Games in status 'scheduled' are NEVER included — picks are sealed until kickoff.
  *
  * Designed to run every 60 seconds on game days via cron.
  * On non-game days, returns immediately after checking competition_config.
@@ -56,7 +58,13 @@ Deno.serve(async (req) => {
       .eq("competition", competition)
       .eq("season_year", seasonYear)
       .eq("week", currentWeek)
-      .or("status.eq.live,status.ilike.%FINAL%");
+      // Match games that have kicked off, case-insensitively. The ESPN
+      // importer/updater write UPPERCASE ('IN_PROGRESS'/'FINAL') and the simulator
+      // writes lowercase ('in_progress'/'final'); nothing writes the literal 'live'
+      // (the old `status.eq.live` matched nothing, so splits only computed once a
+      // game went FINAL — never DURING it). `%progress%` covers IN_PROGRESS in any
+      // case; `%final%` covers FINAL / STATUS_FINAL / STATUS_FINAL_OVERTIME.
+      .or("status.ilike.%progress%,status.ilike.%final%");
 
     if (gamesError) return json({ success: false, error: gamesError.message }, 500);
     if (!activeGames || activeGames.length === 0) {

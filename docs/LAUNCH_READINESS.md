@@ -1,0 +1,91 @@
+# HotPick — Launch Readiness Register (MASTER)
+
+**The single home for everything that has to be true before launch — and everything that should be true eventually.** This is the version of record. It merges: Claude's scoring pass (repo), Code's live parallel audit (2026-06-25, verified against the live DB), the June 8 architecture audit, and the June 2 pre-launch checklist. If Code's repo copy (`docs/LAUNCH_READINESS.md`) and this drift, reconcile to this file.
+
+Last updated 2026-06-25.
+
+### How to read this
+- **Tier 0** = can corrupt a score or stall a live week. The only things that can truly sink the company.
+- **Tier 1** = crashes, won't-open, or a user silently loses data. 1-star territory.
+- **Tier 2** = slows you down or hides future bugs. Not user-facing.
+
+**Status:** ✅ verified good · ⚠️ open risk · 🔧 fix needed (known) · 🔍 not fully checked
+**Owner:** Tom · Code (live DB / repo / fixes) · Claude (synthesis / scoring logic / specs)
+**Before launch?** Yes = before a user opens the app · Window = pre-launch prep, not launch week · No = after launch
+**(L)** = verified against the LIVE database by Code on 2026-06-25.
+
+---
+
+## ✅ THE LAUNCH BLOCKER — RESOLVED 2026-06-25
+
+| # | Item | Plain-language what & why | Status | Owner | Before launch? |
+|---|---|---|---|---|---|
+| **0.0** | **Picks are rejected on `nfl_2026` (status case mismatch)** | The `enforce_pick_lock` trigger checked `status != 'scheduled'` (lowercase), but the importer wrote all 318 `nfl_2026` games as `'SCHEDULED'` (uppercase) → every pick was rejected as "locked." **RESOLVED 2026-06-25:** trigger made case-insensitive (`lower(status) <> 'scheduled'`) via `apply_migration`. (L) Live-verified: fix present; uppercase SCHEDULED now allows picks; IN_PROGRESS/FINAL still lock; trigger `check_pick_lock` enabled. No data rows touched. **Full app-path confirmation (a real pick on UPPERCASE data through the app) is satisfied by the preseason go-live (0.11)** — `nfl_2026_pre` is ESPN-fed (uppercase, same as `nfl_2026`) and runs in REGULAR phase (pickable), so testers picking on it in August exercises the exact path. No need to flip `nfl_2026` (pre-season phase, pick flow not active) to test now. | ✅ **RESOLVED** (DB-verified) · app-path confirmed via preseason | Code (done) → preseason (0.11) | App-path via preseason (Aug) |
+
+> **Fix note (revised 2026-06-25 after Code's full status-comparator scan):** My earlier call — normalize the 318 rows to lowercase + change the importer — was **wrong-direction.** Code traced every reader/writer: UPPERCASE is *canonical* for real (ESPN-fed) competitions (both ESPN writers produce it, the season-template client screens compare against it, all 318 rows hold it); lowercase is only the simulator's local convention. Normalizing to lowercase would have broken the exact-uppercase client screens and the sim filters. The correct, sufficient fix is **trigger-only**: make `enforce_pick_lock` case-insensitive (`lower(status) <> 'scheduled'`) so the one outlier matches every other reader — zero data churn, zero client blast radius. Manual backup first; apply via `apply_migration`; verify a scheduled-game pick saves and IN_PROGRESS/FINAL still rejects. Draft committed: `20260625120000_fix_enforce_pick_lock_status_case.sql`. **Cross-link: unblocks preseason (0.11) too.**
+
+---
+
+## TIER 0 — Can corrupt a score or stall a live week
+
+| # | Item | Plain-language what & why | Status | Owner | Before launch? |
+|---|---|---|---|---|---|
+| 0.1 | Scorer idempotency | Re-running `calculate-scores` overwrites totals (`SET`, not `+=`) → cannot double points. (L) Re-verified. | ✅ verified | — | ✅ good |
+| 0.2 | frozen_rank re-import clobber (T1-1) | Re-import omits rank columns → a locked rank can't be nulled. (L) Re-verified. | ✅ verified | — | ✅ good |
+| 0.3 | Regular-season Ladder scoping | Sums from each pool's `pool_start_date`, joins on `user_id` only (moat intact). Mid-season pools start fresh. | ✅ verified | — | ✅ good |
+| 0.4 | Ties / HotPick ±rank / zero-row backfill | Repo logic correct and test-locked. **But Code found live-scorer vs repo drift on tie handling (2.7)** — reconcile before a real tie occurs (rare in-season, not a blocker). | ✅ repo / ⚠️ live drift | Code | Reconcile (not a blocker) |
+| 0.5 | `power_up` write-path hole | Scorer would double a HotPick on `power_up='double_down'`. (L) **Zero `power_up` rows exist; confirmed safe live.** Optional DB guard remains cheap hardening for when picks open at scale — not a blocker. | ✅ no exposure | Claude (optional spec) | Optional |
+| 0.6 | Playoff double-count | (L) **CONFIRMED** in wk 19–22 data: the **Home rank chip** (`get_user_ranks_in_pools`) sums `week_points + playoff_points`, which are equal for wk ≥ 19 → doubles. **The Ladder itself is correct**, so the two screens disagree in the postseason. | ⚠️ confirmed | Code → Claude spec | Before playoffs (Jan) |
+| 0.7 | Weekly engine / readiness gate | Odds-success is a hard gate before picks open (hardened June 11). No stall found in the audit. Confirm the manual recovery path + emergency brake (0.9). | 🔍 no blocker found | Code / Tom | Confirm |
+| 0.8 | Anon-executable destructive RPCs (audit #14) | (L) **REMEDIATED.** `anon` revoked from every destructive function; all self-authorize by `super_admin`/pool-role; `admin_purge_user` dropped entirely. No Tier 0/1 security holes. | ✅ resolved | — | ✅ good |
+| 0.9 | Emergency brake + runbook | `scoring_locked` pauses scoring with no deploy. Confirm it works AND you know the runbook cold. | 🔍 verify | Tom + Code | Yes |
+| 0.10 | Sim-season dress rehearsal (regular season) | Run a full `nfl_2025_sim` **regular season** end-to-end, checking every score + Ladder position by hand. The scoring-confidence proof. (Playoffs/SB deferred per Tom.) | 🔍 to do | Tom (Claude designs checklist) | Yes |
+| 0.11 | **Preseason isolation — LOCKED** | DECISION (Tom, 2026-06-25): run Aug preseason as its **own competition** (`nfl_2026_pre`), fully scored for a real-world test; flip `active_competition` → `nfl_2026` at the Sept 2 cutover. Real season never touched. Tester accounts optional inside it. **Spec written → handed to Code.** Depends on 0.0 (same importer). Supersedes `PRESEASON_PICKS_NO_SAVE_SPEC.md`. | 🔧 spec done → build | Code (build) | **Yes (before Aug)** |
+
+---
+
+## TIER 1 — Crashes, won't-open, or a user silently loses data
+
+| # | Item | Plain-language what & why | Status | Owner | Before launch? |
+|---|---|---|---|---|---|
+| 1.1 | No ErrorBoundary anywhere | (L) Code: a single screen throwing an error **white-screens the entire app**. Add a top-level React ErrorBoundary so one bug can't kill the whole session. | 🔧 fix needed | Claude spec → Code | **Yes** |
+| 1.2 | Ladder not virtualized | (L) The Ladder renders **every** member with no `FlatList` virtualization → stall / out-of-memory on big pools. Switch to a virtualized list. | 🔧 fix needed | Claude spec → Code | Yes (before any large pool) |
+| 1.3 | notification_preferences toggles don't persist | (L) Root cause confirmed: write succeeds only when `user_id = auth.uid()`; the toggle writes with a null/stale `userId`. Fix: a `SECURITY DEFINER` RPC that derives `auth.uid()` server-side. | 🔧 fix needed | Code | Should |
+| 1.4 | Crash visibility (Sentry replacement) | Sentry dropped (real pain). Use Play Console "Android vitals" + Xcode → Organizer (both free, zero integration) + a small Supabase-backed JS error logger. Pairs with 1.1. | 🔧 to do | Tom (consoles) + Claude/Code (logger) | Yes |
+| 1.5 | Email-confirm null-session onboarding | Fresh email signup can hit "Could not accept terms" when confirm-email is on. Interim fix in place (confirm off). Proper fix before public launch. | ⚠️ interim | Code + Tom | Decide |
+| 1.6 | Device-matrix testing | Test on a real cheap/old Android, not just simulator. Layout + performance only show up here. | 🔍 to do | Tom only | Yes |
+| 1.7 | compute-hardware deploy | Git is one commit ahead of the deployed function. Deploy so live == git. | 🔧 to do | Code + Tom | Yes |
+| 1.8 | Live pick-splits don't refresh during games | `refresh-game-pick-stats` filtered `status.eq.live` (matches nothing — live games are IN_PROGRESS), so splits only refreshed after FINAL. **RESOLVED 2026-06-25:** filter → `%progress%` + `%final%` (case-insensitive), dead `status.eq.live` dropped (commit 502c9b0). **Deployed v15** (`verify_jwt=false` preserved). (L) Verified read-only: deterministic old-vs-new filter proof (`IN_PROGRESS`/`in_progress` now selected, FINAL still selected, scheduled excluded) + real-sim regression clean. Live mid-game `game_pick_stats` row folds into preseason (0.11) — no in_progress games exist now, and manufacturing one would irreversibly ratchet sim `week_state`. | ✅ **RESOLVED** (deployed + filter-verified) | Code (done) | ✅ done → preseason proves live |
+
+---
+
+## TIER 2 — Tech debt / not user-facing
+
+| # | Item | Plain-language what & why | Status | Owner | Before launch? |
+|---|---|---|---|---|---|
+| 2.1 | Migration baseline (audit #1) | Repo can't rebuild the live DB from scratch. Disaster-recovery insurance. Manual backup first. | ⚠️ open | Code | Window |
+| 2.2 | Loose destructive script | `PURGE_PRESEASON_PICKS.sql` (a DELETE) still in `migrations/`. (L) Confirmed present. Move to `scripts/`. | 🔧 quick | Code | Do now (cheap) |
+| 2.3 | God files | (L) 11 large-file refactors; **3 are in-season hot-path — leave alone during a live week.** Decompose the safe ones (SmackTalk first) post-launch. | 🔍 later | Claude spec → Code | No |
+| 2.4 | Dead simulator files | (L) Correction: `season-simulator-v4.html` **stays — it's the live App-Review tool.** **DONE 2026-06-25:** deleted `season-simulator.html`, `-v2.html`, `-v3.html`; kept `-v4.html` + `hotpick-operator-console.html`; trimmed the deleted-file refs from `SERVICE_ROLE_KEY_ROTATION_RUNBOOK.md` (Stage 5 table + tool list). | ✅ done | Code | No |
+| 2.5 | June 8 architecture-audit leftovers (incl. doc accuracy) | Absorbs the remaining items from `ARCHITECTURE_AUDIT.md`: REFERENCE.md drift (§8 registry missing 6 fns, §9 directory tree, §3 config keys + OFF_SEASON lifecycle); verify mutable `search_path` is fully pinned; redeploy `nfl-weekly-transition` from source (stale entrypoint); `send-broadcast-email` is in repo but undeployed — decide enable-or-leave-off before launch; duplicate `sb_*`/`super_bowl_*` columns → dedupe during the Nov SB build. **None are launch blockers**; the audit's one scary item (#14 anon RPCs) is resolved at 0.8. `ARCHITECTURE_AUDIT.md` is now **superseded by this register** — mark it so. Lowest payoff-per-hour — do in the window / dead time. | 🔍 later | Code | No (window) |
+| 2.6 | Public storage buckets | (L) Two enumerable public buckets (not in git). Confirm intentional; add path-prefix policy if any private content could land there. | 🔍 verify | Code | Window |
+| 2.7 | Live scorer vs repo tie-handling drift | (L) The deployed scorer differs from the repo on how a tie is scored. Ties are rare in the regular season but possible. Reconcile so live == tested repo. | ⚠️ open | Code → Claude | Before a real tie |
+| 2.8 | `reset_reviewer_sim` missing role check | (L) One sandbox-only RPC lacks a role check. Sandbox-scoped, low risk, but tighten. | 🔧 minor | Code | No |
+| 2.9 | Status-casing consistency + dead code | Dual-cased system: real/ESPN = UPPERCASE (canonical), sims = lowercase. **The sandbox-render worry was a false alarm** — Code re-traced all six season-template comparisons (`SeasonMatchCard`, `SeasonPicksScreen`, `useSeasonSubmitState`, `seasonStore`); each `.toUpperCase()`s before matching, so lowercase sim data renders correctly (consistent with the reviewer sims that passed App Review). `enforce_pick_lock` was the only live exact-match outlier, fixed by 0.0. **DONE 2026-06-25:** dropped dead `prevent_write_after_kickoff` (verified 0 triggers / 0 referencing fns / 0 pg_depend dependents / 0 repo refs first; migration `20260625164358`). Optional long-term: route future status checks through the normalizer. No live risk. | ✅ confirmed safe · dead code dropped | Code | No |
+
+---
+
+## Running notes
+- 2026-06-25: Register created (Claude scoring pass + June 8 audit + June 2 checklist).
+- 2026-06-25: Preseason isolation LOCKED (own competition); 0.11 spec written for Code.
+- 2026-06-25: **Code live audit merged.** New launch blocker 0.0 (pick status case mismatch). Confirmed: 0.6 playoff double-count (rank chip vs Ladder disagree), 1.1 no ErrorBoundary, 1.2 Ladder not virtualized, 1.3 toggle root cause. Resolved: 0.8 anon RPCs remediated; 0.1/0.2/0.5 confirmed safe live (0 power_up rows). New: 2.7 tie-handling drift, 2.6 public buckets, 2.8 sandbox RPC. Correction: keep simulator-v4 (live tool).
+- 2026-06-25: Folded the June 8 `ARCHITECTURE_AUDIT.md` fully into this register (mostly 0.8 resolved + 2.1/2.2/2.5/2.6). That file is now superseded — retire it with a pointer here so there is only one register.
+- 2026-06-25: Code's status-comparator scan **reversed the 0.0 fix direction** — uppercase is canonical; trigger-only case-insensitive fix is correct (my normalize-data plan was wrong, would have broken client screens). Added 1.8 (live splits stale during games) and 2.9 (status-casing class + dead `prevent_write_after_kickoff`). 0.0 migration drafted (not applied) on branch `claude/zen-tesla-upp18m`.
+- 2026-06-25: **0.0 APPLIED + live-verified by Code — the season can accept picks.** App-path test on uppercase data folds into preseason (0.11); `nfl_2026` isn't pickable now (pre-season phase) so no contortion needed. Migration filename↔applied-version drift to reconcile (folds into 2.1).
+- 2026-06-25: 1.8 live-splits fix drafted (502c9b0, not deployed). 2.9 sandbox-render concern **withdrawn** — Code confirmed the season-template screens normalize via `.toUpperCase()`; lowercase sim data renders correctly. (One of last turn's supporting arguments for the trigger fix — "lowercasing would break client screens" — was wrong; the decision still holds on its other reasons.)
+- 2026-06-25: **0.0 migration filename reconciled** to the applied version (`20260625162854`); **dead `prevent_write_after_kickoff` dropped** (migration `20260625164358`) — closes 2.9's dead-code item.
+- 2026-06-25: **1.8 deployed (v15) + verified.** `refresh-game-pick-stats` live-splits fix is live; `verify_jwt=false` preserved; filter proven (deterministic old-vs-new + real-sim regression). Live in-progress-game E2E folds into preseason (0.11).
+- 2026-06-25: **2.4 done.** Deleted the three dead `season-simulator{,-v2,-v3}.html`; kept `-v4` (App Review) + Operator Console; trimmed deleted-file refs from `SERVICE_ROLE_KEY_ROTATION_RUNBOOK.md`.
+- 2026-06-25: **Audit report archived** → `docs/audit/2026-06-25-launch-audit.md`; the register at `docs/LAUNCH_READINESS.md` is the single source. **OPEN — merge gate:** branch `claude/zen-tesla-upp18m` carries the 0.0 fix + two cleanup migrations (`20260625162854`, `20260625164358`) that are **applied live but only committed on the branch**. `origin/main` cannot reproduce the live DB until this merges (pre-launch window is the safe time). Ties to 2.1 (broader migration baseline). Needs Tom's approval.
+- **Single-source handoff:** this file is the canonical register. Drop it into `docs/LAUNCH_READINESS.md` once; from here Code maintains the repo copy as items close. No parallel copy.
+- Next: Claude builds the regular-season sim checklist (0.10).

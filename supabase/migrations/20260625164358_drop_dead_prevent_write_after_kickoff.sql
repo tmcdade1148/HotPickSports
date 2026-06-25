@@ -1,0 +1,20 @@
+-- Cleanup: drop the dead trigger function prevent_write_after_kickoff().
+-- Orphaned legacy code from the pre-2026 schema — its body reads a `public.games`
+-- table and a `game_status` enum that no longer exist, and NO trigger binds it
+-- (the live pick-lock path is enforce_pick_lock on season_picks). Verified on the
+-- live DB: 0 triggers reference it, 0 functions reference it, 0 pg_depend dependents,
+-- 0 references anywhere in the repo. Non-CASCADE so it self-protects (errors rather
+-- than silently breaking anything if an unforeseen dependent existed). Touches no data.
+--
+-- Original definition (kept here for recovery):
+--   CREATE FUNCTION public.prevent_write_after_kickoff() RETURNS trigger LANGUAGE plpgsql
+--   SET search_path TO 'public' AS $$
+--   declare ko timestamptz; st game_status;
+--   begin
+--     select kickoff_at, status into ko, st from public.games where id = NEW.game_id;
+--     if now() >= ko or st <> 'scheduled' then
+--       raise exception 'Picks are locked after kickoff';
+--     end if;
+--     return NEW;
+--   end $$;
+DROP FUNCTION IF EXISTS public.prevent_write_after_kickoff();
