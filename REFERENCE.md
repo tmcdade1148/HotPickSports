@@ -201,26 +201,11 @@ column is captured but unused. The `PlayoffRulesModal` popup states this ladder
 to players today.
 
 **Planned entry points & sub-competitions (build November 2026 — not yet built):**
-Because scores are user-scoped and pools are lenses on user-level data
-(pool-independent architecture), late-joining sub-competitions are a leaderboard
-*scoping* problem, not a new data model. Tom's intent:
-
-- **Playoffs-only competition** — at *any* point, a new user can sign up and join
-  a pool intending to start fresh at **Week 19 (Wild Card weekend)** and run
-  through the Super Bowl. Their playoff total accumulates from `playoff_start_week`
-  forward, identical to how the mandatory playoff reset already scopes scores.
-  Needs its own champion + tie-breaker (reuse the ladder above, scoped to
-  playoff weeks).
-- **Super Bowl-only competition** — in the **2 weeks before the Super Bowl**, new
-  users can sign up to participate in a **Super Bowl-only** contest, scoped to the
-  Super Bowl week alone.
-- **Super Bowl-only winner** — a distinct winner/champion for the Super Bowl-only
-  competition, separate from the full-season and playoffs-only champions. Its
-  tie-breaker leans on `super_bowl_margin_prediction` (Price Is Right) first.
-
-All three coexist as different *scopes* over the same user picks; no `pool_id` on
-scores, no per-competition tables — the differentiator is the week range each
-leaderboard sums over.
+playoffs-only and Super Bowl-only competitions, each with its own champion. Because
+scores are user-scoped (pool-independent architecture), these are leaderboard
+*scopes* (week-range filters) over the same user picks — never new tables, never
+`pool_id` on scores. **Canonical detail lives in `docs/SUPER_BOWL_SCORING_SPEC.md`
+§6** — kept in one place to avoid drift; don't re-document it here.
 
 ---
 
@@ -316,17 +301,20 @@ Always filter with `.eq('status', 'active')` in leaderboard and member list quer
 - Maximum total: 139 pts
 
 ### Super Bowl Enhanced Scoring (Build November 2026)
-**Full build brief: `docs/SUPER_BOWL_SCORING_SPEC.md`** — read it before starting; it covers what already exists, the gaps, the open decisions, and a build sequence.
+**`docs/SUPER_BOWL_SCORING_SPEC.md` is the canonical home** — the open decisions
+(the margin tier-vs-Price-Is-Right fork, §4A), the schema-formalization step, the
+two sub-competitions, and the build sequence all live there. Don't re-document
+them here; the scoring table below is the only piece kept inline (it sits with the
+other scoring models).
 
-Do not build UI yet. Nullable columns already exist on `season_picks` (verified in `database.ts`; **note these are the real names** — earlier docs wrongly said `super_bowl_q1_pick` / `super_bowl_margin_prediction INT`):
-- `sb_q1_leader`, `sb_q2_leader`, `sb_q3_leader` (TEXT — quarter-leader picks, team abbr)
-- `sb_margin_tier` (TEXT — bucket `"1-6"` / `"7-14"` / `"15+"`; a **tier**, not an exact INT)
+Do not build UI yet. The `sb_q1_leader` / `sb_q2_leader` / `sb_q3_leader` (TEXT)
+and `sb_margin_tier` (TEXT — a *tier*, not an INT) columns exist on `season_picks`,
+but **no tracked migration creates them** (nor `season_user_totals.playoff_points`)
+— formalize with `apply_migration` before building.
 
-⚠️ **Margin concept fork (decide in November):** the schema stores a *tier* (`sb_margin_tier`), matching the Season 1 +8/−4 scoring element. But the §3 tie-breaker ladder and the `PlayoffRulesModal` popup describe margin as **Price-Is-Right (closest exact margin without going over)** — which needs an exact INT column that does not yet exist. Reconcile per `docs/SUPER_BOWL_SCORING_SPEC.md` §4A.
-
-⚠️ **Schema not in migrations:** these `sb_*` columns (and `season_user_totals.playoff_points`) live in the types but **no tracked migration creates them**. Formalize with `apply_migration` before building.
-
-**Canonical scoring model (recovered from the Season 1 Xcode build `tmcdade1148/NFL2025`, Dec 2025 — `SuperBowlRowView.swift` is authoritative).** The Super Bowl is a single game with a **multi-part pick**:
+**Canonical scoring model** (recovered from the Season 1 Xcode build
+`tmcdade1148/NFL2025` — `SuperBowlRowView.swift` is authoritative). The Super Bowl
+is a single game with a **multi-part pick**:
 
 | Pick | Correct | Wrong |
 |---|---|---|
@@ -337,18 +325,10 @@ Do not build UI yet. Nullable columns already exist on `season_picks` (verified 
 | **Margin Tier** — final winning margin bucket: `1–6` / `7–14` / `15+` | **+8** | **−4** |
 | **Score range** | **max +30** | **min −20** |
 
-Notes / decisions still open for the November build:
-- **No Q4 leader, no total-points pick.** The game winner covers the full game; quarters stop at Q3. Season 1 had no over/under or total-points element.
-- **Stale Season 1 copy to ignore:** the old `SuperBowlOnboardingBanner` advertised a "HotPick Quarter" pick and a **+36 / −26** range. Tom confirmed these are **not** in the real scoring — there is no separate HotPick-quarter swing. Canonical range is **+30 / −20**.
-- **Margin concept fork — DECIDE before building.** Season 1 scored margin as a **3-tier bucket** (`1–6` / `7–14` / `15+`, +8/−4) — a *scoring element*, not a tiebreaker. The deferred `super_bowl_margin_prediction` INT column was added for a **Price-Is-Right tiebreaker** (closest exact margin without going over), which is how the §3 tie-breaker ladder and `PlayoffRulesModal` describe it. These are two different mechanics. Resolve in November: keep the tier as a scoring element, use an exact INT for the tiebreaker, or both. Until decided, the §3 ladder copy (Price-Is-Right) is what players see.
-- The Season 1 winner pick reused the **HotPick ±rank** mechanic at rank 16. In Season 2 confirm how ranking applies when the SB week has a single game.
-- **New data requirement:** scoring needs **per-quarter scores** (Q1/Q2/Q3 home & away) from the provider. Regular-season scoring never needed this — Season 2's ESPN polling + `season_games` must capture quarter scores.
-- Each scoring dimension (quarter-leader accuracy, margin-tier correctness) is a candidate **tiebreaker variable** for the §3 ladder and the Super Bowl-only competition.
-
-**Also in scope for this November 2026 build (see §3 "Planned entry points & sub-competitions"):**
-- **Super Bowl-only competition + its own winner** — new users can sign up in the 2 weeks before the Super Bowl and compete on the Super Bowl week alone; distinct champion from the full-season and playoffs-only champions
-- **Playoffs-only competition** — users can join at any point to start fresh at Week 19 (Wild Card) and run through the Super Bowl
-- Both are leaderboard *scopes* (week-range filters) over the same user-scoped picks — no new tables, no `pool_id` on scores
+No Q4 leader and no total-points pick; canonical range is **+30 / −20** (ignore the
+stale Season 1 "+36 / −26" / "HotPick Quarter" copy). Scoring needs **per-quarter
+scores** from the provider — Season 2's ESPN polling + `season_games` must capture
+them.
 
 ### Pick Lock Triggers (Server-Side Authoritative)
 - **`enforce_pick_lock`** — BEFORE INSERT OR UPDATE on `season_picks`: checks game status in `season_games`; raises exception if status != 'scheduled'
@@ -736,21 +716,9 @@ Keeps pool snapshots fresh on partner rename / logo swap / color edits while pre
 
 ### White Label Build Status
 
-| Phase | Status | Notes |
-|---|---|---|
-| 1 | ✅ Done | DB schema: `partners` table + columns above, `pools.partner_id`, `pools.invite_slug` |
-| 2 | ✅ Done | ThemeProvider + useBrand() wiring |
-| 3 | ⏳ Deferred | Branch.io SDK — requires real device, high risk |
-| 4 | ⏳ Deferred | Deep link handler (basic handler exists, needs Branch.io + partner slug lookup) |
-| 5 | ⏳ Deferred | Branded pool join flow (3 screens) |
-| 6 | ✅ Done | PoweredByHotPick component |
-| 7 | ✅ Done | Partner Admin Screen (super_admin only) — creates partners, sets type, creates Club Pool |
-| 8 | ✅ Done | QR code generation in Partner Admin |
-| 9 | ✅ Done | Partner color editing (4 colors + `deriveFullBrandColors()` auto-compute) |
-| 10 | ✅ Done | Partner logo library (per-slug folder, Photos + URL ingestion, in-app delete) |
-| 11 | ✅ Done | Roster model: organizers add their pool to a partner's roster via PartnerDirectoryScreen |
-| 12 | ✅ Done | Club Pool concept (`partners.club_pool_id`) — Club Pool organizer = de facto Partner Admin |
-| 13 | ✅ Done | Inline perk editor + partner-broadcast composer in PoolSettings (Club Pool only) |
+> The phase-by-phase ✅/⏳ status table is point-in-time — moved to
+> `docs/BUILD_STATE.md`. The architectural theming rules stay below and in
+> Hard Rule #25.
 
 Partner dark mode: light/dark theming is derived per-mode from the partner's brand_config slots. **Per the 2026-05-26 product call: Club brand colors render only on Official Club Contest cards on the Home stack.** Every other surface — header, bottom tabs, Settings, admin, partner tiles in YOUR CLUBS, Affiliated Contest cards, Independent Contest cards, PoolSettings — stays HotPick-themed. `useTheme()` / `useBrand()` always return HotPick defaults; only `PoolModule`'s Official-Contest branded band reads `pool.brand_config` directly. Partner identity on partner-centric surfaces (PartnerModule, partner detail screens) uses the Club's name + logo, not Club colors. See Hard Rule #25 in CLAUDE.md.
 
@@ -887,32 +855,11 @@ ROUND_OPENED, ROUND_CLOSED, ROUND_SCORED
 
 ## 20. Build State & Launch Scope
 
-### Current State (March 2026)
-- DB completely restructured supporting all three templates
-- NFL Season 2 working on Android simulator, iOS simulator, physical device
-- Successfully deployed to physical iPhone via Xcode (TestFlight upload tested)
-- Edge Functions rebuilt for simplicity and efficiency
-- Scoring rebuild complete — addresses all Season 1 failures
-- E2E test suite: 48 tests (40 pass, 6 fixed, 2 skipped)
-- Marketing version: 2.0, Bundle: `com.hotpicksports`
-- Game Day Engagement System: live pick splits, HotPick concentration, Path Back narrative
-- History & Hardware System: 11 award types, History tab, Hardware Admin
-- Push notifications: expo-notifications SDK, `process-notification-queue` cron
-- Account deletion: two-step confirmation, `anonymize_deleted_user()` RPC
-- User blocking: platform-wide via `user_blocks` table, long-press Block in SmackTalk
-
-### Launch Sequence
-- **NFL Season 2 — September 2026** (primary validation event)
-- **NHL Playoffs — April 2027** (first multi-sport proof; spec session October 2026)
-- **World Cup / Tournament — TBD**
-
-### Do Not Build Before NFL Season 2 Launch
-Power-ups, career hardware, AI archetypes, tier system, pool discovery, pick-linked SmackTalk, exact score predictions, Super Bowl enhanced scoring UI (November 2026), playoff reset UI (November 2026), global leaderboard (post 500 users), AI SmackTalk observations, NHL/Tournament templates, white label billing (Stripe), acquisition source tagging, automated partner Instagram posts, admin analytics charts.
-
-### Accessibility — Font Scaling (decision, June 2026)
-OS "Larger Text" / Dynamic Type is **disabled app-wide**: `allowFontScaling = false` is defaulted on every `Text`/`TextInput` at startup (`src/shared/setup/fontScaleCap.ts`, installed from `index.js`). HotPick is a fixed-canvas design (big italic display type, auto-fit player names, big-number callouts, fixed-height cards, multi-size lines), so honoring the OS slider overflows/clips those layouts no matter how the multiplier is capped — and capping fights `adjustsFontSizeToFit` + the auto-fit measure-probes (a per-element-cap experiment was tried and reverted, PRs #319 → #321). The app therefore renders at its **designed sizes at every OS setting**. Per-element `allowFontScaling` still wins if a specific Text ever needs to opt back in.
-
-**Deferred to post-launch:** a dedicated **in-app Text-size control** (Settings → Text size), decoupled from the OS slider — built *together with* making the 2–3 highest-traffic screens (Home hero, identity row, pick flow) reflow gracefully. Scaling text *up* re-breaks the fixed layouts the same way the OS slider did, so a real "Large" option needs fluid screens first. A token ±10% slider was explicitly rejected (minimal accessibility benefit, re-break + high-blast-radius mechanism risk during launch).
+> **Moved to `docs/BUILD_STATE.md`** — point-in-time status (current state,
+> launch sequence, the full "Do Not Build Before NFL Season 2 Launch" list, and
+> the June 2026 font-scaling accessibility decision). It's volatile, so it lives
+> out of this evergreen reference. CLAUDE.md keeps the short always-on Scope-Creep
+> guard.
 
 ---
 
@@ -986,135 +933,19 @@ Full sentence copy uses the definite article: "the Gaffer of Hammer's Contest", 
 
 ## 23. Universal Links & Deep Linking
 
-Contest invites use **https universal links** (iOS) / **App Links** (Android) so a
-shared link linkifies in Messages/WhatsApp and opens the app directly when
-installed — falling back to a web landing page (with store buttons) when it isn't.
-The legacy custom scheme (`hotpick://`) still works for in-app/auth flows but is
-**not** used for sharing (it doesn't linkify and only works if the app is already
-installed).
-
-### Canonical link format
-```
-https://hotpick.app/join/CODE      ← share this (universal link, path-style)
-hotpick://join?code=CODE           ← legacy custom scheme (auth/reset, internal)
-```
-`RootNavigator.tsx` parses both: the path-style regex `/join/([A-Za-z0-9]+)` sets
-`pendingInviteCode` in `globalStore`. Share surfaces (`RecruiterBand`, Pool
-Settings) emit the https form only.
-
-### The domain (hotpick.app)
-Hosted on **Netlify** (site `hotpick-app`), DNS at **DirectNIC** — single apex
-`A` record → `75.2.60.5`, plus `www` CNAME → `hotpick-app.netlify.app`. Let's
-Encrypt TLS auto-provisioned. The site is **not** the app repo's deploy target for
-code — it only serves three things from `web/hotpick.app/` (published via the
-repo-root `netlify.toml`):
-
-| Path | Purpose |
-|------|---------|
-| `/.well-known/apple-app-site-association` | iOS verification (served `application/json`, no extension, no redirect) |
-| `/.well-known/assetlinks.json` | Android verification (served `application/json`) |
-| `/join/*` → `join/index.html` | fallback landing page (rewrite, not redirect) |
-
-`netlify.toml` enforces the JSON content-types and the `/join/*` rewrite — both
-are required or the OS silently refuses to verify.
-
-### Identifiers (already wired in)
-- iOS appID (AASA): `W88A7N6XW5.com.hotpicksports` (Team ID + bundle ID)
-- Android package (assetlinks): `com.hotpicksports`
-- Android assetlinks SHA-256: the **Play app signing key** cert fingerprint
-  (Play Console → App integrity → App signing). Accepts multiple entries if the
-  signing key rotates or you also want the upload key.
-- App Store ID (landing page): `6761190235`
-
-### Native config
-- **iOS:** `com.apple.developer.associated-domains` → `applinks:hotpick.app` in
-  `ios/HotPickSports/HotPickSports.entitlements`. The entitlements file is
-  referenced by both build configs (`CODE_SIGN_ENTITLEMENTS`) and signing is
-  **Automatic**, so an EAS build *or* an Xcode archive auto-enables the Associated
-  Domains capability on the App ID and regenerates the profile — no manual portal
-  step (manual signing would require enabling it on the App ID by hand first).
-- **Android:** `autoVerify="true"` https intent-filter for host `hotpick.app` in
-  `AndroidManifest.xml`. Verifies against the hosted `assetlinks.json` on install.
-
-### Go-live / rebuild steps (a native change → full build, never OTA)
-1. `git pull` (entitlement + manifest changes live on `main`).
-2. iOS + Android builds — `eas build -p ios --profile preview` /
-   `-p android --profile preview` (or Xcode archive for iOS). Accept any
-   credential/profile update prompt.
-3. Install on a **real device** (universal links don't work in simulators).
-4. Test: tap `https://hotpick.app/join/TEST123` from **Notes/Messages** (not the
-   browser URL bar) → app opens to the join flow.
-5. Promote to `production` and submit through the normal release flow.
-
-### Verification helpers
-- iOS archive entitlement check: `codesign -d --entitlements :- HotPickSports.app`
-  → expect `applinks:hotpick.app`.
-- Apple ingestion: `https://app-site-association.cdn-apple.com/a/v1/hotpick.app`.
-- Android: `adb shell pm get-app-links com.hotpicksports` → expect
-  `hotpick.app: verified`.
-- iOS caches the AASA at install — if a link won't open the app, delete + reinstall.
-
-Full deploy/host details live in `web/hotpick.app/README.md`.
+> **Moved to `docs/DEEP_LINKING.md`** — https universal links / App Links setup,
+> the `hotpick.app` Netlify host + `.well-known` files, AASA/assetlinks
+> identifiers, native config (entitlements + intent-filter), and the go-live /
+> verification steps. Full deploy/host details also live in
+> `web/hotpick.app/README.md`.
 
 ---
 
 ## 24. Native Build & Toolchain Notes
 
-Hard-won lessons from the SDK 55 upgrade. These are environment/tooling facts,
-not architecture — but each one cost real time, so they're written down.
-
-### Dependency versions
-- **`react-native` is pinned by the Expo SDK — never bump it on its own.**
-  Expo SDK 55 ⇒ **react-native 0.83.6**. A stray bump to 0.84.0 (in the prebuild
-  commit) left Expo's native modules undefined at runtime →
-  `Cannot read property 'EventEmitter' of undefined` on launch. Always realign
-  with `npx expo install --fix`; never hand-edit the RN version in
-  `package.json`. The drift table for SDK 55 lives in `expo/bundledNativeModules.json`.
-- **Never run `npm audit fix --force`.** It rewrote ~250 packages and broke
-  `node_modules` twice. Recover with
-  `git checkout package.json package-lock.json && rm -rf node_modules && npm ci`.
-- RN 0.83.6's bundled global `URL`/`URLSearchParams` types are narrower than
-  0.84's (no `hostname`/`pathname`/`URLSearchParams.get`). `react-native-url-polyfill`
-  supplies them at runtime; the TS gap is patched in
-  `src/shared/types/url-polyfill.d.ts`.
-
-### iOS build (Xcode 26 + CocoaPods)
-- **Disable "Explicitly Built Modules" for BOTH compilers in the Podfile.**
-  Xcode 26 turns it on by default; its dependency scanner expects every pod's
-  module map up front, but CocoaPods generates them later → thousands of
-  `module map file ... not found` (e.g. `RCTSwiftUI.modulemap`). The Podfile
-  `post_install` sets **both** `CLANG_ENABLE_EXPLICIT_MODULES = 'NO'` *and*
-  `SWIFT_ENABLE_EXPLICIT_MODULES = 'NO'` on every pod target — setting only the
-  CLANG flag leaves Swift pods (RCTSwiftUI, Sentry) broken. Keeping it in the
-  Podfile means it survives `pod install`. Verify with
-  `xcodebuild -showBuildSettings | grep -i explicit`.
-- **Ruby 3.4 needs `gem 'nkf'`** in the `Gemfile`, or `pod install` dies with
-  `cannot load such file -- kconv` (xcodeproj `< 1.26` still `require`s `kconv`,
-  which Ruby 3.4 dropped from stdlib).
-- **iOS release path is Xcode Archive** (EAS submit has been unreliable for this
-  project), so local Xcode must stay buildable — don't rely on EAS alone.
-
-### Metro
-- **`config.resolver.unstable_enablePackageExports = false` in `metro.config.js`
-  is load-bearing — do NOT remove it.** It disables Metro's package-"exports"
-  resolution. With it ON (the SDK 55 default), Metro resolves an ESM build of a
-  bootstrap polyfill (`@react-native/js-polyfills/console.js`) that calls
-  `require` before the module runtime exists → the launch-blocking redbox
-  `[runtime not ready]: Property 'require' doesn't exist`. The stack is
-  bootstrap-level with **no app frames**, which is why it reads like a native/cache
-  problem and sent us chasing babel, Pods, and Metro cache for a long time — none
-  of those were it. This one line was the fix (expo/expo #36635 / #36551).
-  **Caveat / known cost:** turning exports resolution off can occasionally
-  mis-resolve a package that ships *only* an `exports` map (no legacy `main`), so
-  if a dependency misbehaves around module loading later, this line is the first
-  suspect — but replace it with a tested alternative; never delete it as "cleanup."
-- **After any native or dependency-version change, start Metro with
-  `--clear`** (`npx expo start --dev-client --clear`). Metro caches a snapshot of
-  `node_modules`; a "module/file not found" error spanning *unrelated* packages
-  (`foreignNames.js`, `checkDuplicateRouteNames.js`) is a stale cache, not the
-  packages. `npx expo run:ios/android` does **not** reset the cache.
-
-### Git
-- **Local `main` can go stale silently** — `git pull` sometimes no-ops while
-  `origin/main` has moved (cost us a "the fix never reached my Mac" detour). When
-  in doubt: `git fetch origin main && git reset --hard origin/main`.
+> **Moved to `docs/NATIVE_BUILD_NOTES.md`** — SDK 55 / Xcode 26 / Metro / Git
+> environment + toolchain lessons (the `react-native` pin, the Metro
+> `unstable_enablePackageExports` workaround, Explicitly-Built-Modules, the
+> `nkf` gem, `--clear` after native changes). These are tooling facts, not
+> architecture, so they live in a runbook now. CLAUDE.md's Deployment Rules
+> point there too.

@@ -1,6 +1,6 @@
 # HotPick Sports — Claude Code Guardrails
 
-Read this file before writing any code. Full architecture context is in `REFERENCE.md`.
+Read this file before writing any code. Architecture context is in `REFERENCE.md`; deeper specs and runbooks are in `docs/`.
 
 ---
 
@@ -14,13 +14,16 @@ Do not default to worldCup2026 or any other event.
 
 ---
 
-## 24 Hard Rules
+## 25 Hard Rules
 
-These are non-negotiable. If a task requires violating one, stop and ask.
+These are non-negotiable. If a task requires violating one, stop and ask. When you must push back on a violation, state the relevant rule plainly and ask for a revision.
 
 1. **Never create new tables per sport or event** — add rows with `event_id` to existing template tables
-2. **Never attach `pool_id` to scores or picks** — pool-independent architecture is non-negotiable
-3. **Never compute scores client-side** — Edge Functions only
+2. **Never attach `pool_id` to scores or picks** — pool-independent architecture is non-negotiable. `pool_id` is always a WHERE filter, never a column on `*_user_totals` and never a data-model boundary; never assume one pool per user.
+   > Pushback: "Scores and picks must never carry a `pool_id`. Pools are a view on user-level data, not owners of it. Please revise."
+3. **Never compute scores client-side** — Edge Functions only.
+   Smells: `?? false`/default on `is_hotpick_correct` (write `null` until the game is FINAL); award computation in a React component (`compute-hardware` only); hardcoded `season_year` (read via `seasonStore.seasonYear`); `scoring_locked` missing from new competition seed data.
+   > Pushback: "Scoring runs in Edge Functions only — the client displays scores, never computes them. Please revise."
 4. **Never let the app shell import from a sport module directly** — use SportRegistry
 5. **Ranks are platform-assigned** — users cannot set their own point values
 6. **`frozen_rank` is immutable after pick deadline** — never overwrite it; use `COALESCE` to preserve existing values
@@ -39,114 +42,61 @@ These are non-negotiable. If a task requires violating one, stop and ask.
 19. **Home Screen shows maximum 2 event cards** — priority-ordered by urgency; rest appear in sport switcher only
 20. **Pool selection is global app state** — switching pools updates Home Screen, Board tab, and SmackTalk simultaneously; never scoped to one component
 21. **Next week's picks never open until current week reaches `complete`** — states are sequential: `picks_open → locked → live → settling → complete → picks_open`
-22. **Season phases are sequential and admin-initiated** — `OFF_SEASON → PRE_SEASON → REGULAR → REGULAR_COMPLETE → PLAYOFFS → SUPERBOWL_INTRO → SUPERBOWL → SEASON_COMPLETE`. OFF_SEASON is the quiet calendar window before exhibition games. PRE_SEASON covers exhibition games (NFL: Aug 6–Sept 8 for 2026) — picks allowed for practice but **scores don't count toward season total**. Weekly cycle only runs inside REGULAR, PLAYOFFS, and SUPERBOWL.
-23. **Partner brand config is copied to pool at creation** — rendering never depends on a live join to `partners`. Pools are self-contained. Snapshot stays fresh via the `partners_propagate_brand` AFTER UPDATE trigger — partner edits cascade to `pools.brand_config` + `pool_partner_affiliations.brand_config_snapshot` server-side. Don't refresh client-side; the read path stays self-contained.
-24. **Partners attract pools to their roster, not the other way around** — `pools.partner_id` is set by the pool's organizer via `PartnerDirectoryScreen`, never by super-admin push. A partner's board lives in **`partner_members`** (one **Chairman** + **Directors**), **independent of any Club Pool** — so sponsor-only partners have admins too. HotPick staff seed the Chairman by email in `PartnerAdminScreen`; the Chairman adds Directors. Chairman + Directors manage perk + broadcasts via **League Tools** (`ClubAdminScreen`); `_caller_can_manage_partner` and `send-partner-broadcast` gate on `partner_members`. Each partner still has at most one Club Pool (`partners.club_pool_id`); if present it's just a Contest the board also runs — it is **no longer** what defines the Partner Admin. (Pool-level delegation — Gaffer / Assistant Gaffer via `pool_members` — is unchanged.)
-25. **Club brand colors render only on Official Club Contest cards on the Home stack.** Settings, admin, shell surfaces, partner tiles in YOUR CLUBS, Affiliated Contest cards, Independent Contest cards — all stay HotPick-themed. Partner tiles in YOUR CLUBS surface Club identity via name + logo, not Club colors. `useTheme()` and `useBrand()` always return HotPick defaults; only PoolModule's Official-Contest branded band reads `pool.brand_config` directly.
+22. **Season phases are sequential and admin-initiated** — `OFF_SEASON → PRE_SEASON → REGULAR → REGULAR_COMPLETE → PLAYOFFS → SUPERBOWL_INTRO → SUPERBOWL → SEASON_COMPLETE`. The weekly cycle runs only inside REGULAR, PLAYOFFS, and SUPERBOWL. PRE_SEASON picks are practice — **scores don't count toward the season total**. (Phase detail: REFERENCE.md §3.)
+23. **Partner brand config is copied to the pool at creation** — rendering never live-joins to `partners`; pools are self-contained. The `partners_propagate_brand` trigger keeps the snapshot fresh server-side — never refresh it client-side. (REFERENCE.md §15.)
+24. **Pool organizers join partner rosters — super-admin never pushes partners onto pools.** `pools.partner_id` is set by the organizer via `PartnerDirectoryScreen`. A partner's board is `partner_members` (one Chairman + Directors), independent of any Club Pool — so sponsor-only partners have admins too; `_caller_can_manage_partner` and `send-partner-broadcast` gate on it. (Full model: REFERENCE.md §5 + §15.)
+25. **Club brand colors render only on Official Club Contest cards on the Home stack** — every other surface stays HotPick-themed. `useTheme()`/`useBrand()` always return HotPick defaults; only PoolModule's Official-Contest branded band reads `pool.brand_config`. (REFERENCE.md §15.)
 
 ---
 
 ## Critical Red Flags
 
-If you find yourself writing any of the following, stop and revise.
+The 25 rules above state the law; these are the specific code smells with no rule of their own. If you're about to write one, stop and revise.
 
-### Scoring & Picks
-- Client-side score calculation of any kind → Edge Functions only
-- `frozen_rank` recalculated after pick deadline → must be immutable; use `COALESCE`
-- `?? false` or default fallback on `is_hotpick_correct` → write `null` until game is FINAL
-- `season_year` hardcoded anywhere → always read from `competition_config` via `seasonStore.seasonYear`
-- `scoring_locked` missing from new competition seed data → always include it
-- Award computation in a React component → `compute-hardware` Edge Function only
-
-### Data Architecture
-- New table per sport or event → use template tables with `event_id`
-- `pool_id` column on `*_user_totals` tables → never; scores are user-scoped
-- Any query or feature that assumes one pool per user → users belong to many pools; `pool_id` is always a WHERE filter, never a data-model boundary
-- Leaderboard query without `pool_start_date` filter → always filter from pool start, not season start
-- Playoff leaderboard mixing regular season scores → scope to `week_number >= playoff_start_week`
+### Data & Scoring
+- Leaderboard query without a `pool_start_date` filter → filter from pool start, not season start
+- Playoff leaderboard mixing regular-season scores → scope to `week_number >= playoff_start_week`
 - `DELETE FROM user_hardware` → use `is_visible = false`; hardware rows are permanent
 - `INSERT INTO user_hardware` without `ON CONFLICT DO NOTHING` → duplicates are permanent
-- **Reading partner identity (name/logo/colors) from `pool.brand_config` in a partner-centric component** → wrong partner in multi-affiliate cases. `pool.brand_config` is the *lead/primary* partner's snapshot. Partner-centric surfaces (PartnerModule, partner tiles, partner detail screens) read live from `partnersById[partnerId]`. Pool-centric surfaces (Contest card) read the snapshot per Hard Rule #23.
+- **Partner identity (name/logo/colors) read from `pool.brand_config` in a partner-centric component** → that snapshot is the *lead* partner only. Partner-centric surfaces (PartnerModule, partner tiles, detail screens) read live from `partnersById[partnerId]`; pool-centric surfaces (Contest card) read the snapshot (Rule #23)
 
 ### SmackTalk & Messaging
-- `DELETE FROM smack_messages` without prior INSERT to archive → data is never deleted, only archived
-- Client querying `smack_messages_archive` directly → service role Edge Function only
-- Moderator note written to `smack_messages` → must use `organizer_notifications`
-- Reaction validation only on client → Postgres trigger is authoritative
-- Unread count computed by loading all messages client-side → use aggregated query by `pool_id`
+- `DELETE FROM smack_messages` without first archiving → data is archived, never deleted
+- Client querying `smack_messages_archive` → service-role Edge Function only
+- Moderator note written to `smack_messages` → use `organizer_notifications`
+- Reaction validation only on the client → the Postgres trigger is authoritative
+- Unread count by loading all messages client-side → use the aggregated query by `pool_id`
 
 ### Auth & Security
-- `supabase.auth.admin` or service role key in client code → server only
-- `apply_migration` vs `execute_sql`: schema changes and RLS-protected DML require `apply_migration`; `execute_sql` runs under anon role and RLS silently blocks writes
-- **Silent RLS-filtered writes** — `from('table').update(...).eq(...)` with no `.select()` returns success with zero rows affected when RLS filters the write. Always chain `.select('id').single()` so a filtered write throws `PGRST116`, or move the mutation to a SECURITY DEFINER RPC that explicitly authorizes.
-- **Direct client UPDATE of `pools.partner_id`, `pools.brand_config`, or `pools.invite_slug`** — the `pools_update` RLS only checks who can write *which row*, not *what values*. Route through a SECURITY DEFINER RPC (e.g. `join_partner_roster`) that validates the target partner is active and reads `brand_config` server-side.
-- **Storage policies gated only by `bucket_id`** — grants every authenticated user blanket access across the bucket. Always include a path-prefix check or role check (e.g. `(storage.foldername(name))[1] = auth.uid()::text` OR a super_admin `EXISTS` clause).
+- `supabase.auth.admin` or a service-role key in client code → server only (Rule #8)
+- **Silent RLS-filtered writes** — `update(...).eq(...)` with no `.select()` returns success with zero rows when RLS filters it. Chain `.select('id').single()` (throws `PGRST116`) or use a SECURITY DEFINER RPC
+- **Direct client UPDATE of `pools.partner_id` / `brand_config` / `invite_slug`** — `pools_update` RLS checks *which* row, not *what values*. Route through a SECURITY DEFINER RPC that validates server-side
+- **Storage policy gated only by `bucket_id`** → add a path-prefix or role check (e.g. `(storage.foldername(name))[1] = auth.uid()::text`)
 
 ### Config & State
-- Competition state hardcoded in a component or Edge Function → always read from `competition_config`
-- New `competition_config` key without a `description` field → always include description
-- Key names invented on the fly → use the defined key names for the template type
-- `competition_config` key inserted with `execute_sql` → use `apply_migration`
+- Competition state hardcoded in a component or Edge Function → read from `competition_config`
+- New `competition_config` key without a `description` → always include one; use the defined key names, never invented ones
 
 ### UI & Theming
-- Hex color value in a StyleSheet (except `SplashScreen.tsx` container background) → use `useTheme()`
-- Hardcoded logo path or app name string → use `useBrand()`
-- **Hardcoded user-facing nouns** ("Pool", "Poolie", "Organizer", "Partner", "Leaderboard", "Standings", "SmackTalk" in a TSX/TS string literal) → import from `@shared/lexicon`. The user-facing vocabulary (Contest / Player / the Gaffer / the Club / the Ladder / Chirps) is intentionally decoupled from the internal code identifiers (`pool_id`, `organizer_id`, `smack_messages`, etc.) per REFERENCE.md §22. Internal names stay; only user labels move.
-- Card priority logic computed inside a React component → computed in globalStore only
-- Week state transition triggered from the client → admin-initiated via Edge Function
-- ESPN API called directly from the client → server-side polling only; clients use Realtime
+- Hex color in a StyleSheet → `useTheme()` (only exception: the native BootSplash background — REFERENCE.md §15)
+- **Hardcoded user-facing nouns** ("Pool", "Poolie", "Organizer", "Partner", "Leaderboard", "SmackTalk" in a TS/TSX string literal) → import from `@shared/lexicon`; internal code identifiers (`pool_id`, `organizer_id`, …) stay (REFERENCE.md §22)
+- Card-priority logic inside a React component → computed in globalStore only
+- Week-state transition triggered from the client → admin-initiated via Edge Function
+- ESPN API called from the client → server-side polling only; clients use Realtime
 - `useEffect` polling from a component → Realtime subscription in the store
 
 ### Admin & Pools
-- `DELETE FROM pools` outside the scheduled cron job → archive only for organizers
-- Pool creation or join enforcement logic in a React component → always server-side
-- Pool intelligence computed in a component → read from `pool_pulse`
 - Admin UI importing from a sport module → admin lives in `/shell` only
-- `pool_events` written with freeform `event_type` strings → use defined enum values
-- Notification sent without rate limit check → always call `check_notification_rate_limit()` first
+- Notification sent without a rate-limit check → call `check_notification_rate_limit()` first
 
 ### Simulator & Sandbox
-- **`nfl-import-schedule` must never run against a simulator competition** — an ESPN import matches zero sim game_ids and the stale-id cleanup deletes the entire sim week before inserting. The importer refuses any competition whose `data_provider` isn't `espn` (covers sim + demo, config-driven); only the simulator writes sim rows.
+- **`nfl-import-schedule` run against a simulator competition** → an ESPN import matches zero sim `game_id`s and the stale-id cleanup wipes the entire sim week. The importer refuses any competition whose `data_provider` isn't `espn` (covers sim + demo); only the simulator writes sim rows.
 
 ### Scope Creep (do not build before NFL Season 2 launch)
 Power-ups, career hardware awards, AI archetypes, tier system, pool discovery, Super Bowl enhanced scoring UI, playoff reset UI, global leaderboard, NHL/Tournament templates, white label billing, admin analytics dashboard.
 > "That feature is explicitly deferred until after NFL Season 2 launch. Let's stay on scope."
 
-**Deferred → November 2026 (Super Bowl Enhanced Scoring build, see REFERENCE.md §3 + §"Super Bowl Enhanced Scoring"):** Super Bowl-only competition with its own winner (sign-up opens 2 weeks before the SB), playoffs-only competition (join any time, start fresh at Week 19 / Wild Card through the SB), and the playoff-champion tie-breaker ladder computation (points → SB margin Price-Is-Right → most correct playoff picks → most correct playoff HotPicks → co-champions). All are leaderboard *scopes* over user-scoped picks — never new tables, never `pool_id` on scores.
-
----
-
-## What To Say (Copy-Paste Responses)
-
-**Scoring violation:**
-> "Scoring computation runs in Edge Functions only. The client displays scores; it never computes them. Please revise."
-
-**Pool-independent violation:**
-> "Scores and picks must never have a `pool_id`. Pools are a view on user-level data, not owners of it. Please revise."
-
-**competition_config violation:**
-> "Competition state is always read from `competition_config`, never hardcoded. Use the defined key names for this template type and always include a description. Please revise."
-
-**SmackTalk data destruction:**
-> "SmackTalk data is never deleted — it is archived. The archive is permanent and exists for AI/analytics. Please revise."
-
-**Hardware deletion:**
-> "Award computation runs in the compute-hardware Edge Function only. Never delete from `user_hardware` — use `is_visible = false`. Hardware slugs are permanent. Please revise."
-
-**Pool deletion:**
-> "Organizers archive pools — they never delete. Hard deletion is admin-only, requires audit log entry first, and runs via cron after 24-hour grace period. Use `organizer_id` not `created_by`. Please revise."
-
-**RLS bypass:**
-> "Service role is for Edge Functions only, never the client. All client queries go through RLS with the anon key. Please revise."
-
-**Tier limit hardcoding:**
-> "Tier limits are read from `competition_config` global keys, never hardcoded. Enforcement always runs server-side in an Edge Function. Valid plan values: free, organizer_small, organizer_medium, organizer_large, addon_sport, addon_pool. Please revise."
-
-**Sport store isolation:**
-> "Sport stores are isolated. Global store holds only cross-sport shared state. Sport-specific data stays in the sport store. Please revise."
-
-**Wrong-direction partner-pool model:**
-> "Pool organizers join partner rosters — super-admin doesn't push partners onto pools. Each partner has one Club Pool (`partners.club_pool_id`) whose organizer manages perk + broadcasts via PoolSettings. Please revise."
+The November 2026 Super Bowl Enhanced Scoring build (SB-only + playoffs-only sub-competitions, the playoff tie-breaker ladder) is deferred too — all leaderboard *scopes* over user-scoped picks, never new tables, never `pool_id` on scores. Spec: `docs/SUPER_BOWL_SCORING_SPEC.md`; context in REFERENCE.md §3 + §7. Full roadmap: `docs/BUILD_STATE.md`.
 
 ---
 
@@ -159,26 +109,26 @@ Power-ups, career hardware awards, AI archetypes, tier system, pool discovery, S
 | Cron job setup | Non-RLS utility queries |
 | Any write that must bypass RLS | |
 
-When in doubt, use `apply_migration`.
+`execute_sql` runs under the anon role, so RLS silently blocks writes (returns success, zero rows). `competition_config` writes and any RLS-protected DML must use `apply_migration`. When in doubt, use `apply_migration`.
 
 ---
 
 ## Deployment Rules
 
-These rules apply from the moment the app is live in the App Store and Google Play. Violations risk user-facing incidents during a live season.
+These apply from the moment the app is live in the App Store and Google Play. Violations risk user-facing incidents during a live season.
 
-- **Never commit directly to main during a live season** — all changes go through a feature branch and preview build first
-- **EAS Update (OTA) is for JavaScript-only fixes only** — new features that change app behavior require a full build and store submission
-- **All Edge Functions must be committed to git before deployment** — never deploy an Edge Function that isn't in the repository
+- **Never commit directly to main during a live season** — feature branch + preview build first
+- **EAS Update (OTA) is JavaScript-only** — anything that changes app behavior or native code needs a full build + store submission (use the `ship-check` skill to classify a change)
+- **All Edge Functions committed to git before deployment** — never deploy what isn't in the repo
 - **Take a manual Supabase backup before every schema migration** — Project Settings → Database → Backups → Manual backup
-- **`scoring_locked` in `competition_config` is the emergency scoring brake** — set to `true` to pause all scoring computation instantly, no deployment needed
-- **Build profile order is always: `development` → `preview` → `production`** — never skip preview; every non-trivial change verifies on a real device first
-- **When bumping the app's marketing version, bump `runtimeVersion` simultaneously in all three places** — `app.json`, `ios/HotPickSports/Supporting/Expo.plist` (`EXUpdatesRuntimeVersion`), and `android/app/src/main/res/values/strings.xml` (`expo_runtime_version`). Drift breaks OTA silently. Bare workflow requires a literal string; the `appVersion` policy is not supported
-- **File-type EAS env vars must be scoped to all three environments (`production, preview, development`)** — narrowing to one environment silently breaks builds on the others (the pre-install hook's `if [ -n "$VAR" ]` guard skips, the Gradle plugin then fails with "File google-services.json is missing"). Verify scope before a release cycle with `eas env:list --environment preview --format long`. Confirm the build log's `Environment secrets:` block lists the var before investigating any Gradle failure
-- **`react-native`'s version is owned by the Expo SDK — never bump it on its own.** Expo SDK 55 ⇒ react-native **0.83.6**. A stray bump to 0.84.0 made Expo's native modules undefined at launch (`Cannot read property 'EventEmitter' of undefined`). Realign with `npx expo install --fix`; never hand-edit the RN version. (See REFERENCE.md §24.)
-- **Do not remove `config.resolver.unstable_enablePackageExports = false` from `metro.config.js`.** It is a deliberate SDK 55 / Hermes workaround, not dead config. With package-"exports" resolution ON, Metro resolves an ESM build of a bootstrap polyfill (`@react-native/js-polyfills/console.js`) that calls `require` before the module runtime exists → the launch-blocking redbox `[runtime not ready]: Property 'require' doesn't exist` (bootstrap stack, no app frames). This was THE fix for that redbox — not babel, Pods, or cache (expo/expo #36635 / #36551). Caveat: the flag can occasionally mis-resolve a dependency that ships only an `exports` entry, so if a feature later misbehaves around module loading, suspect this line first — but remove it only with a tested replacement, never as "cleanup." (See REFERENCE.md §24.)
-- **Never run `npm audit fix --force`** — it rewrites the dependency tree and breaks `node_modules`. Recover with `git checkout package.json package-lock.json && rm -rf node_modules && npm ci`.
-- **After any native or dependency-version change, restart Metro with `--clear`** (`npx expo start --dev-client --clear`). A "module not found" error spanning *unrelated* packages is a stale Metro cache, not the packages — `expo run:ios/android` does not reset it.
+- **`scoring_locked` in `competition_config` is the emergency scoring brake** — set `true` to pause all scoring instantly, no deployment needed
+- **Build profile order is always `development → preview → production`** — never skip preview; every non-trivial change verifies on a real device first
+- **Bumping the marketing version bumps `runtimeVersion` in all three places** — `app.json`, `ios/.../Expo.plist` (`EXUpdatesRuntimeVersion`), `android/.../strings.xml` (`expo_runtime_version`). Drift breaks OTA silently
+- **File-type EAS env vars must be scoped to all three environments** (`production, preview, development`) — narrowing one silently breaks the others' builds (the pre-install guard skips, Gradle then fails with "File google-services.json is missing"). Verify with `eas env:list --environment preview --format long`
+- **Never hand-edit the `react-native` version** (owned by the Expo SDK; realign with `npx expo install --fix`) and **never run `npm audit fix --force`** — both break `node_modules`
+- **After any native or dependency-version change, restart Metro with `--clear`** (`npx expo start --dev-client --clear`)
+
+> The SDK 55 / Xcode / Metro war-stories behind the last two rules — the load-bearing `metro.config.js` `unstable_enablePackageExports = false`, the RN pin, Explicitly-Built-Modules, the `nkf` gem — live in `docs/NATIVE_BUILD_NOTES.md`. Read it before "cleaning up" any of that config.
 
 ---
 
@@ -196,4 +146,4 @@ These rules apply from the moment the app is live in the App Store and Google Pl
 
 ---
 
-*Full architecture, schema details, UI patterns, store interfaces, Edge Function registry, and build roadmap are in `REFERENCE.md`.*
+*Full architecture, schema details, store interfaces, Edge Function registry, and build roadmap are in `REFERENCE.md`. Specs and runbooks are in `docs/`.*
