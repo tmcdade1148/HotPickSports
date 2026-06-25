@@ -88,7 +88,7 @@ they break when legacy keys are disabled until the operator pastes
 
 | Tool | Location | Action in Stage 5 |
 |---|---|---|
-| `season-simulator` (browser) | `tools/season-simulator{,-v2,-v3,-v4}.html` | paste new secret; confirm it's sent in the `apikey` header on both REST and `functions/v1` calls. (The committed `eyJ` here is the **anon** key — public, not a leak.) |
+| `season-simulator-v4` (browser) | `tools/season-simulator-v4.html` | paste new secret; confirm it's sent in the `apikey` header on both REST and `functions/v1` calls. (The committed `eyJ` here is the **anon** key — public, not a leak.) |
 | `season-simulator` (Edge Function) | counted in **B** | migrated in Stage 3 with the rest. |
 | **`hotpick_engine_monitor`** | **external — not in this repo** | paste new secret **and update its key-format validation** to accept `sb_secret_…` (it currently appears to require an `eyJ…`/URL pair → see §8). Optional read-only tool; fix it here, not on the critical path. |
 
@@ -171,7 +171,7 @@ SELECT cron.schedule(
   scoring path against the **SANDBOX only** (`nfl_2025_sim`).
 
 ### Stage 5 — Migrate operator tools *(you)*
-- `season-simulator` HTML + `hotpick_engine_monitor`: paste `{{NEW_SECRET_KEY}}`,
+- `season-simulator-v4` HTML + `hotpick_engine_monitor`: paste `{{NEW_SECRET_KEY}}`,
   ensure the key is sent in the **`apikey`** header, and update
   `hotpick_engine_monitor`'s key-format validation to accept `sb_secret_…` (§8).
 - **Verify:** each tool performs a read against the sandbox without error.
