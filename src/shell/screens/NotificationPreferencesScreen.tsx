@@ -115,16 +115,15 @@ export function NotificationPreferencesScreen() {
     // Optimistic update
     setPrefs(prev => ({...prev, [type]: newValue}));
 
-    // Upsert the single boolean column. .select().single() makes an
-    // RLS-filtered or failed write throw instead of silently succeeding.
-    const {error} = await supabase
-      .from('notification_preferences')
-      .upsert(
-        {user_id: userId, [type]: newValue, updated_at: new Date().toISOString()},
-        {onConflict: 'user_id'},
-      )
-      .select(`user_id, ${type}`)
-      .single();
+    // Persist via a SECURITY DEFINER RPC that derives auth.uid() server-side and
+    // updates the caller's own row. Replaces the prior client upsert, which silently
+    // no-op'd when userId was null/stale (the toggle-reset bug, register 1.3). The
+    // RPC raises on an unauthenticated caller or an unknown type, so a failed write
+    // surfaces as `error` here instead of a silent success.
+    const {error} = await supabase.rpc('set_notification_preference', {
+      p_type: type,
+      p_value: newValue,
+    });
 
     if (error) {
       // Revert so the UI never claims a change that didn't persist.

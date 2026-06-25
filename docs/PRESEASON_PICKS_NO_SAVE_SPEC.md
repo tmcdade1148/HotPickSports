@@ -1,3 +1,5 @@
+> **⚠️ SUPERSEDED by [`PRESEASON_ISOLATION_SPEC.md`](./PRESEASON_ISOLATION_SPEC.md) (2026-06-25)** — the phase-within-`nfl_2026` "no-save" approach is replaced by running preseason as its own competition (`nfl_2026_pre`). Kept for history; do not implement.
+
 # Preseason Picks — No Persistence Spec
 
 **Status:** Spec only — implement before loading preseason games into `season_games`.
