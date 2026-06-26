@@ -110,8 +110,8 @@ export async function registerForPushNotifications(
     const token = tokenData.data;
     console.log('[Push] Token:', token);
 
-    // Upsert to user_devices — safe to call every app launch
-    await upsertDeviceToken(userId, token);
+    // Register the token (via a SECURITY DEFINER RPC) — safe every app launch.
+    await upsertDeviceToken(token);
 
     return token;
   } catch (err) {
@@ -121,41 +121,28 @@ export async function registerForPushNotifications(
 }
 
 /**
- * Upsert a push token into user_devices.
- * Re-activates a previously deactivated token if the same device is used again.
+ * Register this device's push token via the SECURITY DEFINER `register_device_token`
+ * RPC, then mark it active.
  *
- * The column names + values below must match the live `user_devices` schema
- * exactly — earlier they didn't, and every write threw (silently, because the
- * result wasn't inspected), which is why the table sat empty and no push ever
- * delivered:
- *   • `platform` is the token TRANSPORT, not the OS — the table CHECK allows
- *     only 'expo' | 'apns' | 'fcm'. We always fetch an Expo push token here, so
- *     it's 'expo'. Writing 'ios'/'android' violated the CHECK.
- *   • the table has no `updated_at` column (it's `last_used_at`).
- *   • the only unique index is on `push_token` alone (a token identifies a
- *     device), so that's the conflict target — not (user_id, push_token).
+ * Tokens live in user_devices keyed by `push_token` alone — one row per device. On
+ * a phone shared across accounts (a tester's test + real account, or a reinstall)
+ * the SAME token can already belong to a DIFFERENT user. A direct client upsert
+ * hits that other user's row and the per-user RLS (USING auth.uid() = user_id)
+ * rejects the reassign with a 42501 "(USING expression)" error, so the newly
+ * signed-in account silently registered nothing and got no pushes. The RPC derives
+ * auth.uid() server-side and reassigns the token to the caller — the device's
+ * notifications follow whoever is currently signed in. (`platform` is the token
+ * TRANSPORT, not the OS; the table CHECK allows only 'expo' | 'apns' | 'fcm', and
+ * we always fetch an Expo token here.)
  */
-async function upsertDeviceToken(userId: string, token: string): Promise<void> {
-  const {error} = await supabase
-    .from('user_devices')
-    .upsert(
-      {
-        user_id: userId,
-        push_token: token,
-        platform: 'expo',
-        is_active: true,
-        last_used_at: new Date().toISOString(),
-      },
-      {onConflict: 'push_token'},
-    )
-    // Chain .select() so an RLS/constraint failure throws (PGRST116 on zero
-    // rows) instead of silently returning success — per the CLAUDE.md
-    // silent-RLS-write guardrail. The throw is caught + logged by the caller.
-    .select('id')
-    .single();
+async function upsertDeviceToken(token: string): Promise<void> {
+  const {error} = await supabase.rpc('register_device_token', {
+    p_push_token: token,
+    p_platform: 'expo',
+  });
 
   if (error) {
-    console.error('[Push] Failed to upsert device token:', error.message);
+    console.error('[Push] Failed to register device token:', error.message);
     throw error;
   }
   console.log('[Push] Device token registered');
