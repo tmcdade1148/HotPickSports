@@ -12,6 +12,7 @@ import {
 } from '@shell/stores/globalStore';
 import {getDefaultEvent, getAllEventsUnfiltered} from '@sports/registry';
 import {resolvePendingInviteCodeOnLaunch} from '@shell/services/pendingInvite';
+import {registerForPushNotifications} from '@shell/services/pushNotifications';
 
 /**
  * LoadingScreen — bootstraps auth session and navigates to the first real screen.
@@ -176,6 +177,16 @@ export function LoadingScreen({navigation}: any) {
         }
 
         subscribeSmackUnread();
+
+        // Register/refresh the push token on app launch for returning users
+        // (non-blocking). postAuthFlow already does this on an *explicit* sign-in,
+        // but a user who only ever reopens the app — restoring a stored session
+        // here instead of signing in — never hit that path, so a missing or stale
+        // push token was never replaced (user_devices stayed empty and no push
+        // could deliver). The token upsert is idempotent and safe to call every
+        // launch.
+        registerForPushNotifications(session.user.id).catch(() => {});
+
         BootSplash.hide({fade: true}).catch(() => {});
         // reset, not replace — guarantees Home is the only route so a
         // back-gesture/swipe can't reach an auth screen (matches the auth/
