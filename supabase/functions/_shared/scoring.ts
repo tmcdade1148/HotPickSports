@@ -103,8 +103,10 @@ function emptyAgg(user_id: string): UserAgg {
  *   • Non-HotPick loss → 0
  *   • HotPick win → +rank (×2 if double_down), correct_picks +1, is_hotpick_correct=true
  *   • HotPick loss → −rank, is_hotpick_correct=false (only if not already true)
- *   • A TIE (final game with no winner_team) is scored as a LOSS — non-HotPick → 0,
- *     HotPick → −rank. It is NOT skipped.
+ *   • A DRAW (final game with no winner_team) is a PUSH — it does not score at all.
+ *     Regular pick → excluded (total_picks NOT incremented, no result row, 0 pts).
+ *     HotPick → 0 swing (no +rank, no −rank; is_hotpick_correct stays null;
+ *     hotpick_rank not set). A draw is NEVER a loss (Tie Handling spec / register 2.7).
  *   • Picks whose game isn't final yet (absent from gameMap) are skipped (not counted)
  */
 export function scorePicks(gameMap: Map<string, ScoreGame>, picks: ScorePick[]): ScoreResult {
@@ -113,13 +115,20 @@ export function scorePicks(gameMap: Map<string, ScoreGame>, picks: ScorePick[]):
 
   for (const p of picks) {
     const game = gameMap.get(p.game_id);
-    // gameMap holds only FINAL games (the caller filters by status). A pick whose
-    // game isn't final yet is absent from the map → skip it (it gets the zero-row
-    // backfill below). A final game WITH a null winner_team is a genuine tie, which
-    // is scored as a loss (isWin === false), not skipped.
+    // gameMap holds only FINAL games (the caller filters by status). Two cases,
+    // kept deliberately DISTINCT — do not collapse them back into one guard:
+    //   1. No game row → the pick's game isn't FINAL yet → not scorable; skip it
+    //      (it still gets the zero-row backfill below).
     if (!game) continue;
+    //   2. FINAL game with a null winner_team → a genuine DRAW → PUSH. The pick
+    //      does not score: a regular pick is excluded (no total_picks increment,
+    //      no result row, 0 pts) and a HotPick takes a 0 swing (is_hotpick_correct
+    //      stays null, hotpick_rank not set). A draw is NEVER a loss. Folding this
+    //      into the !game skip, or scoring it as −rank, is the register 2.7
+    //      regression — keep the branch explicit so it can't silently return.
+    if (!game.winner_team) continue;
 
-    const isWin = !!game.winner_team && p.picked_team === game.winner_team;
+    const isWin = p.picked_team === game.winner_team;
     const isHotpick = !!p.is_hotpick;
     const isDoubleDown = p.power_up === 'double_down';
     const rank = game.effectiveRank;

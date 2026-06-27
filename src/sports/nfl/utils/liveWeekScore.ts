@@ -56,6 +56,12 @@ export function computeLiveWeekEarned(
     const userScore = pickedHome ? score.homeScore : score.awayScore;
     const oppScore = pickedHome ? score.awayScore : score.homeScore;
     if (isFinalStatus(score.status)) {
+      if (userScore === oppScore) {
+        // Final DRAW → PUSH (Tie Handling spec): 0 swing, not counted. Mirrors the
+        // server scorer, which skips a drawn game entirely. Never show −rank for a
+        // draw — that was the mid-settlement flash this fixes.
+        continue;
+      }
       counted += 1;
       const isCorrect = userScore > oppScore;
       if (isCorrect) correct += 1;

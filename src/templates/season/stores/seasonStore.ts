@@ -24,6 +24,11 @@ export interface SeasonLeaderboardEntry {
   total_picks: number;
   /** Per-week breakdown: week number -> week_points */
   weekly_breakdown: Record<number, number>;
+  /** Co-ranked standing from the server (get_pool_standings) — shared on a tie
+   *  (1,2,2,4). The client never computes this; undefined until loaded. */
+  standing_rank?: number;
+  /** True when another member shares this exact total_points → render "T-{rank}". */
+  is_tied?: boolean;
 }
 
 /**
@@ -477,11 +482,13 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       (typeof cfgMap.current_week === 'number' ? cfgMap.current_week : 1);
 
     // Step 1: Get ACTIVE pool member user IDs + pool_start_date in parallel.
-    // All active members appear on the ladder, including super-admins.
+    // All active members appear on the ladder EXCEPT super-admins — they are
+    // hidden members (the hidden-member rule), matching the rank chip and
+    // compute_pool_standings so the Ladder and the chip agree on a tie.
     const [membersResult, poolResult] = await Promise.all([
       supabase
         .from('pool_members')
-        .select('user_id')
+        .select('user_id, profiles!inner(is_super_admin)')
         .eq('pool_id', poolId)
         .eq('status', 'active'),
       supabase
@@ -491,7 +498,10 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
         .single(),
     ]);
 
-    const memberRows = (membersResult.data ?? []) as any[];
+    const memberRows = ((membersResult.data ?? []) as any[]).filter(m => {
+      const prof = Array.isArray(m?.profiles) ? m.profiles[0] : m?.profiles;
+      return !prof?.is_super_admin;
+    });
     const memberIds = memberRows.map(m => m.user_id);
     if (memberIds.length === 0) {
       set({leaderboard: [], allUserScores: {}, userNames: {}, isLoading: false});
@@ -581,8 +591,9 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       }
     }
 
-    // Break ties alphabetically by display name (names are only known now, so
-    // re-sort here): higher total_points first, then A→Z within equal scores.
+    // Stable DISPLAY order within a tie: higher total_points first, then A→Z by
+    // name. This orders the rows only — it never sets the rank NUMBER (that comes
+    // from the server's co-ranked standing_rank below).
     leaderboard.sort((a, b) => {
       if (b.total_points !== a.total_points) return b.total_points - a.total_points;
       return (names[a.user_id] ?? '').localeCompare(
@@ -591,6 +602,31 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
         {sensitivity: 'base'},
       );
     });
+
+    // Co-ranked standing + tie marker from the canonical server function (Tie
+    // Handling spec — the client never computes the displayed rank). Scoped to
+    // the same weeks the displayed points include (settled weeks only). If the
+    // call fails or hasn't been deployed yet, entries keep undefined ranks and
+    // the screen falls back to a sequential index — no crash during rollout.
+    const includedWeeks = rows.map(r => r.week);
+    const throughWeek = includedWeeks.length ? Math.max(...includedWeeks) : null;
+    const {data: standingRows} = await supabase.rpc('get_pool_standings', {
+      p_pool_ids: [poolId],
+      p_through_week: throughWeek,
+    });
+    const rankByUser: Record<string, {standing_rank: number; is_tied: boolean}> = {};
+    for (const r of (standingRows ?? []) as Array<{
+      user_id: string;
+      standing_rank: number;
+      is_tied: boolean;
+    }>) {
+      rankByUser[r.user_id] = {standing_rank: r.standing_rank, is_tied: r.is_tied};
+    }
+    for (const entry of leaderboard) {
+      const sr = rankByUser[entry.user_id];
+      entry.standing_rank = sr?.standing_rank;
+      entry.is_tied = sr?.is_tied ?? false;
+    }
 
     set({
       leaderboard,
