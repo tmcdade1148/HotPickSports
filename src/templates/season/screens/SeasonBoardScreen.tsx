@@ -199,8 +199,17 @@ export function SeasonBoardScreen() {
       pts: e.total_points - (e.weekly_breakdown[latestWeek] ?? 0),
     }));
     prevTotals.sort((a, b) => b.pts - a.pts);
+    // CO-RANK the previous-week standings (1,2,2,4) — the ONE place the client is
+    // permitted to compute a rank (Tie Handling spec §6), because the server
+    // standings function is current-state only and cannot reconstruct last week.
+    // It feeds the ▲/▼ movement arrow ONLY — never the displayed rank number.
     const map: Record<string, number> = {};
-    prevTotals.forEach((e, i) => { map[e.user_id] = i + 1; });
+    let lastPts: number | null = null;
+    let lastRank = 0;
+    prevTotals.forEach((e, i) => {
+      if (lastPts === null || e.pts !== lastPts) { lastRank = i + 1; lastPts = e.pts; }
+      map[e.user_id] = lastRank;
+    });
     return map;
   }, [leaderboard]);
 
@@ -225,7 +234,11 @@ export function SeasonBoardScreen() {
 
   const renderSeasonRow = ({item, index}: {item: SeasonLeaderboardEntry; index: number}) => {
     const isMe = item.user_id === user?.id;
-    const rank = index + 1;
+    // Co-ranked standing from the server; fall back to a sequential index only
+    // until the standings function has loaded (or on a degraded call).
+    const rank = item.standing_rank ?? index + 1;
+    // "T-3rd" when the rank is shared on a points tie; plain "3rd" otherwise.
+    const rankLabel = item.is_tied ? `T-${rank}` : `${rank}`;
 
     const weekKeys = Object.keys(item.weekly_breakdown)
       .map(Number)
@@ -233,7 +246,8 @@ export function SeasonBoardScreen() {
     const latestWeek = weekKeys[0];
     const latestPoints = latestWeek != null ? item.weekly_breakdown[latestWeek] : null;
 
-    // Rank movement: positive = moved up, negative = moved down
+    // Rank movement: positive = moved up, negative = moved down. Both ranks are
+    // co-ranked, so the delta is meaningful across shared positions.
     const prevRank = prevRankMap[item.user_id];
     const rankDelta = prevRank != null ? prevRank - rank : 0;
 
@@ -242,7 +256,7 @@ export function SeasonBoardScreen() {
         key={item.user_id}
         style={[styles.row, isMe && styles.rowHighlight]}
         ref={isMe ? mySeasonRowRef : undefined}>
-        <Text style={[styles.rank, isMe && styles.textHighlight]}>{rank}</Text>
+        <Text style={[styles.rank, isMe && styles.textHighlight]}>{rankLabel}</Text>
         <AvatarBadge avatarKey={userAvatars[item.user_id]} name={userNames[item.user_id] ?? 'P'} size={24} />
         <View style={styles.userInfo}>
           <View style={styles.nameRow}>

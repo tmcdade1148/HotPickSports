@@ -2,22 +2,31 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // Posts a "regular season winner" announcement to each pool's Chirps feed when
 // the regular season closes (REGULAR_COMPLETE), before the playoff scoreboard
-// resets. Per-pool winner is computed from the final REGULAR-phase standings
-// (scoped to the pool's members + pool_start_date), ties broken alphabetically
-// to match the app's Ladder. Idempotent: a pool that already has a
-// 'regular_season_winner' message is skipped, so it's safe to re-run.
+// resets. The per-pool winner comes from compute_pool_standings — the SAME
+// canonical ranking the Ladder, the crown trigger, and the podium hardware read,
+// so the crown can never disagree with them on a tie. Champion = row(s) with
+// title_rank = 1 (points, then HotPick points); a shared title_rank 1 → co-champions.
+// Idempotent: a pool that already has a 'regular_season_winner' message is skipped.
 //
 // NOTE: Production fires this automatically via the
 // announce_regular_winners_on_phase DB trigger when current_phase flips to
-// REGULAR_COMPLETE. This function is kept as a MANUAL backfill / re-run tool
-// (e.g. to announce for pools created after the flip, or if the trigger was
-// added after a competition had already advanced).
+// REGULAR_COMPLETE. This function is kept as a MANUAL backfill / re-run tool and
+// MUST stay in lockstep with that trigger (both read compute_pool_standings).
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL") ?? "",
   (Deno.env.get("SB_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")) ?? "",
   { auth: { persistSession: false } }
 );
+
+interface Standing {
+  user_id: string;
+  total_points: number;
+  hotpick_points: number;
+  standing_rank: number;
+  title_rank: number;
+  is_tied: boolean;
+}
 
 Deno.serve(async (req) => {
   try {
@@ -26,7 +35,7 @@ Deno.serve(async (req) => {
 
     const { data: pools } = await supabase
       .from("pools")
-      .select("id, pool_start_date")
+      .select("id")
       .eq("competition", competition)
       .eq("is_archived", false);
 
@@ -43,64 +52,39 @@ Deno.serve(async (req) => {
         .limit(1);
       if (existing && existing.length > 0) { skipped++; continue; }
 
-      const { data: members } = await supabase
-        .from("pool_members")
-        .select("user_id")
-        .eq("pool_id", pool.id)
-        .eq("status", "active");
-      const memberIds = (members ?? []).map((m) => m.user_id);
-      if (memberIds.length === 0) { skipped++; continue; }
+      // Canonical standings (service-role can call the internal keystone).
+      const { data: standings, error } = await supabase.rpc("compute_pool_standings", {
+        p_pool_id: pool.id,
+      });
+      if (error || !standings || standings.length === 0) { skipped++; continue; }
 
-      // First week on/after the pool's start date (mid-season pools start later).
-      let startWeek = 1;
-      if (pool.pool_start_date) {
-        const { data: firstGame } = await supabase
-          .from("season_games")
-          .select("week")
-          .eq("competition", competition)
-          .gte("kickoff_at", pool.pool_start_date)
-          .order("kickoff_at", { ascending: true })
-          .limit(1)
-          .maybeSingle();
-        if (firstGame?.week) startWeek = firstGame.week;
-      }
+      const rows = standings as Standing[];
+      const champions = rows.filter((s) => s.title_rank === 1);
+      if (champions.length === 0) { skipped++; continue; }
 
-      // Final regular-season standings for this pool's members.
-      const { data: totals } = await supabase
-        .from("season_user_totals")
-        .select("user_id, week_points")
-        .eq("competition", competition)
-        .in("user_id", memberIds)
-        .eq("phase", "REGULAR")
-        .gte("week", startWeek);
+      // Title decided on HotPick points: points were tied at the top AND the
+      // HotPick-points rung left a single champion.
+      const topShared = rows.filter((s) => s.standing_rank === 1).length > 1;
+      const decidedByHotpick = topShared && champions.length === 1;
+      const winnerPts = champions[0].total_points;
 
-      const byUser: Record<string, number> = {};
-      for (const t of totals ?? []) {
-        byUser[t.user_id] = (byUser[t.user_id] ?? 0) + (t.week_points ?? 0);
-      }
-      const ids = Object.keys(byUser);
-      if (ids.length === 0) { skipped++; continue; }
-
+      // Names for the champion(s).
       const { data: profiles } = await supabase
         .from("profiles")
         .select("id, poolie_name, first_name, last_name")
-        .in("id", ids);
-      const names: Record<string, string> = {};
-      for (const p of profiles ?? []) names[p.id] = formatName(p);
+        .in("id", champions.map((c) => c.user_id));
+      const nameById = new Map((profiles ?? []).map((p) => [p.id, formatName(p)]));
+      const names = champions
+        .map((c) => nameById.get(c.user_id) ?? "A player")
+        .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))
+        .join(" & ");
 
-      // Top points, ties A→Z by name (matches the Ladder).
-      ids.sort((a, b) =>
-        byUser[b] !== byUser[a]
-          ? byUser[b] - byUser[a]
-          : (names[a] ?? "").localeCompare(names[b] ?? "", undefined, { sensitivity: "base" })
-      );
-      const winnerId = ids[0];
-      const winnerName = names[winnerId] ?? "A player";
-      const winnerPts = byUser[winnerId];
-
-      const text =
-        `\u{1F3C6} Regular season's in the books! ${winnerName} takes the crown with ` +
-        `${winnerPts} pts. The playoff board resets now — everyone starts fresh.`;
+      const text = champions.length > 1
+        ? `\u{1F3C6} Regular season's in the books! ${names} share the crown as co-champions ` +
+          `with ${winnerPts} pts each. The playoff board resets now — everyone starts fresh.`
+        : `\u{1F3C6} Regular season's in the books! ${names} takes the crown with ${winnerPts} pts.` +
+          (decidedByHotpick ? ` Level on points — the title was decided on HotPick points.` : ``) +
+          ` The playoff board resets now — everyone starts fresh.`;
 
       await supabase.rpc("post_system_message", {
         p_pool_id: pool.id,
