@@ -1,0 +1,65 @@
+name: EAS iOS Build → TestFlight
+
+# Builds a full native iOS app from THIS branch and submits it to TestFlight, so
+# the fix is baked into the binary (no OTA download to wait on). Use this when an
+# OTA update won't land on a device.
+#
+# MANUAL ONLY: this never runs on a push — you start it by hand from the Actions
+# tab (workflow_dispatch). A native build is slow (~15–30 min on EAS) and consumes
+# an EAS build credit, so it's deliberately opt-in.
+#
+# Requirements (one-time, on the Expo/Apple side — NOT done here):
+#   • EXPO_TOKEN repo secret (already added for the OTA workflow).
+#   • Apple signing credentials on the Expo account (a Distribution certificate +
+#     App Store provisioning profile). If you've shipped an iOS build before, these
+#     already exist and EAS reuses them automatically.
+#   • An App Store Connect API key registered with EAS for the TestFlight submit.
+# If a credential is missing, the build/submit step fails with a clear message and
+# nothing is shipped — see the run log.
+
+on:
+  workflow_dispatch:
+    inputs:
+      message:
+        description: Note shown on the EAS build (optional)
+        required: false
+        default: "Rehearsal build — No Silent Failures + Ladder fix"
+
+concurrency:
+  group: eas-build-ios-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-ios:
+    name: eas build --platform ios --profile testflight (+auto-submit)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install EAS CLI
+        run: npm install -g eas-cli
+
+      - name: Build iOS and submit to TestFlight
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::EXPO_TOKEN secret is not set. Add it in Settings -> Secrets and variables -> Actions, then re-run."
+            exit 1
+          fi
+          eas build \
+            --platform ios \
+            --profile testflight \
+            --message "${{ github.event.inputs.message }}" \
+            --auto-submit \
+            --non-interactive
