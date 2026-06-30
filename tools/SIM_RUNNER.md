@@ -1,6 +1,9 @@
 # Season Simulator — Node runner (`sim-runner.mjs`)
 
-Protected-environment replacement for `season-simulator-v4.html`.
+Protected-environment simulator runner — the sole sandbox write tool. (Supersedes the
+retired browser tools `season-simulator-v4.html` and `hotpick-operator-console.html`;
+the operator console survives only as `hotpick-operator-console_v2.html` for its
+read-only Home Screen Spec Preview.)
 
 ## Why the browser tool stopped working
 

@@ -265,10 +265,12 @@ eng flow (PR → preview → ship/OTA). **Claude** = a well-scoped follow-up Cla
 - **Location:** `tools/season-simulator.html`, `tools/season-simulator-v2.html`, `tools/season-simulator-v3.html` (~205 KB total).
 - **Risk (plain language):** Three near-identical stale copies of a simulator UI that's been replaced twice over (by v4, then the
   CLI runner, then the Operator Console). Harmless but confusing clutter. Grep proves nothing references them (only `.git/index`).
-- **Correction to the brief:** Only **three** are dead — **`tools/season-simulator-v4.html` is still the live App-Review reviewer
-  tool** (referenced in `docs/REVIEWER_SIM_RUNBOOK.md:103`) and `tools/hotpick-operator-console.html` is still wired into
-  `tools/check-home-spec-sync.mjs` + app SYNC comments. **Keep both.**
-- **Suggested fix:** Delete the three v1/v2/v3 files (or move to `tools/archive/`) after a final confirmation. Do not touch v4 or the operator console.
+- **Correction to the brief:** At audit time v4 + the operator console were kept. **Superseded 2026-06-30:** `season-simulator-v4.html`
+  was also retired — browsers now hard-block the `sb_secret_` key, so the HTML tool could no longer perform sandbox writes;
+  `tools/sim-runner.mjs` is the protected-environment replacement, including the App-Review reviewer flow (`docs/REVIEWER_SIM_RUNBOOK.md` §3,
+  now repointed). The operator console was renamed `tools/hotpick-operator-console_v2.html` (single canonical console; `check-home-spec-sync.mjs`
+  + app SYNC comments repointed). Survivors: `sim-runner.mjs`, `hotpick-operator-console_v2.html`.
+- **Suggested fix:** ~~Delete the three v1/v2/v3 files~~ **DONE** — v1/v2/v3 deleted 2026-06-25; v4 retired 2026-06-30.
 
 #### T2-D3 · Large files (> ~800 lines) — split-out plan + in-season risk
 **Owner: Claude/Code** (off-season refactors) · **Status: OPEN — schedule for the off-season**

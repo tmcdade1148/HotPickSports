@@ -88,7 +88,7 @@ they break when legacy keys are disabled until the operator pastes
 
 | Tool | Location | Action in Stage 5 |
 |---|---|---|
-| `season-simulator-v4` (browser) | `tools/season-simulator-v4.html` | paste new secret; confirm it's sent in the `apikey` header on both REST and `functions/v1` calls. (The committed `eyJ` here is the **anon** key — public, not a leak.) |
+| `sim-runner` (Node CLI) | `tools/sim-runner.mjs` | reads `SB_SECRET_KEY` from the environment (never committed); no key pasted into a file. Replaces the retired browser tool `season-simulator-v4.html`. |
 | `season-simulator` (Edge Function) | counted in **B** | migrated in Stage 3 with the rest. |
 | **`hotpick_engine_monitor`** | **external — not in this repo** | paste new secret **and update its key-format validation** to accept `sb_secret_…` (it currently appears to require an `eyJ…`/URL pair → see §8). Optional read-only tool; fix it here, not on the critical path. |
 

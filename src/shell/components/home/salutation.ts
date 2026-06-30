@@ -15,7 +15,7 @@
 // keys off `firstKickoff` (first game of the week) — once that's within
 // 24h, at least some picks are about to lock individually.
 //
-// SYNC: the Operator Console (tools/hotpick-operator-console.html) AND
+// SYNC: the Operator Console (tools/hotpick-operator-console_v2.html) AND
 // REFERENCE.md §11 hand-mirror this copy. If you change a salutation here,
 // update both and run `node tools/check-home-spec-sync.mjs` (it guards both).
 

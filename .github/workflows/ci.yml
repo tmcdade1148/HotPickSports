@@ -47,7 +47,7 @@ jobs:
       - name: Lint
         run: npx eslint .
 
-      # Doc-sync guard: the Operator Console (tools/hotpick-operator-console.html)
+      # Doc-sync guard: the Operator Console (tools/hotpick-operator-console_v2.html)
       # hand-mirrors the app's Home Screen copy. Fails if a salutation/headline the
       # console shows no longer exists in src/shell/components/home/* (drift).
       # Zero-dependency Node script — see tools/check-home-spec-sync.mjs.
