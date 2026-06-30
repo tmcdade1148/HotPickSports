@@ -1,0 +1,68 @@
+name: EAS Preview Update
+
+# Publishes a JS-only OTA update to the PREVIEW channel from CI, so the bundle
+# is built from THIS branch's code (not a local checkout that might be on a
+# different branch) and runs on a network that can reach Expo (the dev sandbox's
+# egress policy blocks api.expo.dev / u.expo.dev, so `eas update` can't run there).
+#
+# PREVIEW ONLY — never production. The channel is hardcoded below.
+#
+# Setup (one time): an Expo access token must exist as a repo secret named
+# EXPO_TOKEN (already added for the earlier preview publish). If it's missing,
+# the publish step fails with a clear message — add it in
+#   GitHub → Settings → Secrets and variables → Actions → New repository secret
+#   Name: EXPO_TOKEN   Value: <your Expo token>
+# then re-run the job.
+#
+# Trigger: pushing to this feature branch runs it automatically; you can also
+# run it on demand from the Actions tab (workflow_dispatch).
+
+on:
+  push:
+    branches:
+      - claude/rehearsal-bugs-diagnostic-e9rg9o
+  workflow_dispatch:
+    inputs:
+      message:
+        description: Update message shown in the Expo dashboard
+        required: false
+        default: "No Silent Failures + Ladder fix (blank season-side) — rehearsal build"
+
+# Don't let two pushes publish at once; cancel an in-flight run when a newer one starts.
+concurrency:
+  group: eas-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish-preview:
+    name: eas update --channel preview
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install EAS CLI
+        run: npm install -g eas-cli
+
+      - name: Publish OTA to the preview channel
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::EXPO_TOKEN secret is not set. Add it in Settings -> Secrets and variables -> Actions (name: EXPO_TOKEN), then use 'Re-run jobs' on this run."
+            exit 1
+          fi
+          MSG="${{ github.event.inputs.message }}"
+          if [ -z "$MSG" ]; then
+            MSG="No Silent Failures + Ladder fix (blank season-side) — rehearsal build"
+          fi
+          eas update --channel preview --message "$MSG" --non-interactive
