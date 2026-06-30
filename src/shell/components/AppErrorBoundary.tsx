@@ -18,7 +18,11 @@
 // constants from hotpickDefaults directly rather than useTheme()/useBrand().
 // ---------------------------------------------------------------------------
 import React from 'react';
-import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
+import {View, TouchableOpacity, StyleSheet} from 'react-native';
+// Text comes from AppText (font-scaling lock; enforced by no-restricted-imports).
+// AppText is a pure forwardRef wrapper — no hooks/theme context — so it's safe
+// in this fallback even if the provider tree is what failed.
+import {Text} from '@shared/components/AppText';
 import {HOTPICK_BRAND_COLORS, HOTPICK_BRAND} from '@shell/theme/hotpickDefaults';
 import {logError} from '@shared/logging/logError';
 
