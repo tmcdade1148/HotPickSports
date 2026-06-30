@@ -1,5 +1,7 @@
 import {create} from 'zustand';
 import {supabase} from '@shared/config/supabase';
+import {logError} from '@shared/logging/logError';
+import {LEXICON} from '@shared/lexicon';
 import type {SeasonConfig} from '@shared/types/templates';
 import type {
   DbSeasonGame,
@@ -24,6 +26,12 @@ export interface SeasonLeaderboardEntry {
   total_picks: number;
   /** Per-week breakdown: week number -> week_points */
   weekly_breakdown: Record<number, number>;
+  /** Co-ranked standing from the server (get_pool_standings) — shared on a tie
+   *  (1,2,2,4). The client never computes this; undefined until loaded or if
+   *  the (non-fatal) standings call degrades. */
+  standing_rank?: number;
+  /** True when another member shares this exact total_points → render "T-{rank}". */
+  is_tied?: boolean;
 }
 
 /**
@@ -64,6 +72,10 @@ interface SeasonState {
   allWeekGames: Record<number, DbSeasonGame[]>;
   weekPicks: DbSeasonPick[];
   leaderboard: SeasonLeaderboardEntry[];
+  /** Set when a Ladder fetch ERRORS (vs. genuinely empty). Drives a visible
+   *  error + retry state — never let a failed query render as a blank list
+   *  (the #360 regression). Null on success and while loading. */
+  leaderboardError: string | null;
   /** Every active member's season total keyed by user_id. Backs getUserScore
    *  so a user can always read their own total directly. */
   allUserScores: Record<string, SeasonLeaderboardEntry>;
@@ -139,6 +151,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
   allWeekGames: {},
   weekPicks: [],
   leaderboard: [],
+  leaderboardError: null,
   allUserScores: {},
   weekLeaderboard: [],
   weekLeaderboardDisplayedWeek: null,
@@ -197,6 +210,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
         allWeekGames: competitionChanged ? {} : state.allWeekGames,
         weekPicks: competitionChanged ? [] : state.weekPicks,
         leaderboard: [], // pool-scoped, always clear
+        leaderboardError: null, // clear any stale error on pool/competition switch
         allUserScores: {}, // pool-scoped, always clear
         weekLeaderboard: [], // pool-scoped, always clear
         weekLeaderboardDisplayedWeek: null,
@@ -444,7 +458,12 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       return;
     }
 
-    set({isLoading: true});
+    set({isLoading: true, leaderboardError: null});
+
+    // Surface-don't-swallow: any data-fetch error below raises this visible
+    // message (error + retry state) instead of falling through to an empty
+    // Ladder — the #360 regression was exactly a swallowed query rendering blank.
+    const failMessage = `Couldn't load ${LEXICON.ladder.long}. Pull down to retry.`;
 
     // Pool-independent: scores have no pool_id.
     // Regular season and playoffs are separate leaderboards.
@@ -477,7 +496,6 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       (typeof cfgMap.current_week === 'number' ? cfgMap.current_week : 1);
 
     // Step 1: Get ACTIVE pool member user IDs + pool_start_date in parallel.
-    // All active members appear on the ladder, including super-admins.
     const [membersResult, poolResult] = await Promise.all([
       supabase
         .from('pool_members')
@@ -491,10 +509,58 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
         .single(),
     ]);
 
-    const memberRows = (membersResult.data ?? []) as any[];
-    const memberIds = memberRows.map(m => m.user_id);
+    // Surface (don't swallow) a failed member query — this is the regression's
+    // worked example. A dead query must raise an error state, never land in the
+    // "no members" branch and render blank.
+    if (membersResult.error) {
+      logError(membersResult.error, {
+        screen: 'SeasonBoard',
+        action: 'fetchLeaderboard.members',
+        competition: config.competition,
+      });
+      set({leaderboardError: failMessage, isLoading: false});
+      return;
+    }
+
+    const allMemberIds = (membersResult.data ?? []).map((m: any) => m.user_id);
+
+    // Hidden-member rule: exclude super-admins so the Ladder matches the rank
+    // chip and compute_pool_standings. Read is_super_admin in a SEPARATE query
+    // (the pattern used by fetchWeekLeaderboard / loadRegularSeasonPodium) —
+    // embedding `profiles!inner(is_super_admin)` is ambiguous here because
+    // pool_members has two FKs into profiles, and PostgREST returns PGRST201
+    // (the #360 blank-Ladder cause).
+    let memberIds = allMemberIds;
+    if (allMemberIds.length > 0) {
+      const {data: memberProfiles, error: memberProfilesError} = await supabase
+        .from('profiles')
+        .select('id, is_super_admin')
+        .in('id', allMemberIds);
+      if (memberProfilesError) {
+        logError(memberProfilesError, {
+          screen: 'SeasonBoard',
+          action: 'fetchLeaderboard.memberProfiles',
+          competition: config.competition,
+        });
+        set({leaderboardError: failMessage, isLoading: false});
+        return;
+      }
+      const superAdminIds = new Set(
+        (memberProfiles ?? []).filter(p => p.is_super_admin).map(p => p.id),
+      );
+      memberIds = allMemberIds.filter(id => !superAdminIds.has(id));
+    }
+
+    // Genuinely empty (query SUCCEEDED with no eligible members) → real empty
+    // state, never the landing spot for a failed query.
     if (memberIds.length === 0) {
-      set({leaderboard: [], allUserScores: {}, userNames: {}, isLoading: false});
+      set({
+        leaderboard: [],
+        allUserScores: {},
+        userNames: {},
+        leaderboardError: null,
+        isLoading: false,
+      });
       return;
     }
 
@@ -534,7 +600,18 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       query = query.neq('week', currentWeek);
     }
 
-    const {data: totals} = await query;
+    const {data: totals, error: totalsError} = await query;
+    // P3: the totals query is the Ladder's actual data source — surface its
+    // failure too while we're here, rather than silently rendering empty.
+    if (totalsError) {
+      logError(totalsError, {
+        screen: 'SeasonBoard',
+        action: 'fetchLeaderboard.totals',
+        competition: config.competition,
+      });
+      set({leaderboardError: failMessage, isLoading: false});
+      return;
+    }
     const rows = (totals as DbSeasonUserTotal[]) ?? [];
 
     // Step 3: Aggregate per user — sum week_points for the current phase
@@ -581,8 +658,9 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       }
     }
 
-    // Break ties alphabetically by display name (names are only known now, so
-    // re-sort here): higher total_points first, then A→Z within equal scores.
+    // Stable DISPLAY order within a tie: higher total_points first, then A→Z by
+    // name. This orders the rows only — it never sets the rank NUMBER (that comes
+    // from the server's co-ranked standing_rank below).
     leaderboard.sort((a, b) => {
       if (b.total_points !== a.total_points) return b.total_points - a.total_points;
       return (names[a.user_id] ?? '').localeCompare(
@@ -592,11 +670,46 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       );
     });
 
+    // Co-ranked standing + tie marker from the canonical server function (the
+    // client never computes the displayed rank). Scoped to the same settled
+    // weeks the displayed points include. NON-FATAL: if it errors (or isn't
+    // deployed), log it but keep the Ladder — entries keep undefined ranks and
+    // the screen falls back to a sequential index. This must never blank the
+    // list, so it is the one read here that surfaces via logError, not an error
+    // state.
+    const includedWeeks = rows.map(r => r.week);
+    const throughWeek = includedWeeks.length ? Math.max(...includedWeeks) : null;
+    const {data: standingRows, error: standingError} = await supabase.rpc(
+      'get_pool_standings',
+      {p_pool_ids: [poolId], p_through_week: throughWeek},
+    );
+    if (standingError) {
+      logError(standingError, {
+        screen: 'SeasonBoard',
+        action: 'fetchLeaderboard.standings',
+        competition: config.competition,
+      });
+    }
+    const rankByUser: Record<string, {standing_rank: number; is_tied: boolean}> = {};
+    for (const r of (standingRows ?? []) as Array<{
+      user_id: string;
+      standing_rank: number;
+      is_tied: boolean;
+    }>) {
+      rankByUser[r.user_id] = {standing_rank: r.standing_rank, is_tied: r.is_tied};
+    }
+    for (const entry of leaderboard) {
+      const sr = rankByUser[entry.user_id];
+      entry.standing_rank = sr?.standing_rank;
+      entry.is_tied = sr?.is_tied ?? false;
+    }
+
     set({
       leaderboard,
       allUserScores,
       userNames: names,
       userAvatars: avatars,
+      leaderboardError: null,
       isLoading: false,
     });
   },
