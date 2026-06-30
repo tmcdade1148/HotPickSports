@@ -98,6 +98,17 @@ interface Affiliate {
   isPrimary: boolean;
 }
 
+// LAUNCH FLAG — the Pool card's Season + Week rank rows are HIDDEN for launch.
+// The two rank sources are inconsistent (week rank counts super-admins -> /12,
+// season rank excludes them -> /11) and render stale values, which produced
+// impossible/garbage ranks on the first screen ("0th", "12th of 11"). Removed for
+// launch, NOT deleted — flip to true to restore once the loading-timing AND the
+// super-admin-count mismatch are fixed (align loadWeekRankByPool with
+// get_user_ranks_in_pools, or move both ranks onto compute_pool_standings).
+// Note: this hides only the PoolModule RENDER — userRankByPool/weekRankByPool keep
+// loading, so RecruiterBand + Settings (which read .memberCount) are unaffected.
+const SHOW_POOL_RANK_CHIP = false;
+
 // Render the rank number — wrapped in a medal pill when top-3,
 // plain text otherwise. Inlined helper (not a Component) so it can
 // sit unwrapped next to a sibling Text element in the row's
@@ -458,7 +469,7 @@ export function PoolModule({pool}: PoolModuleProps) {
                 </Pressable>
               )}
             </View>
-            {scoresAvailable && rankData && (
+            {SHOW_POOL_RANK_CHIP && scoresAvailable && rankData && (
               <>
                 <View style={styles.rankRow}>
                   <Text style={[bodyType.regular, styles.rankLabel, {color: colors.textSecondary}]}>
