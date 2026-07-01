@@ -14,7 +14,7 @@ Every item is labelled by **demonstrable state**, not "does code exist":
 - **SPECCED-NOT-BUILT** — a doc/decision with no implementation.
 - **NEEDS-CONFIRMATION** — I could not fully verify; the next session must check.
 
-> **Why the paranoia:** the previous session reported the title tiebreaker as "half-built" because it read a *repo* copy of `compute-hardware` and saw an array-index sort. That was **stale unmerged code**. The **live** function is the correct `title_rank` version. Lesson applied throughout: *verify the live consumer, not the repo producer.* A computed value with no consumer is called out explicitly.
+> **Why the paranoia:** an earlier read of a *repo* copy of `compute-hardware` (stale, forked from `main` before #360) suggested the title tiebreaker wasn't wired. Reading the **live deployed** function corrected that — it is the `title_rank` version and it works. Lesson applied throughout: *verify the live consumer, not the repo producer.* A computed value with no consumer is called out explicitly.
 
 ---
 
@@ -44,9 +44,9 @@ Every item is labelled by **demonstrable state**, not "does code exist":
   - `compute_pool_standings` / `get_pool_standings` — **live** (migration effect present; see §2).
   - `compute-hardware` v14 (podium by `title_rank`) — **live** (see §2).
   - `nfl-calculate-scores` v30 (`_shared/scoring.ts` push-on-draw) — **live** (see §3/§7).
-  - `nfl-announce-regular-winners` v11 (crown by `title_rank`) — claimed by #360, **NEEDS-CONFIRMATION** (not re-read this session).
+  - `nfl-announce-regular-winners` v11 (crown by `title_rank`) — **DONE-&-VERIFIED** (re-read live: filters `title_rank === 1`, co-champions on a shared rank, `decidedByHotpick` indicator, reads `compute_pool_standings`). Production fires it via the `announce_regular_winners_on_phase` DB trigger; this edge fn is the manual backfill twin.
 - **Sequence decision (from prior session, still holds):** this branch (#361) is the **carrier of the corrected app-side** Ladder fix. #360 keeps its server migration + edge functions; **drop #360's app-side `seasonStore`/`SeasonBoardScreen` edits** in favour of #361's.
-- **The drift risk is real:** `main` (and this branch) contain the **old** `compute-hardware` (array-index podium) and the **old** `_shared/scoring.ts` (tie-as-loss). If anyone redeploys those functions **from the repo**, production regresses. Closing this requires **merging #360's server code to `main`** (or porting it onto this branch) — see §2 and §3.
+- **The drift is a safety issue, not cleanup:** `main` (and this branch) contain the **older** `compute-hardware` (index-based podium, pre-`title_rank`) and the **older** `_shared/scoring.ts` (tie-as-loss). **Redeploying either function from the repo would regress production** (podium tiebreaker lost; drawn games scored as losses). Closing this requires **landing #360's server code into `main`** (merge #360 or port it onto this branch) — see §2 and §3.
 
 **Exact merge order that is safe:**
 1. Fix the `sim-operator` tie regression (§3) so the sandbox mirrors prod.
@@ -58,7 +58,7 @@ Every item is labelled by **demonstrable state**, not "does code exist":
 
 ## 2. Podium / champion title tiebreaker — **#1 NEXT ACTION** — DEPLOYED-BUT-UNMERGED + BUILT-UNVERIFIED
 
-**Corrected understanding (important):** the tiebreaker is **not** "half-built in production." The **live** `compute-hardware` v14 `computePodiumAward()` was re-read this session and it:
+**Status: VERIFIED-LIVE, UNVERIFIED-BY-REHEARSAL.** The tiebreaker is wired and deployed. The **live** `compute-hardware` v14 `computePodiumAward()` was re-read this session and it:
 - calls `supabase.rpc("compute_pool_standings", { p_pool_id })`,
 - awards **every row at `title_rank === targetRank`** (not an array index),
 - emits `co_champions`, and on the champion slot `title_decided_by_hotpick_points` + `title_tiebreak_reason`.
@@ -92,7 +92,7 @@ Set up a sandbox pool and drive weeks so that, in one pool, **two non-admin memb
 5. **Idempotent.** Re-invoke `season_settle`; `user_hardware` row count for the pool is unchanged (ON CONFLICT DO NOTHING).
 
 ### After it passes
-Land #360's server code into `main` (merge #360 or cherry-port `compute-hardware` + the `20260627120000` migration + `nfl-calculate-scores` + `nfl-announce-regular-winners`) so **repo == live** and the array-index version can't be redeployed. **NEEDS-CONFIRMATION:** the migration `20260627120000` did **not** appear in `supabase_migrations.schema_migrations` when queried, yet the functions are live — confirm the ledger records it (or reconcile) before relying on a `db reset`.
+Land #360's server code into `main` (merge #360 or cherry-port `compute-hardware` + the `tie_handling_standings` migration + `nfl-calculate-scores` + `nfl-announce-regular-winners`) so **repo == live** and the older index-based version can't be redeployed. **Ledger caveat (verified):** the tie-handling migration is applied, but recorded under version `20260627165654` (`apply_migration`'s timestamp), while the **repo file is named `20260627120000_tie_handling_standings.sql`**. A `supabase db push`/reset keys on the filename version → it would see `20260627120000` as unapplied and try to re-run it. Rename the repo file to the ledger version (or reconcile) when landing #360. See §9.
 
 ---
 
@@ -142,13 +142,45 @@ Land #360's server code into `main` (merge #360 or cherry-port `compute-hardware
 
 ## 7. Open bugs — current read (each labelled)
 
-- **Client "score wrong at kickoff" — EXPLAINED, and it contradicts a locked decision.**
-  Locked decision: *game scores update live, but a user's own score resolves only at FINAL.*
-  - **Server (authoritative) = FINAL-only** ✅ — both scorers filter `ilike status '%FINAL%'`; `season_user_totals` only reflects finalized games.
-  - **Client display `src/sports/nfl/utils/liveWeekScore.ts` = moves LIVE** ✗ — `computeLiveWeekEarned()` deliberately adds/subtracts points for **in-progress** games (currently-winning → `+value`; HotPick currently-losing → `-rank`). Its own header calls it a "running estimate … converges to the settled total once every game is final."
-  - **So the decision is DECISION-ONLY on the client** — the shipped code does the opposite of "resolve only at FINAL," which is almost certainly the "score wrong at kickoff" report. **Product call needed:** either (a) change the decision (accept a live-moving estimate), or (b) make `computeLiveWeekEarned` count only FINAL games (drop the `isLiveStatus` branch). Not yet done.
+- **Client "score wrong at kickoff" — DECIDED (Option A), fix scheduled-after-merge. See §7a for the full spec.** Root cause: server scoring is FINAL-only (correct), but the client display `liveWeekScore.ts` moves points on in-progress games. The decision resolves it; the code change is narrow and deferred until after the rehearsal + merge so it doesn't muddy the rehearsal build.
 - **Season-side Ladder blanking on game-advance — FIXED (app-side), UNVERIFIED on device.** Root cause was the `profiles!inner(is_super_admin)` ambiguous embed (PGRST201) swallowed → empty members → blank. Fixed in `503865b` (separate profiles query + surfaced `leaderboardError`). Verified by code read; not yet re-observed on a device running this bundle (same delivery gap as §5).
 - **~9-second "settling churn" — NEEDS-CONFIRMATION, likely sim wave-pacing artifact, not a real-app bug.** The prior session's read was that this is the operator console/sim advancing waves + realtime re-renders, not a production loop. **Not reproduced this session** — do not assert it's benign without watching a realtime subscription during a real (non-sim) settle.
+
+---
+
+## 7a. FINAL-only weekly scoring — DECIDED (Option A) — scheduled-after-merge
+
+**Decision (locked, Option A).** A pick's points are **0 until that specific game is FINAL**, then resolve: regular pick **+1 / 0**, HotPick **+rank / −rank** (draw = PUSH per §3). The week total **sums only-FINAL games and climbs game-by-game across the weekend** — it is **NOT** a whole-week freeze (the total isn't withheld until every game ends) and **NOT** a live estimate (an in-progress game contributes 0, not a provisional swing).
+
+**Server side — already correct (DONE-&-VERIFIED), no change.** Both scorers filter `ilike status '%FINAL%'`; `season_user_totals` only reflects finalized games and grows as each game finalizes.
+
+**Client change — narrow, ONE function.** `src/sports/nfl/utils/liveWeekScore.ts → computeLiveWeekEarned()`:
+- Treat any **non-FINAL** game as **0** (no contribution).
+- **Drop the `isLiveStatus` branch entirely** (lines ~63–72 today: currently-winning `+value`, HotPick currently-losing `−rank`). Keep only the `isFinalStatus` branch.
+- Net effect: the widget shows the running only-FINAL total, matching the server, climbing game-by-game.
+
+**Picks page — DONE-&-VERIFIED, NO change needed.** Per-game point values render via `SeasonMatchCard` gated on `existingPick?.points != null` (line ~219), and `season_picks.points` is server-written only when a game is scored (FINAL). So per-game points already appear only at FINAL. Do **not** touch `SeasonMatchCard`.
+
+**Sequencing.** This is a **behavior change → preview→production review** (not an OTA-silent fix). **Implement AFTER the rehearsal + the #360/#361 merges** so it doesn't muddy the rehearsal build. Acceptance (demonstrable): on a live game in progress, the Home weekly pill and Picks Week-Score widget show **0 contribution** from that game; the value increments only as each game flips FINAL; final total equals `season_user_totals.week_points`.
+
+---
+
+## 7b. Deferred UI/UX backlog — post-rehearsal, post-merge (CAPTURE, do NOT build)
+
+Captured so it survives into the next session. **Do not build any of these until after the rehearsal + merges.** Each was scope-checked against CLAUDE.md's "do not build before Season 2 launch" list; two touch hard-ruled systems and are flagged ⚠️.
+
+- **Remove the preloaded Gaffer chirp** — also removes half of the Chirp keyboard-trap bug (below). Straightforward.
+- **Chirp keyboard trap (bug)** — composer/keyboard focus trap in the Chirp screen. Bug, not a feature; safe to fix.
+- **CTA label** — `PicksOpenHero` CTA "MAKE YOUR PICKS" → "GO TO WEEK {X} GAMES". Copy-only (mind `@shared/lexicon` for any user-facing noun).
+- **Larger contest dots + ★ default-pin** — enlarge the contest indicator dots; a ★ marks the default-pinned contest.
+- **Welcome-screen content** — explainer + how-to-play + invite flow, including a "start your own" path.
+- **Version/build number at the bottom of Settings** — surface app version + build.
+- **Home-screen layout change** — top module = picks/game info only; move the CTA banner (keep its transparent bg) to just above the Join/Create pills; cut the contextual line under the CTA. **⚠️ AMBIGUITY — map exact elements before building:** "the contextual line under the CTA" vs the "You sit {Nth}" standing line (already hidden via `SHOW_STANDING_LINE=false`, §5) are potentially different elements. Identify the precise components (`PicksOpenHero` contextual message vs `CompleteHero` standing line) and confirm which one is meant before removing anything.
+- **⚠️ "Post as Gaffer" official chirps** — SCOPE-CHECK vs SmackTalk. Not on CLAUDE.md's explicit deferred list, but it touches `smack_messages` + role gating. If built: use a **defined `message_type`** (never a freeform string), **gate the Gaffer role server-side** (not client-enforced), and keep moderator/official semantics off `smack_messages` where a hard rule routes them elsewhere (moderator notes → `organizer_notifications`). Verify against REFERENCE.md's SmackTalk model first.
+- **⚠️ Role-grant notification** — SCOPE-CHECK vs delegation/notifications. Notify a user when granted a role (e.g. Assistant Gaffer). Delegation via `pool_members` exists (Hard Rule #24), so this is a notification on an existing mechanism, **not** tier/delegation feature work — keep it that way. If built: **call `check_notification_rate_limit()` first**, push token via `user_devices`. Do not let it expand into tier-system scope (that IS deferred).
+- **Super-admin-only unread indicator** — an unread badge visible only to super-admins. Small; verify it reads the same unread aggregate, not a client-side full-message scan (Hard Rule).
+
+None of these are on the hard deferred list *by name* except where the ⚠️ notes call out adjacency. Re-scope-check at build time.
 
 ---
 
@@ -167,9 +199,9 @@ Land #360's server code into `main` (merge #360 or cherry-port `compute-hardware
 Entries that are now **stale vs. verified state** — update the register:
 - **2.4 (dead simulator files):** already updated this session — `season-simulator-v4.html` retired (browsers block the `sb_secret_` key; `sim-runner.mjs` is the replacement incl. App-Review flow), operator console renamed `_v2`. If any register text still says "v4 stays — it's the live App-Review tool," it's stale.
 - **2.7 (tie-handling drift, "live scorer differs from repo on ties"):** **partially resolved but re-opened by this session.** Production `nfl-calculate-scores` v30 = PUSH (matches the tested repo intent). BUT (a) `main`/this branch still hold tie-as-loss (`_shared/scoring.ts`), so repo≠live until #360 merges; and (b) `sim-operator` was **regressed to tie-as-loss** this session (§3). Register 2.7 should reflect: prod=push, repo=loss (unmerged), sandbox=loss (regressed, fix pending).
-- **Title tiebreaker:** if any register/PR note implies the podium tiebreaker is unbuilt or "arbitrary," that's stale — it's **live in `compute-hardware` v14** (§2), just unmerged and unverified-by-rehearsal.
+- **Title tiebreaker:** if any register/PR note implies the podium tiebreaker is unbuilt or index-based, that's stale — it's **VERIFIED-LIVE in `compute-hardware` v14 and `nfl-announce-regular-winners` v11** (both by `title_rank`, §2), just unmerged and unverified-by-rehearsal.
 - **0.11 (preseason):** still open and now **dated** (early August) — see §8. Confirm it's flagged as a deadline, not a "later."
-- **Migration-ledger reconciliation (2.1-adjacent):** `20260627120000` (tie-handling) and `20260630120000` (client_error_log) were **not found** in `supabase_migrations.schema_migrations` though their objects are live — add a register item to reconcile ledger vs. live so a `db reset`/baseline can rebuild them.
+- **Migration-ledger version mismatch (2.1-adjacent) — VERIFIED:** both migrations ARE applied, but the ledger records them under `apply_migration`'s timestamps, not the repo filenames — `tie_handling_standings` = ledger `20260627165654` vs repo `20260627120000`; `client_error_log` = ledger `20260630175352` vs repo `20260630120000`. A `supabase db push`/reset keys on the filename → it would treat both repo files as unapplied and re-run them. Reconcile (rename the repo files to the ledger versions) when landing #360/#361.
 
 ---
 
@@ -178,4 +210,6 @@ Entries that are now **stale vs. verified state** — update the register:
 2. **Run the rehearsal in `nfl_2025_sim`** (§2 acceptance criteria: points-tie → co-rank "T-1"; title-tie → champion by HotPick points; co-champions; super-admin excluded; drawn game = push). First real use of the **Seed Bots** button (§4) — prove it works.
 3. **Resolve device delivery** so the operator's phone actually runs this bundle (§5) and the Ladder/display fixes can be confirmed on-device.
 4. **Land #360's server code into `main`** so repo == live (kills the redeploy-regression risk), then **merge #361**.
-5. **Product call on client FINAL-only display** (§7) and **schedule preseason isolation** before early August (§8).
+5. **Then** implement **FINAL-only weekly scoring (Option A, §7a)** — narrow `computeLiveWeekEarned` change, behavior change → preview→production — and **land preseason isolation** before early August (§8). Both are explicitly scheduled-after-merge.
+
+_Deferred UI/UX backlog (do not build until after the above): §7b._
