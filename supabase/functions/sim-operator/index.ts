@@ -350,9 +350,12 @@ async function scoreWeek(admin: any, competition: string, year: number, week: nu
   for (const p of picks ?? []) {
     const g: any = gameMap.get(p.game_id);
     if (!g) continue;
-    // gameMap holds only FINAL games. A null winner is a TIE → scored as a LOSS
-    // (isWin false): non-HotPick → 0, HotPick → -rank. Matches _shared/scoring.ts.
-    const isWin = g.winner !== null && p.picked_team === g.winner;
+    // gameMap holds only FINAL games. A null winner is a DRAW → PUSH, not a loss:
+    // the pick does not score at all (not counted in total_picks, no result row,
+    // 0 pts; a HotPick takes a 0 swing so is_hotpick_correct stays null). A draw is
+    // NEVER a loss. Matches _shared/scoring.ts push branch (register 2.7 / #360).
+    if (g.winner === null) continue;
+    const isWin = p.picked_team === g.winner;
     const agg = byUser.get(p.user_id) ?? { user_id: p.user_id, week_points: 0, correct_picks: 0, total_picks: 0, is_hotpick_correct: null, hotpick_rank: null };
     agg.total_picks += 1;
     let pickPoints = 0;
