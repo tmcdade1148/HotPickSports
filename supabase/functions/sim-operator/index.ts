@@ -64,7 +64,7 @@ const SEED_BOTS = [
 // The bots live in nfl_2025_sim, not the Apple/Google reviewer sims (spec §3C).
 const SEED_BOTS_COMPETITION = "nfl_2025_sim";
 
-const VALID_ACTIONS = ["advance_week_state", "advance_game_day", "advance_phase", "jump_to_week", "reset_to_off_season", "auto_pick_tom", "seed_bots"];
+const VALID_ACTIONS = ["advance_week_state", "advance_game_day", "advance_phase", "jump_to_week", "reset_to_off_season", "auto_pick_tom", "seed_bots", "settle_season_awards"];
 
 // NFL kickoff slots ("waves") derived from kickoff_at — matches tools/sim-runner.mjs.
 // Ordered chronologically: the Sunday-morning international game (~9:30am ET,
@@ -137,6 +137,7 @@ Deno.serve(async (req: Request) => {
       case "reset_to_off_season":return await resetToOffSeason(admin, competition, callerId);
       case "auto_pick_tom":      return await autoPickTom(admin, competition, callerId);
       case "seed_bots":          return await seedBots(admin, competition, body.targets);
+      case "settle_season_awards": return await settleSeasonAwards(admin, competition, authHeader);
       default:                   return json({ success: false, error: "Unhandled action" }, 400);
     }
   } catch (err: unknown) {
@@ -391,6 +392,45 @@ async function invokeComputeHardware(admin: any, authHeader: string, competition
   // authorizes a super-admin via the Authorization JWT, so forward the caller's token.
   try { await admin.functions.invoke("compute-hardware", { body: { trigger, competition }, headers: { Authorization: authHeader } }); }
   catch (e) { console.error("[sim-operator] compute-hardware invoke failed", e); }
+}
+
+// ── settle_season_awards ────────────────────────────────────────────────────────
+// Fires the season-end award engine (Pool Champion + podium) ON DEMAND, in
+// isolation, for the rehearsal. This does NOT walk the phase machine — a real
+// walk to SEASON_COMPLETE passes through the PLAYOFFS transition, which re-scopes
+// the leaderboard and would wipe the engineered week-1 tie. Instead it just marks
+// the season complete (so compute-hardware's season_settle gate passes) and
+// INVOKES the live compute-hardware with the caller's super-admin token. It never
+// redeploys or edits compute-hardware. Re-runnable for the idempotency check.
+//
+// HARD-LOCKED to the primary sandbox only (same lock as seed_bots) — it can never
+// fire season_settle on nfl_2026 or any other competition.
+async function settleSeasonAwards(admin: any, competition: string, authHeader: string) {
+  if (competition !== SEED_BOTS_COMPETITION) {
+    return json({ success: false, error: `settle_season_awards is locked to ${SEED_BOTS_COMPETITION}` }, 403);
+  }
+  const cfg = await getConfig(admin, competition);
+  const seasonYear = Number(cfg.season_year ?? 2025);
+
+  // Season-settle gate in compute-hardware requires is_season_complete = true.
+  await setConfig(admin, competition, "is_season_complete", true);
+
+  try {
+    const { data, error } = await admin.functions.invoke("compute-hardware", {
+      // Pass the sandbox's own season_year so award rows are tagged 2025, not the
+      // compute-hardware default (2026).
+      body: { trigger: "season_settle", competition, season_year: seasonYear },
+      headers: { Authorization: authHeader },
+    });
+    if (error) {
+      console.error("[sim-operator] settle_season_awards compute-hardware", error);
+      return json({ success: false, error: `compute-hardware: ${error.message ?? String(error)}` }, 400);
+    }
+    return json({ success: true, action: "settle_season_awards", competition, season_year: seasonYear, compute_hardware: data }, 200);
+  } catch (e) {
+    console.error("[sim-operator] settle_season_awards invoke failed", e);
+    return json({ success: false, error: "compute-hardware invoke failed — see function logs" }, 500);
+  }
 }
 
 // ── advance_phase ─────────────────────────────────────────────────────────────
