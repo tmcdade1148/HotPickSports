@@ -435,7 +435,7 @@ const STAGE_INFO = {
 const REFRESH_MS = 30000;
 // Bump on each console change so you can confirm the loaded file is current
 // (file:// caching otherwise hides updates). Shown next to the wordmark.
-const CONSOLE_BUILD = 'build 2026-06-30.1 · seed-bots';
+const CONSOLE_BUILD = 'build 2026-07-01.1 · settle-awards';
 document.getElementById('build-stamp').textContent = CONSOLE_BUILD;
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -1169,6 +1169,16 @@ function renderControls() {
     html += renderSeedPanel(week);
   }
 
+  // Settle Season Awards — sandbox only. Fires compute-hardware season_settle in
+  // ISOLATION (no phase walk → no PLAYOFFS leaderboard reset) so the season-end
+  // Pool Champion + podium compute on the current week's standings. Safe to re-run
+  // (awards are ON CONFLICT DO NOTHING). Score the week to Complete first.
+  if (comp === SEED_BOTS_COMP) {
+    html += `<div class="ctl-group"><div class="ctl-label">Season awards — SANDBOX</div>
+      <div class="ctl-disabled-note" style="margin:0 0 8px;">Fires the season-end award engine (Pool Champion + podium) on the current standings, in isolation. Score the week to Complete first. Safe to re-run.</div>
+      <button class="ctl-btn" style="background:#7a3ea8;color:#fff;" onclick="opSettleAwards()">Settle Season Awards</button></div>`;
+  }
+
   html += `<div class="ctl-group"><div class="ctl-label">Phase transition</div>`;
   if (nextPhase) {
     html += `<select id="phase-next" class="ctl-num" style="width:100%;margin-bottom:6px;"><option value="${nextPhase}">${nextPhase}</option></select>`;
@@ -1260,6 +1270,10 @@ function opNext() {
 function opPhase() {
   const sel = document.getElementById('phase-next');
   callSimOperator('advance_phase', { label: 'Advance phase → ' + (sel ? sel.value : '') });
+}
+function opSettleAwards() {
+  if (!window.confirm('Fire the season-end award engine (Pool Champion + podium) for this sandbox now?\nThis marks the sim season complete and computes awards in isolation. Safe to re-run.')) return;
+  callSimOperator('settle_season_awards', { label: 'Settle Season Awards' });
 }
 function opJump() {
   const t = parseInt(document.getElementById('jump-week').value, 10);
