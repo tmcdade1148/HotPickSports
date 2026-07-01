@@ -169,30 +169,39 @@ describe('scorePicks — combined / edge cases', () => {
     expect(userAggs[0]).toMatchObject({week_points: 9, correct_picks: 2, total_picks: 2});
   });
 
-  it('scores a TIE (final game, no winner) as a loss — not skipped', () => {
-    // A null winner_team on a game that IS in the map (i.e. final) is a tie, which
-    // counts as a loss: a non-HotPick tie is 0 pts but still a counted pick.
+  it('scores a regular pick on a DRAW as a PUSH — excluded, not counted', () => {
+    // A null winner_team on a game that IS final is a genuine draw → PUSH (Tie
+    // Handling spec / register 2.7). The drawn game does not score and is NOT
+    // counted: total_picks reflects only the other (decided) game, and no result
+    // row is written for the drawn game. A draw is never a loss.
     const games = new Map([
-      ['g1', game(null, 5)], // final, tied
+      ['g1', game(null, 5)], // final, drawn
       ['g2', game('SF', 3)],
     ]);
     const {userAggs, pickResults, scoredUserIds} = scorePicks(games, [
-      pick({user_id: 'u1', game_id: 'g1', picked_team: 'KC'}), // tie → loss, 0 pts, counted
+      pick({user_id: 'u1', game_id: 'g1', picked_team: 'KC'}), // draw → push, excluded
       pick({user_id: 'u1', game_id: 'g2', picked_team: 'SF'}), // +1
     ]);
-    expect(userAggs[0]).toMatchObject({week_points: 1, total_picks: 2});
-    expect(pickResults).toHaveLength(2);
-    expect(pickResults.find(r => r.game_id === 'g1')).toMatchObject({is_correct: false, points: 0});
+    expect(userAggs[0]).toMatchObject({week_points: 1, total_picks: 1});
+    expect(pickResults).toHaveLength(1); // only the decided game writes a result row
+    expect(pickResults.find(r => r.game_id === 'g1')).toBeUndefined();
     expect(scoredUserIds.has('u1')).toBe(true);
   });
 
-  it('scores a HotPick on a TIE as a loss of -rank', () => {
-    const games = new Map([['g1', game(null, 7)]]); // final, tied
-    const {userAggs, pickResults} = scorePicks(games, [
-      pick({user_id: 'u1', game_id: 'g1', picked_team: 'KC', is_hotpick: true}), // tie → -7
+  it('scores a HotPick on a DRAW as a PUSH — 0 swing, is_hotpick_correct stays null', () => {
+    const games = new Map([['g1', game(null, 7)]]); // final, drawn
+    const {userAggs, pickResults, scoredUserIds} = scorePicks(games, [
+      pick({user_id: 'u1', game_id: 'g1', picked_team: 'KC', is_hotpick: true}), // draw → 0 push
     ]);
-    expect(userAggs[0]).toMatchObject({week_points: -7, total_picks: 1, is_hotpick_correct: false});
-    expect(pickResults[0]).toMatchObject({is_correct: false, points: -7});
+    // The drawn HotPick does not score; u1 appears only via the zero-row backfill.
+    expect(userAggs[0]).toMatchObject({
+      week_points: 0,
+      total_picks: 0,
+      is_hotpick_correct: null,
+      hotpick_rank: null,
+    });
+    expect(pickResults).toHaveLength(0); // no −rank, no result row
+    expect(scoredUserIds.has('u1')).toBe(false); // backfilled, not actually scored
   });
 
   it('backfills a zero-row for a user whose only picked game is not final yet', () => {
