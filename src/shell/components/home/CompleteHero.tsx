@@ -19,6 +19,13 @@ import {WeeklyTrend} from './WeeklyTrend';
 import {WeekLockStrip} from './WeekLockStrip';
 import {GamesTagFlame} from '@shared/components/GamesTagFlame';
 
+// LAUNCH FLAG — the "You sit Nth in <Contest>" standing line is HIDDEN for launch.
+// weekResult.newRank intermittently renders a null "0th" (render-timing), which
+// reads as broken on the first screen, and the line duplicates the Ladder (one tap
+// away). Removed for launch, NOT deleted — flip to true to restore the status line
+// once newRank loading is reliable. See also userRankByPool/get_user_ranks_in_pools.
+const SHOW_STANDING_LINE = false;
+
 export function CompleteHero() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
@@ -192,7 +199,7 @@ export function CompleteHero() {
 
       {/* Standing context — sits between CTA and trend strip, same spot
           PicksOpenHero uses for its confirmation line. */}
-      {typeof newRank === 'number' && (
+      {SHOW_STANDING_LINE && typeof newRank === 'number' && (
         <Text style={[bodyType.regular, styles.standingText, {color: colors.textPrimary}]}>
           You sit <Text style={{fontFamily: 'Manrope-Bold'}}>{ordinal(newRank)}</Text> in {poolName}.
         </Text>

@@ -46,7 +46,25 @@ const TOM_USER_ID = "7b4f41c8-008d-4319-98e7-8c80ec6edf69";
 // Canonical results source for every NFL sim.
 const SOURCE_COMPETITION = "nfl_2025";
 
-const VALID_ACTIONS = ["advance_week_state", "advance_game_day", "advance_phase", "jump_to_week", "reset_to_off_season", "auto_pick_tom"];
+// Sandbox bots — the 8 fake members on the nfl_2025_sim Ladder. UUIDs match
+// tools/sim-runner.mjs FAKE_MEMBERS (the proven seeder). seed_bots writes ONLY
+// these accounts, as hard constants — never tom, never super-admin, never a real
+// user (260630_HotPick_SeedBots_Spec §3C / §7).
+const SEED_BOTS = [
+  { id: "11111111-1111-4111-8111-000000000001", name: "The Gunslinger" },
+  { id: "11111111-1111-4111-8111-000000000002", name: "Salty Sarah" },
+  { id: "11111111-1111-4111-8111-000000000003", name: "DSmiley" },
+  { id: "11111111-1111-4111-8111-000000000004", name: "P-Train" },
+  { id: "11111111-1111-4111-8111-000000000005", name: "BigSwingJake" },
+  { id: "11111111-1111-4111-8111-000000000006", name: "The Oracle" },
+  { id: "11111111-1111-4111-8111-000000000007", name: "ChrisP" },
+  { id: "11111111-1111-4111-8111-000000000008", name: "LateNightMia" },
+];
+// seed_bots is locked to the primary sandbox ONLY — stricter than SIM_ALLOWLIST.
+// The bots live in nfl_2025_sim, not the Apple/Google reviewer sims (spec §3C).
+const SEED_BOTS_COMPETITION = "nfl_2025_sim";
+
+const VALID_ACTIONS = ["advance_week_state", "advance_game_day", "advance_phase", "jump_to_week", "reset_to_off_season", "auto_pick_tom", "seed_bots", "settle_season_awards"];
 
 // NFL kickoff slots ("waves") derived from kickoff_at — matches tools/sim-runner.mjs.
 // Ordered chronologically: the Sunday-morning international game (~9:30am ET,
@@ -118,6 +136,8 @@ Deno.serve(async (req: Request) => {
       case "jump_to_week":       return await jumpToWeek(admin, competition, body.target_week);
       case "reset_to_off_season":return await resetToOffSeason(admin, competition, callerId);
       case "auto_pick_tom":      return await autoPickTom(admin, competition, callerId);
+      case "seed_bots":          return await seedBots(admin, competition, body.targets);
+      case "settle_season_awards": return await settleSeasonAwards(admin, competition, authHeader);
       default:                   return json({ success: false, error: "Unhandled action" }, 400);
     }
   } catch (err: unknown) {
@@ -331,9 +351,12 @@ async function scoreWeek(admin: any, competition: string, year: number, week: nu
   for (const p of picks ?? []) {
     const g: any = gameMap.get(p.game_id);
     if (!g) continue;
-    // gameMap holds only FINAL games. A null winner is a TIE → scored as a LOSS
-    // (isWin false): non-HotPick → 0, HotPick → -rank. Matches _shared/scoring.ts.
-    const isWin = g.winner !== null && p.picked_team === g.winner;
+    // gameMap holds only FINAL games. A null winner is a DRAW → PUSH, not a loss:
+    // the pick does not score at all (not counted in total_picks, no result row,
+    // 0 pts; a HotPick takes a 0 swing so is_hotpick_correct stays null). A draw is
+    // NEVER a loss. Matches _shared/scoring.ts push branch (register 2.7 / #360).
+    if (g.winner === null) continue;
+    const isWin = p.picked_team === g.winner;
     const agg = byUser.get(p.user_id) ?? { user_id: p.user_id, week_points: 0, correct_picks: 0, total_picks: 0, is_hotpick_correct: null, hotpick_rank: null };
     agg.total_picks += 1;
     let pickPoints = 0;
@@ -369,6 +392,45 @@ async function invokeComputeHardware(admin: any, authHeader: string, competition
   // authorizes a super-admin via the Authorization JWT, so forward the caller's token.
   try { await admin.functions.invoke("compute-hardware", { body: { trigger, competition }, headers: { Authorization: authHeader } }); }
   catch (e) { console.error("[sim-operator] compute-hardware invoke failed", e); }
+}
+
+// ── settle_season_awards ────────────────────────────────────────────────────────
+// Fires the season-end award engine (Pool Champion + podium) ON DEMAND, in
+// isolation, for the rehearsal. This does NOT walk the phase machine — a real
+// walk to SEASON_COMPLETE passes through the PLAYOFFS transition, which re-scopes
+// the leaderboard and would wipe the engineered week-1 tie. Instead it just marks
+// the season complete (so compute-hardware's season_settle gate passes) and
+// INVOKES the live compute-hardware with the caller's super-admin token. It never
+// redeploys or edits compute-hardware. Re-runnable for the idempotency check.
+//
+// HARD-LOCKED to the primary sandbox only (same lock as seed_bots) — it can never
+// fire season_settle on nfl_2026 or any other competition.
+async function settleSeasonAwards(admin: any, competition: string, authHeader: string) {
+  if (competition !== SEED_BOTS_COMPETITION) {
+    return json({ success: false, error: `settle_season_awards is locked to ${SEED_BOTS_COMPETITION}` }, 403);
+  }
+  const cfg = await getConfig(admin, competition);
+  const seasonYear = Number(cfg.season_year ?? 2025);
+
+  // Season-settle gate in compute-hardware requires is_season_complete = true.
+  await setConfig(admin, competition, "is_season_complete", true);
+
+  try {
+    const { data, error } = await admin.functions.invoke("compute-hardware", {
+      // Pass the sandbox's own season_year so award rows are tagged 2025, not the
+      // compute-hardware default (2026).
+      body: { trigger: "season_settle", competition, season_year: seasonYear },
+      headers: { Authorization: authHeader },
+    });
+    if (error) {
+      console.error("[sim-operator] settle_season_awards compute-hardware", error);
+      return json({ success: false, error: `compute-hardware: ${error.message ?? String(error)}` }, 400);
+    }
+    return json({ success: true, action: "settle_season_awards", competition, season_year: seasonYear, compute_hardware: data }, 200);
+  } catch (e) {
+    console.error("[sim-operator] settle_season_awards invoke failed", e);
+    return json({ success: false, error: "compute-hardware invoke failed — see function logs" }, 500);
+  }
 }
 
 // ── advance_phase ─────────────────────────────────────────────────────────────
@@ -481,6 +543,110 @@ async function autoPickTom(admin: any, competition: string, callerId: string) {
   if (error) { console.error("[sim-operator] auto-pick insert", error); return json({ success: false, error: "Auto-pick failed — some games may have locked" }, 400); }
 
   return json({ success: true, action: "auto_pick_tom", picks_submitted: rows.length, hotpick_game_id: rows[hotpickIdx].game_id }, 200);
+}
+
+// ── seed_bots ──────────────────────────────────────────────────────────────────
+// Writes a full slate of picks for the 8 sandbox bots so the Ladder populates and
+// each bot's weekly finish can be steered (incl. engineering a precise tie). Writes
+// PICKS ONLY (Hard Rule #3) — the existing scoreWeek turns them into points on
+// Complete; this never writes season_user_totals.
+//
+// Outcome timing (the spec's key design question): a pick is "correct" iff
+// picked_team === the game's winner_team, and the winner is the REAL nfl_2025 result
+// (sourceScoreMap), known deterministically at all times. So we seed at picks_open —
+// while games are still 'scheduled' (enforce_pick_lock requires it) — reading the
+// intended winners from source. No need to wait for Settle.
+//
+// targets: { "<botUUID>": { correct: <0..N>, hotpick: "win"|"lose"|"none" }, ... }
+// Only the 8 hard-constant bot UUIDs are ever written; any other key is ignored, so
+// tom / super-admin / a real user can never be targeted (spec §3C / §7). Idempotent:
+// a bot that already has picks for the week is skipped (matches seedFakeWeekPicks).
+async function seedBots(admin: any, competition: string, targetsRaw: any) {
+  // Hard lock — defence in depth on top of the allowlist (spec §3C).
+  if (competition !== SEED_BOTS_COMPETITION) {
+    return json({ success: false, error: `seed_bots is locked to ${SEED_BOTS_COMPETITION}` }, 403);
+  }
+  const targets: Record<string, any> = (targetsRaw && typeof targetsRaw === "object") ? targetsRaw : {};
+
+  const cfg = await getConfig(admin, competition);
+  const week = Number(cfg.current_week);
+  const year = Number(cfg.season_year ?? 2025);
+
+  // Pickable slate — only 'scheduled' games can take picks (enforce_pick_lock).
+  const { data: games } = await admin.from("season_games")
+    .select("game_id, home_team, away_team, rank, frozen_rank, status")
+    .eq("competition", competition).eq("season_year", year).eq("week", week).eq("status", "scheduled");
+  if (!games || !games.length) {
+    return json({ success: false, error: "No scheduled games for the current week — open picks first." }, 400);
+  }
+
+  // Intended winners from the real nfl_2025 results (deterministic, fixed).
+  const srcMap = await sourceScoreMap(admin, week);
+  const enriched = games.map((g: any) => {
+    const s: any = srcFor(g.game_id, srcMap);
+    return { ...g, rank: Number(g.frozen_rank ?? g.rank ?? 1), winner: s?.winner_team ?? null };
+  });
+  const decisive = enriched.filter((g: any) => g.winner !== null);
+
+  // The week's single HotPick game: highest-rank game with a decisive winner (so a
+  // HotPick can be deterministically won or lost). Its rank is the ± swing.
+  const hotpickGame = decisive.slice().sort((a: any, b: any) => b.rank - a.rank)[0] ?? null;
+  const hotpickRank = hotpickGame ? hotpickGame.rank : 0;
+
+  // Skip-if-present idempotency.
+  const { data: have } = await admin.from("season_picks")
+    .select("user_id").eq("competition", competition).eq("week", week).in("user_id", SEED_BOTS.map((b) => b.id));
+  const already = new Set((have ?? []).map((p: any) => p.user_id));
+
+  const rows: any[] = [];
+  const seeded: any[] = [];
+  const skipped: any[] = [];
+
+  for (const bot of SEED_BOTS) {
+    if (already.has(bot.id)) { skipped.push({ id: bot.id, name: bot.name, reason: "already has picks" }); continue; }
+    const t = targets[bot.id];
+    if (!t) { skipped.push({ id: bot.id, name: bot.name, reason: "no target supplied" }); continue; }
+
+    const hotpickMode = (t.hotpick === "win" || t.hotpick === "lose") ? t.hotpick : "none";
+    const useHotpick = hotpickMode !== "none" && hotpickGame !== null;
+
+    // Regular (non-hotpick) games this bot is scored on.
+    const regular = enriched.filter((g: any) => !(useHotpick && g.game_id === hotpickGame.game_id));
+    const regularDecisive = regular.filter((g: any) => g.winner !== null);
+
+    // Clamp requested correct-count to what's achievable among decisive regular games.
+    const want = Number.isFinite(Number(t.correct)) ? Math.max(0, Math.floor(Number(t.correct))) : 0;
+    const correctN = Math.min(want, regularDecisive.length);
+    const correctIds = new Set(regularDecisive.slice(0, correctN).map((g: any) => g.game_id));
+
+    for (const g of regular) {
+      let picked: string;
+      if (correctIds.has(g.game_id)) picked = g.winner;                                   // correct
+      else if (g.winner !== null) picked = g.winner === g.home_team ? g.away_team : g.home_team; // deliberately wrong
+      else picked = g.home_team;                                                          // tie → scored as a loss anyway
+      rows.push({ user_id: bot.id, game_id: g.game_id, competition, season_year: year, week, picked_team: picked, is_hotpick: false });
+    }
+
+    if (useHotpick) {
+      const hp = hotpickGame;
+      const picked = hotpickMode === "win" ? hp.winner : (hp.winner === hp.home_team ? hp.away_team : hp.home_team);
+      rows.push({ user_id: bot.id, game_id: hp.game_id, competition, season_year: year, week, picked_team: picked, is_hotpick: true });
+    }
+
+    const expectedPoints = correctN + (useHotpick ? (hotpickMode === "win" ? hotpickRank : -hotpickRank) : 0);
+    seeded.push({ id: bot.id, name: bot.name, correct: correctN, requested_correct: want, hotpick: useHotpick ? hotpickMode : "none", expected_points: expectedPoints });
+  }
+
+  if (rows.length) {
+    const { error } = await admin.from("season_picks").insert(rows);
+    if (error) { console.error("[sim-operator] seed_bots insert", error); return json({ success: false, error: "Seed insert failed — some games may have locked." }, 400); }
+  }
+
+  return json({
+    success: true, action: "seed_bots", competition, week, hotpick_rank: hotpickRank,
+    seeded, skipped, picks_written: rows.length,
+    message: `Seeded ${seeded.length} bot(s) for Week ${week}, ${skipped.length} skipped. HotPick swing = ${hotpickRank}.`,
+  }, 200);
 }
 
 // ── shared ────────────────────────────────────────────────────────────────────

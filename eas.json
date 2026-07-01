@@ -17,6 +17,12 @@
       "distribution": "internal",
       "channel": "preview"
     },
+    "testflight": {
+      "extends": "preview",
+      "distribution": "store",
+      "channel": "preview",
+      "autoIncrement": true
+    },
     "production": {
       "autoIncrement": true,
       "channel": "production",
@@ -26,6 +32,7 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {},
+    "testflight": {}
   }
 }

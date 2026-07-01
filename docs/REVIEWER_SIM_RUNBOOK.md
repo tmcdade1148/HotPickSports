@@ -98,14 +98,21 @@ on conflict do nothing;
 For `simG`: pool UUID `11111111-9999-4111-8111-000000000001`, competition `nfl_2025_simG`, invite_code `PROVEG`, the Google reviewer id, and a `competition='nfl_2025_simG'` access row.
 
 ### 3. Games + scored weeks 1–7
-Open the parameterized HTML tool pointed at `simX`:
+Drive the protected-environment runner (`tools/sim-runner.mjs`) pointed at `simX`. The
+old browser tool (`season-simulator-v4.html`) is retired — browsers now hard-block the
+`sb_secret_` key, so all sim writes go through this Node runner (see `tools/SIM_RUNNER.md`).
+
+```bash
+export SB_SECRET_KEY='sb_secret_…'         # Dashboard → API Keys → Secret keys
+export CRON_SHARED_SECRET='…64-hex…'        # Vault cron_shared_secret (scoring commands)
+export SIM_COMPETITION=nfl_2025_simA
+export SIM_POOL_ID=11111111-aaaa-4111-8111-000000000001
+export SIM_REVIEWER_ID=<APPLE_REVIEWER_USER_ID>
 ```
-tools/season-simulator-v4.html?competition=nfl_2025_simA&pool=11111111-aaaa-4111-8111-000000000001&reviewer=<APPLE_REVIEWER_USER_ID>
-```
-(Title + badges read `nfl_2025_simA` so you can't drive the wrong sim.) Then:
-- [ ] **`setup`** — copies `nfl_2025` source games into `simX` (sim-prefixed game ids), resets to week 1.
-- [ ] **`run_range 1 → 7`** — plays + scores weeks 1–7 for the pool's members (Ladder now reflects 7 weeks).
-- [ ] Re-assert **Week 8 / picks_open** (the tool advances week; re-run the Step 1 `update`s).
+(Writes refuse any target outside the sim allowlist, so you can't drive the wrong sim.) Then:
+- [ ] **`reset-to-start --yes`** — copies `nfl_2025` source games into `simX` (sim-prefixed game ids), resets to Week 1 picks_open.
+- [ ] **`run-season 1 7 --yes`** — plays + scores weeks 1–7 for the pool's members (Ladder now reflects 7 weeks).
+- [ ] **`reset-to-week8 --yes`** — lands back on Week 8 / picks_open (re-run the Step 1 `update`s if any reviewer-row state needs re-asserting).
 - [ ] Spot-check: week 8 games `scheduled` (reviewer can pick), weeks 1–7 `final`.
 
 ### 4. Seed mock Chirps (auto-posts are suppressed for sims)

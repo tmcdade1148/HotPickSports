@@ -5,7 +5,6 @@ import {supabase} from '@shared/config/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {getEventsByPriority, getEventByCompetition} from '@sports/registry';
 import {deactivateDeviceTokens} from '@shell/services/pushNotifications';
-import {setMonitoringUser} from '@shared/monitoring/sentry';
 import {createSmackUnreadSlice} from './slices/smackUnreadSlice';
 import {createDelegateSlice} from './slices/delegateSlice';
 import {createHistoryHardwareSlice} from './slices/historyHardwareSlice';
@@ -64,9 +63,6 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   user: null,
   isAuthLoading: true,
   setUser: user => {
-    // Tag monitoring events with the auth user id only (no PII). No-ops when
-    // monitoring isn't active.
-    setMonitoringUser(user?.id ?? null);
     set({user});
   },
   setAuthLoading: isAuthLoading => set({isAuthLoading}),
@@ -97,7 +93,6 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       await AsyncStorage.multiRemove(toRemove);
     }
     await supabase.auth.signOut();
-    setMonitoringUser(null);
     set({
       user: null,
       userProfile: null,

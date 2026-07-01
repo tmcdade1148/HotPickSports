@@ -489,68 +489,78 @@ async function computePodiumAward(
 
   if (!pools) return { awarded: 0 };
 
-  const { data: allMembers } = await supabase
-    .from("pool_members")
-    .select("user_id, pool_id")
-    .eq("status", "active")
-    .in("pool_id", pools.map(p => p.id));
-
+  // Per-user season HotPick record, for award context only (weeks_played +
+  // hotpick_record). The RANK and the winner identity come from the canonical
+  // compute_pool_standings below — never from a local array sort (which was
+  // arbitrary on a tie). A pushed HotPick (is_hotpick_correct null) is excluded
+  // from both sides of the record, the same as everywhere else.
   const { data: totals } = await supabase
     .from("season_user_totals")
-    .select("user_id, week_points, is_hotpick_correct, hotpick_rank")
+    .select("user_id, is_hotpick_correct")
     .eq("competition", competition)
     .eq("phase", "REGULAR");
 
-  if (!allMembers || !totals) return { awarded: 0 };
-
-  // Sum points per user
-  const userPoints = new Map<string, { total: number; hpWins: number; hpTotal: number; weeks: number }>();
-  for (const t of totals) {
-    if (!userPoints.has(t.user_id)) userPoints.set(t.user_id, { total: 0, hpWins: 0, hpTotal: 0, weeks: 0 });
-    const u = userPoints.get(t.user_id)!;
-    u.total += t.week_points ?? 0;
+  const hpByUser = new Map<string, { hpWins: number; hpTotal: number; weeks: number }>();
+  for (const t of totals ?? []) {
+    const u = hpByUser.get(t.user_id) ?? { hpWins: 0, hpTotal: 0, weeks: 0 };
     u.weeks += 1;
     if (t.is_hotpick_correct === true) u.hpWins += 1;
     if (t.is_hotpick_correct !== null) u.hpTotal += 1;
+    hpByUser.set(t.user_id, u);
   }
-
-  const poolNameMap = new Map(pools.map(p => [p.id, p.name]));
 
   const rows: any[] = [];
   for (const pool of pools) {
-    const poolMembers = allMembers.filter(m => m.pool_id === pool.id);
-    const standings = poolMembers
-      .map(m => ({
-        userId: m.user_id,
-        pts: userPoints.get(m.user_id)?.total ?? 0,
-        hp: userPoints.get(m.user_id),
-      }))
-      .sort((a, b) => b.pts - a.pts);
-
-    if (standings.length < targetRank) continue;
-    const winner = standings[targetRank - 1];
-    const hp = winner.hp;
-
-    rows.push({
-      user_id: winner.userId,
-      hardware_slug: slug,
-      hardware_name: name,
-      category: "season",
-      scope: "pool",
-      competition,
-      season_year: seasonYear,
-      week: null,
-      pool_id: pool.id,
-      context_json: {
-        final_rank: targetRank,
-        final_points: winner.pts,
-        pool_size: poolMembers.length,
-        pool_name: poolNameMap.get(pool.id) ?? "",
-        weeks_played: hp?.weeks ?? 0,
-        hotpick_record: `${hp?.hpWins ?? 0}-${(hp?.hpTotal ?? 0) - (hp?.hpWins ?? 0)}`,
-        competition,
-      },
+    // Canonical standings: same co-ranking + points→HotPick-points tiebreak as
+    // the Ladder and the crown. Award everyone AT the target title_rank:
+    //   • targetRank 1 with two title_rank-1 rows → co-champions, both get the
+    //     pool_champion slot. computePodium then asks for title_rank 2, which a
+    //     1,1,3 ranking leaves empty → no Runner Up that season (decided, Tom).
+    const { data: standings, error } = await supabase.rpc("compute_pool_standings", {
+      p_pool_id: pool.id,
     });
+    if (error || !standings || standings.length === 0) continue;
+
+    const winners = (standings as any[]).filter(s => s.title_rank === targetRank);
+    if (winners.length === 0) continue;
+
+    // Indicator (champion slot only): points were tied at the top AND the
+    // HotPick-points rung produced a SINGLE champion → the title was decided on
+    // HotPick points. A shared title_rank 1 is a true co-championship, not a
+    // tiebreaker decision.
+    const topShared    = (standings as any[]).filter(s => s.standing_rank === 1).length > 1;
+    const soleChampion = (standings as any[]).filter(s => s.title_rank === 1).length === 1;
+    const decidedByHotpick = targetRank === 1 && topShared && soleChampion;
+    const coChampions      = targetRank === 1 && winners.length > 1;
+
+    for (const w of winners) {
+      const hp = hpByUser.get(w.user_id);
+      rows.push({
+        user_id: w.user_id,
+        hardware_slug: slug,
+        hardware_name: name,
+        category: "season",
+        scope: "pool",
+        competition,
+        season_year: seasonYear,
+        week: null,
+        pool_id: pool.id,
+        context_json: {
+          final_rank: targetRank,
+          final_points: w.total_points,
+          pool_size: standings.length,
+          pool_name: pool.name ?? "",
+          weeks_played: hp?.weeks ?? 0,
+          hotpick_record: `${hp?.hpWins ?? 0}-${(hp?.hpTotal ?? 0) - (hp?.hpWins ?? 0)}`,
+          co_champions: coChampions,
+          ...(targetRank === 1 ? { title_decided_by_hotpick_points: decidedByHotpick } : {}),
+          ...(decidedByHotpick
+            ? { title_tiebreak_reason: "Level on points — the title was decided on HotPick points." }
+            : {}),
+          competition,
+        },
+      });
+    }
   }
 
   return await upsertAwards(rows);

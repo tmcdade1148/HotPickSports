@@ -361,6 +361,32 @@ const REVIEWER_COMPS = ['nfl_2025_simA', 'nfl_2025_simG'];
 const PHASE_SEQUENCE = ['OFF_SEASON', 'PRE_SEASON', 'REGULAR', 'REGULAR_COMPLETE', 'PLAYOFFS', 'SUPERBOWL_INTRO', 'SUPERBOWL', 'SEASON_COMPLETE'];
 function isWritable(comp) { return SIM_ALLOWLIST.includes(comp); }
 
+// ── Seed Bots (260630_HotPick_SeedBots_Spec) ────────────────────────────────
+// The 8 sandbox bots (UUIDs match sim-operator SEED_BOTS / sim-runner FAKE_MEMBERS).
+// The server hard-locks the targets to these UUIDs + nfl_2025_sim; this list only
+// labels the per-bot control rows. Seeding is offered ONLY for nfl_2025_sim.
+const SEED_BOTS_COMP = 'nfl_2025_sim';
+const SEED_BOTS_UI = [
+  { id: '11111111-1111-4111-8111-000000000001', name: 'The Gunslinger' },
+  { id: '11111111-1111-4111-8111-000000000002', name: 'Salty Sarah' },
+  { id: '11111111-1111-4111-8111-000000000003', name: 'DSmiley' },
+  { id: '11111111-1111-4111-8111-000000000004', name: 'P-Train' },
+  { id: '11111111-1111-4111-8111-000000000005', name: 'BigSwingJake' },
+  { id: '11111111-1111-4111-8111-000000000006', name: 'The Oracle' },
+  { id: '11111111-1111-4111-8111-000000000007', name: 'ChrisP' },
+  { id: '11111111-1111-4111-8111-000000000008', name: 'LateNightMia' },
+];
+// A reasonable spread so a normal week looks natural; override per-bot to engineer a tie.
+const SEED_DEFAULT_SPREAD = [
+  { correct: 11, hotpick: 'win' },  { correct: 9, hotpick: 'win' },
+  { correct: 8,  hotpick: 'lose' }, { correct: 7, hotpick: 'win' },
+  { correct: 6,  hotpick: 'win' },  { correct: 5, hotpick: 'lose' },
+  { correct: 4,  hotpick: 'win' },  { correct: 3, hotpick: 'none' },
+];
+let seedDraft = {}; // index -> { correct, hotpick }, in memory only
+function seedSet(i, k, v) { seedDraft[i] = seedDraft[i] || { correct: 6, hotpick: 'win' }; seedDraft[i][k] = v; }
+function seedDefault() { SEED_DEFAULT_SPREAD.forEach((d, i) => { seedDraft[i] = { ...d }; }); renderControls(); }
+
 // NFL kickoff slots ("waves") — mirrors sim-operator detectWave + tools/sim-runner.mjs,
 // including the Sunday-morning international slot ("sunday_am") so this ladder lines
 // up with what advance_game_day actually walks.
@@ -409,7 +435,7 @@ const STAGE_INFO = {
 const REFRESH_MS = 30000;
 // Bump on each console change so you can confirm the loaded file is current
 // (file:// caching otherwise hides updates). Shown next to the wordmark.
-const CONSOLE_BUILD = 'build 2026-06-24.6 · confirm-line';
+const CONSOLE_BUILD = 'build 2026-07-01.1 · settle-awards';
 document.getElementById('build-stamp').textContent = CONSOLE_BUILD;
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -1137,6 +1163,22 @@ function renderControls() {
   }
   html += `</div>`;
 
+  // Seed Bots — sandbox only, and only while picks are open (games must be
+  // 'scheduled' to accept picks). The score "falls out" of the picks on Complete.
+  if (comp === SEED_BOTS_COMP && ws === 'picks_open') {
+    html += renderSeedPanel(week);
+  }
+
+  // Settle Season Awards — sandbox only. Fires compute-hardware season_settle in
+  // ISOLATION (no phase walk → no PLAYOFFS leaderboard reset) so the season-end
+  // Pool Champion + podium compute on the current week's standings. Safe to re-run
+  // (awards are ON CONFLICT DO NOTHING). Score the week to Complete first.
+  if (comp === SEED_BOTS_COMP) {
+    html += `<div class="ctl-group"><div class="ctl-label">Season awards — SANDBOX</div>
+      <div class="ctl-disabled-note" style="margin:0 0 8px;">Fires the season-end award engine (Pool Champion + podium) on the current standings, in isolation. Score the week to Complete first. Safe to re-run.</div>
+      <button class="ctl-btn" style="background:#7a3ea8;color:#fff;" onclick="opSettleAwards()">Settle Season Awards</button></div>`;
+  }
+
   html += `<div class="ctl-group"><div class="ctl-label">Phase transition</div>`;
   if (nextPhase) {
     html += `<select id="phase-next" class="ctl-num" style="width:100%;margin-bottom:6px;"><option value="${nextPhase}">${nextPhase}</option></select>`;
@@ -1164,6 +1206,7 @@ async function invokeOp(action, opts) {
   try {
     const body = { action, competition: selectedComp };
     if (opts && opts.target_week !== undefined) body.target_week = opts.target_week;
+    if (opts && opts.targets !== undefined) body.targets = opts.targets;
     const { data, error } = await sb.functions.invoke('sim-operator', { body });
     if (error) {
       let msg = translateError(error);
@@ -1228,6 +1271,10 @@ function opPhase() {
   const sel = document.getElementById('phase-next');
   callSimOperator('advance_phase', { label: 'Advance phase → ' + (sel ? sel.value : '') });
 }
+function opSettleAwards() {
+  if (!window.confirm('Fire the season-end award engine (Pool Champion + podium) for this sandbox now?\nThis marks the sim season complete and computes awards in isolation. Safe to re-run.')) return;
+  callSimOperator('settle_season_awards', { label: 'Settle Season Awards' });
+}
 function opJump() {
   const t = parseInt(document.getElementById('jump-week').value, 10);
   const cur = cfg('current_week');
@@ -1238,6 +1285,57 @@ function opJump() {
   if (!window.confirm(`Jump to week ${t}?\n${skipMsg}\nThis cannot be undone.`)) return;
   callSimOperator('jump_to_week', { target_week: t, label: `Jump to week ${t}` });
 }
+// Seed Bots panel — per-bot correct-count + HotPick, rendered under the Week state
+// group at picks_open. Writes picks for the 8 bots only; the existing scorer turns
+// them into points on Complete (260630_HotPick_SeedBots_Spec).
+function renderSeedPanel(week) {
+  let h = `<div class="ctl-group"><div class="ctl-label">Seed Bots — Week ${week} · SANDBOX</div>`;
+  h += `<div class="ctl-disabled-note" style="margin:0 0 8px;">Per-bot: # correct (0–15) + HotPick (win/lose/none). Score falls out on Complete. Writes picks for the 8 bots only — never you, never super-admin. Pressing twice is safe (bots with picks are skipped).</div>`;
+  SEED_BOTS_UI.forEach((b, i) => {
+    const d = seedDraft[i] || (seedDraft[i] = { correct: 6, hotpick: 'win' });
+    h += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+      <span style="flex:1;font-size:12px;color:#cdd6e2;">${b.name}</span>
+      <input type="number" min="0" max="15" value="${d.correct}" class="ctl-num" style="width:56px;" title="# correct picks" oninput="seedSet(${i},'correct',this.value)">
+      <select class="ctl-num" style="width:78px;" title="HotPick result" onchange="seedSet(${i},'hotpick',this.value)">
+        ${['win', 'lose', 'none'].map(o => `<option value="${o}" ${d.hotpick === o ? 'selected' : ''}>${o}</option>`).join('')}
+      </select>
+    </div>`;
+  });
+  h += `<div class="ctl-row" style="margin-top:8px;">
+    <button class="ctl-btn" style="flex:1;margin:0;background:#26405f;" onclick="seedDefault()">Default spread</button>
+    <button class="ctl-btn" style="flex:1;margin:0;" onclick="opSeedBots()">Seed Bots</button></div></div>`;
+  return h;
+}
+
+async function opSeedBots() {
+  const comp = selectedComp;
+  if (comp !== SEED_BOTS_COMP) { log(`Seed Bots is locked to ${SEED_BOTS_COMP}`, 'error'); return; }
+  const week = cfg('current_week', '?');
+  const targets = {};
+  const lines = [];
+  SEED_BOTS_UI.forEach((b, i) => {
+    const d = seedDraft[i] || { correct: 6, hotpick: 'win' };
+    const correct = Math.max(0, Math.min(15, parseInt(d.correct, 10) || 0));
+    targets[b.id] = { correct, hotpick: d.hotpick };
+    lines.push(`${b.name}: ${correct} correct · HotPick ${d.hotpick}`);
+  });
+  if (!window.confirm(`Seed the 8 bots for ${comp} · Week ${week}?\n\n${lines.join('\n')}\n\nWrites picks only (the scorer makes points on Complete). Bots that already have picks are skipped.`)) {
+    log('Seed Bots cancelled', 'warn'); return;
+  }
+  const res = await invokeOp('seed_bots', { targets });
+  if (res && res.success) {
+    log(`Seed Bots ✓ — ${res.message}`, 'success');
+    (res.seeded || []).forEach(s => {
+      const clamp = (s.requested_correct != null && s.requested_correct !== s.correct) ? ` (requested ${s.requested_correct}, clamped)` : '';
+      log(`  • ${s.name}: ${s.correct} correct + HotPick ${s.hotpick} → ${s.expected_points} pts${clamp}`, 'info');
+    });
+    (res.skipped || []).forEach(s => log(`  • ${s.name}: skipped (${s.reason})`, 'warn'));
+    await refreshAll();
+  } else {
+    log(`Seed Bots failed: ${(res && res.error) || 'error'}`, 'error');
+  }
+}
+
 function opReset() {
   const comp = selectedComp;
   const typed = window.prompt(`This will DELETE all picks and scores for ${comp} and reset it to OFF_SEASON week 1.\nThis cannot be undone.\n\nType RESET to confirm:`);

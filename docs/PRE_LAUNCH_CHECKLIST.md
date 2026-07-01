@@ -51,15 +51,24 @@
 - [ ] **Odds API — verify end-to-end in PRE_SEASON (Aug 6).** Off-season this can't be tested: `nfl-fetch-odds` returns `no_active_week` before ever calling The Odds API, and the NFL has no games to price until preseason. When a preseason week is active: (1) confirm `ODDS_API_KEY` is set (Dashboard → Edge Functions → Secrets); (2) let the Tuesday `nfl-fetch-odds` cron run (or trigger it with the `x-cron-secret` header); (3) check `week_readiness` for that week shows `odds_status = 'ok'` and `odds_count = odds_expected` with no `odds_error`.
 - [x] **Odds success is already a hard gate before picks open.** `open_week_picks` → `_assert_week_ready` → `_week_readiness_is_ready` requires `odds_status = 'ok'` **and** `odds_count = odds_expected` (every game priced), plus games + ranks complete — otherwise it raises `NOT_READY` and refuses to open the week. Hardened **2026-06-11** (migration `20260611160000`) with a freshness/ordering guard (`odds_at >= games_at`, `ranks_at >= odds_at`) so a stale readiness row can't satisfy the gate even if counts coincidentally match.
 
-## 6. Monitoring — activate Sentry (before launch)
+## 6. Monitoring — No Silent Failures (Sentry removed)
 
-Crash/error reporting is **scaffolded but inert** (PR #207, `src/shared/monitoring/sentry.ts`). It no-ops until **both** a DSN is configured **and** a fresh native build ships. Turn it on before Season 2 so live crashes are actually visible. One-time native setup: `docs/SENTRY.md`.
+Sentry was **removed entirely** (`@sentry/react-native` caused a native-module
+startup crash and an Xcode-26 iOS pod build break). Crash/error visibility now
+comes from three Sentry-free pieces (spec: `260629_HotPick_NoSilentFailures_Spec`):
 
-- [ ] **Create a Sentry project** (react-native platform) and copy its **DSN** (a public ingest key — safe to expose, but we keep it out of git so it can rotate without a code change).
-- [ ] **Supply the DSN** via the EAS env var **`EXPO_PUBLIC_SENTRY_DSN`** (preferred), scoped to **production + preview** — leave dev unset (Sentry is disabled in `__DEV__` anyway). `app.json` `extra.sentryDsn` is the fallback.
-- [ ] **Native rebuild required.** `@sentry/react-native` is a native module — the DSN alone does nothing without a fresh `eas build` (`cd ios && pod install` for iOS). OTA won't activate it.
-- [ ] **Verify events flow** in a release/TestFlight build: trigger a test error and confirm it lands in the dashboard (check `release` = `hotpicksports@<version>` and the right `environment`).
-- [ ] *(Optional, robustness)* Harden `sentry.ts` to a **guarded `require()`** so a missing/stale `@sentry/react-native` install degrades to a no-op instead of red-screening Metro — the current static `import` bit us once during a stale `npm install`.
+- [x] **Top-level `AppErrorBoundary`** contains a render crash with a visible,
+  recoverable fallback instead of white-screening the session (register 1.1).
+- [x] **Standalone `logError()`** writes to the `client_error_log` table — a plain
+  Supabase insert, no Sentry/DSN/native dependency. Throttled + dedup'd; no PII.
+- [x] **"Surface-don't-swallow"** — data-fetch errors raise a visible error state
+  AND a `logError` row, never a silent empty list (the #360 Ladder fix is the
+  worked example).
+- [ ] **Apply the `client_error_log` migration** (`20260630120000_client_error_log.sql`)
+  after a manual Supabase backup. Verify a forced error writes a row and
+  super-admin read works.
+- [ ] **Turn on the free native consoles** (Tom): Play Console → Android vitals
+  and Xcode → Organizer. They catch native crashes the JS logger can't.
 
 ## 7. Auth — email confirmation on signup
 

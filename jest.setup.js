@@ -32,15 +32,11 @@ jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
 
-// Crash/error monitoring pulls in native-only modules (@sentry/react-native,
-// expo-constants, expo-updates) that ship un-transpiled ESM and have no node
-// backing. Anything importing globalStore or App transitively imports this, so
-// mock it with inert no-ops. The guard logic it wraps is trivial and not under
-// test; this matches how we mock other native-dependent modules above.
-jest.mock('@shared/monitoring/sentry', () => ({
-  initMonitoring: jest.fn(),
-  wrapWithMonitoring: component => component,
-  setMonitoringUser: jest.fn(),
-  captureError: jest.fn(),
-  isMonitoringActive: () => false,
+// expo-constants ships un-transpiled and has no node backing. The standalone
+// logError() (→ imported by seasonStore → most board screens) reads
+// Constants.expoConfig?.version, so give it an inert shape suite-wide.
+jest.mock('expo-constants', () => ({
+  __esModule: true,
+  default: {expoConfig: {version: '0.0.0-test'}},
 }));
+

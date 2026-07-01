@@ -36,6 +36,7 @@ export function SeasonBoardScreen() {
   const poolId = useSeasonStore(s => s.poolId);
   const currentWeek = useSeasonStore(s => s.currentWeek);
   const leaderboard = useSeasonStore(s => s.leaderboard);
+  const leaderboardError = useSeasonStore(s => s.leaderboardError);
   const weekLeaderboard = useSeasonStore(s => s.weekLeaderboard);
   const weekLeaderboardDisplayedWeek = useSeasonStore(
     s => s.weekLeaderboardDisplayedWeek,
@@ -225,7 +226,11 @@ export function SeasonBoardScreen() {
 
   const renderSeasonRow = ({item, index}: {item: SeasonLeaderboardEntry; index: number}) => {
     const isMe = item.user_id === user?.id;
-    const rank = index + 1;
+    // Co-ranked standing from the server; fall back to a sequential index only
+    // until the standings function has loaded (or on a degraded call).
+    const rank = item.standing_rank ?? index + 1;
+    // "T-3rd" when the rank is shared on a points tie; plain "3rd" otherwise.
+    const rankLabel = item.is_tied ? `T-${rank}` : `${rank}`;
 
     const weekKeys = Object.keys(item.weekly_breakdown)
       .map(Number)
@@ -242,7 +247,7 @@ export function SeasonBoardScreen() {
         key={item.user_id}
         style={[styles.row, isMe && styles.rowHighlight]}
         ref={isMe ? mySeasonRowRef : undefined}>
-        <Text style={[styles.rank, isMe && styles.textHighlight]}>{rank}</Text>
+        <Text style={[styles.rank, isMe && styles.textHighlight]}>{rankLabel}</Text>
         <AvatarBadge avatarKey={userAvatars[item.user_id]} name={userNames[item.user_id] ?? 'P'} size={24} />
         <View style={styles.userInfo}>
           <View style={styles.nameRow}>
@@ -385,7 +390,30 @@ export function SeasonBoardScreen() {
           {/* Season panel */}
           <View style={{width: SCREEN_WIDTH}}>
             <View style={styles.leaderboard}>
-              {leaderboard.length === 0 ? (
+              {leaderboardError ? (
+                // Surfaced fetch error — visible + recoverable, NEVER a silent
+                // blank list (the #360 regression). Distinct from the genuine
+                // empty state below.
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyText}>{leaderboardError}</Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      fetchLeaderboard();
+                      fetchWeekLeaderboard();
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Retry loading the Ladder"
+                    style={{
+                      marginTop: 12,
+                      paddingHorizontal: 20,
+                      paddingVertical: 8,
+                      borderRadius: borderRadius.md,
+                      backgroundColor: colors.primary,
+                    }}>
+                    <Text style={{color: '#FFFFFF', fontWeight: '600'}}>Retry</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : leaderboard.length === 0 ? (
                 <View style={styles.emptyState}>
                   <Text style={styles.emptyText}>
                     {currentWeek === 1 &&

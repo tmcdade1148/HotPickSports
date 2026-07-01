@@ -226,12 +226,33 @@ export function HomeScreen() {
         nfl.fetchUserPickStatus(userId).catch(() => {});
         nfl.fetchUserHotPick(userId, currentWeek).catch(() => {});
         nfl.fetchLiveScores().catch(() => {});
+        // Restore the CURRENT-week season context on focus return (mirrors the
+        // mount effect). Reviewing a past week loads that week's picks/games into
+        // seasonStore and moves the viewed week; without re-syncing here the Home
+        // week tile renders stale data (e.g. Week 2 showed 0 after viewing Week 1).
+        // The season total is a separate source, which is why only the week tile
+        // went stale. fetchWeekResult has its own stale-guard.
+        setSeasonViewedWeek(currentWeek);
+        fetchSeasonWeekGames(currentWeek, true).catch(() => {});
+        fetchSeasonUserPicks(userId, currentWeek).catch(() => {});
+        fetchWeekResult(userId, currentWeek).catch(() => {});
       }
       if (allPoolIds.length > 0) {
         loadPoolIndicators(userId, allPoolIds).catch(() => {});
         loadUserRankByPool(userId, allPoolIds).catch(() => {});
       }
-    }, [userId, competition, currentWeek, allPoolIds, loadPoolIndicators, loadUserRankByPool]),
+    }, [
+      userId,
+      competition,
+      currentWeek,
+      allPoolIds,
+      loadPoolIndicators,
+      loadUserRankByPool,
+      setSeasonViewedWeek,
+      fetchSeasonWeekGames,
+      fetchSeasonUserPicks,
+      fetchWeekResult,
+    ]),
   );
 
   // Pull-to-refresh — reuses the same existing fetch actions as the focus

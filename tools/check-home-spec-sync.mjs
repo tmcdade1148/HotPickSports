@@ -3,7 +3,7 @@
 //
 // Drift guard for the hand-maintained mirrors of the app's Home Screen copy.
 // Two files restate copy that actually lives in src/shell/components/home/*:
-//   1. tools/hotpick-operator-console.html  — HOME_SCREEN_SPECS (Spec Preview)
+//   1. tools/hotpick-operator-console_v2.html  — HOME_SCREEN_SPECS (Spec Preview)
 //   2. REFERENCE.md §11                      — "Home Screen Copy — two engines"
 // Neither can import the app's TS, so they drift silently. This script pulls the
 // verbatim phrases each mirror claims the app shows and verifies every one still
@@ -20,7 +20,7 @@ import {join, dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const consolePath = join(root, 'tools', 'hotpick-operator-console.html');
+const consolePath = join(root, 'tools', 'hotpick-operator-console_v2.html');
 const referencePath = join(root, 'REFERENCE.md');
 const homeDir = join(root, 'src', 'shell', 'components', 'home');
 
@@ -101,5 +101,5 @@ if (misses.length === 0) {
 console.error(`\n✗ DRIFT — ${misses.length} phrase(s) not found in the app source:`);
 for (const {label, phrase} of misses) console.error(`    [${label}]  "${phrase}"`);
 console.error('\nFix: update the mirror to match the app copy in ' + rel + ', or correct the app copy.');
-console.error('Mirrors: tools/hotpick-operator-console.html (HOME_SCREEN_SPECS), REFERENCE.md §11.');
+console.error('Mirrors: tools/hotpick-operator-console_v2.html (HOME_SCREEN_SPECS), REFERENCE.md §11.');
 process.exit(1);

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // =============================================================================
-// HotPick Season Simulator — Node runner (protected-environment replacement
-// for tools/season-simulator-v4.html).
+// HotPick Season Simulator — Node runner (protected-environment simulator;
+// supersedes the retired browser tool tools/season-simulator-v4.html).
 //
 // WHY THIS EXISTS
 // The browser simulator did service-role REST writes straight from the page.
