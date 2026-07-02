@@ -54,6 +54,15 @@ Deno.serve(async (req) => {
 
     const seasonYear = Number(cfg.season_year ?? 2026);
 
+    // Preseason isolation: espn_season_type is a preseason-only config key ('1' =>
+    // preseason). Unlike the two ESPN-driven functions, this one reads from the
+    // Odds API, whose single `americanfootball_nfl` sport key already covers
+    // preseason games — there is no seasontype parameter to pin. So the branch
+    // reads the key for parity/observability and the fetch URL is UNCHANGED. Absent
+    // (every regular competition, incl. nfl_2026) => isPreseason=false, same result.
+    const espnSeasonType = String(cfg.espn_season_type ?? "").replace(/^"|"$/g, "");
+    const isPreseason = espnSeasonType === "1";
+
     const { data: games, error: gamesError } = await supabase
       .from("season_games")
       .select("game_id, home_team, away_team, spread, home_moneyline, away_moneyline")
@@ -127,7 +136,7 @@ Deno.serve(async (req) => {
       odds_at: new Date().toISOString(),
     });
 
-    return json({ success: true, competition, season_year: seasonYear, week, updated, skipped, preserved, total: games.length, errors,
+    return json({ success: true, competition, season_year: seasonYear, week, preseason: isPreseason, updated, skipped, preserved, total: games.length, errors,
       apiUsage: { used: oddsRes.headers.get("x-requests-used"), remaining: oddsRes.headers.get("x-requests-remaining") } }, 200);
   } catch (err) {
     if (week) await markReadiness(competition, week, { odds_status: "failed", odds_error: String(err), odds_at: new Date().toISOString() });

@@ -30,7 +30,17 @@ Deno.serve(async (req) => {
 
     const seasonYear = Number(cfg.season_year ?? 2026);
 
-    const espnRes = await fetch("https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard");
+    // Preseason isolation: espn_season_type is a preseason-only config key. When
+    // set to '1', pin the ESPN scoreboard call to seasontype=1 so we score
+    // preseason games. Absent (every regular competition, incl. nfl_2026) =>
+    // isPreseason=false => the default scoreboard URL runs EXACTLY as before.
+    const espnSeasonType = String(cfg.espn_season_type ?? "").replace(/^"|"$/g, "");
+    const isPreseason = espnSeasonType === "1";
+
+    const scoreboardUrl = isPreseason
+      ? "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=1"
+      : "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard";
+    const espnRes = await fetch(scoreboardUrl);
     if (!espnRes.ok) throw new Error(`ESPN API error: ${espnRes.status}`);
 
     const espnData = await espnRes.json();

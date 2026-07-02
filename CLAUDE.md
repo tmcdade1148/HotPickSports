@@ -67,6 +67,7 @@ If you find yourself writing any of the following, stop and revise.
 - `DELETE FROM user_hardware` → use `is_visible = false`; hardware rows are permanent
 - `INSERT INTO user_hardware` without `ON CONFLICT DO NOTHING` → duplicates are permanent
 - **Reading partner identity (name/logo/colors) from `pool.brand_config` in a partner-centric component** → wrong partner in multi-affiliate cases. `pool.brand_config` is the *lead/primary* partner's snapshot. Partner-centric surfaces (PartnerModule, partner tiles, partner detail screens) read live from `partnersById[partnerId]`. Pool-centric surfaces (Contest card) read the snapshot per Hard Rule #23.
+- **Test accounts are excluded from every aggregate, statistics, inference, or data-licensing query.** There is no `is_test` flag on `profiles` today; test accounts are identifiable only by (a) email pattern `tester_%@hotpicksports.com`, (b) the known mock cast, and (c) the super-admin id `7b4f41c8-008d-4319-98e7-8c80ec6edf69` (already excluded from standings/awards). When the aggregate/analytics/data-licensing work begins, add an `is_test` boolean to `profiles` and exclude it everywhere statistics are drawn.
 
 ### SmackTalk & Messaging
 - `DELETE FROM smack_messages` without prior INSERT to archive → data is never deleted, only archived

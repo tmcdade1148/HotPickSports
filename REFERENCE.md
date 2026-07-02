@@ -132,8 +132,14 @@ Key-value config store for all competition state. One row per `(competition, key
 ```
 current_week, current_phase, is_active, is_season_complete,
 template, sport, season_year, phases, powerUps, carryOver,
-data_provider, scoring_locked, playoff_start_week
+data_provider, scoring_locked, playoff_start_week,
+global_pool_id, open_picks_mode, week_state, picks_locked,
+preseason_start_date, season_opener_date, season_picks_open_at,
+next_picks_open_at
 ```
+
+- `global_pool_id` is present on competitions that have a global pool; omitted on invite-only competitions.
+- `espn_season_type` is a preseason-only key ('1' => ESPN seasontype=1); absent elsewhere, defaulting to regular. Added with the preseason isolation build.
 
 **Tournament (world_cup_2026):**
 ```

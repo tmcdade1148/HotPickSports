@@ -56,8 +56,16 @@ Deno.serve(async (req) => {
 
     const seasonYear = Number(cfg.season_year ?? 2026);
 
+    // Preseason isolation: espn_season_type is a preseason-only config key. When
+    // set to '1', force ESPN seasontype=1 and label rows PRESEASON. Absent (every
+    // regular competition, incl. nfl_2026) => isPreseason=false => the existing
+    // seasontype 2 (regular) / 3 (playoff) mapping below runs EXACTLY as before.
+    const espnSeasonType = String(cfg.espn_season_type ?? "").replace(/^"|"$/g, "");
+    const isPreseason = espnSeasonType === "1";
+
     let seasonType: number, espnWeek: number, phase: string;
-    if (week <= 18) { seasonType = 2; espnWeek = week; phase = "REGULAR"; }
+    if (isPreseason) { seasonType = 1; espnWeek = week; phase = "PRESEASON"; }
+    else if (week <= 18) { seasonType = 2; espnWeek = week; phase = "REGULAR"; }
     else if (WEEK_TO_ESPN[week]) { ({ seasonType, espnWeek, phase } = WEEK_TO_ESPN[week]); }
     else return json({ error: `Invalid week: ${week}` }, 400);
 
