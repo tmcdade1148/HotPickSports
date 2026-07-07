@@ -2,6 +2,8 @@
 
 Read this file before writing any code. Full architecture context is in `REFERENCE.md`.
 
+Session start: before your first response, also read the "Working With Tom & How This Project Operates" section at the top of REFERENCE.md. It covers how to collaborate, the document hierarchy (CLAUDE.md → REFERENCE.md → LAUNCH_READINESS.md), how to approach problems, and what NFL Season 2 is validating. LAUNCH_READINESS.md is the source of truth for current state — never trust a frozen snapshot
+
 ---
 
 ## What This App Is

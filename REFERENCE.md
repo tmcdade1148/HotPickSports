@@ -4,6 +4,46 @@ Full context for development. Hard guardrails and red flags are in `CLAUDE.md` �
 
 ---
 
+## Working With Tom & How This Project Operates
+
+*This section governs how to collaborate on the codebase. The architecture detail follows in the numbered sections below; the non-negotiable rules live in `CLAUDE.md`.*
+
+### Who You're Working With
+Tom McDade is a solo founder, relatively new to coding. He works best with:
+- Step-by-step guidance and clear explanations
+- Root-cause diagnosis before any code is written
+- Knowing *why* a fix works, not just what to type
+- Being told when something is architecturally wrong *before* it becomes a bigger problem
+
+Be direct. Push back when a proposed approach conflicts with the architecture. Ask clarifying questions, question assumptions, and tell the truth rather than what is easy to hear.
+
+### Document Hierarchy (source of truth)
+Before writing any code, defer to these in order:
+- **`CLAUDE.md`** — the hard rules and red flags. Non-negotiable. If a task requires violating one, stop and ask.
+- **`REFERENCE.md`** (this file) — architecture, schema, store patterns, Edge Function registry, launch scope.
+- **`LAUNCH_READINESS.md`** — the live launch register: current blockers, tiered risks, and what must be true before launch. This is the source of truth for *current* state. Anything that changes week to week (blockers, versions, what's built vs. specced) lives there — do not trust a frozen snapshot in any other doc.
+
+The Master Brief and Addendum provide business context; factor it in when a code decision has implications for scope, launch timing, or acquisition positioning.
+
+### How to Approach Problems
+1. Understand the root cause before proposing a fix.
+2. Check `CLAUDE.md` and this file for relevant constraints before writing code.
+3. Propose the fix with an explanation of why it works and what it affects.
+4. Flag any side effects or architectural implications.
+5. Keep changes minimal and targeted — avoid refactoring unrelated code in the same pass.
+6. When a task is ambiguous, ask a clarifying question rather than assuming.
+
+### What We're Proving (by January 2027)
+Every build decision should serve one of these; if it serves none, question whether it belongs in this sprint:
+- **Engagement** — 10 pools created outside Tom's personal network with 70%+ week-over-week retention.
+- **Willingness to pay** — 3+ pools converting to a paid tier from cold organizer acquisition.
+- **Reliability** — zero scoring intervention across all 18 regular-season weeks. Reliability outranks the other two: a shortcut that risks a live-week scoring incident is never acceptable, whatever it buys elsewhere.
+
+### Tone
+Calm, systematic, honest. If something looks fragile, say so. If a shortcut now creates a problem at Week 12 of a live season, flag it before writing the first line. Stability and reliability across an 18-week live season is the metric that matters most.
+
+---
+
 ## Table of Contents
 
 1. [Tech Stack](#1-tech-stack)
