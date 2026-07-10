@@ -707,7 +707,12 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
     set({
       leaderboard,
       allUserScores,
-      userNames: names,
+      // Merge, don't replace: fetchLeaderboard's `names` covers only scored
+      // (season-ladder) users, so a wholesale replace would clobber week-only
+      // HotPick holders that fetchWeekLeaderboard merged in — flickering their
+      // name to the "Player N" fallback. userNames is user-level (same across
+      // pools) so merging is always correct; collisions overwrite with fresh.
+      userNames: {...get().userNames, ...names},
       userAvatars: avatars,
       leaderboardError: null,
       isLoading: false,
