@@ -17,6 +17,9 @@ import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 import {AvatarBadge} from '@shared/components/AvatarBadge';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
+import {useFocusEffect} from '@react-navigation/native';
+import {useCountdown} from '@shell/components/home/useCountdown';
+import {logError} from '@shared/logging/logError';
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
@@ -62,6 +65,15 @@ export function SeasonBoardScreen() {
     : currentWeek - 1;
 
   const [activeTab, setActiveTab] = useState<'season' | 'week'>('season');
+
+  // Board-owned week lock time (MIN kickoff for the displayed week), fetched
+  // via get_week_lock_time so the HotPick-reveal trigger is phase-safe and
+  // always fresh — NOT nflStore.weekFirstKickoff (null in preseason) or
+  // picksDeadline (null in sim). isExpired flips true when the clock crosses it.
+  const [weekLockAt, setWeekLockAt] = useState<Date | null>(null);
+  const {isExpired} = useCountdown(weekLockAt);
+  const wasLockedRef = useRef(false);
+
   // Scroll-aware pinning: measureInWindow gives screen-space Y that
   // works reliably across nested ScrollViews. Compare the real row's
   // screen Y against the pinned row's screen Y to decide visibility.
@@ -161,6 +173,56 @@ export function SeasonBoardScreen() {
       supabase.removeChannel(channel);
     };
   }, [config, fetchLeaderboard, fetchWeekLeaderboard]);
+
+  // Board-owned lock time: fetch get_week_lock_time (MIN kickoff) for the
+  // current week, on mount and whenever the week changes. This is the same
+  // value the server RPC gates the HotPick reveal on, so client trigger and
+  // server gate open at the same instant by construction.
+  useEffect(() => {
+    if (!config) return;
+    let cancelled = false;
+    (async () => {
+      const {data, error} = await supabase.rpc('get_week_lock_time', {
+        p_competition: config.competition,
+        p_week: currentWeek,
+      });
+      if (error) {
+        logError(error, {
+          screen: 'SeasonBoard',
+          action: 'getWeekLockTime',
+          competition: config.competition,
+        });
+        return;
+      }
+      if (!cancelled) setWeekLockAt(data ? new Date(data) : null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [config, currentWeek]);
+
+  // Effect 4 — lock-time trigger: when the week's countdown crosses zero (first
+  // kickoff), re-fetch so the HotPick reveal appears without waiting for an
+  // incidental refetch. Guarded to a genuine false→true crossing with a real
+  // lock time (a null deadline also reports isExpired, hence the weekLockAt guard).
+  useEffect(() => {
+    if (!weekLockAt) return;
+    if (isExpired && !wasLockedRef.current) {
+      wasLockedRef.current = true;
+      fetchWeekLeaderboard();
+    }
+    if (!isExpired) wasLockedRef.current = false;
+  }, [isExpired, weekLockAt, fetchWeekLeaderboard]);
+
+  // Effect 5 — re-fetch when the Board regains focus (app foreground, tab
+  // return). Catches the common case: app backgrounded at kickoff, opened
+  // later; focus fires the fetch and the reveal is present. Effect 4 covers the
+  // app-open-through-lock case.
+  useFocusEffect(
+    useCallback(() => {
+      if (poolId && config) fetchWeekLeaderboard();
+    }, [poolId, config, fetchWeekLeaderboard]),
+  );
 
   // Re-check pinned visibility after tab switch or data change.
   useEffect(() => {
