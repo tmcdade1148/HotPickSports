@@ -870,12 +870,19 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
     // which means a plain .from('season_picks') call only returns the current user's
     // picks — other members' HotPick rows are silently filtered out. The RPC bypasses
     // RLS and returns every active member's hotpick pick for this week.
-    const {data: pickSubmissions} = await supabase
+    const {data: pickSubmissions, error: pickSubmissionsError} = await supabase
       .rpc('get_pool_pick_submissions', {
         p_pool_id: poolId,
         p_competition: config.competition,
         p_week: targetWeek,
       });
+    if (pickSubmissionsError) {
+      logError(pickSubmissionsError, {
+        screen: 'SeasonBoard',
+        action: 'fetchWeekLeaderboard.pickSubmissions',
+        competition: config.competition,
+      });
+    }
 
     // Step 4: Fetch game details for all HotPick games from the RPC results
     const hotPickGameIds = [
