@@ -79,8 +79,14 @@ export async function runPostAuthFlow({
     return;
   }
 
-  // Step 7: Load pools and restore selection
-  await store.fetchUserPools(user.id, defaultEvent.competition);
+  // Step 7: Load pools and restore selection.
+  // activeSport may have been force-landed onto a tester's sandbox (nfl_2025_sim)
+  // inside fetchProfile, AFTER the `store` snapshot was captured — so re-read
+  // getState() fresh; the captured `store.activeSport` is stale. Mirrors
+  // LoadingScreen.tsx:137.
+  const resolvedCompetition =
+    useGlobalStore.getState().activeSport?.competition ?? defaultEvent.competition;
+  await store.fetchUserPools(user.id, resolvedCompetition);
   const pools = useGlobalStore.getState().userPools;
 
   if (pools.length > 0) {
@@ -88,10 +94,10 @@ export async function runPostAuthFlow({
     let activeId: string | null = null;
     try {
       defaultId = await AsyncStorage.getItem(
-        `hotpick_default_pool_${defaultEvent.competition}`,
+        `hotpick_default_pool_${resolvedCompetition}`,
       );
       activeId = await AsyncStorage.getItem(
-        `hotpick_active_pool_${defaultEvent.competition}`,
+        `hotpick_active_pool_${resolvedCompetition}`,
       );
     } catch {
       // proceed with fallbacks

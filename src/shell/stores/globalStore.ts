@@ -2,6 +2,7 @@ import {create} from 'zustand';
 import type {DbPool} from '@shared/types/database';
 import type {BrandConfig} from '@shell/theme/types';
 import {supabase} from '@shared/config/supabase';
+import {logError} from '@shared/logging/logError';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {getEventsByPriority, getEventByCompetition} from '@sports/registry';
 import {deactivateDeviceTokens} from '@shell/services/pushNotifications';
@@ -240,12 +241,19 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   fetchUserPools: async (userId, competition) => {
     set({isLoadingPools: true});
     // Join pools with pool_members to get pools this user belongs to
-    const {data} = await supabase
+    const {data, error} = await supabase
       .from('pool_members')
       .select('pool_id, role, invite_code_used, pools!inner(*)')
       .eq('user_id', userId)
       .eq('pools.competition', competition)
       .eq('status', 'active');
+    if (error) {
+      logError(error, {
+        screen: 'globalStore',
+        action: 'fetchUserPools.members',
+        competition,
+      });
+    }
 
     const pools: DbPool[] =
       data?.map((row: any) => row.pools as DbPool) ?? [];
@@ -267,13 +275,20 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     // never open in PoolSettings to manage the public designation. Owner role
     // 'organizer' so the management surface renders.
     const seen = new Set(pools.map(p => p.id));
-    const {data: ownedData} = await supabase
+    const {data: ownedData, error: ownedError} = await supabase
       .from('pools')
       .select('*')
       .eq('organizer_id', userId)
       .eq('competition', competition)
       .eq('is_archived', false)
       .is('deleted_at', null);
+    if (ownedError) {
+      logError(ownedError, {
+        screen: 'globalStore',
+        action: 'fetchUserPools.owned',
+        competition,
+      });
+    }
     for (const owned of (ownedData ?? []) as DbPool[]) {
       if (seen.has(owned.id)) continue;
       seen.add(owned.id);
