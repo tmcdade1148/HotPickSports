@@ -4,6 +4,9 @@
 // returned (passed in via `slate`) against the week's game list (`games`).
 // The RPC is the sole gate — this component never re-computes privacy or lock
 // state. `isNonPrivate` is used ONLY to choose empty-state copy.
+// Slice 3 — each picked team is colored by the server's is_correct
+// (win/loss/pending) with a ✓/✗ mark for decided picks. Result is READ from
+// the server, never derived from scores/winner_team.
 
 import React from 'react';
 import {View, ActivityIndicator, StyleSheet} from 'react-native';
@@ -16,6 +19,10 @@ export interface PlayerSlatePick {
   game_id: string;
   picked_team: string;
   is_hotpick: boolean;
+  /** Server-computed result (season_picks.is_correct): true=win, false=loss,
+   *  null=pending (game not yet scored). READ only — the client never derives
+   *  win/loss from scores/winner_team. */
+  is_correct: boolean | null;
 }
 
 export interface PlayerSlateState {
@@ -91,30 +98,46 @@ export function PlayerSlateAccordion({games, slate, isNonPrivate}: Props) {
         const away = g.away_team ?? '';
         const home = g.home_team ?? '';
         const picked = pick?.picked_team;
+        // Result color straight from the server's is_correct — win/loss/pending.
+        // Never derived from scores/winner_team.
+        const resultColor =
+          pick?.is_correct === true
+            ? colors.success
+            : pick?.is_correct === false
+            ? colors.error
+            : colors.textSecondary; // pending: picked, not yet scored
         return (
           <View key={g.game_id} style={styles.gameRow}>
             <View style={styles.matchup}>
               {picked === away ? (
-                <View style={styles.pickedBox}>
-                  <Text style={styles.pickedText}>{away}</Text>
+                <View style={[styles.pickedBox, {borderColor: resultColor}]}>
+                  <Text style={[styles.pickedText, {color: resultColor}]}>
+                    {away}
+                  </Text>
                 </View>
               ) : (
                 <Text style={styles.teamText}>{away}</Text>
               )}
               <Text style={styles.atText}>@</Text>
               {picked === home ? (
-                <View style={styles.pickedBox}>
-                  <Text style={styles.pickedText}>{home}</Text>
+                <View style={[styles.pickedBox, {borderColor: resultColor}]}>
+                  <Text style={[styles.pickedText, {color: resultColor}]}>
+                    {home}
+                  </Text>
                 </View>
               ) : (
                 <Text style={styles.teamText}>{home}</Text>
               )}
             </View>
-            {pick?.is_hotpick ? (
-              <Text style={styles.hotFlag}>{'🔥'} HotPick</Text>
-            ) : !pick ? (
-              <Text style={styles.noPick}>No Pick</Text>
-            ) : null}
+            <View style={styles.rightCol}>
+              {pick?.is_hotpick ? <Text style={styles.hotFlag}>{'🔥'}</Text> : null}
+              {pick?.is_correct === true ? (
+                <Text style={styles.markWin}>{'✓'}</Text>
+              ) : pick?.is_correct === false ? (
+                <Text style={styles.markLoss}>{'✗'}</Text>
+              ) : null}
+              {!pick ? <Text style={styles.noPick}>No Pick</Text> : null}
+            </View>
           </View>
         );
       })}
@@ -155,6 +178,9 @@ const createStyles = (colors: any) =>
     },
     pickedText: {fontSize: 12, fontWeight: '700', color: colors.accentTeal},
     hotFlag: {fontSize: 11, fontWeight: '700', color: colors.primary},
+    rightCol: {flexDirection: 'row', alignItems: 'center', gap: 4},
+    markWin: {fontSize: 13, fontWeight: '800', color: colors.success},
+    markLoss: {fontSize: 13, fontWeight: '800', color: colors.error},
     noPick: {fontSize: 11, fontStyle: 'italic', color: colors.textSecondary},
     muted: {
       fontSize: 13,
