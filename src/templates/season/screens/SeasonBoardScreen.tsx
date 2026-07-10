@@ -20,6 +20,9 @@ import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useFocusEffect} from '@react-navigation/native';
 import {useCountdown} from '@shell/components/home/useCountdown';
 import {logError} from '@shared/logging/logError';
+import {useGlobalStore} from '@shell/stores/globalStore';
+import {PlayerSlateAccordion} from '../components/PlayerSlateAccordion';
+import type {PlayerSlateState} from '../components/PlayerSlateAccordion';
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
@@ -53,7 +56,21 @@ export function SeasonBoardScreen() {
   const isLoading = useSeasonStore(s => s.isLoading);
   const fetchLeaderboard = useSeasonStore(s => s.fetchLeaderboard);
   const fetchWeekLeaderboard = useSeasonStore(s => s.fetchWeekLeaderboard);
+  const allWeekGames = useSeasonStore(s => s.allWeekGames);
+  const fetchWeekGames = useSeasonStore(s => s.fetchWeekGames);
   const {user} = useAuth();
+
+  // Pool privacy flags (globalStore) — used ONLY to choose the slate accordion's
+  // empty-state copy, never to gate tappability. get_player_week_picks is the
+  // sole gate; the client just reacts to what it returns. Getting these wrong
+  // only mis-picks a string — it can't leak data or break interaction.
+  const activePool = useGlobalStore(s => s.userPools.find(p => p.id === poolId));
+  const isNonPrivate =
+    !!activePool &&
+    (activePool.is_public ||
+      activePool.is_global ||
+      activePool.is_designated_public ||
+      activePool.owning_club_id != null);
 
   const pathBackNarrative = useNFLStore(s => s.pathBackNarrative);
   const weekState = useNFLStore(s => s.weekState);
@@ -73,6 +90,11 @@ export function SeasonBoardScreen() {
   const [weekLockAt, setWeekLockAt] = useState<Date | null>(null);
   const {isExpired} = useCountdown(weekLockAt);
   const wasLockedRef = useRef(false);
+
+  // Slice 2 — inline full-slate accordion. One-open-at-a-time (expandedUserId);
+  // slates caches the RPC result per `${userId}:${week}` so re-expand is instant.
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [slates, setSlates] = useState<Record<string, PlayerSlateState>>({});
 
   // Scroll-aware pinning: measureInWindow gives screen-space Y that
   // works reliably across nested ScrollViews. Compare the real row's
@@ -224,6 +246,12 @@ export function SeasonBoardScreen() {
     }, [poolId, config, fetchWeekLeaderboard]),
   );
 
+  // Collapse any open slate when the displayed week changes, so an expanded row
+  // never points at a week whose games/slate aren't loaded (perpetual spinner).
+  useEffect(() => {
+    setExpandedUserId(null);
+  }, [displayedWeek]);
+
   // Re-check pinned visibility after tab switch or data change.
   useEffect(() => {
     updatePinned();
@@ -343,15 +371,67 @@ export function SeasonBoardScreen() {
     );
   };
 
+  // Fetch the week's games and the member's slate together on ONE captured week
+  // value so they can never diverge. Matches the hardened .rpc error pattern.
+  const loadSlate = async (targetUserId: string, week: number, key: string) => {
+    if (!config || !poolId) return;
+    const [, picksResult] = await Promise.all([
+      fetchWeekGames(week),
+      supabase.rpc('get_player_week_picks', {
+        p_pool_id: poolId,
+        p_competition: config.competition,
+        p_week: week,
+        p_target_user_id: targetUserId,
+      }),
+    ]);
+    const {data, error} = picksResult;
+    if (error) {
+      logError(error, {
+        screen: 'SeasonBoard',
+        action: 'getPlayerWeekPicks',
+        competition: config.competition,
+      });
+      setSlates(prev => ({...prev, [key]: {status: 'error', picks: []}}));
+      return;
+    }
+    setSlates(prev => ({
+      ...prev,
+      [key]: {status: 'ready', picks: (data ?? []) as PlayerSlateState['picks']},
+    }));
+  };
+
+  const toggleExpand = (targetUserId: string) => {
+    if (expandedUserId === targetUserId) {
+      setExpandedUserId(null);
+      return;
+    }
+    setExpandedUserId(targetUserId);
+    const week = displayedWeek;
+    const key = `${targetUserId}:${week}`;
+    // Lazy; cache SUCCESSES (and in-flight) only. An 'error' entry falls through
+    // and re-fetches on reopen, so a failed slate isn't stuck.
+    const cached = slates[key];
+    if (cached && (cached.status === 'ready' || cached.status === 'loading')) return;
+    setSlates(prev => ({...prev, [key]: {status: 'loading', picks: []}}));
+    void loadSlate(targetUserId, week, key);
+  };
+
   const renderWeekRow = ({item, index}: {item: WeekLeaderboardEntry; index: number}) => {
     const isMe = item.user_id === user?.id;
     const rank = index + 1;
+    const isExpanded = expandedUserId === item.user_id && !isMe;
+    const weekGames = allWeekGames[displayedWeek] ?? [];
+    const slateKey = `${item.user_id}:${displayedWeek}`;
 
     return (
-      <View
-        key={item.user_id}
-        style={[styles.row, isMe && styles.rowHighlight]}
-        ref={isMe ? myWeekRowRef : undefined}>
+      <View key={item.user_id}>
+        <TouchableOpacity
+          activeOpacity={isMe ? 1 : 0.7}
+          onPress={isMe ? undefined : () => toggleExpand(item.user_id)}
+          disabled={isMe}>
+          <View
+            style={[styles.row, isMe && styles.rowHighlight]}
+            ref={isMe ? myWeekRowRef : undefined}>
         <Text style={[styles.rank, isMe && styles.textHighlight]}>{rank}</Text>
         <AvatarBadge avatarKey={userAvatars[item.user_id]} name={userNames[item.user_id] ?? 'P'} size={24} />
         <View style={styles.userInfo}>
@@ -404,6 +484,15 @@ export function SeasonBoardScreen() {
         <Text style={[styles.totalPoints, isMe && styles.textHighlight]}>
           {item.week_points} pts
         </Text>
+          </View>
+        </TouchableOpacity>
+        {isExpanded && (
+          <PlayerSlateAccordion
+            games={weekGames}
+            slate={slates[slateKey]}
+            isNonPrivate={isNonPrivate}
+          />
+        )}
       </View>
     );
   };
