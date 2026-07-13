@@ -16,7 +16,7 @@ Do not default to worldCup2026 or any other event.
 
 ---
 
-## 24 Hard Rules
+## 26 Hard Rules
 
 These are non-negotiable. If a task requires violating one, stop and ask.
 
@@ -45,6 +45,7 @@ These are non-negotiable. If a task requires violating one, stop and ask.
 23. **Partner brand config is copied to pool at creation** — rendering never depends on a live join to `partners`. Pools are self-contained. Snapshot stays fresh via the `partners_propagate_brand` AFTER UPDATE trigger — partner edits cascade to `pools.brand_config` + `pool_partner_affiliations.brand_config_snapshot` server-side. Don't refresh client-side; the read path stays self-contained.
 24. **Partners attract pools to their roster, not the other way around** — `pools.partner_id` is set by the pool's organizer via `PartnerDirectoryScreen`, never by super-admin push. A partner's board lives in **`partner_members`** (one **Chairman** + **Directors**), **independent of any Club Pool** — so sponsor-only partners have admins too. HotPick staff seed the Chairman by email in `PartnerAdminScreen`; the Chairman adds Directors. Chairman + Directors manage perk + broadcasts via **League Tools** (`ClubAdminScreen`); `_caller_can_manage_partner` and `send-partner-broadcast` gate on `partner_members`. Each partner still has at most one Club Pool (`partners.club_pool_id`); if present it's just a Contest the board also runs — it is **no longer** what defines the Partner Admin. (Pool-level delegation — Gaffer / Assistant Gaffer via `pool_members` — is unchanged.)
 25. **Club brand colors render only on Official Club Contest cards on the Home stack.** Settings, admin, shell surfaces, partner tiles in YOUR CLUBS, Affiliated Contest cards, Independent Contest cards — all stay HotPick-themed. Partner tiles in YOUR CLUBS surface Club identity via name + logo, not Club colors. `useTheme()` and `useBrand()` always return HotPick defaults; only PoolModule's Official-Contest branded band reads `pool.brand_config` directly.
+26. **No member-data export exists or may be added anywhere in the app, product-wide** — no CSV, no roster download, no bulk export of member/roster data, in any UI or via any endpoint/RPC. Rationale: a member-data export is a portable money-ledger scaffold *and* a bulk export of other members' personal data — both a money-posture and privacy risk (locked, June 23 Money Posture spec). This does **not** affect the individual "your own data" request path (Privacy Policy §8.4, handled via privacy@hotpicksports.com) — that is a separate legal right and stays.
 
 ---
 
@@ -70,6 +71,7 @@ If you find yourself writing any of the following, stop and revise.
 - `INSERT INTO user_hardware` without `ON CONFLICT DO NOTHING` → duplicates are permanent
 - **Reading partner identity (name/logo/colors) from `pool.brand_config` in a partner-centric component** → wrong partner in multi-affiliate cases. `pool.brand_config` is the *lead/primary* partner's snapshot. Partner-centric surfaces (PartnerModule, partner tiles, partner detail screens) read live from `partnersById[partnerId]`. Pool-centric surfaces (Contest card) read the snapshot per Hard Rule #23.
 - **Test accounts are excluded from every aggregate, statistics, inference, or data-licensing query.** There is no `is_test` flag on `profiles` today; test accounts are identifiable only by (a) email pattern `tester_%@hotpicksports.com`, (b) the known mock cast, and (c) the super-admin id `7b4f41c8-008d-4319-98e7-8c80ec6edf69` (already excluded from standings/awards). When the aggregate/analytics/data-licensing work begins, add an `is_test` boolean to `profiles` and exclude it everywhere statistics are drawn.
+- **Any member-data export — CSV, roster download, or bulk member/roster dump, in any UI or via any endpoint/RPC** → prohibited product-wide; none exists and none may be added (Hard Rule #26; locked, June 23 Money Posture spec). A member/roster export is a portable money-ledger scaffold *and* a bulk export of other members' PII. This does not touch the individual "your own data" request path (Privacy Policy §8.4, via privacy@hotpicksports.com) — a separate legal right that stays.
 
 ### SmackTalk & Messaging
 - `DELETE FROM smack_messages` without prior INSERT to archive → data is never deleted, only archived

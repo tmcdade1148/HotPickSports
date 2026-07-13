@@ -10,12 +10,11 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Share,
   StyleSheet,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation, useRoute} from '@react-navigation/native';
-import {ChevronLeft, Shield, Crown, UserMinus, StickyNote, X, Download} from 'lucide-react-native';
+import {ChevronLeft, Shield, Crown, UserMinus, StickyNote, X} from 'lucide-react-native';
 import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {useAuth} from '@shared/hooks/useAuth';
@@ -34,40 +33,6 @@ type MemberWithProfile = DbPoolMember & {profile?: DbProfile};
 // pool per app session — this module-level set survives remounts within a
 // session and resets on app restart.
 const seenMemberCapWall = new Set<string>();
-
-// RFC 4180-ish CSV cell escaping: wrap in quotes if the cell contains
-// a comma, quote, or newline; double any internal quotes.
-function csvEscape(value: string): string {
-  if (/[",\n\r]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
-}
-
-function formatCsv(rows: Array<{
-  poolie_name: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  joined_at: string;
-  role: string;
-  note: string;
-}>): string {
-  const header = ['Player Name', 'Legal First', 'Legal Last', 'Email', 'Joined', 'Role', 'Notes'];
-  const lines = [header.map(csvEscape).join(',')];
-  for (const r of rows) {
-    lines.push([
-      csvEscape(r.poolie_name),
-      csvEscape(r.first_name),
-      csvEscape(r.last_name),
-      csvEscape(r.email),
-      csvEscape(new Date(r.joined_at).toISOString().slice(0, 10)),
-      csvEscape(r.role),
-      csvEscape(r.note),
-    ].join(','));
-  }
-  return lines.join('\n');
-}
 
 export function PoolMembersScreen() {
   const {colors} = useTheme();
@@ -151,59 +116,6 @@ export function PoolMembersScreen() {
   const closeNoteEditor = () => {
     setEditingMember(null);
     setEditNoteText('');
-  };
-
-  // CSV export — managers only. Server-side RPC handles auth + audit
-  // log, returns rows as JSON; client formats CSV and shares as text
-  // (no file-share dep). Users paste into Sheets / Numbers / Mail.
-  const [exporting, setExporting] = useState(false);
-  const handleExportCsv = async () => {
-    if (!canManage) return;
-    Alert.alert(
-      `Export ${poolMembers.length} members?`,
-      "The export includes each Player's name, email, join date, role, and any private notes you've added. Don't share this file publicly — emails are PII.",
-      [
-        {text: 'Cancel', style: 'cancel'},
-        {
-          text: 'Export',
-          onPress: async () => {
-            setExporting(true);
-            const {data, error} = await supabase.rpc('export_pool_members', {
-              p_pool_id: poolId,
-            });
-            setExporting(false);
-            if (error) {
-              Alert.alert('Export failed', error.message);
-              return;
-            }
-            const result = data as
-              | {ok: true; pool_name: string; rows: Array<{
-                  poolie_name: string;
-                  first_name: string;
-                  last_name: string;
-                  email: string;
-                  joined_at: string;
-                  role: string;
-                  note: string;
-                }>}
-              | {error: string};
-            if ('error' in result) {
-              Alert.alert('Export failed', result.error);
-              return;
-            }
-            const csv = formatCsv(result.rows);
-            try {
-              await Share.share({
-                title: `${result.pool_name} — Member Export`,
-                message: csv,
-              });
-            } catch {
-              // User canceled — non-error
-            }
-          },
-        },
-      ],
-    );
   };
 
   const handleSaveNote = async () => {
@@ -460,21 +372,6 @@ export function PoolMembersScreen() {
         <View style={styles.countBadge}>
           <Text style={styles.countText}>{poolMembers.length}</Text>
         </View>
-        {canManage && (
-          <TouchableOpacity
-            onPress={handleExportCsv}
-            disabled={exporting}
-            hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
-            style={styles.exportBtn}
-            accessibilityRole="button"
-            accessibilityLabel="Export members as CSV">
-            {exporting ? (
-              <ActivityIndicator size="small" color={colors.primary} />
-            ) : (
-              <Download size={20} color={colors.primary} />
-            )}
-          </TouchableOpacity>
-        )}
       </View>
 
       {isLoadingMembers ? (
@@ -643,10 +540,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     paddingVertical: 2,
     minWidth: 28,
     alignItems: 'center',
-  },
-  exportBtn: {
-    marginLeft: 'auto',
-    padding: spacing.xs,
   },
   countText: {
     fontSize: 13,
