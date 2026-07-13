@@ -31,6 +31,12 @@ interface SeasonMatchCardProps {
    */
   picksAreOpen?: boolean;
   /**
+   * Whether the WHOLE WEEK has locked (now >= MIN(kickoff_at)), matching the
+   * server's enforce_pick_lock. Computed once via the shared weekLock helper and
+   * passed in; when true every card in the week is read-only. Defaults false.
+   */
+  weekLocked?: boolean;
+  /**
    * True once the user has designated a HotPick for the week. When set, the
    * rank badge on every card that ISN'T the chosen HotPick is dimmed, so the
    * one chosen HotPick stands out.
@@ -67,7 +73,6 @@ interface TeamRowProps {
   isLocked: boolean;
   isFinal: boolean;
   isLive: boolean;
-  lockAtPassed: boolean;
   onPress: () => void;
 }
 
@@ -79,7 +84,6 @@ function TeamRow({
   isLocked,
   isFinal,
   isLive,
-  lockAtPassed,
   onPress,
 }: TeamRowProps) {
   const {colors} = useTheme();
@@ -95,8 +99,8 @@ function TeamRow({
     if (isFinal || isLive) return;
 
     Alert.alert(
-      'Game Locked',
-      'This game has already kicked off, so its pick is locked. Other games stay editable until each one kicks off individually.',
+      'Picks Locked',
+      'Picks lock for the whole week once the first game kicks off, so this week is now read-only.',
       [{text: 'Got it'}],
     );
   };
@@ -141,6 +145,7 @@ export function SeasonMatchCard({
   userId,
   pickSplit,
   picksAreOpen = true,
+  weekLocked = false,
   hotPickSelected = false,
 }: SeasonMatchCardProps) {
   const {colors} = useTheme();
@@ -161,13 +166,13 @@ export function SeasonMatchCard({
     status === 'FINAL' || status === 'STATUS_FINAL' || status === 'COMPLETED';
   const isLive = status === 'IN_PROGRESS' || status === 'LIVE';
   const kickoffDate = new Date(game.kickoff_at);
-  // Per-game locking: each game locks at its OWN kickoff, never before. lock_at
-  // is set to the game's kickoff by nfl-open-picks and enforced server-side by
-  // the enforce_pick_lock trigger; the client mirrors that authoritative value
-  // here. (A live/final status also locks, covering any game whose status has
-  // updated even if lock_at somehow wasn't written.)
-  const lockAtPassed = !!game.lock_at && new Date(game.lock_at).getTime() <= Date.now();
-  const isLocked = !picksAreOpen || isFinal || isLive || lockAtPassed;
+  // Whole-week locking (slice 1): the entire week is read-only once its FIRST
+  // kickoff passes (now >= MIN(kickoff_at)), matching the server's
+  // enforce_pick_lock trigger — NOT per-game. `weekLocked` carries that single
+  // shared value (see utils/weekLock). isFinal/isLive stay as belt-and-suspenders
+  // for realtime status flips. The old per-game `lock_at` term was slice-1
+  // obsolete (the server no longer locks per game) and is removed.
+  const isLocked = !picksAreOpen || weekLocked || isFinal || isLive;
   const rank = game.frozen_rank ?? game.rank ?? 0;
 
   // Flame is tappable if this game has a pick and isn't already the hotpick
@@ -275,7 +280,6 @@ export function SeasonMatchCard({
                 isLocked={isLocked}
                 isFinal={isFinal}
                 isLive={isLive}
-                lockAtPassed={lockAtPassed}
                 onPress={() => selectTeam(game.away_team)}
               />
               <TeamRow
@@ -286,7 +290,6 @@ export function SeasonMatchCard({
                 isLocked={isLocked}
                 isFinal={isFinal}
                 isLive={isLive}
-                lockAtPassed={lockAtPassed}
                 onPress={() => selectTeam(game.home_team)}
               />
             </View>

@@ -6,6 +6,7 @@ import {BarChart3} from 'lucide-react-native';
 import {useSeasonStore} from '../stores/seasonStore';
 import {WeekSelector} from '../components/WeekSelector';
 import {SeasonMatchCard} from '../components/SeasonMatchCard';
+import {isWeekLocked} from '../utils/weekLock';
 import {PicksProgressHeader} from '../components/PicksProgressHeader';
 import {SubmitPicksFooter} from '../components/SubmitPicksFooter';
 import {useAuth} from '@shared/hooks/useAuth';
@@ -314,6 +315,12 @@ export function SeasonPicksScreen() {
   const picksAreOpen =
     (weekState === 'picks_open' || weekState === 'live') && currentWeek === dbCurrentWeek;
 
+  // Whole-week lock (matches the server's enforce_pick_lock): read-only once the
+  // week's first kickoff passes. Single shared source — the card, the section
+  // grouping below, and the submit footer all read this, never their own MIN.
+  // picksAreOpen keeps its phase meaning; weekLocked is a separate fact.
+  const weekLocked = isWeekLocked(games);
+
   // Started games (or the whole week locked) rise to the top, grouped into
   // kickoff-time WAVES — one section per kickoff time, labelled with that time
   // (e.g. "SUN 1:00 PM"), newest wave first. So as the week plays out each new
@@ -325,7 +332,7 @@ export function SeasonPicksScreen() {
     const started: DbSeasonGame[] = [];
     const open: DbSeasonGame[] = [];
     for (const g of games) {
-      (!picksAreOpen || hasStarted(g) ? started : open).push(g);
+      (!picksAreOpen || weekLocked || hasStarted(g) ? started : open).push(g);
     }
     const byRank = (a: DbSeasonGame, b: DbSeasonGame) => effectiveRank(a) - effectiveRank(b);
 
@@ -356,7 +363,7 @@ export function SeasonPicksScreen() {
       out.push({title: 'OPEN', data: open});
     }
     return out;
-  }, [games, picksAreOpen]);
+  }, [games, picksAreOpen, weekLocked]);
 
   if (!config) {
     return (
@@ -391,6 +398,7 @@ export function SeasonPicksScreen() {
         userId={user?.id ?? ''}
         pickSplit={pickStats[item.game_id] ?? null}
         picksAreOpen={picksAreOpen}
+        weekLocked={weekLocked}
         hotPickSelected={hotPickCount > 0}
       />
     </View>

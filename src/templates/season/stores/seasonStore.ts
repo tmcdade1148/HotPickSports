@@ -379,7 +379,7 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       // tapped again (closes the stale-state gap before realtime catches up).
       if (/picks are locked/i.test(error.message ?? '')) {
         console.warn('[savePick] game locked before save:', error.message);
-        set({weekPicks: prevWeekPicks, saveError: "That game just locked — your pick wasn't saved."});
+        set({weekPicks: prevWeekPicks, saveError: 'Picks are locked for the week.'});
         get().fetchWeekGames(currentWeek, true);
       } else {
         console.error('[savePick] ERROR:', error.message, error.details, error.hint, JSON.stringify(error));

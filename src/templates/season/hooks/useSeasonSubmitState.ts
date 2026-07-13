@@ -8,6 +8,7 @@
 import {useCallback, useState} from 'react';
 import {Alert} from 'react-native';
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
+import {isWeekLocked} from '@templates/season/utils/weekLock';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {supabase} from '@shared/config/supabase';
@@ -67,7 +68,12 @@ export function useSeasonSubmitState(): SeasonSubmitState {
   // allGamesLocked still covers the case where every game has kicked off.
   const picksWindowOpen =
     (weekState === 'picks_open' || weekState === 'live') && viewedWeek === currentWeek;
-  const fullyLocked = !picksWindowOpen || allGamesLocked;
+  // Whole-week lock (matches server enforce_pick_lock) — the SAME shared value
+  // the cards use. Required: locking the cards but not the footer would leave a
+  // "Select your HotPick" prompt with every flame locked. It fires at the week's
+  // first kickoff (before allGamesLocked, which needs every game locked).
+  const weekLocked = isWeekLocked(games);
+  const fullyLocked = !picksWindowOpen || weekLocked || allGamesLocked;
 
   const state: PicksSubmitState = (() => {
     if (fullyLocked) return 'locked';
