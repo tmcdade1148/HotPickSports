@@ -23,6 +23,7 @@ import {logError} from '@shared/logging/logError';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {PlayerSlateAccordion} from '../components/PlayerSlateAccordion';
 import type {PlayerSlateState} from '../components/PlayerSlateAccordion';
+import {LEXICON} from '@shared/lexicon';
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
@@ -75,8 +76,11 @@ export function SeasonBoardScreen() {
   const pathBackNarrative = useNFLStore(s => s.pathBackNarrative);
   const weekState = useNFLStore(s => s.weekState);
 
-  // Last finalized week: if current week is settling/complete, it's this week.
-  // Otherwise it's the previous week (current week is still in play).
+  // Last FINALIZED week (settling/complete → this week, else the previous one).
+  // This is the honest denominator for the Season tab's "Points thru Week N":
+  // during a 'live' week displayedWeek is already N, but the week isn't done —
+  // lastFinalizedWeek stays N-1 there, so the label never claims a week that's
+  // still in progress is complete.
   const lastFinalizedWeek = (weekState === 'settling' || weekState === 'complete')
     ? currentWeek
     : currentWeek - 1;
@@ -88,7 +92,17 @@ export function SeasonBoardScreen() {
   // always fresh — NOT nflStore.weekFirstKickoff (null in preseason) or
   // picksDeadline (null in sim). isExpired flips true when the clock crosses it.
   const [weekLockAt, setWeekLockAt] = useState<Date | null>(null);
-  const {isExpired} = useCountdown(weekLockAt);
+  const {isExpired, unit, unitText} = useCountdown(weekLockAt);
+  // Slice 4 — persist-then-countdown. During the NEXT week's picks_open the
+  // ladder persists the prior week's reveal (displayedWeek === currentWeek - 1),
+  // and weekLockAt = get_week_lock_time(currentWeek) is the UPCOMING lock. When
+  // that countdown drops under an hour (useCountdown reports unit === 'minute',
+  // i.e. totalMinutes < 60), show a bold banner atop the reveal. The
+  // displayedWeek === currentWeek - 1 gate keeps "week displayed" and "week we
+  // count down to" adjacent; a null weekLockAt (post-Super-Bowl / no next week)
+  // reports isExpired, so no banner. Reuses slice 1's useCountdown tick.
+  const showLockCountdown =
+    displayedWeek === currentWeek - 1 && !isExpired && unit === 'minute';
   const wasLockedRef = useRef(false);
 
   // Slice 2 — inline full-slate accordion. One-open-at-a-time (expandedUserId);
@@ -514,7 +528,7 @@ export function SeasonBoardScreen() {
               styles.toggleText,
               activeTab === 'season' && styles.toggleTextActive,
             ]}>
-              Season{lastFinalizedWeek > 0 ? ` - Wk${lastFinalizedWeek}` : ''}
+              Points thru Week {lastFinalizedWeek}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -524,7 +538,7 @@ export function SeasonBoardScreen() {
               styles.toggleText,
               activeTab === 'week' && styles.toggleTextActive,
             ]}>
-              Week {displayedWeek}
+              Week {displayedWeek} Points
             </Text>
           </TouchableOpacity>
         </View>
@@ -582,6 +596,13 @@ export function SeasonBoardScreen() {
           {/* Week panel */}
           <View style={{width: SCREEN_WIDTH}}>
             <View style={styles.leaderboard}>
+              {showLockCountdown && (
+                <View style={styles.lockBanner}>
+                  <Text style={styles.lockBannerText}>
+                    {`WEEK ${currentWeek} ${LEXICON.picks.toUpperCase()} LOCK IN ${unitText.toUpperCase()}`}
+                  </Text>
+                </View>
+              )}
               {weekLeaderboard.length === 0 ? (
                 <View style={styles.emptyState}>
                   <Text style={styles.emptyText}>
@@ -667,6 +688,20 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   leaderboard: {
     padding: spacing.md,
+  },
+  lockBanner: {
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    alignItems: 'center',
+  },
+  lockBannerText: {
+    color: colors.onPrimary,
+    fontWeight: '800',
+    fontSize: 14,
+    letterSpacing: 0.5,
   },
   row: {
     flexDirection: 'row',
