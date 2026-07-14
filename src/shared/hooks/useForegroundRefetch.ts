@@ -49,6 +49,17 @@ export function useForegroundRefetch() {
         // No active session — nothing to refetch.
         if (!userId) return;
 
+        // Pool membership — silent (no spinner). This is also how an approved
+        // applicant's Contest appears without any poll: on the next foreground,
+        // their now-active membership is picked up here. Pre-existing gap fix —
+        // the pool list never refetched on foreground before.
+        if (activeSport?.competition) {
+          await useGlobalStore
+            .getState()
+            .fetchUserPools(userId, activeSport.competition, {silent: true})
+            .catch(() => {});
+        }
+
         // 1. NFL store — competition_config (week_state, picks_open, etc) and
         // live scores. Only when on a season-template competition. The handler
         // is already write-safe (gates derived state behind configLoaded).

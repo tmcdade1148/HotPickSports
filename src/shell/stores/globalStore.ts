@@ -238,8 +238,9 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     }
   },
 
-  fetchUserPools: async (userId, competition) => {
-    set({isLoadingPools: true});
+  fetchUserPools: async (userId, competition, options) => {
+    const silent = options?.silent === true;
+    if (!silent) set({isLoadingPools: true});
     // Join pools with pool_members to get pools this user belongs to
     const {data, error} = await supabase
       .from('pool_members')
@@ -312,7 +313,9 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       poolRoles: {...state.poolRoles, ...roles},
       manualGlobalJoins,
       poolsByCompetition: {...state.poolsByCompetition, [competition]: pools},
-      isLoadingPools: false,
+      // In silent mode never toggle the flag — leave whatever a concurrent
+      // initial load set, so a background refetch can't clear its spinner early.
+      isLoadingPools: silent ? state.isLoadingPools : false,
     }));
 
     // Fetch flagged counts for organizer/admin pools + recent broadcasts
@@ -423,6 +426,22 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
           (rawCode && friendlyJoinError[rawCode]) ??
           'Invalid invite code. Please check and try again.',
       };
+    }
+
+    // Gaffer Approval Gate (Stage 2): a fresh join now lands as a PENDING
+    // applicant, not an active member. Route to the waiting-room instead of
+    // dropping them into the pool — do NOT persist the selection, switch the
+    // active sport, set activePoolId, or refetch. (fetchUserPools filters
+    // status='active', so a pending pool wouldn't appear anyway; setting it
+    // active would strand activePoolId on a pool absent from the list.) The
+    // applicant sees an inline confirmation; the Message Center carries the
+    // standing "waiting on the Gaffer" entry, sourced from
+    // get_my_pending_applications. Backward-compatible: the old server never
+    // returns a 'status' key, so this branch is inert until the held
+    // join→pending migration lands — this client is safe to ship first (OTA).
+    if ((data as {status?: string}).status === 'pending') {
+      const pendingPool = data.pool as DbPool;
+      return {pending: true, poolName: pendingPool?.name};
     }
 
     const typedPool = data.pool as DbPool;

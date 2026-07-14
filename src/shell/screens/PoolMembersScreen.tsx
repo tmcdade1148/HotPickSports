@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation, useRoute} from '@react-navigation/native';
-import {ChevronLeft, Shield, Crown, UserMinus, StickyNote, X, Download} from 'lucide-react-native';
+import {ChevronLeft, Shield, Crown, UserMinus, StickyNote, X, Download, Check, Clock} from 'lucide-react-native';
 import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {useAuth} from '@shared/hooks/useAuth';
@@ -24,10 +24,26 @@ import {AvatarBadge} from '@shared/components/AvatarBadge';
 import {spacing, borderRadius} from '@shared/theme';
 import type {DbPoolMember, DbProfile} from '@shared/types/database';
 import {useTheme} from '@shell/theme';
-import {roleLabel} from '@shared/lexicon';
+import {roleLabel, LEXICON} from '@shared/lexicon';
 import {FoundingWall, usePaywallConfig, useFoundingGafferFlag} from '@shell/paywall';
 
 type MemberWithProfile = DbPoolMember & {profile?: DbProfile};
+
+// Gaffer Approval Gate — a pending applicant as returned by the organizer-gated
+// get_pending_applicants RPC. `contact` is the applicant's email and is the ONE
+// place it's exposed, to the Gaffer only. Never merged into the shared
+// poolMembers list.
+type PendingApplicant = {
+  user_id: string;
+  display_name: string;
+  real_name: string;
+  contact: string;
+  applied_at: string;
+};
+
+function applicantName(a: PendingApplicant): string {
+  return a.display_name || a.real_name || 'This applicant';
+}
 
 // Trigger A is Gaffer-side derived (no server write): the wall shows when a
 // Gaffer opens a Contest they run that's at/over its member cap. Shown once per
@@ -125,6 +141,103 @@ export function PoolMembersScreen() {
   const [actionMember, setActionMember] = useState<MemberWithProfile | null>(null);
   const [editNoteText, setEditNoteText] = useState('');
   const [savingNote, setSavingNote] = useState(false);
+
+  // --- Gaffer Approval Gate: pending applicants (Gaffer-only) ---
+  // Kept in local state, never in the shared poolMembers list, so applicant
+  // email (contact) is confined to this screen and only for the organizer. The
+  // RPC is itself organizer-gated; the isOrganizer guard mirrors it client-side
+  // so an Assistant Gaffer/admin never even issues the query.
+  const [pendingApplicants, setPendingApplicants] = useState<PendingApplicant[]>([]);
+  const [actioningId, setActioningId] = useState<string | null>(null);
+
+  const fetchPendingApplicants = useCallback(async () => {
+    if (!poolId || !isOrganizer) return;
+    const {data, error} = await supabase.rpc('get_pending_applicants', {
+      p_pool_id: poolId,
+    });
+    if (error) return;
+    const result = data as {
+      ok?: boolean;
+      applicants?: PendingApplicant[];
+      error?: string;
+    };
+    if (result?.ok && Array.isArray(result.applicants)) {
+      setPendingApplicants(result.applicants);
+    }
+  }, [poolId, isOrganizer]);
+
+  useEffect(() => {
+    fetchPendingApplicants();
+  }, [fetchPendingApplicants]);
+
+  const handleApprove = async (applicant: PendingApplicant) => {
+    setActioningId(applicant.user_id);
+    const {data, error} = await supabase.rpc('approve_pending_member', {
+      p_pool_id: poolId,
+      p_user_id: applicant.user_id,
+    });
+    setActioningId(null);
+    if (error) {
+      Alert.alert('Could not approve', error.message);
+      return;
+    }
+    const result = data as {ok?: boolean; error?: string; cap?: number};
+    if (result?.error === 'cap_exceeded') {
+      // Plain informative alert — NOT the FoundingWall. cap_exceeded means the
+      // approve was BLOCKED (founding season off); FoundingWall announces the
+      // opposite ("we let you through"), so it must never appear here.
+      Alert.alert(
+        'Contest is full',
+        `This Contest is at its limit of ${result.cap} ${LEXICON.player.plural}. ` +
+          `${applicantName(applicant)} stays pending until a spot opens.`,
+      );
+      return;
+    }
+    if (result?.error) {
+      Alert.alert('Could not approve', result.error);
+      return;
+    }
+    // Approved — drop from pending and refetch members so the new active
+    // member (and the header count) update.
+    setPendingApplicants(prev => prev.filter(a => a.user_id !== applicant.user_id));
+    fetchPoolMembers(poolId);
+  };
+
+  const handleReject = (applicant: PendingApplicant) => {
+    // Confirm — reject is silent to the applicant (their pending state simply
+    // ends). A mis-tap would strand them waiting forever, so gate it.
+    Alert.alert(
+      `Reject ${applicantName(applicant)}?`,
+      "They won't be added to this Contest. They can request to join again later.",
+      [
+        {text: 'Cancel', style: 'cancel'},
+        {
+          text: 'Reject',
+          style: 'destructive',
+          onPress: async () => {
+            setActioningId(applicant.user_id);
+            const {data, error} = await supabase.rpc('reject_pending_member', {
+              p_pool_id: poolId,
+              p_user_id: applicant.user_id,
+            });
+            setActioningId(null);
+            if (error) {
+              Alert.alert('Could not reject', error.message);
+              return;
+            }
+            const result = data as {ok?: boolean; error?: string};
+            if (result?.error) {
+              Alert.alert('Could not reject', result.error);
+              return;
+            }
+            setPendingApplicants(prev =>
+              prev.filter(a => a.user_id !== applicant.user_id),
+            );
+          },
+        },
+      ],
+    );
+  };
 
   const fetchNotes = useCallback(async () => {
     if (!poolId || !canManage) return;
@@ -447,6 +560,65 @@ export function PoolMembersScreen() {
     );
   };
 
+  // Gaffer-only pending-approval block, rendered ABOVE the members list. Regular
+  // players never see it (isOrganizer gate) and can't obtain contact info (the
+  // RPC that supplies it is organizer-gated).
+  const renderPendingBlock = () => {
+    if (!isOrganizer || pendingApplicants.length === 0) return null;
+    return (
+      <View style={styles.pendingSection}>
+        <View style={styles.pendingSectionHeader}>
+          <Clock size={15} color={colors.warning ?? colors.primary} />
+          <Text style={styles.pendingSectionTitle}>
+            Pending approval ({pendingApplicants.length})
+          </Text>
+        </View>
+        {pendingApplicants.map(applicant => {
+          const busy = actioningId === applicant.user_id;
+          return (
+            <View key={applicant.user_id} style={styles.pendingRow}>
+              <View style={styles.pendingInfo}>
+                <Text style={styles.pendingName} numberOfLines={1}>
+                  {applicantName(applicant)}
+                </Text>
+                {!!applicant.contact && (
+                  <Text style={styles.pendingContact} numberOfLines={1}>
+                    {applicant.contact}
+                  </Text>
+                )}
+              </View>
+              <View style={styles.pendingActions}>
+                <TouchableOpacity
+                  style={[styles.rejectBtn, busy && styles.pendingBtnDisabled]}
+                  onPress={() => handleReject(applicant)}
+                  disabled={busy}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Reject ${applicantName(applicant)}`}>
+                  <X size={18} color={colors.error} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.acceptBtn, busy && styles.pendingBtnDisabled]}
+                  onPress={() => handleApprove(applicant)}
+                  disabled={busy}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Accept ${applicantName(applicant)}`}>
+                  {busy ? (
+                    <ActivityIndicator size="small" color={colors.onPrimary} />
+                  ) : (
+                    <Check size={18} color={colors.onPrimary} />
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          );
+        })}
+        <Text style={styles.pendingHint}>
+          Approve to add them to this Contest. Contact is shown to you only.
+        </Text>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
@@ -491,6 +663,7 @@ export function PoolMembersScreen() {
           keyExtractor={item => item.user_id}
           renderItem={renderMember}
           contentContainerStyle={styles.list}
+          ListHeaderComponent={renderPendingBlock()}
           ListEmptyComponent={
             <View style={styles.empty}>
               <UserMinus size={32} color={colors.textSecondary} />
@@ -881,5 +1054,77 @@ const createStyles = (colors: any) => StyleSheet.create({
   emptyText: {
     fontSize: 14,
     color: colors.textSecondary,
+  },
+
+  // Gaffer Approval Gate — pending-approval block (Gaffer-only, above the list).
+  pendingSection: {
+    marginBottom: spacing.lg,
+  },
+  pendingSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: spacing.sm,
+  },
+  pendingSectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  pendingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: (colors.warning ?? colors.primary) + '40',
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  pendingInfo: {
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  pendingName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  pendingContact: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  pendingActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  rejectBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.error,
+  },
+  acceptBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+  },
+  pendingBtnDisabled: {
+    opacity: 0.5,
+  },
+  pendingHint: {
+    fontSize: 12,
+    color: colors.textTertiary,
+    fontStyle: 'italic',
   },
 });

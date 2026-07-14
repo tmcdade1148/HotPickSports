@@ -17,6 +17,7 @@ import {
 import {getDefaultEvent} from '@sports/registry';
 import {getDisplayName} from '@shared/utils/displayName';
 import {leagueWelcomeCopy} from '@shared/copy/leagueWelcome';
+import {applicationPendingMessage} from '@shared/lexicon';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 
@@ -43,6 +44,9 @@ export function PoolWelcomeScreen({navigation}: any) {
   const [joinedPool, setJoinedPool] = useState<{
     name: string;
   } | null>(null);
+  // Gaffer Approval Gate: Contest name when the join landed pending (applicant
+  // awaits the Gaffer). Distinct from joinedPool — they are NOT a member yet.
+  const [pendingContest, setPendingContest] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState('');
 
@@ -87,7 +91,9 @@ export function PoolWelcomeScreen({navigation}: any) {
     const result = await joinPool(user.id, code.trim());
     consumePendingInviteCode();
 
-    if (result.pool) {
+    if (result.pending) {
+      setPendingContest(result.poolName ?? 'the Contest');
+    } else if (result.pool) {
       setJoinedPool({name: result.pool.name});
     } else if (result.poolFull) {
       setJoinError('This Contest is full and cannot accept new members.');
@@ -129,7 +135,7 @@ export function PoolWelcomeScreen({navigation}: any) {
 
   // Deep-link joining, successful join, or a League manager being forwarded
   // to Home — show a loading/confirmation state instead of the player page.
-  if (hasDeepLinkInvite || joinedPool || joining || isLeagueManager) {
+  if (hasDeepLinkInvite || joinedPool || pendingContest || joining || isLeagueManager) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.content}>
@@ -172,6 +178,20 @@ export function PoolWelcomeScreen({navigation}: any) {
                 </Text>
               </View>
 
+              <TouchableOpacity
+                style={styles.primaryButton}
+                onPress={initializeAndNavigate}>
+                <Text style={styles.primaryButtonText}>Let's pick</Text>
+              </TouchableOpacity>
+            </>
+          ) : pendingContest ? (
+            <>
+              <Text style={styles.checkmark}>{'\u{23F3}'}</Text>
+              <Text style={styles.title}>Request sent</Text>
+              <Text style={styles.subtitle}>
+                {applicationPendingMessage(pendingContest)} In the meantime you're
+                already in the HotPick NFL 2026 Contest — start picking.
+              </Text>
               <TouchableOpacity
                 style={styles.primaryButton}
                 onPress={initializeAndNavigate}>
