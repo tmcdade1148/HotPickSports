@@ -14,6 +14,15 @@ import {supabase} from '@shared/config/supabase';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 import {FoundingWall} from '@shell/paywall';
+import {organizerMoneyAcknowledgment} from '@shared/lexicon';
+
+/**
+ * Organizer money-posture acknowledgment version. Bumped 1.0 → 2.0 for the
+ * counsel-approved v2.0 wording (June 23 Money Posture spec §6). Logged to
+ * organizer_acknowledgments on acceptance. Keep in lockstep with the
+ * organizerMoneyAcknowledgment copy in @shared/lexicon.
+ */
+const ORGANIZER_ACK_VERSION = '2.0';
 
 /**
  * CreatePoolScreen — Form to create a new pool for the active event.
@@ -46,7 +55,7 @@ export function CreatePoolScreen({navigation}: any) {
     // Log organizer acknowledgment
     await supabase.from('organizer_acknowledgments').insert({
       user_id: user.id,
-      version: '1.0',
+      version: ORGANIZER_ACK_VERSION,
     });
 
     const result = await createPool({
@@ -91,7 +100,7 @@ export function CreatePoolScreen({navigation}: any) {
 
     Alert.alert(
       'Before You Create Your Contest',
-      'HotPick Contests are for friendly competition only.\n\nCollecting money from participants — entry fees, prize pots, or any financial arrangement — is prohibited by our Terms of Service and may result in account termination.',
+      organizerMoneyAcknowledgment,
       [
         {text: 'Cancel', style: 'cancel'},
         {text: 'I Understand. Create My Contest', onPress: doCreate},
