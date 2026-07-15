@@ -202,6 +202,15 @@ export const scoringNeverNegative =
   'Regular picks never cost you points — only your HotPick can swing negative.';
 
 /**
+ * Email-confirmation hold (email/password signup). With "Confirm email" on,
+ * signUp returns a user but a NULL session until the address is confirmed via
+ * the emailed link — so we stop here instead of entering onboarding without a
+ * JWT. Shown on the EmailEntry screen after a pending-confirmation signUp.
+ */
+export const confirmEmailMessage =
+  'Almost in. Confirm your email with the link we sent, then sign in.';
+
+/**
  * Organizer money-posture acknowledgment (v2.0). Counsel-approved verbatim
  * wording — June 23 Money Posture spec §6. Do NOT paraphrase. Shown in the
  * unskippable native Alert before a Contest is created; acceptance logs to

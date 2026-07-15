@@ -14,6 +14,7 @@ import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 import {PasswordInput} from '@shared/components/PasswordInput';
 import {runPostAuthFlow} from '@shell/services/postAuthFlow';
+import {confirmEmailMessage} from '@shared/lexicon';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
@@ -36,6 +37,7 @@ export function EmailEntryScreen({navigation, route}: any) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
 
   const isValidEmail = EMAIL_REGEX.test(email.trim());
   const isValidPassword = password.length >= MIN_PASSWORD_LENGTH;
@@ -48,6 +50,7 @@ export function EmailEntryScreen({navigation, route}: any) {
 
   const clearError = () => {
     if (error) setError('');
+    if (notice) setNotice('');
   };
 
   const handleSubmit = async () => {
@@ -102,9 +105,22 @@ export function EmailEntryScreen({navigation, route}: any) {
         return;
       }
 
-      if (data.user) {
+      // Only enter onboarding with a real session. With email confirmation on,
+      // signUp returns a user but a NULL session until the address is confirmed
+      // via the emailed link. Running postAuthFlow now would strand the user on
+      // the TOS gate with no JWT, so rpc_accept_tos (and auto_enroll_global_pools)
+      // execute as `anon` and are denied. This also covers the existing-account
+      // case, where Supabase returns an obfuscated user + null session — showing
+      // the same notice avoids email enumeration.
+      if (data.session && data.user) {
         await runPostAuthFlow({user: data.user, navigation});
+        return;
       }
+
+      setNotice(confirmEmailMessage);
+      setMode('sign_in');
+      setPassword('');
+      setConfirmPassword('');
     } else {
       const {data, error: signInError} =
         await supabase.auth.signInWithPassword({
@@ -132,6 +148,7 @@ export function EmailEntryScreen({navigation, route}: any) {
   const toggleMode = () => {
     setMode(m => (m === 'sign_in' ? 'sign_up' : 'sign_in'));
     setError('');
+    setNotice('');
     setConfirmPassword('');
   };
 
@@ -237,6 +254,7 @@ export function EmailEntryScreen({navigation, route}: any) {
             )}
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
+          {notice ? <Text style={styles.notice}>{notice}</Text> : null}
 
           <TouchableOpacity
             style={[
@@ -335,6 +353,12 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.error,
     fontSize: 14,
     marginTop: spacing.sm,
+  },
+  notice: {
+    color: colors.primary,
+    fontSize: 16,
+    marginTop: spacing.sm,
+    textAlign: 'center',
   },
   button: {
     backgroundColor: colors.primary,
