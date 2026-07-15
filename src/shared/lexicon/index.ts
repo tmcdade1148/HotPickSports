@@ -171,6 +171,30 @@ export function welcomeOpenerDefault(contestName: string): string {
 }
 
 /**
+ * Gaffer Approval Gate — applicant-facing. Shown in the join waiting-room
+ * confirmation and as the applicant's standing Message Center entry. Keeps the
+ * definite article on "the Gaffer" per §2.
+ *   applicationPendingMessage("Stella's Gang")
+ *     → "Your request to join Stella's Gang is in. You'll get your spot as soon
+ *        as the Gaffer approves you."
+ */
+export function applicationPendingMessage(contestName: string): string {
+  return `Your request to join ${contestName} is in. You'll get your spot as soon as ${LEXICON.gaffer.long} approves you.`;
+}
+
+/**
+ * Gaffer Approval Gate — Gaffer-facing standing prompt. ONE per Contest with any
+ * applicants awaiting approval, never one per applicant, so the copy is
+ * deliberately count-free (see the inherent-dedup design). The entry is tappable
+ * → the Members screen.
+ *   gafferPendingAlertMessage("Stella's Gang")
+ *     → "You have Players waiting to join Stella's Gang. Tap to review them."
+ */
+export function gafferPendingAlertMessage(contestName: string): string {
+  return `You have ${LEXICON.player.plural} waiting to join ${contestName}. Tap to review them.`;
+}
+
+/**
  * Scoring explainer — makes the HotPick exception explicit. A regular wrong pick
  * is 0 (never a penalty); only the HotPick can lose points.
  */

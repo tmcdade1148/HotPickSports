@@ -69,6 +69,7 @@ export function HomeScreen() {
   const loadActivePartners    = useGlobalStore(s => s.loadActivePartners);
   const poolAffiliations      = useGlobalStore(s => s.poolAffiliations);
   const loadPartnerIndicators = useGlobalStore(s => s.loadPartnerIndicators);
+  const fetchUserPools        = useGlobalStore(s => s.fetchUserPools);
   const fetchUserPickStatus    = useNFLStore(s => s.fetchUserPickStatus);
   const fetchUserHotPick       = useNFLStore(s => s.fetchUserHotPick);
   const fetchWeekResult        = useNFLStore(s => s.fetchWeekResult);
@@ -270,6 +271,9 @@ export function HomeScreen() {
     try {
       const nfl = useNFLStore.getState();
       await Promise.allSettled([
+        // Pool membership — silent (no full-screen spinner). Also how an
+        // approved applicant's Contest shows up on pull-to-refresh, no poll.
+        fetchUserPools(userId, competition, {silent: true}),
         nfl.fetchCompetitionConfig(),
         ...(currentWeek > 0
           ? [
@@ -288,7 +292,7 @@ export function HomeScreen() {
     } finally {
       setRefreshing(false);
     }
-  }, [userId, competition, currentWeek, allPoolIds, loadPoolIndicators, loadUserRankByPool]);
+  }, [userId, competition, currentWeek, allPoolIds, loadPoolIndicators, loadUserRankByPool, fetchUserPools]);
 
   useEffect(() => {
     if (!userId || !competition) return;

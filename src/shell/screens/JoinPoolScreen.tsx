@@ -12,6 +12,7 @@ import {useGlobalStore} from '@shell/stores/globalStore';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 import {normalizeRosterPass} from '@shared/utils/format';
+import {applicationPendingMessage} from '@shared/lexicon';
 
 /**
  * JoinPoolScreen — Enter a pool invite code (6–12 alphanumeric chars).
@@ -37,6 +38,10 @@ export function JoinPoolScreen({navigation, route}: any) {
   );
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Gaffer Approval Gate: set to the Contest name once a join lands pending.
+  // Swaps the form for a waiting-room confirmation (the applicant is NOT a
+  // member yet — no navigation into the pool).
+  const [pendingContest, setPendingContest] = useState<string | null>(null);
 
   // Reuse the same strip-non-alphanumeric + uppercase normalizer that
   // PartnerDirectory's Roster Pass field uses — same character set,
@@ -72,7 +77,11 @@ export function JoinPoolScreen({navigation, route}: any) {
 
     setJoining(false);
 
-    if (result.pool) {
+    if (result.pending) {
+      // Waiting-room: request is in, Gaffer must approve. Show confirmation
+      // in place instead of returning to the caller as if joined.
+      setPendingContest(result.poolName ?? 'the Contest');
+    } else if (result.pool) {
       navigation.goBack();
     } else if (result.poolFull) {
       setError('This Contest is full and cannot accept new members.');
@@ -93,6 +102,22 @@ export function JoinPoolScreen({navigation, route}: any) {
           <Text style={styles.title}>Join Contest</Text>
         </View>
 
+        {pendingContest ? (
+          <View style={styles.form}>
+            <View style={styles.waitingBox}>
+              <Text style={styles.waitingTitle}>Request sent</Text>
+              <Text style={styles.waitingText}>
+                {applicationPendingMessage(pendingContest)} We'll post updates in
+                your Message Center.
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.joinButton}
+              onPress={() => navigation.goBack()}>
+              <Text style={styles.joinButtonText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
         <View style={styles.form}>
           <Text style={styles.label}>Invite Code</Text>
           <TextInput
@@ -136,6 +161,7 @@ export function JoinPoolScreen({navigation, route}: any) {
             )}
           </TouchableOpacity>
         </View>
+        )}
       </View>
     </KeyboardAvoidingView>
   );
@@ -214,6 +240,23 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 14,
     marginBottom: spacing.md,
     textAlign: 'center',
+  },
+  waitingBox: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  waitingTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+  },
+  waitingText: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: colors.textSecondary,
   },
   joinButton: {
     backgroundColor: colors.primary,

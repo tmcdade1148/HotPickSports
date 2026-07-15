@@ -112,7 +112,14 @@ export interface GlobalState {
   setActivePoolId: (poolId: string | null) => void;
   setDefaultPoolId: (poolId: string) => void;
   loadDefaultPoolId: (competition: string) => Promise<void>;
-  fetchUserPools: (userId: string, competition: string) => Promise<void>;
+  // `silent` skips the isLoadingPools spinner — used by background refetch
+  // triggers (app foreground, pull-to-refresh) so they don't flash the
+  // full-screen loader on PoolSelectionScreen. Initial loads omit it.
+  fetchUserPools: (
+    userId: string,
+    competition: string,
+    options?: {silent?: boolean},
+  ) => Promise<void>;
   getPoolsForCompetition: (competition: string) => DbPool[];
   createPool: (params: {
     userId: string;
@@ -131,7 +138,16 @@ export interface GlobalState {
   joinPool: (
     userId: string,
     inviteCode: string,
-  ) => Promise<{pool?: DbPool; error?: string; poolFull?: boolean}>;
+  ) => Promise<{
+    pool?: DbPool;
+    error?: string;
+    poolFull?: boolean;
+    // Gaffer Approval Gate: a fresh join lands pending, not active. `pending`
+    // routes the caller to the waiting-room; `poolName` labels the Contest
+    // applied to (the pool is intentionally NOT added to any list).
+    pending?: boolean;
+    poolName?: string;
+  }>;
   joinPublicContest: (
     userId: string,
   ) => Promise<{pool?: DbPool; error?: string}>;

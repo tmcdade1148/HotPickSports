@@ -11,9 +11,10 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
-import {ChevronLeft, Megaphone, MessageCircle, Building2} from 'lucide-react-native';
+import {ChevronLeft, Megaphone, MessageCircle, Building2, Clock} from 'lucide-react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {formatRelativeTime} from '@shared/utils/format';
+import {applicationPendingMessage, gafferPendingAlertMessage} from '@shared/lexicon';
 import {supabase} from '@shared/config/supabase';
 import {messageCenterWindowStartIso} from '@shared/config/notifications';
 import {spacing, borderRadius} from '@shared/theme';
@@ -21,7 +22,17 @@ import {useTheme} from '@shell/theme';
 
 interface MessageItem {
   id: string;
-  type: 'broadcast' | 'moderator_note' | 'partner_broadcast';
+  // Gaffer Approval Gate adds two client-SYNTHESIZED types (no DB row):
+  //   application_pending  — applicant awaiting the Gaffer (from
+  //                          get_my_pending_applications)
+  //   gaffer_pending_alert — Gaffer's standing "players waiting" prompt, ONE
+  //                          per Contest (tappable → Members)
+  type:
+    | 'broadcast'
+    | 'moderator_note'
+    | 'partner_broadcast'
+    | 'application_pending'
+    | 'gaffer_pending_alert';
   poolId: string;
   poolName: string;
   message: string;
@@ -69,34 +80,71 @@ export function MessageCenterScreen() {
     // active competition and would drop platform-wide broadcasts.
     const {data: memberRows} = await supabase
       .from('pool_members')
-      .select('pool_id, pools!inner(id, name, is_hidden_from_users)')
+      .select('pool_id, role, pools!inner(id, name, is_hidden_from_users)')
       .eq('user_id', userId)
       .eq('status', 'active');
 
     type RawRow = {
       pool_id: string;
+      role: string;
       pools: {id: string; name: string | null; is_hidden_from_users: boolean}
            | {id: string; name: string | null; is_hidden_from_users: boolean}[]
            | null;
     };
 
     const poolIds: string[] = [];
+    // Pools this user is the Gaffer of — the only ones eligible for the
+    // "players waiting for approval" standing prompt (Piece 4).
+    const organizedPoolIds: string[] = [];
     const nameMap: Record<string, string> = {};
     const hiddenById: Record<string, boolean> = {};
     for (const r of ((memberRows ?? []) as unknown) as RawRow[]) {
       const p = Array.isArray(r.pools) ? r.pools[0] : r.pools;
       if (!p) continue;
       poolIds.push(p.id);
+      if (r.role === 'organizer') organizedPoolIds.push(p.id);
       hiddenById[p.id] = p.is_hidden_from_users;
       nameMap[p.id] = p.is_hidden_from_users ? 'HotPick' : (p.name ?? 'Contest');
     }
 
+    // Piece 2 — applicant's own pending applications. Independent of active
+    // membership (the applicant is pending, not active), so it's computed here,
+    // BEFORE the empty-poolIds early-return, and sourced from the SECURITY
+    // DEFINER get_my_pending_applications (pools_select would otherwise withhold
+    // the Contest name from a non-active applicant). Client-synthesized: no DB
+    // row, stable synthetic id, clears when the pending row does.
+    const pendingItems: MessageItem[] = [];
+    const {data: myPending} = await supabase.rpc('get_my_pending_applications');
+    if (
+      myPending &&
+      (myPending as {ok?: boolean}).ok &&
+      Array.isArray((myPending as {applications?: unknown[]}).applications)
+    ) {
+      const apps = (myPending as {
+        applications: Array<{pool_id: string; pool_name: string; applied_at: string}>;
+      }).applications;
+      for (const app of apps) {
+        pendingItems.push({
+          id: `pending-app-${app.pool_id}`,
+          type: 'application_pending',
+          poolId: app.pool_id,
+          poolName: '',
+          message: applicationPendingMessage(app.pool_name ?? 'the Contest'),
+          senderName: 'HotPick Sports',
+          sentAt: app.applied_at,
+          fromPlatform: true,
+        });
+      }
+    }
+
     if (poolIds.length === 0) {
-      setMessages([]);
+      // No active memberships — but a brand-new applicant with zero active
+      // pools must still see their pending entry.
+      setMessages(pendingItems);
       setLoading(false);
       return;
     }
-    const items: MessageItem[] = [];
+    const items: MessageItem[] = [...pendingItems];
 
     // Messages time out of the Message Center after the shared window (per Tom,
     // 2026-06-15). The same constant gates the HomeInbox banner and the Pool /
@@ -242,6 +290,39 @@ export function MessageCenterScreen() {
       }
     }
 
+    // Piece 4 — Gaffer standing prompt: ONE entry per Contest that has any
+    // pending applicant. Inherent dedup — we collapse all pending rows to a set
+    // of pool_ids (with the most-recent applied_at for sort ordering), so N
+    // applicants in a Contest still yield exactly one entry. Reads only pool_id
+    // + joined_at — never contact/email (that stays in the organizer-gated
+    // get_pending_applicants, surfaced on the Members screen).
+    if (organizedPoolIds.length > 0) {
+      const {data: pendingRows} = await supabase
+        .from('pool_members')
+        .select('pool_id, joined_at')
+        .in('pool_id', organizedPoolIds)
+        .eq('status', 'pending');
+      const latestByPool: Record<string, string> = {};
+      for (const row of (pendingRows ?? []) as {pool_id: string; joined_at: string}[]) {
+        if (!latestByPool[row.pool_id] || row.joined_at > latestByPool[row.pool_id]) {
+          latestByPool[row.pool_id] = row.joined_at;
+        }
+      }
+      for (const pid of Object.keys(latestByPool)) {
+        const name = nameMap[pid] ?? 'Contest';
+        items.push({
+          id: `gaffer-waiting-${pid}`,
+          type: 'gaffer_pending_alert',
+          poolId: pid,
+          poolName: name,
+          message: gafferPendingAlertMessage(name),
+          senderName: 'HotPick Sports',
+          sentAt: latestByPool[pid],
+          fromPlatform: true,
+        });
+      }
+    }
+
     // Sort all by date descending
     items.sort(
       (a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime(),
@@ -301,6 +382,10 @@ export function MessageCenterScreen() {
   const renderItem = ({item}: {item: MessageItem}) => {
     const isPartner = item.type === 'partner_broadcast';
     const isBroadcast = item.type === 'broadcast';
+    // Gaffer Approval Gate synthetic entries (no DB row).
+    const isPending =
+      item.type === 'application_pending' || item.type === 'gaffer_pending_alert';
+    const isGafferAlert = item.type === 'gaffer_pending_alert';
     // Club broadcasts read in the brand's neutral primary; org broadcasts in
     // secondary; moderator notes in primary. (Club COLOR is never themed here
     // per Hard Rule #25 — identity surfaces via name + logo only.)
@@ -309,11 +394,26 @@ export function MessageCenterScreen() {
       ? colors.secondary + '20'
       : colors.primary + '20';
     // Only org/Gaffer broadcasts and moderator notes carry an "@ contest"
-    // suffix. Platform broadcasts and Club broadcasts don't (no single pool).
-    const showPoolSuffix = !item.fromPlatform && !isPartner && !!item.poolName;
+    // suffix. Platform broadcasts, Club broadcasts, and the synthetic pending
+    // entries don't (the Contest name is already in the message body).
+    const showPoolSuffix =
+      !item.fromPlatform && !isPartner && !isPending && !!item.poolName;
+
+    // The Gaffer's "players waiting" prompt taps through to the Members screen,
+    // where the pending block lives. Other rows are static.
+    const Wrapper: any = isGafferAlert ? TouchableOpacity : View;
+    const wrapperProps = isGafferAlert
+      ? {
+          activeOpacity: 0.7,
+          onPress: () =>
+            navigation.navigate('PoolMembers', {poolId: item.poolId}),
+        }
+      : {};
 
     return (
-      <View style={[styles.messageCard, {backgroundColor: colors.surface}]}>
+      <Wrapper
+        style={[styles.messageCard, {backgroundColor: colors.surface}]}
+        {...wrapperProps}>
         <View style={styles.messageRow}>
           <View style={[styles.iconCircle, {backgroundColor: iconBg}]}>
             {isPartner && item.logoUrl ? (
@@ -324,6 +424,8 @@ export function MessageCenterScreen() {
               />
             ) : isPartner ? (
               <Building2 size={18} color={iconColor} />
+            ) : isPending ? (
+              <Clock size={18} color={iconColor} />
             ) : isBroadcast ? (
               <Megaphone size={18} color={iconColor} />
             ) : (
@@ -358,7 +460,7 @@ export function MessageCenterScreen() {
             </Text>
           </View>
         </View>
-      </View>
+      </Wrapper>
     );
   };
 
