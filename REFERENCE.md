@@ -556,37 +556,9 @@ picks_open → locked → live → settling → complete → picks_open (next we
 ```
 Above is the in-cycle progression during REGULAR, PLAYOFFS, and SUPERBOWL. Outside the weekly cycle (PRE_SEASON, REGULAR_COMPLETE, SUPERBOWL_INTRO, SEASON_COMPLETE), `week_state = 'idle'`.
 
-| State | Hero | What the card shows |
-|---|---|---|
-| `idle` | OffSeason / PreSeason / bridge (by phase) | Off-cycle resting card: calm salutation, 0 pts season total, join/create pool CTA, SmackTalk pointer. No countdown, no live data. |
-| `picks_open` | `PicksOpenHero` | Eyebrow `EDITABLE PICKS`; contextual prompt (`buildContextualMessage`) + HotPick card with inline kickoff countdown |
-| `locked` | `PicksOpenHero` (unified) | Same hero as `picks_open` — pencils-down beat. Near-instant in production: games usually flip `scheduled`→`in_progress`, so the engine skips straight to `live`. |
-| `live` | `PicksOpenHero` (unified) | Eyebrow `EDITABLE PICKS`→`LOCKED PICKS`; live scores + "GAME IN PROGRESS"; picks for games that haven't kicked off stay editable (per-game lock) |
-| `settling` | `SettlingHero` | `getContextGreeting` salutation + the weekly result settling in |
-| `complete` | `CompleteHero` | "You sit Nth in {pool}." + rank delta + brand-voice week recap; "WEEK N COMPLETE" CTA |
-
-### Home Screen Copy — two engines
-
-Since the v3 redesign, `picks_open` / `locked` / `live` all render **one** hero — `PicksOpenHero` (`StateHero.tsx`) — whose prompt comes from **`buildContextualMessage()`** (`PicksOpenHero.tsx`), *not* the salutation pool. The salutation pool — **`getContextGreeting()`** (`salutation.ts`) — drives `settling` (`SettlingHero`) and the off-cycle / bridge heroes (`OffSeason`, `RegularComplete`, `SuperBowlIntro`, `SeasonComplete`). `complete` renders `CompleteHero` with its own recap ("You sit Nth in {pool}." + week recap) — no salutation.
-
-**`getContextGreeting()` pools** (as defined in `salutation.ts`, deterministic per-hour):
-
-| Context | Pool |
-|---|---|
-| PRE_SEASON / no phase | "Nothing on yet. Enjoy it" / "Offseason. It won't last" / "Season's coming" |
-| SEASON_COMPLETE | "What a ride" / "That's a wrap" / "See you next season" |
-| REGULAR_COMPLETE / SUPERBOWL_INTRO | "Dust settling" / "Big things ahead" / "Stay sharp" |
-| `settling` / `complete` | "The record doesn't lie" / "It's official" / "Week closed" |
-| off day / default | "Nothing today" / "Rest day" / "Back at it soon" |
-| `picks_open` / `locked` / `live` † | submitted: "On record. No edits" / "Said what you said" / "Locked in" · last call (<24h): "Last call" / "Closing time" / "You sure about this?" · open: "Picks are open" / "Your move" / "Clock's running" · live: "It's happening" / "Too late to change anything" / "Watching or refreshing?" |
-
-† Defined but **no longer rendered** in those states post-v3 — `PicksOpenHero` shows `buildContextualMessage()` instead.
-
-**`buildContextualMessage()` headlines** — what `picks_open` / `locked` / `live` actually show, by picks / HotPick / time left:
-- *No HotPick yet:* "Make your picks. First game kicks off in:" · "{n} of {total} picks in — you still need a HotPick. First kickoff in:" · "You've missed kickoff but it's not too late to pick some real winners."
-- *HotPick set:* "Feeling good about your HotPick?" (calm) · "Picks are set." (tightening) · "Locked & loaded." (final minutes) · "Bold call — your HotPick is the first game."
-
-> The Operator Console's Home Screen Spec Preview mirrors this same copy; `tools/check-home-spec-sync.mjs` guards both this section and that snapshot against drift. There is no shared source — re-sync by hand after any copy change.
+> Home modules, state→content mapping, and all copy: CLAUDE HQ /
+> SOURCE OF TRUTH / HOME_MODULE_MAP.md — canonical. §11 covers
+> architecture only.
 
 ### Join Pool Module
 - Shown when user has no visible private pool
@@ -595,7 +567,7 @@ Since the v3 redesign, `picks_open` / `locked` / `live` all render **one** hero 
 - No dismiss button — the module IS the CTA
 
 ### Bottom Tab Order
-Dashboard (far left, raised Target icon) | Games | Leaders | SmackTalk | (History)
+Home · Picks · Ladder · Chirp · Settings
 
 Leaders and SmackTalk share a single underline via custom `GroupedTabBar` in `MainTabNavigator.tsx`.
 
