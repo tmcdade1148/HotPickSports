@@ -574,7 +574,6 @@ Leaders and SmackTalk share a single underline via custom `GroupedTabBar` in `Ma
 **Tab-bar context awareness** (`GroupedTabBar`):
 - **On HomeTab and PicksTab:** Leaders + SmackTalk grouped box hides (both are pick-flow surfaces — no jump to social mid-flow).
 - **On PicksTab:** the freed right half of the bar renders `<SubmitPicksBarSlot />` — the Submit Picks button hoisted from the screen. Single source of truth driven by the `useSeasonSubmitState()` hook reading from seasonStore + nflStore. Five states (locked / no_picks / needs_hotpick / in_progress / submitted), each with its own bg color + enabled state.
-- **Settings is not in the bar.** Reached via the gear icon in `HomeHeader`, `PoolHeader`, and `PicksHeader`. `SettingsTab` is filtered out of `state.routes` in `GroupedTabBar` before the leading/grouped/trailing partition. Route is still registered so `navigation.navigate('SettingsTab')` from any header works.
 
 ### Per-Tab Headers
 Three slim, HomeHeader-styled headers (HotPick wordmark + period pill + gear, ~one row each):
