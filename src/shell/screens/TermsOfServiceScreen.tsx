@@ -49,11 +49,10 @@ export function TermsOfServiceScreen({navigation}: any) {
 
       <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent}>
         {/* Title block */}
-        <H1 s={s}>HotPick Sports</H1>
+        <H1 s={s}>HOTPICK SPORTS</H1>
         <H1 s={s}>Terms of Service</H1>
-        <P s={s}>Effective Date: March 15, 2026</P>
-        <P s={s}>Version 1.0</P>
-        <P s={s}>Last Updated: March 19, 2026</P>
+        <P s={s}>Effective Date: July 20, 2026 • Version 1.0.2</P>
+        <P s={s}>Last Updated: July 20, 2026 — Supersedes Version 1.0.1 (June 22, 2026)</P>
 
         <P s={s}>
           Please read these Terms of Service carefully before using the HotPick Sports mobile application or any related services. These Terms constitute a legally binding agreement between you and HotPick Sports, Inc., a Delaware corporation.
@@ -84,14 +83,16 @@ export function TermsOfServiceScreen({navigation}: any) {
 
         <Bold s={s}>"Pool"</Bold>
         <P s={s}>
-          means a competition group created within the Platform in which Members make Picks on sporting event outcomes and compete against each other on a Leaderboard.
+          means a competition group created within the Platform in which Members make Picks on sporting event outcomes and compete against each other on a Leaderboard. A Pool is displayed in the App as a "Contest."
         </P>
 
         <Bold s={s}>"Organizer"</Bold>
-        <P s={s}>means a User who creates and administers a Pool.</P>
+        <P s={s}>
+          means a User who creates and administers a Pool, and includes any User to whom an Organizer delegates administrative authority over that Pool. An Organizer is displayed in the App as the "Gaffer," and a delegated administrator as an "Assistant Gaffer."
+        </P>
 
         <Bold s={s}>"Member"</Bold>
-        <P s={s}>means a User who participates in a Pool.</P>
+        <P s={s}>means a User who participates in a Pool. A Member is displayed in the App as a "Player."</P>
 
         <Bold s={s}>"Pick"</Bold>
         <P s={s}>
@@ -110,12 +111,12 @@ export function TermsOfServiceScreen({navigation}: any) {
 
         <Bold s={s}>"Leaderboard"</Bold>
         <P s={s}>
-          means the display of Users' cumulative scores within a Pool or across the Platform.
+          means the display of Users' cumulative scores within a Pool or across the Platform. A Leaderboard is displayed in the App as the "Ladder."
         </P>
 
         <Bold s={s}>"SmackTalk"</Bold>
         <P s={s}>
-          means the in-Platform social messaging feature that allows Members within a Pool to communicate with each other.
+          means the in-Platform social messaging feature that allows Members within a Pool to communicate with each other. SmackTalk is displayed in the App as "Chirps."
         </P>
 
         <Bold s={s}>"User Content"</Bold>
@@ -128,7 +129,27 @@ export function TermsOfServiceScreen({navigation}: any) {
 
         <Bold s={s}>"Global Pool"</Bold>
         <P s={s}>
-          means the platform-wide Pool in which all Users are automatically enrolled upon creating an account, enabling competition across the entire Platform user base.
+          means the platform-wide Pool in which all Users are automatically enrolled upon creating an account. The Global Pool is not currently displayed in the App, and no Global Pool standings or Leaderboard positions are shown to any User.
+        </P>
+
+        <Bold s={s}>"League"</Bold>
+        <P s={s}>
+          means an organizational partner that offers a branded Pool experience on the Platform. A League is displayed in the App as a "League" and may be administered by one or more League administrators. A League is referred to in certain partner agreements as a "White Label Partner."
+        </P>
+
+        <Bold s={s}>"Perk"</Bold>
+        <P s={s}>
+          means a benefit made available by a League to participants in a Pool affiliated with that League, as described in Section 4.7.
+        </P>
+
+        <Bold s={s}>"Broadcast"</Bold>
+        <P s={s}>
+          means a message or notification sent by an Organizer or a League to Members of a Pool, as described in Section 4.8.
+        </P>
+
+        <Bold s={s}>"Organizer Note"</Bold>
+        <P s={s}>
+          means a private administrative note recorded by an Organizer about a Member of that Organizer's Pool, visible only to administrators of that Pool and not displayed to the Member it concerns. An Organizer Note is displayed in the App as a "Gaffer note."
         </P>
 
         {/* SECTION 2 */}
@@ -199,7 +220,7 @@ export function TermsOfServiceScreen({navigation}: any) {
           Organizers may create and administer Pools for groups of Members. The Platform does not collect fees from Members, does not process payments between Users, and has no mechanism by which money moves through the Platform in connection with Pool participation or competition outcomes.
         </P>
         <P s={s}>
-          Prior to creating a Pool, Organizers are required to affirmatively acknowledge HotPick's prohibition on financial arrangements. The timestamp and version of that acknowledgment are recorded in our systems.
+          Prior to creating a Pool, each Organizer must affirmatively accept the HotPick Organizer Acknowledgment, which is incorporated into these Terms by reference. Under the Organizer Acknowledgment, Organizers and Members may not use the Platform — including any Pool, SmackTalk, profile field, Organizer Note, Broadcast, or other Platform feature — to collect, solicit, advertise, track, or administer money, buy-ins, entry fees, prizes, or payouts. Any private arrangements among participants occur entirely outside the Platform and are not collected, held, processed, facilitated, or tracked by HotPick Sports, Inc. The timestamp and version of each Organizer's acceptance are recorded in our systems.
         </P>
         <P s={s}>
           HotPick Sports, Inc. is not a party to, and has no knowledge of, any private financial arrangements that may exist among members of any Pool. The existence of any such arrangements outside the Platform does not make HotPick Sports, Inc. a participant in, or responsible for, those arrangements.
@@ -212,12 +233,31 @@ export function TermsOfServiceScreen({navigation}: any) {
 
         <H3 s={s}>4.5 Pools and Competition Rounds</H3>
         <P s={s}>
-          Pools are organized around specific competitions or seasons. A Pool covers one event or season and does not automatically continue to the next. Organizers may create a new Pool for a subsequent event and invite prior Members to join. All Users are automatically enrolled in the Global Pool upon account creation, which provides a platform-wide Leaderboard.
+          Pools are organized around specific competitions or seasons. A Pool covers one event or season and does not automatically continue to the next. Organizers may create a new Pool for a subsequent event and invite prior Members to join. All Users are automatically enrolled in the Global Pool upon account creation. The Global Pool is not currently displayed in the App, and no Global Pool Leaderboard, standings, or position is shown to you or to any other User. If Global Pool visibility is enabled in a future release, these Terms will be updated and you will be notified and required to accept the updated Terms before continuing to use the Platform.
         </P>
 
         <H3 s={s}>4.6 Use of Third-Party Sports Data</H3>
         <P s={s}>
           The Platform uses publicly available sports data from third-party providers, including game schedules, scores, and publicly available game competitiveness metrics, solely for the purpose of ranking games by competitiveness and determining Pick outcomes. No odds, lines, or wagering data is displayed to Users. This data is used for informational and operational purposes only and does not constitute facilitation of gambling.
+        </P>
+
+        <H3 s={s}>4.7 Leagues and Perks</H3>
+        <P s={s}>
+          Some Pools are affiliated with a League. A League may make Perks available to participants in an affiliated Pool. Perks are offered, provided, and fulfilled solely by the League, not by HotPick Sports, Inc. HotPick Sports, Inc. does not provide, guarantee, or assume responsibility for any Perk.
+        </P>
+        <P s={s}>
+          Perks are made available to participants on a participation basis. Perks are not prizes, are not awarded by HotPick Sports, Inc., and are not determined by a Member's standing, rank, or performance on any Leaderboard or in any competition.
+        </P>
+        <P s={s}>
+          League branding does not change the operator of the Platform or the handling of your information, which remains governed by these Terms and our Privacy Policy regardless of any League affiliation.
+        </P>
+
+        <H3 s={s}>4.8 Organizer and League Broadcasts</H3>
+        <P s={s}>
+          Organizers and Leagues may send Broadcasts to Members of a Pool, such as reminders and Pool announcements. You can control Broadcast notifications in your account Settings.
+        </P>
+        <P s={s}>
+          Broadcasts are subject to these Terms, including the prohibitions in Section 4.3. Organizers and Leagues may not use Broadcasts to collect, solicit, advertise, track, or administer money, buy-ins, entry fees, prizes, or payouts.
         </P>
 
         {/* SECTION 5 */}
@@ -274,6 +314,14 @@ export function TermsOfServiceScreen({navigation}: any) {
           Your individual Picks and scores are your User Content. They are associated with your account and displayed to other Members of your Pools on Leaderboards. See Section 9 for how anonymized and aggregated Pick data is used by HotPick Sports, Inc.
         </P>
 
+        <H3 s={s}>6.6 Organizer Notes</H3>
+        <P s={s}>
+          Organizers and delegated Pool administrators may record private administrative notes (Organizer Notes) about Members of their Pool. An Organizer Note is visible only to administrators of that Pool and is not displayed to the Member it concerns. Organizer Notes are associated with a specific Pool and are removed when that Pool is deleted; an Organizer Note concerning you is also removed when you delete your account, as described in Section 12.
+        </P>
+        <P s={s}>
+          Organizer Notes may not be used to record, track, or administer money, buy-ins, entry fees, prizes, or payouts, or to record any content prohibited under Section 7. HotPick Sports, Inc. may remove any Organizer Note that violates these Terms.
+        </P>
+
         {/* SECTION 7 */}
         <H2 s={s}>SECTION 7. PROHIBITED CONDUCT</H2>
         <P s={s}>
@@ -286,6 +334,7 @@ export function TermsOfServiceScreen({navigation}: any) {
         <Bullet s={s}>Using automated scripts, bots, or other tools to submit Picks or interact with the Platform;</Bullet>
         <Bullet s={s}>Attempting to access another User's account or any non-public areas of the Platform;</Bullet>
         <Bullet s={s}>Distributing spam, unsolicited messages, or promotional content through SmackTalk or other Platform features;</Bullet>
+        <Bullet s={s}>Using the Platform — including any Pool, SmackTalk, profile field, Organizer Note, or Broadcast — to collect, solicit, advertise, track, or administer money, buy-ins, entry fees, prizes, or payouts among Users;</Bullet>
         <Bullet s={s}>Posting content in SmackTalk that is threatening, harassing, defamatory, obscene, or in violation of any applicable law;</Bullet>
         <Bullet s={s}>Using Pool names, Pool descriptions, or any other Platform feature to organize, promote, advertise, or facilitate financial arrangements among Users, including entry fees, prize pools, or wagering of any kind;</Bullet>
         <Bullet s={s}>Using the Platform in any manner that could damage, disable, overburden, or impair the Platform's servers or networks;</Bullet>
@@ -313,9 +362,9 @@ export function TermsOfServiceScreen({navigation}: any) {
 
         {/* SECTION 9 */}
         <H2 s={s}>SECTION 9. AGGREGATE DATA — OWNERSHIP AND LICENSE</H2>
-        <P s={s}>
+        <Bold s={s}>
           IMPORTANT: This section contains material provisions regarding HotPick Sports, Inc.'s ownership and use of aggregated data derived from Platform activity. Please read it carefully before using the Platform.
-        </P>
+        </Bold>
 
         <H3 s={s}>9.1 Individual Data vs. Aggregate Data</H3>
         <P s={s}>
@@ -384,6 +433,7 @@ export function TermsOfServiceScreen({navigation}: any) {
         <Bullet s={s}>Your account is anonymized — your identity is replaced with a generic, non-reversible identifier;</Bullet>
         <Bullet s={s}>Your Picks, scores, and Pool membership records are retained in anonymized form to preserve the integrity of historical Leaderboards and competition records for other Users;</Bullet>
         <Bullet s={s}>Your SmackTalk messages in the active feed are removed; archived messages are retained in permanently anonymized form as described in Section 6.3 and Section 9;</Bullet>
+        <Bullet s={s}>Organizer Notes concerning you are removed;</Bullet>
         <Bullet s={s}>Your push notification tokens are deactivated; and</Bullet>
         <Bullet s={s}>Aggregate Data derived from your activity is retained as described in Section 9.</Bullet>
         <P s={s}>
@@ -431,9 +481,9 @@ export function TermsOfServiceScreen({navigation}: any) {
 
         {/* SECTION 15 */}
         <H2 s={s}>SECTION 15. DISPUTE RESOLUTION</H2>
-        <P s={s}>
+        <Bold s={s}>
           PLEASE READ THIS SECTION CAREFULLY. IT AFFECTS YOUR LEGAL RIGHTS, INCLUDING YOUR RIGHT TO FILE A LAWSUIT IN COURT AND YOUR RIGHT TO A JURY TRIAL.
-        </P>
+        </Bold>
 
         <H3 s={s}>15.1 Informal Resolution</H3>
         <P s={s}>
@@ -563,10 +613,10 @@ export function TermsOfServiceScreen({navigation}: any) {
         {/* Footer */}
         <View style={s.footer}>
           <Text style={s.footerText}>
-            HotPick Sports Terms of Service — Version 1.0 — Effective March 15, 2026
+            HotPick Sports Terms of Service — Version 1.0.2 — Effective July 20, 2026
           </Text>
           <Text style={s.footerText}>
-            Copyright 2026 HotPick Sports, Inc. All rights reserved.
+            Copyright © 2026 HotPick Sports, Inc. All rights reserved.
           </Text>
           <Text style={s.footerText}>
             https://hotpicksports.com/terms
