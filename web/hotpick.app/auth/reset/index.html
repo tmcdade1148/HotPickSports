@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Reset your password · HotPick Sports</title>
+  <meta name="apple-itunes-app" content="app-id=6761190235" />
+  <style>
+    :root {
+      --black: #303030; --orange: #F66321; --teal: #45615E;
+      --amber: #E39032; --lightblue: #A5CCD9;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--black); color: #fff; min-height: 100vh;
+      display: flex; align-items: center; justify-content: center; padding: 24px;
+    }
+    .card { max-width: 420px; width: 100%; text-align: center; }
+    h1 { font-size: 26px; margin: 0 0 8px; }
+    p { color: var(--lightblue); font-size: 16px; line-height: 1.5; margin: 0 0 24px; }
+    .stores { display: flex; flex-direction: column; gap: 12px; }
+    a.store {
+      display: block; padding: 16px; border-radius: 12px; text-decoration: none;
+      font-weight: 700; font-size: 16px; color: #fff; background: var(--teal);
+    }
+    a.store.primary { background: var(--orange); }
+    .hint { margin-top: 22px; font-size: 13px; color: #8a97aa; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Reset your password</h1>
+    <p>
+      Open this link on your phone with the HotPick Sports app installed — it
+      takes you straight to the reset-password screen. This page can't reset
+      your password on its own.
+    </p>
+    <div class="stores">
+      <a class="store primary" href="https://apps.apple.com/app/id6761190235">Download on the App Store</a>
+      <a class="store" href="https://play.google.com/store/apps/details?id=com.hotpicksports">Get it on Google Play</a>
+    </div>
+    <div class="hint">
+      Reset links expire. If yours no longer works, request a new one from the
+      app's sign-in screen — tap &ldquo;Forgot password?&rdquo;
+    </div>
+  </div>
+  <!--
+    Deliberately static: no token consumption here. A recovery link's token
+    arrives in the URL fragment (#access_token=… / ?code=…); when the app is
+    installed, iOS/Android intercept https://hotpick.app/auth/reset (per the
+    AASA /auth/reset* component + Android app-link) and open the app's Reset
+    Password flow, so this page is only ever seen by someone WITHOUT the app.
+    In-browser reset (reading the fragment and calling Supabase to set the
+    session + show a password form) is a separate feature and needs its own
+    decision — do NOT add it here without one. We also do NOT try to launch the
+    hotpick:// scheme from here: on a device without the app that just throws an
+    "address is invalid" error (same reason the /join page avoids it).
+  -->
+</body>
+</html>

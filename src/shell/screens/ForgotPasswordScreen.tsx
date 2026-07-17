@@ -49,7 +49,7 @@ export function ForgotPasswordScreen({navigation, route}: any) {
 
     const {error: resetError} = await supabase.auth.resetPasswordForEmail(
       trimmedEmail,
-      {redirectTo: 'hotpick://auth/reset'},
+      {redirectTo: 'https://hotpick.app/auth/reset'},
     );
 
     setLoading(false);

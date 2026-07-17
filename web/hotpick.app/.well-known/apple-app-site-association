@@ -7,6 +7,10 @@
           {
             "/": "/join/*",
             "comment": "Contest invite links open the app to the Join flow."
+          },
+          {
+            "/": "/auth/reset*",
+            "comment": "Password-reset recovery links open the app to the Reset Password flow."
           }
         ]
       }
