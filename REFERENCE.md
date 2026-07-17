@@ -672,20 +672,41 @@ Written to `organizer_notifications` with `notification_type = 'moderator_note'`
 
 Partners get branded pool experiences inside the standard app. Users download HotPick. "Powered by HotPick" is non-negotiable on all branded screens (`powered_by_hotpick` typed as literal `true` — cannot be false).
 
-### HotPick Brand Color Tokens (Source of Truth: `hotpickDefaults.ts`)
+### HotPick Brand Color Tokens (Source of Truth: `hotpickDefaults.ts` + `defaults.ts`)
 
-| Token | Hex | Usage |
-|---|---|---|
-| `primary` | `#F5620F` | CTAs, active buttons, highlights |
-| `secondary` | `#45615E` | Inactive accents, secondary states |
-| `highlight` | `#F5C842` | NFL header, WEEK X, pool name, rank badges, chevrons |
-| `background` | `#FCFCFC` | App bg (light) |
-| `surface` | `#F4F4F4` | Cards, rows, SmackTalk bubbles (light) |
-| `glow` | `#51A1A6` | Glow around active elements |
+`useTheme()` resolves **21 tokens**. Values below are the *resolved* output per mode, current as of the 2026-07-17 dark-mode a11y pass. Rewritten from code — the prior table was frozen before the 2026-05-13 redesign and had 8 of 11 values wrong.
 
-**Dark mode:** `background: #0D1117`, `surface: #161C26`, `text_primary: #8A97AA`, `text_secondary: #A0A0A0`, `border: #2C3A52`
+| Token | Light | Dark | Notes |
+|---|---|---|---|
+| `primary` | `#F66321` | `#F66321` | Flame orange. CTAs, active buttons. |
+| `secondary` | `#E39032` | `#E39032` | Amber (was `#45615E` teal pre-05-13). |
+| `background` | `#FCFCFC` | `#141414` | App background. |
+| `surface` | `#EBEBEB` | `#1A1A1A` | Cards, rows, bubbles. |
+| `highlight` | `#45615E` | `#A5CCD9` | One role split per mode: teal on light, light-blue on dark. |
+| `textPrimary` | `#303030` | `#FFFFFF` | |
+| `textSecondary` | `#6B6B6B` | `#B8B8B8` | |
+| `surfaceElevated` | `#F4F4F4` | `#242424` | Pool/partner modules, hero blocks. |
+| `accentTeal` | `#45615E` | `#A5CCD9` | Split per mode (same pairing as `highlight`). |
+| `ink` | `#303030` | `#303030` | Type on light surfaces. **Same value both modes** — ~1.4:1 if drawn on dark (see `WeekSelector` viewed-week chip). Registered a11y debt. |
+| `textTertiary` | `#8A8A8A` | `#7A7A7A` | Captions, placeholders. |
+| `live` | `#22C55E` | `#22C55E` | Live/in-progress dot. |
+| `loss` | `#DC2626` | `#DC2626` | Negative-delta numerals. |
+| `win` | `#22C55E` | `#22C55E` | Positive-delta numerals. |
+| `onPrimary` | `#FFFFFF` | `#FFFFFF` | Foreground on `primary`. Hardcoded in `hooks.ts` — no owning object. |
+| `success` | `#1DC24C` | `#1DC24C` | |
+| `warning` | `#FFD166` | `#FFD166` | **Same value both modes** — ~1.4:1 as text/icon on light across ~27 callsites. Registered a11y debt. |
+| `error` | `#C21D1D` | `#F1655A` | Dark split 2026-07-17 (light red was ~2.9:1 on dark). |
+| `border` | `#E0E0E0` | `#2C3A52` | |
+| `ctaAccentOutline` | `#45615E` | `#A5CCD9` | Secondary-CTA border/icon. Split per mode. |
+| `ctaAccentText` | `#45615E` | `#E39032` | Secondary-CTA label. Light teal / dark amber. |
 
-Never copy hex strings into component files — import from `hotpickDefaults.ts`.
+(`glow` `#51A1A6` was removed 2026-07-17 — defined but never consumed.)
+
+**Resolver behaviour — read before changing any dark value.** Dark mode is **derived, not a parallel table.** `deriveDarkColors(config)` spreads the light config and overrides only `background`, `surface`, `text_primary`, `text_secondary`, `highlight_color`; `HOTPICK_EXTENDED_TOKENS_DARK` and `SEMANTIC_COLORS_DARK` supply explicit dark twins for the rest. **Any token with no explicit dark override silently inherits its light value — silence means "same as light."** That spread-inherit is exactly how five tokens (`highlight`, `accentTeal`, `ctaAccentOutline`, `ctaAccentText`, `error`) were wrong in one mode until 2026-07-17. When adding a token, give it a dark value or deliberately confirm light == dark is correct.
+
+A full remap touches six places: `HOTPICK_BRAND_COLORS` + `HOTPICK_BRAND` (light brand), `HOTPICK_DARK_OVERRIDES` (dark brand), `HOTPICK_EXTENDED_TOKENS` (+ `_DARK`), `SEMANTIC_COLORS` (+ `_DARK`), and two hardcodes in `hooks.ts` (`highlight` partner fallback `#A5CCD9`, `onPrimary` `#FFFFFF`). Note `SettingsScreen.tsx` runs a **second resolver** off `deriveDarkColors` + `SEMANTIC_COLORS[_DARK]` — brand/semantic changes flow to it, but it does not import the extended tokens.
+
+Never copy hex strings into component files — import from the theme.
 
 ### Splash Screen Exception
 The launch/splash background is `#181818` (rgb 24,24,24). It is hardcoded in four native places that must stay in sync — change all or none:

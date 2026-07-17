@@ -11,6 +11,14 @@
 // teal value is preserved as the new `accent_teal` token so components
 // that genuinely need teal can still reach it via useTheme().accentTeal.
 //
+// Updated 2026-07-17 (dark-mode a11y pass). Five tokens were silently
+// inheriting their light value into dark — the resolver spread-inherits, so
+// a missing dark override means "same as light" (see defaults.ts:deriveDarkColors).
+// `highlight` now splits per mode: teal #45615E (light) / light-blue #A5CCD9
+// (dark) — one role, two values, so it clears AA on each background.
+// accentTeal, ctaAccentOutline, ctaAccentText and error got their missing
+// per-mode overrides; the unused `glow` token was removed.
+//
 // Brand vs Extended tokens:
 //   • HOTPICK_BRAND_COLORS (this file) — the 4 partner-overridable values.
 //     Partners can rebrand these via brand_config.
@@ -26,7 +34,9 @@ import type {BrandConfig, BrandLogoSet} from './types';
  * |------------|-----------|------------------------------------------------|
  * | primary    | #F66321   | Flame orange. CTAs, active buttons, highlights.|
  * | secondary  | #E39032   | Amber accent. (was #45615E teal)               |
- * | highlight  | #A5CCD9   | Light-blue accent (fills). Same in light/dark. |
+ * | highlight  | #45615E   | Teal in LIGHT mode. Dark = #A5CCD9 (light-blue)|
+ * |            |           | via HOTPICK_DARK_OVERRIDES — one role split per |
+ * |            |           | mode so it clears AA on each background.        |
  * | background | #FCFCFC   | App bg (LIGHT mode). Dark mode value lives     |
  * |            |           | in HOTPICK_DARK_OVERRIDES (defaults.ts).       |
  *
@@ -36,7 +46,7 @@ import type {BrandConfig, BrandLogoSet} from './types';
 export const HOTPICK_BRAND_COLORS = {
   primary: '#F66321',
   secondary: '#E39032',
-  highlight: '#A5CCD9',
+  highlight: '#45615E', // LIGHT-mode value (teal). Dark = #A5CCD9 via HOTPICK_DARK_OVERRIDES.
   background: '#FCFCFC',
 } as const;
 

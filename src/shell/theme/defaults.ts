@@ -19,19 +19,25 @@ export {
  * HotPick dark mode overrides.
  *
  * Partners don't manage dark mode — we auto-derive it.
- * Brand primary/secondary stay the same; backgrounds and text flip.
+ * Brand primary/secondary stay the same; backgrounds, text, and highlight flip.
  *
  * Updated 2026-05-13 per spec §6.3 to match `colors_and_type.css` dark theme:
  *   --bg-1  #141414   (was #181818)
  *   --bg-2  #1A1A1A   (was #262626)
  *   --fg-1  #FFFFFF   (was #8A97AA — that was an a11y bug)
  *   --fg-2  #B8B8B8   (was #A0A0A0)
+ * Updated 2026-07-17: highlight_color added — it splits per mode.
  */
 export const HOTPICK_DARK_OVERRIDES = {
   background_color: '#141414',
   surface_color: '#1A1A1A',
   text_primary: '#FFFFFF',
   text_secondary: '#B8B8B8',
+  // highlight splits per mode: teal #45615E (light, in HOTPICK_BRAND_COLORS)
+  // reads on light bg; light-blue #A5CCD9 reads on dark (10.7:1 on #141414).
+  // deriveDarkColors carries this so useTheme() AND SettingsScreen's resolver
+  // both get it — a hooks-only fix would leave Settings on the light value.
+  highlight_color: '#A5CCD9',
 } as const;
 
 /**
@@ -42,7 +48,7 @@ export const HOTPICK_DARK_OVERRIDES = {
  * | Token            | Light    | Dark     | Usage                                |
  * |------------------|----------|----------|--------------------------------------|
  * | surface_elevated | #F4F4F4  | #242424  | Pool modules, partner modules, hero  |
- * | accent_teal      | #45615E  | #45615E  | Pool-as-aligned visual connection    |
+ * | accent_teal      | #45615E  | #A5CCD9  | Pool-aligned accent (AA per mode)    |
  * | ink              | #303030  | #303030  | Deep ink for type on light surfaces  |
  * | text_tertiary    | #8A8A8A  | #7A7A7A  | Captions, muted labels, placeholders |
  *
@@ -61,7 +67,7 @@ export const HOTPICK_EXTENDED_TOKENS = {
 
 export const HOTPICK_EXTENDED_TOKENS_DARK = {
   surface_elevated: '#242424',
-  accent_teal: '#45615E',
+  accent_teal: '#A5CCD9', // light-blue on dark (was #45615E — 2.6:1 as text, a bug). 9.05:1 on #242424.
   ink: '#303030',
   text_tertiary: '#7A7A7A',
   live: '#22C55E',
@@ -73,8 +79,13 @@ export const HOTPICK_EXTENDED_TOKENS_DARK = {
  * Derive dark mode colors from any BrandConfig.
  *
  * Partners provide light-mode brand colors. Dark mode keeps their
- * primary/secondary intact (brand recognition) but swaps backgrounds
- * and text for dark surfaces.
+ * primary/secondary intact (brand recognition) but swaps backgrounds,
+ * text, and highlight for dark surfaces.
+ *
+ * Only these fields are overridden; every other field spreads from the
+ * light config unchanged. That spread-inherit is the theme's bug class —
+ * a token with no explicit dark value silently renders its light value in
+ * dark mode.
  */
 export function deriveDarkColors(config: BrandConfig): BrandConfig {
   return {
@@ -83,6 +94,7 @@ export function deriveDarkColors(config: BrandConfig): BrandConfig {
     surface_color: HOTPICK_DARK_OVERRIDES.surface_color,
     text_primary: HOTPICK_DARK_OVERRIDES.text_primary,
     text_secondary: HOTPICK_DARK_OVERRIDES.text_secondary,
+    highlight_color: HOTPICK_DARK_OVERRIDES.highlight_color,
   };
 }
 
@@ -163,11 +175,12 @@ export const SEMANTIC_COLORS = {
   warning: '#FFD166',
   error: '#C21D1D',
   border: '#E0E0E0',
-  glow: '#51A1A6',
-  // Brand accents for secondary CTAs. HotPick teal + amber that read
-  // on both light and dark surfaces without per-mode tweaks.
+  // Brand accents for secondary CTAs (Join / Create Contest on Home). Split
+  // per mode for AA — see the _DARK twin. LIGHT: both are teal #45615E
+  // (6.6:1 on #FCFCFC). DARK: outline → light-blue #A5CCD9, text → amber
+  // #E39032. Measured 2026-07-17.
   ctaAccentOutline: '#45615E',
-  ctaAccentText:    '#E39032',
+  ctaAccentText:    '#45615E',
 } as const;
 
 /**
@@ -176,11 +189,14 @@ export const SEMANTIC_COLORS = {
 export const SEMANTIC_COLORS_DARK = {
   success: '#1DC24C',
   warning: '#FFD166',
-  error: '#C21D1D',
+  // Light #C21D1D fails on dark (~2.9:1). #F1655A clears AA 4.5:1 on all three
+  // dark surfaces: 5.9:1 (#141414) / 5.6:1 (#1A1A1A) / 5.0:1 (#242424).
+  error: '#F1655A',
   border: '#2C3A52',
-  glow: '#51A1A6',
-  // Brand accents for secondary CTAs. Same hues in dark mode — both
-  // colors clear WCAG 3:1 against dark surfaceElevated.
-  ctaAccentOutline: '#45615E',
+  // Brand accents for secondary CTAs, dark mode. outline → light-blue #A5CCD9
+  // (9.05:1 on surfaceElevated #242424 — the prior #45615E was 2.3:1, not the
+  // 3:1 the old comment claimed). text → amber #E39032 (6.1:1 on #242424).
+  // Measured 2026-07-17.
+  ctaAccentOutline: '#A5CCD9',
   ctaAccentText:    '#E39032',
 } as const;

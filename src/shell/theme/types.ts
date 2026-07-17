@@ -90,7 +90,6 @@ export interface ThemeColors {
   warning: string;
   error: string;
   border: string;
-  glow: string;
 
   // Brand accents for secondary CTAs (Join / Create Contest on Home,
   // future empty-state buttons). HotPick brand secondaries that read
