@@ -9,6 +9,7 @@ import {
   Platform,
   ScrollView,
   Alert,
+  Keyboard, // TEMP DEBUG — remove before build cut
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useGlobalStore} from '@shell/stores/globalStore';
@@ -114,6 +115,26 @@ export function ProfileSetupScreen({navigation}: any) {
   // platforms independent of the KAV behavior.
   const scrollRef = useRef<ScrollView>(null);
   const fieldY = useRef<Record<string, number>>({});
+
+  // ── TEMP DEBUG — edge-to-edge keyboard diagnosis. REMOVE BEFORE BUILD CUT. ──
+  // Decides native-vs-OTA fix. Tom taps a field and reads the on-screen banner:
+  //   kbd = 0     → RN reports no keyboard height → JS fixes are dead → native.
+  //   kbd = ~300  → keyboard height is live → JS path (KAV behavior="height")
+  //                 works → Monday's build stays untouched.
+  //   sv should be identical before/after → confirms the window never resizes.
+  const [dbgKbd, setDbgKbd] = useState(0);
+  const [dbgSv, setDbgSv] = useState(0);
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', e =>
+      setDbgKbd(Math.round(e.endCoordinates.height)),
+    );
+    const hide = Keyboard.addListener('keyboardDidHide', () => setDbgKbd(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+  // ── END TEMP DEBUG ──
   const scrollFieldIntoView = (key: string) => {
     // Delay so the keyboard has begun to show and layout has settled.
     setTimeout(() => {
@@ -129,8 +150,14 @@ export function ProfileSetupScreen({navigation}: any) {
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        {/* TEMP DEBUG banner — REMOVE BEFORE BUILD CUT. Reads: keyboard height
+            reported by RN (kbd) and the ScrollView viewport height (sv). */}
+        <Text style={styles.debugBanner}>
+          TEMP DEBUG  kbd={dbgKbd}  sv={dbgSv}
+        </Text>
         <ScrollView
           ref={scrollRef}
+          onLayout={e => setDbgSv(Math.round(e.nativeEvent.layout.height))}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           automaticallyAdjustKeyboardInsets={true}>
@@ -258,6 +285,15 @@ const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  // TEMP DEBUG — remove before build cut.
+  debugBanner: {
+    backgroundColor: '#B00020',
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+    paddingVertical: 6,
   },
   flex: {
     flex: 1,
