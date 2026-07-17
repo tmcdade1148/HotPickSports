@@ -411,7 +411,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       // 'upgrade_required' is the facade's enforce-mode response (founding
       // season off); 'pool_full' is the legacy code. Both mean "at cap".
       if (data?.error === 'pool_full' || data?.error === 'upgrade_required') {
-        return {error: 'pool_full', poolFull: true};
+        return {error: 'pool_full', poolFull: true, errorCode: 'pool_full'};
       }
       // Map the RPC's raw error codes to user-facing copy so internal
       // tokens (NOT_FOUND, ALREADY_MEMBER) never surface in the join UI.
@@ -421,10 +421,17 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
         ALREADY_MEMBER: "You're already in this Contest.",
       };
       const rawCode = data?.error as string | undefined;
+      const errorCode =
+        rawCode === 'NOT_FOUND'
+          ? 'not_found'
+          : rawCode === 'ALREADY_MEMBER'
+            ? 'already_member'
+            : 'invalid';
       return {
         error:
           (rawCode && friendlyJoinError[rawCode]) ??
           'Invalid invite code. Please check and try again.',
+        errorCode,
       };
     }
 
@@ -441,7 +448,11 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     // join→pending migration lands — this client is safe to ship first (OTA).
     if ((data as {status?: string}).status === 'pending') {
       const pendingPool = data.pool as DbPool;
-      return {pending: true, poolName: pendingPool?.name};
+      return {
+        pending: true,
+        poolName: pendingPool?.name,
+        organizerId: pendingPool?.organizer_id ?? null,
+      };
     }
 
     const typedPool = data.pool as DbPool;

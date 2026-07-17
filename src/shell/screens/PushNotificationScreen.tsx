@@ -14,10 +14,15 @@ import {useTheme} from '@shell/theme';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {registerForPushNotifications, seedNotificationPreferences} from '@shell/services/pushNotifications';
 
+// Verbatim from HOME_MODULE_MAP "Onboarding 2 — Notifications". Three lines,
+// no icons: the old ⏰/🏆/📈 pairing broke on two of the three once the copy
+// changed, and the intuitive icon for "Special HotPick Announcements" is 🔥 —
+// which rule 1 permanently forbids outside the HotPick card. A pattern that can
+// never be completed correctly shouldn't be half-kept.
 const BENEFITS = [
-  {icon: '\u{23F0}', text: 'Pick deadline reminders so you never miss a week'},
-  {icon: '\u{1F3C6}', text: 'Score alerts when your picks land'},
-  {icon: '\u{1F4C8}', text: 'Know instantly when you move up the leaderboard'},
+  'Pick deadline reminders so you never miss a week',
+  'Important messages from your Gaffers and Leagues',
+  'Special HotPick Announcements',
 ];
 
 export function PushNotificationScreen({navigation}: any) {
@@ -79,10 +84,9 @@ export function PushNotificationScreen({navigation}: any) {
 
         <View style={styles.benefitsList}>
           {BENEFITS.map((benefit, index) => (
-            <View key={index} style={styles.benefitRow}>
-              <Text style={styles.benefitIcon}>{benefit.icon}</Text>
-              <Text style={styles.benefitText}>{benefit.text}</Text>
-            </View>
+            <Text key={index} style={styles.benefitText}>
+              {benefit}
+            </Text>
           ))}
         </View>
 
@@ -145,18 +149,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginBottom: spacing.xl,
     gap: spacing.md,
   },
-  benefitRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  benefitIcon: {
-    fontSize: 24,
-    width: 32,
-    textAlign: 'center',
-  },
   benefitText: {
-    flex: 1,
     fontSize: 15,
     color: colors.textPrimary,
     lineHeight: 22,

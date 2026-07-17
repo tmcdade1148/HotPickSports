@@ -16,8 +16,8 @@ import {
 } from '@shell/services/pendingInvite';
 import {getDefaultEvent} from '@sports/registry';
 import {getDisplayName} from '@shared/utils/displayName';
-import {leagueWelcomeCopy} from '@shared/copy/leagueWelcome';
-import {applicationPendingMessage} from '@shared/lexicon';
+import {supabase} from '@shared/config/supabase';
+import type {DbProfile} from '@shared/types/database';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 
@@ -43,21 +43,51 @@ export function PoolWelcomeScreen({navigation}: any) {
   const [inviteCode, setInviteCode] = useState('');
   const [joinedPool, setJoinedPool] = useState<{
     name: string;
+    organizerId: string | null;
   } | null>(null);
-  // Gaffer Approval Gate: Contest name when the join landed pending (applicant
+  // Gaffer Approval Gate: Contest when the join landed pending (applicant
   // awaits the Gaffer). Distinct from joinedPool — they are NOT a member yet.
-  const [pendingContest, setPendingContest] = useState<string | null>(null);
+  const [pendingContest, setPendingContest] = useState<{
+    name: string;
+    organizerId: string | null;
+  } | null>(null);
+  // Resolved Gaffer display name for the joined / pending copy. Stays null when
+  // it can't be resolved — the caller OMITS the Gaffer line rather than
+  // substituting invented copy.
+  const [gafferName, setGafferName] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState('');
 
   const displayName = getDisplayName(userProfile);
   const hasDeepLinkInvite = !!pendingInviteCode;
-  // Chairman or Director of a League (partner board). Their welcome now lives
-  // on ProfileSetup, so they skip this player-oriented page entirely (see the
-  // auto-forward effect below). leagueWelcome is kept only as a graceful
-  // fallback in case managedClub hasn't resolved by the time this renders.
+  // Chairman or Director of a League (partner board). Their welcome lives on
+  // ProfileSetup, so they skip this player-oriented page entirely (see the
+  // auto-forward effect below).
   const isLeagueManager = !!managedClub;
-  const leagueWelcome = leagueWelcomeCopy(managedClub?.role);
+
+  // Resolve the Gaffer's name for the joined / pending welcome. profiles is
+  // world-readable (profiles_select USING true), so this works even for a
+  // pending applicant who is not a member yet. Gated on poolie_name: a Gaffer
+  // without one would render as the generic "Player", so treat that as
+  // unresolved and drop the line instead.
+  useEffect(() => {
+    const organizerId =
+      joinedPool?.organizerId ?? pendingContest?.organizerId ?? null;
+    if (!organizerId) return;
+    let active = true;
+    (async () => {
+      const {data} = await supabase
+        .from('profiles')
+        .select('poolie_name, first_name, last_name')
+        .eq('id', organizerId)
+        .maybeSingle();
+      if (!active) return;
+      if (data?.poolie_name) setGafferName(getDisplayName(data as DbProfile));
+    })();
+    return () => {
+      active = false;
+    };
+  }, [joinedPool?.organizerId, pendingContest?.organizerId]);
 
   // Auto-join if there's a pending invite code. Re-resolve first as a safety net
   // in case LoadingScreen's async resolution hadn't landed before this mounted
@@ -92,15 +122,22 @@ export function PoolWelcomeScreen({navigation}: any) {
     consumePendingInviteCode();
 
     if (result.pending) {
-      setPendingContest(result.poolName ?? 'the Contest');
+      setPendingContest({
+        name: result.poolName ?? 'the Contest',
+        organizerId: result.organizerId ?? null,
+      });
     } else if (result.pool) {
-      setJoinedPool({name: result.pool.name});
+      setJoinedPool({
+        name: result.pool.name,
+        organizerId: result.pool.organizer_id ?? null,
+      });
     } else if (result.poolFull) {
-      setJoinError('This Contest is full and cannot accept new members.');
+      setJoinError('That Contest is full. The Gaffer can make room — worth an ask.');
+    } else if (result.errorCode === 'already_member') {
+      setJoinError("You're already in that one.");
     } else {
-      setJoinError(
-        result.error ?? 'Could not join the Contest. The invite code may be invalid or the Contest is full.',
-      );
+      // Bad code / NOT_FOUND / any other cause — one actionable line.
+      setJoinError("That code didn't work. Double-check it with whoever sent it.");
     }
     setJoining(false);
   };
@@ -151,32 +188,33 @@ export function PoolWelcomeScreen({navigation}: any) {
             </>
           ) : joinError ? (
             <>
-              <Text style={styles.title}>Hmm, that didn't work</Text>
-              <Text style={styles.errorText}>{joinError}</Text>
+              <Text style={styles.title}>That code didn't work.</Text>
+              <Text style={styles.errorText}>
+                Double-check it with whoever sent it, or skip and add one later.
+              </Text>
               <TouchableOpacity
                 style={styles.primaryButton}
+                onPress={() => setJoinError('')}>
+                <Text style={styles.primaryButtonText}>Try again</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.secondaryButton}
                 onPress={initializeAndNavigate}>
-                <Text style={styles.primaryButtonText}>Continue anyway</Text>
+                <Text style={styles.secondaryButtonText}>I'll do this later</Text>
               </TouchableOpacity>
             </>
           ) : joinedPool ? (
             <>
               <Text style={styles.checkmark}>{'\u{2705}'}</Text>
-              <Text style={styles.title}>You're in!</Text>
+              <Text style={styles.title}>You're in.</Text>
               <Text style={styles.poolName}>{joinedPool.name}</Text>
+              {gafferName ? (
+                <Text style={styles.gafferLine}>{gafferName} runs it.</Text>
+              ) : null}
               <Text style={styles.subtitle}>
-                You're also in the HotPick NFL 2026 Contest — compete with
-                everyone on the platform.
+                Your Picks play here and in every other Contest you're in. One
+                set of calls.
               </Text>
-
-              <View style={styles.mechanic}>
-                <Text style={styles.mechanicTitle}>How HotPick works</Text>
-                <Text style={styles.mechanicText}>
-                  Pick winners each week. Designate one as your HotPick for
-                  bonus points. Compete with your Contest and climb the
-                  Ladder.
-                </Text>
-              </View>
 
               <TouchableOpacity
                 style={styles.primaryButton}
@@ -187,10 +225,15 @@ export function PoolWelcomeScreen({navigation}: any) {
           ) : pendingContest ? (
             <>
               <Text style={styles.checkmark}>{'\u{23F3}'}</Text>
-              <Text style={styles.title}>Request sent</Text>
+              <Text style={styles.title}>Request sent.</Text>
+              <Text style={styles.poolName}>{pendingContest.name}</Text>
+              {gafferName ? (
+                <Text style={styles.gafferLine}>
+                  {gafferName} has to wave you in. You'll know when they do.
+                </Text>
+              ) : null}
               <Text style={styles.subtitle}>
-                {applicationPendingMessage(pendingContest)} In the meantime you're
-                already in the HotPick NFL 2026 Contest — start picking.
+                Make your Picks in the meantime — your record follows you in.
               </Text>
               <TouchableOpacity
                 style={styles.primaryButton}
@@ -212,22 +255,29 @@ export function PoolWelcomeScreen({navigation}: any) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.content}>
           <Text style={styles.welcomeEmoji}>{'\u{1F44B}'}</Text>
-          <Text style={styles.title}>Welcome, {displayName}!</Text>
+          <Text style={styles.title}>Hey {displayName}</Text>
           <Text style={styles.subtitle}>
-            {leagueWelcome ??
-              "You're in the HotPick NFL 2026 Contest — compete with everyone on the platform."}
+            Your Picks. On the record. Bragging rights TBD.
           </Text>
 
           <View style={styles.mechanic}>
             <Text style={styles.mechanicTitle}>How HotPick works</Text>
             <Text style={styles.mechanicText}>
-              Pick winners each week. Designate one as your HotPick for bonus
-              points. Compete with your Contest and climb the Ladder.
+              Pick winners every week. Designate one as your HotPick. That's
+              where you plant your flag. Picks lock at first kickoff and
+              everyone sees everyone else's call. Make picks once and they play
+              in every Contest you're in. The longer you play, the more it
+              means.
             </Text>
           </View>
 
           <View style={styles.inviteSection}>
             <Text style={styles.inviteLabel}>Have a Contest invite code?</Text>
+            <Text style={styles.inviteBody}>
+              A Contest is your group. Family, coworkers, the middle school
+              group text. Invite codes come from a Contest's Gaffer, whoever
+              runs it. Join as many as you want. The record comes with you.
+            </Text>
             <View style={styles.codeRow}>
               <TextInput
                 style={styles.codeInput}
@@ -263,10 +313,15 @@ export function PoolWelcomeScreen({navigation}: any) {
             ) : null}
           </View>
 
+          <Text style={styles.gafferPitch}>
+            Don't have an invite code? Then you should be the Gaffer and start
+            your own Contest.
+          </Text>
+
           <TouchableOpacity
             style={styles.primaryButton}
             onPress={initializeAndNavigate}>
-            <Text style={styles.primaryButtonText}>Skip — I'll add later</Text>
+            <Text style={styles.primaryButtonText}>I'll do this later</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -307,7 +362,15 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: colors.primary,
+    marginBottom: spacing.xs,
+  },
+  gafferLine: {
+    fontSize: 15,
+    color: colors.textPrimary,
+    textAlign: 'center',
+    lineHeight: 22,
     marginBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
   },
   subtitle: {
     fontSize: 15,
@@ -343,7 +406,21 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  inviteBody: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    lineHeight: 20,
     marginBottom: spacing.sm,
+  },
+  gafferPitch: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: spacing.lg,
+    paddingHorizontal: spacing.md,
   },
   codeRow: {
     flexDirection: 'row',
@@ -392,6 +469,16 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.onPrimary,
     fontSize: 16,
     fontWeight: '600',
+  },
+  secondaryButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    width: '100%',
+    marginTop: spacing.sm,
+  },
+  secondaryButtonText: {
+    color: colors.textSecondary,
+    fontSize: 14,
   },
   joiningText: {
     marginTop: spacing.md,

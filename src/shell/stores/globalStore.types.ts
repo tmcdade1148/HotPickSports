@@ -142,11 +142,19 @@ export interface GlobalState {
     pool?: DbPool;
     error?: string;
     poolFull?: boolean;
+    // Machine-readable join-failure cause, so callers can pick their own copy
+    // per case instead of matching on `error` text. `error` stays for callers
+    // that render the store's default strings (e.g. JoinPoolScreen).
+    errorCode?: 'pool_full' | 'not_found' | 'already_member' | 'invalid';
     // Gaffer Approval Gate: a fresh join lands pending, not active. `pending`
     // routes the caller to the waiting-room; `poolName` labels the Contest
     // applied to (the pool is intentionally NOT added to any list).
     pending?: boolean;
     poolName?: string;
+    // Gaffer of the applied-to Contest. The pool object is deliberately not
+    // returned on the pending branch, so the organizer id is surfaced on its
+    // own for the waiting-room copy ("<Gaffer> has to wave you in").
+    organizerId?: string | null;
   }>;
   joinPublicContest: (
     userId: string,

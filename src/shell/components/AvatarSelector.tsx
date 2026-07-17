@@ -22,9 +22,22 @@ function defaultUploadPress() {
   );
 }
 
-/** System avatars — colored abstract shapes with initials fallback */
+/** System avatars — colored abstract shapes with initials fallback.
+ *
+ * No flame here, deliberately. The flame means exactly one thing in this
+ * product — "this is my HotPick" — and it renders on the HotPick card and
+ * nowhere else (HOME_MODULE_MAP rule 1, which bans it on Ladder rows
+ * specifically). avatar_flame used to be entry [0], so it was both the default
+ * and the most-picked avatar; a third of every Ladder was flames meaning
+ * "I'm a user" sitting next to one flame meaning "this is my call". Spend the
+ * symbol on avatars and it can't mean anything else. Do not re-add it.
+ *
+ * Legacy: profiles written before 2026-07-16 may still hold avatar_key
+ * 'avatar_flame'. Every read path degrades gracefully (AvatarBadge falls back
+ * to the initial circle; SettingsScreen to a User icon) and self-heals when the
+ * Player next picks an avatar.
+ */
 const SYSTEM_AVATARS = [
-  {key: 'avatar_flame', color: '#F66321', emoji: '\u{1F525}'},
   {key: 'avatar_bolt', color: '#FFD166', emoji: '\u{26A1}'},
   {key: 'avatar_trophy', color: '#1DC24C', emoji: '\u{1F3C6}'},
   {key: 'avatar_star', color: '#004E89', emoji: '\u{2B50}'},
