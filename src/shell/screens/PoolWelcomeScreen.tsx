@@ -8,6 +8,7 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  Keyboard,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useGlobalStore} from '@shell/stores/globalStore';
@@ -62,6 +63,27 @@ export function PoolWelcomeScreen({navigation}: any) {
   // Android — a focused field can stay buried under the keyboard. On focus we
   // scroll the invite field (near the bottom of the content) into view.
   const scrollRef = useRef<ScrollView>(null);
+  // Edge-to-edge keyboard handling (Android). At targetSdk 36 the OS forces
+  // edge-to-edge so the window never resizes when the keyboard opens — the
+  // ScrollView keeps full height with zero overscroll and scrollToEnd has
+  // nowhere to go. RN still reports the keyboard height, so we add it as bottom
+  // padding to create the room, then scrollToEnd lifts the invite field above
+  // the keyboard. iOS is handled by KAV behavior="padding" and left untouched.
+  const [kbHeight, setKbHeight] = useState(0);
+  useEffect(() => {
+    if (Platform.OS !== 'android') return; // iOS handled by KAV behavior="padding"
+    const show = Keyboard.addListener('keyboardDidShow', e => {
+      setKbHeight(Math.round(e.endCoordinates.height));
+      // Re-run the scroll once the padding is applied — onFocus's timer can fire
+      // before keyboardDidShow on the first focus, before there's room to scroll.
+      setTimeout(() => scrollRef.current?.scrollToEnd({animated: true}), 80);
+    });
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKbHeight(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   const displayName = getDisplayName(userProfile);
   const hasDeepLinkInvite = !!pendingInviteCode;
@@ -268,7 +290,10 @@ export function PoolWelcomeScreen({navigation}: any) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           ref={scrollRef}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            kbHeight > 0 && {paddingBottom: kbHeight},
+          ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
           <Text style={styles.welcomeEmoji}>{'\u{1F44B}'}</Text>
@@ -374,8 +399,8 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   // Organic branch scrolls (it has the invite TextInput). flexGrow keeps the
   // block vertically centered when it fits, and lets it scroll the field above
-  // the keyboard when the OS shrinks the viewport (iOS via KAV padding, Android
-  // via the manifest's adjustResize). Mirrors EmailEntryScreen's KAV+ScrollView.
+  // the keyboard (iOS via KAV padding; Android via the keyboard-height bottom
+  // padding applied above — adjustResize is inert under OS-enforced edge-to-edge).
   scrollContent: {
     flexGrow: 1,
     alignItems: 'center',

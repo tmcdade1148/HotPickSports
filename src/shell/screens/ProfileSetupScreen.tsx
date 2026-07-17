@@ -9,7 +9,7 @@ import {
   Platform,
   ScrollView,
   Alert,
-  Keyboard, // TEMP DEBUG — remove before build cut
+  Keyboard,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useGlobalStore} from '@shell/stores/globalStore';
@@ -107,36 +107,24 @@ export function ProfileSetupScreen({navigation}: any) {
     }
   };
 
-  // Keyboard-safe scrolling. On Android the KAV behavior is undefined and
-  // automaticallyAdjustKeyboardInsets is iOS-only, so nothing lifts a focused
-  // field above the keyboard on its own (verified on device: Player Name sat
-  // under it). Each field records its y in the scroll content via onLayout, and
-  // onFocus scrolls that y to just below the viewport top. Works on both
-  // platforms independent of the KAV behavior.
+  // Keyboard-safe scrolling under OS-enforced edge-to-edge (Android). At
+  // targetSdk 36 the OS forces edge-to-edge and the window never resizes when
+  // the keyboard opens — the manifest's adjustResize is inert, so the ScrollView
+  // stays full-height (measured on device: sv=805 open and closed) with zero
+  // overscroll and a focused field sits stranded under the keyboard. RN still
+  // reports the keyboard height correctly (measured 339), so we add that as
+  // bottom padding to create the scroll room, then scroll the focused field's
+  // recorded y to just below the viewport top. iOS is handled by
+  // KeyboardAvoidingView behavior="padding" and is left untouched.
   const scrollRef = useRef<ScrollView>(null);
   const fieldY = useRef<Record<string, number>>({});
+  const focusedKey = useRef<string | null>(null);
+  const [kbHeight, setKbHeight] = useState(0);
 
-  // ── TEMP DEBUG — edge-to-edge keyboard diagnosis. REMOVE BEFORE BUILD CUT. ──
-  // Decides native-vs-OTA fix. Tom taps a field and reads the on-screen banner:
-  //   kbd = 0     → RN reports no keyboard height → JS fixes are dead → native.
-  //   kbd = ~300  → keyboard height is live → JS path (KAV behavior="height")
-  //                 works → Monday's build stays untouched.
-  //   sv should be identical before/after → confirms the window never resizes.
-  const [dbgKbd, setDbgKbd] = useState(0);
-  const [dbgSv, setDbgSv] = useState(0);
-  useEffect(() => {
-    const show = Keyboard.addListener('keyboardDidShow', e =>
-      setDbgKbd(Math.round(e.endCoordinates.height)),
-    );
-    const hide = Keyboard.addListener('keyboardDidHide', () => setDbgKbd(0));
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, []);
-  // ── END TEMP DEBUG ──
   const scrollFieldIntoView = (key: string) => {
-    // Delay so the keyboard has begun to show and layout has settled.
+    focusedKey.current = key;
+    // Delay so the keyboard has begun to show and layout (including the new
+    // bottom padding) has settled before we scroll.
     setTimeout(() => {
       const y = fieldY.current[key];
       if (y != null) {
@@ -145,20 +133,34 @@ export function ProfileSetupScreen({navigation}: any) {
     }, 80);
   };
 
+  useEffect(() => {
+    if (Platform.OS !== 'android') return; // iOS handled by KAV behavior="padding"
+    const show = Keyboard.addListener('keyboardDidShow', e => {
+      setKbHeight(Math.round(e.endCoordinates.height));
+      // Re-run the scroll once the padding is applied. On the first focus,
+      // onFocus's timer can fire before keyboardDidShow, i.e. before the padding
+      // that gives the scroll somewhere to go.
+      if (focusedKey.current) scrollFieldIntoView(focusedKey.current);
+    });
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKbHeight(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        {/* TEMP DEBUG banner — REMOVE BEFORE BUILD CUT. Reads: keyboard height
-            reported by RN (kbd) and the ScrollView viewport height (sv). */}
-        <Text style={styles.debugBanner}>
-          TEMP DEBUG  kbd={dbgKbd}  sv={dbgSv}
-        </Text>
         <ScrollView
           ref={scrollRef}
-          onLayout={e => setDbgSv(Math.round(e.nativeEvent.layout.height))}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            kbHeight > 0 && {paddingBottom: kbHeight},
+          ]}
           keyboardShouldPersistTaps="handled"
           automaticallyAdjustKeyboardInsets={true}>
           {/* Greeting */}
@@ -285,15 +287,6 @@ const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-  },
-  // TEMP DEBUG — remove before build cut.
-  debugBanner: {
-    backgroundColor: '#B00020',
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-    textAlign: 'center',
-    paddingVertical: 6,
   },
   flex: {
     flex: 1,
