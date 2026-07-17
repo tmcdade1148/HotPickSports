@@ -2,6 +2,7 @@ import React, {useEffect, useState} from 'react';
 import {Text, TextInput} from '@shared/components/AppText';
 import {
   View,
+  ScrollView,
   TouchableOpacity,
   ActivityIndicator,
   StyleSheet,
@@ -127,6 +128,11 @@ export function PoolWelcomeScreen({navigation}: any) {
         organizerId: result.organizerId ?? null,
       });
     } else if (result.pool) {
+      // organizer_id comes straight from the RPC payload now: join_pool_by_invite
+      // returns public._pool_client_json(v_pool), which includes it (repointed
+      // 2026-07-17). Same field the pending branch reads — one source, both
+      // branches. (The prior userPools lookup could only ever work for the joined
+      // branch anyway: a pending applicant's pool is kept out of userPools by RLS.)
       setJoinedPool({
         name: result.pool.name,
         organizerId: result.pool.organizer_id ?? null,
@@ -209,7 +215,10 @@ export function PoolWelcomeScreen({navigation}: any) {
               <Text style={styles.title}>You're in.</Text>
               <Text style={styles.poolName}>{joinedPool.name}</Text>
               {gafferName ? (
-                <Text style={styles.gafferLine}>{gafferName} runs it.</Text>
+                <Text style={styles.gafferLine}>
+                  {gafferName} runs this one. That makes them the Gaffer.
+                  Complaints go to them.
+                </Text>
               ) : null}
               <Text style={styles.subtitle}>
                 Your Picks play here and in every other Contest you're in. One
@@ -253,7 +262,10 @@ export function PoolWelcomeScreen({navigation}: any) {
       <KeyboardAvoidingView
         style={styles.inner}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={styles.content}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}>
           <Text style={styles.welcomeEmoji}>{'\u{1F44B}'}</Text>
           <Text style={styles.title}>Hey {displayName}</Text>
           <Text style={styles.subtitle}>
@@ -314,8 +326,12 @@ export function PoolWelcomeScreen({navigation}: any) {
           </View>
 
           <Text style={styles.gafferPitch}>
-            Don't have an invite code? Then you should be the Gaffer and start
-            your own Contest.
+            Don't have an invite code? Then you should be the Gaffer and{' '}
+            <Text
+              style={styles.gafferPitchLink}
+              onPress={() => navigation.navigate('CreatePool')}>
+              start your own Contest.
+            </Text>
           </Text>
 
           <TouchableOpacity
@@ -323,7 +339,7 @@ export function PoolWelcomeScreen({navigation}: any) {
             onPress={initializeAndNavigate}>
             <Text style={styles.primaryButtonText}>I'll do this later</Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -342,6 +358,17 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
+  },
+  // Organic branch scrolls (it has the invite TextInput). flexGrow keeps the
+  // block vertically centered when it fits, and lets it scroll the field above
+  // the keyboard when the OS shrinks the viewport (iOS via KAV padding, Android
+  // via the manifest's adjustResize). Mirrors EmailEntryScreen's KAV+ScrollView.
+  scrollContent: {
+    flexGrow: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
   },
   welcomeEmoji: {
     fontSize: 48,
@@ -415,12 +442,18 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginBottom: spacing.sm,
   },
   gafferPitch: {
-    fontSize: 14,
-    color: colors.textSecondary,
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.textPrimary,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 23,
     marginBottom: spacing.lg,
     paddingHorizontal: spacing.md,
+  },
+  gafferPitchLink: {
+    color: colors.primary,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
   codeRow: {
     flexDirection: 'row',

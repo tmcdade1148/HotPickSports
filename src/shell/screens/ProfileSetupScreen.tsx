@@ -113,7 +113,8 @@ export function ProfileSetupScreen({navigation}: any) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled">
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets={true}>
           {/* Greeting */}
           <Text style={styles.greeting}>Welcome!</Text>
           {leagueWelcome ? (

@@ -133,7 +133,7 @@ export function JoinPoolScreen({navigation, route}: any) {
           />
 
           <Text style={styles.hint}>
-            Ask a friend for their Contest invite code ({INVITE_CODE_MIN}–{INVITE_CODE_MAX} letters and numbers).
+            Ask the Gaffer, or anyone already in it.
           </Text>
 
           {looksLikeRosterPass && !error && (
