@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {Text, TextInput} from '@shared/components/AppText';
 import {
   View,
@@ -58,6 +58,10 @@ export function PoolWelcomeScreen({navigation}: any) {
   const [gafferName, setGafferName] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState('');
+  // Organic-branch ScrollView ref. Making the content scrollable isn't enough on
+  // Android — a focused field can stay buried under the keyboard. On focus we
+  // scroll the invite field (near the bottom of the content) into view.
+  const scrollRef = useRef<ScrollView>(null);
 
   const displayName = getDisplayName(userProfile);
   const hasDeepLinkInvite = !!pendingInviteCode;
@@ -263,6 +267,7 @@ export function PoolWelcomeScreen({navigation}: any) {
         style={styles.inner}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
@@ -299,6 +304,14 @@ export function PoolWelcomeScreen({navigation}: any) {
                 onChangeText={text => {
                   setInviteCode(text.toUpperCase());
                   if (joinError) setJoinError('');
+                }}
+                onFocus={() => {
+                  // Delay so the keyboard is up; scroll the field (+ Join button
+                  // and the CTA below it) above the keyboard on both platforms.
+                  setTimeout(
+                    () => scrollRef.current?.scrollToEnd({animated: true}),
+                    80,
+                  );
                 }}
                 autoCapitalize="characters"
                 autoCorrect={false}

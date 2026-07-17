@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {Text, TextInput} from '@shared/components/AppText';
 import {
   View,
@@ -106,12 +106,31 @@ export function ProfileSetupScreen({navigation}: any) {
     }
   };
 
+  // Keyboard-safe scrolling. On Android the KAV behavior is undefined and
+  // automaticallyAdjustKeyboardInsets is iOS-only, so nothing lifts a focused
+  // field above the keyboard on its own (verified on device: Player Name sat
+  // under it). Each field records its y in the scroll content via onLayout, and
+  // onFocus scrolls that y to just below the viewport top. Works on both
+  // platforms independent of the KAV behavior.
+  const scrollRef = useRef<ScrollView>(null);
+  const fieldY = useRef<Record<string, number>>({});
+  const scrollFieldIntoView = (key: string) => {
+    // Delay so the keyboard has begun to show and layout has settled.
+    setTimeout(() => {
+      const y = fieldY.current[key];
+      if (y != null) {
+        scrollRef.current?.scrollTo({y: Math.max(y - 24, 0), animated: true});
+      }
+    }, 80);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           automaticallyAdjustKeyboardInsets={true}>
@@ -138,7 +157,11 @@ export function ProfileSetupScreen({navigation}: any) {
           </View>
 
           {/* First name (required) — pre-filled from the OAuth provider when available */}
-          <View style={styles.section}>
+          <View
+            style={styles.section}
+            onLayout={e => {
+              fieldY.current.first = e.nativeEvent.layout.y;
+            }}>
             <Text style={styles.label}>
               First name <Text style={styles.required}>*</Text>
             </Text>
@@ -148,6 +171,7 @@ export function ProfileSetupScreen({navigation}: any) {
               placeholderTextColor={colors.textSecondary}
               value={firstName}
               onChangeText={setFirstName}
+              onFocus={() => scrollFieldIntoView('first')}
               autoCapitalize="words"
               autoCorrect={false}
               editable={!saving}
@@ -155,7 +179,11 @@ export function ProfileSetupScreen({navigation}: any) {
           </View>
 
           {/* Last name (required) — stored, but only the initial is shown publicly */}
-          <View style={styles.section}>
+          <View
+            style={styles.section}
+            onLayout={e => {
+              fieldY.current.last = e.nativeEvent.layout.y;
+            }}>
             <Text style={styles.label}>
               Last name <Text style={styles.required}>*</Text>
             </Text>
@@ -165,6 +193,7 @@ export function ProfileSetupScreen({navigation}: any) {
               placeholderTextColor={colors.textSecondary}
               value={lastName}
               onChangeText={setLastName}
+              onFocus={() => scrollFieldIntoView('last')}
               autoCapitalize="words"
               autoCorrect={false}
               editable={!saving}
@@ -175,7 +204,11 @@ export function ProfileSetupScreen({navigation}: any) {
           </View>
 
           {/* Poolie name (required) */}
-          <View style={styles.section}>
+          <View
+            style={styles.section}
+            onLayout={e => {
+              fieldY.current.poolie = e.nativeEvent.layout.y;
+            }}>
             <Text style={styles.label}>
               Choose your Player Name <Text style={styles.required}>*</Text>
             </Text>
@@ -185,6 +218,7 @@ export function ProfileSetupScreen({navigation}: any) {
               placeholderTextColor={colors.textSecondary}
               value={poolieName}
               onChangeText={setPoolieName}
+              onFocus={() => scrollFieldIntoView('poolie')}
               autoCapitalize="none"
               autoCorrect={false}
               maxLength={20}
