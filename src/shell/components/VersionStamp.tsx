@@ -33,22 +33,35 @@ export function VersionStamp({style}: {style?: any}) {
   const {colors} = useTheme();
   const version = Constants.expoConfig?.version ?? '?';
 
-  // Read expo-updates constants defensively — reads are safe when updates are
-  // disabled (dev), but guard so the stamp can never crash a screen.
+  // Check isEnabled FIRST. A dev build (Xcode / expo-updates disabled) cannot
+  // take an OTA at all, so channel/date are empty and "OTA" would be a lie —
+  // the exact wrong answer to the only question this stamp exists to answer.
+  // isEmbedded is the wrong test here: it asks embedded-vs-downloaded, which
+  // only means anything once updates ARE enabled. When disabled we say "dev"
+  // and skip channel/date entirely rather than print empty separators.
+  let enabled = false;
   let createdAt: Date | null = null;
   let channel: string | null = null;
   let embedded = false;
   try {
-    createdAt = Updates.createdAt;
-    channel = Updates.channel;
-    embedded = Updates.isEmbedded;
+    enabled = Updates.isEnabled;
+    if (enabled) {
+      createdAt = Updates.createdAt;
+      channel = Updates.channel;
+      embedded = Updates.isEmbedded;
+    }
   } catch {
-    // updates module unavailable — fall through to the version-only stamp
+    // updates module unavailable — treated as disabled (dev) below
   }
 
-  const parts = [`v${version}`, channel ?? 'dev'];
-  if (createdAt) parts.push(fmtDate(createdAt));
-  parts.push(embedded ? 'embedded' : 'OTA');
+  const parts = [`v${version}`];
+  if (!enabled) {
+    parts.push('dev');
+  } else {
+    parts.push(channel ?? '?');
+    if (createdAt) parts.push(fmtDate(createdAt));
+    parts.push(embedded ? 'embedded' : 'OTA');
+  }
 
   return (
     <Text style={[styles.stamp, {color: colors.textTertiary}, style]}>

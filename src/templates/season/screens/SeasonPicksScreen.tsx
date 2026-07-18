@@ -97,7 +97,6 @@ export function SeasonPicksScreen() {
   const dbCurrentWeek = useNFLStore(s => s.currentWeek);
   const weekState = useNFLStore(s => s.weekState);
   const currentPhase = useNFLStore(s => s.currentPhase);
-  const picksOpenAt = useNFLStore(s => s.picksOpenAt);
   const activePoolId = useGlobalStore(s => s.activePoolId);
   const subscribeToGameScores = useSeasonStore(s => s.subscribeToGameScores);
 
@@ -375,19 +374,42 @@ export function SeasonPicksScreen() {
     );
   }
 
-  // PRE_SEASON: no picks yet — show a holding screen
-  if (currentPhase === 'PRE_SEASON') {
-    const picksOpenLabel = picksOpenAt
-      ? picksOpenAt.toLocaleDateString([], {weekday: 'long', month: 'long', day: 'numeric'})
-      : null;
+  // Outside the weekly cycle → no slate, just a holding screen (REFERENCE.md
+  // §557 idle phases). Gate on current_phase, the authority — week_state is
+  // 'idle' for these too, but it's derived from ESPN's 5-min cron and lags.
+  // No countdown here: Home owns that. Picks points, Home tells.
+  const IDLE_PHASES = [
+    'OFF_SEASON',
+    'PRE_SEASON',
+    'REGULAR_COMPLETE',
+    'SUPERBOWL_INTRO',
+    'SEASON_COMPLETE',
+  ];
+  if (IDLE_PHASES.includes(currentPhase)) {
+    const {title, body} = (() => {
+      switch (currentPhase) {
+        case 'SEASON_COMPLETE':
+          return {
+            title: "That's the season.",
+            body: "No more picks. The Ladder's final — go see where you landed.",
+          };
+        case 'REGULAR_COMPLETE':
+        case 'SUPERBOWL_INTRO':
+          return {
+            title: 'Nothing to pick yet.',
+            body: "That week's done. The next one's coming.",
+          };
+        default: // OFF_SEASON, PRE_SEASON
+          return {
+            title: 'Nothing to pick yet.',
+            body: "The schedule's set. Home's counting the days.",
+          };
+      }
+    })();
     return (
       <View style={styles.centered}>
-        <Text style={styles.emptyTitle}>Picks aren't open yet.</Text>
-        <Text style={styles.emptyText}>
-          {picksOpenLabel
-            ? `Picks open ${picksOpenLabel}. The schedule is loaded — come back then.`
-            : 'The schedule is set. Check back when the season kicks off.'}
-        </Text>
+        <Text style={styles.emptyTitle}>{title}</Text>
+        <Text style={styles.emptyText}>{body}</Text>
       </View>
     );
   }
