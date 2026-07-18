@@ -6,8 +6,11 @@
 // Send button shows the recipient count + an explicit "this cannot be
 // undone" confirmation before invoking admin-broadcast Edge Function.
 //
-// Rate limit is enforced server-side (1 per 24h) — we surface the
-// "next available" timestamp the function returns.
+// Rate limit is enforced SERVER-SIDE and the server is the SOLE gate. The
+// admin-broadcast Edge Function reads the cadence from the competition_config
+// global key `admin_broadcast_rate_limit_hours` (0 = no limit) and answers 429
+// when it declines. The client never predicts the limit — it only surfaces the
+// wait_hours / next_available_at the function returns.
 
 import React, {useEffect, useState} from 'react';
 import {Text, TextInput} from '@shared/components/AppText';
@@ -38,7 +41,11 @@ function AdminBroadcastScreenImpl() {
   const [body, setBody] = useState('');
   const [target, setTarget] = useState<string>('all');
   const [sending, setSending] = useState(false);
-  const [lastSentAt, setLastSentAt] = useState<string | null>(null);
+  // Set ONLY from a server 429 — never computed locally. Null until the server
+  // actually declines a send.
+  const [rateLimit, setRateLimit] = useState<
+    {waitHours: number | null; nextAvailableAt: string | null} | null
+  >(null);
   const [competitions, setCompetitions] = useState<TargetOption[]>([{label: 'All users', value: 'all'}]);
 
   useEffect(() => {
@@ -54,25 +61,19 @@ function AdminBroadcastScreenImpl() {
         {label: 'All users', value: 'all'},
         ...Array.from(seen).sort().map(c => ({label: c, value: c})),
       ]);
-
-      // Last broadcast timestamp for the rate-limit indicator
-      const {data: last} = await supabase
-        .from('competition_config')
-        .select('value, updated_at')
-        .eq('competition', 'global')
-        .eq('key', 'last_admin_broadcast_at')
-        .maybeSingle();
-      if (last?.value) {
-        const iso = typeof last.value === 'string' ? last.value : (last.value as {iso?: string})?.iso ?? null;
-        setLastSentAt(iso);
-      }
     })();
   }, []);
 
-  const ageHours = lastSentAt ? (Date.now() - new Date(lastSentAt).getTime()) / 3600000 : Infinity;
-  // Subject is optional; only the message body is required.
-  const canSend = ageHours >= 24 && body.trim().length > 0 && !sending;
-  const waitHours = ageHours < 24 ? Math.ceil(24 - ageHours) : 0;
+  // Validity ONLY. The client does not compute the rate limit — there is no
+  // hours constant here by design. Send is enabled whenever the message is
+  // well-formed; if the cadence hasn't elapsed the server answers 429 and we
+  // surface its numbers. Subject is optional.
+  const trimmed = body.trim();
+  const canSend =
+    trimmed.length > 0 &&
+    trimmed.length <= 280 &&
+    subject.trim().length <= 60 &&
+    !sending;
 
   const handleSend = () => {
     Alert.alert(
@@ -89,23 +90,49 @@ function AdminBroadcastScreenImpl() {
               body: {subject: subject.trim(), body: body.trim(), target},
             });
             setSending(false);
+
             if (error) {
+              // A declined send returns HTTP 429, so supabase-js routes it into
+              // `error` with data === null — which is why the old
+              // `result.error === 'RATE_LIMITED'` check below could never fire.
+              // The JSON body lives on the FunctionsHttpError's Response
+              // (`error.context`); reading it here is the only way wait_hours /
+              // next_available_at ever reach the UI.
+              let payload: any = null;
+              try {
+                payload = await (error as any).context?.json?.();
+              } catch {
+                // Non-JSON body — fall through to the generic failure alert.
+              }
+              if (payload?.error === 'RATE_LIMITED') {
+                setRateLimit({
+                  waitHours: payload.wait_hours ?? null,
+                  nextAvailableAt: payload.next_available_at ?? null,
+                });
+                return;
+              }
               Alert.alert('Failed', error.message);
               return;
             }
+
             const result = data as {error?: string; recipients?: number; wait_hours?: number; next_available_at?: string};
+            // Fallback only — reachable if the function ever answers 200 with a
+            // RATE_LIMITED body instead of 429.
             if (result?.error === 'RATE_LIMITED') {
-              Alert.alert('Rate limited', `Next broadcast available in ~${result.wait_hours}h.`);
+              setRateLimit({
+                waitHours: result.wait_hours ?? null,
+                nextAvailableAt: result.next_available_at ?? null,
+              });
               return;
             }
             if (result?.error) {
               Alert.alert('Failed', result.error);
               return;
             }
+            setRateLimit(null);
             Alert.alert('Sent', `Reached ${result.recipients ?? 0} recipients.`);
             setSubject('');
             setBody('');
-            setLastSentAt(new Date().toISOString());
           },
         },
       ],
@@ -126,14 +153,23 @@ function AdminBroadcastScreenImpl() {
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll}>
-          {waitHours > 0 && (
+          {/* Dormant unless the SERVER declines a send. Never predicted — with
+              admin_broadcast_rate_limit_hours at 0 this should never appear. */}
+          {rateLimit !== null && (
             <View style={[styles.warningCard, {backgroundColor: colors.surface, borderColor: colors.warning ?? colors.primary}]}>
               <Text style={[bodyType.bold, {color: colors.warning ?? colors.primary}]}>
                 Rate-limited
               </Text>
               <Text style={[bodyType.regular, {color: colors.textSecondary, marginTop: 4, fontSize: 12}]}>
-                You sent a broadcast {Math.floor(ageHours)}h ago. Next broadcast available in ~{waitHours}h.
+                {rateLimit.waitHours != null
+                  ? `The server declined this send. Next broadcast available in ~${rateLimit.waitHours}h.`
+                  : 'The server declined this send — the broadcast cadence has not elapsed yet.'}
               </Text>
+              {rateLimit.nextAvailableAt ? (
+                <Text style={[bodyType.regular, {color: colors.textTertiary, marginTop: 2, fontSize: 11}]}>
+                  Next available: {new Date(rateLimit.nextAvailableAt).toLocaleString()}
+                </Text>
+              ) : null}
             </View>
           )}
 
@@ -215,7 +251,7 @@ function AdminBroadcastScreenImpl() {
               <ActivityIndicator color={colors.onPrimary} />
             ) : (
               <Text style={[bodyType.bold, {color: colors.onPrimary}]}>
-                {waitHours > 0 ? `Wait ~${waitHours}h to send` : 'Send Broadcast'}
+                Send Broadcast
               </Text>
             )}
           </Pressable>
