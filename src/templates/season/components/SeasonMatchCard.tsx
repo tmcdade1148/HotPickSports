@@ -3,6 +3,7 @@ import {Text} from '@shared/components/AppText';
 import {View, TouchableOpacity, Alert, StyleSheet} from 'react-native';
 import {Lock} from 'lucide-react-native';
 import {HotPickFlame} from '@shared/components/HotPickFlame';
+import {GameChip} from '@shared/components/GameChip';
 import type {SeasonConfig} from '@shared/types/templates';
 import type {DbSeasonGame} from '@shared/types/database';
 import {spacing} from '@shared/theme';
@@ -201,26 +202,31 @@ export function SeasonMatchCard({
     isHotPick && !isFinal ? `${rank} HotPick Points` : null;
 
   return (
-    <View style={[styles.container, isLocked && !isLive && !isFinal && styles.containerLocked, isHotPick && styles.containerHotPick]}>
-      {/* ── Header: day/time | status | lock | points ── */}
+    <View style={[
+      styles.container,
+      // The GameChip is itself an outlined pill with its own surface, so the
+      // wrapper drops its card decoration on that path — otherwise it's a card
+      // inside a card.
+      isLocked && styles.containerChip,
+      isLocked && !isLive && !isFinal && styles.containerLocked,
+      isHotPick && styles.containerHotPick,
+    ]}>
+      {/* ── Header: day/time | lock | points ──
+          When the card is read-only the GameChip below owns the day/time and
+          the LIVE / FINAL status, so the header drops them and keeps only the
+          lock affordance and the points. Two status lines would be a
+          duplicate, and the chip's is the canonical one. */}
       <View style={styles.header}>
-        {!isFinal && !isLive ? (
+        {!isLocked ? (
           <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
-            <Text style={[styles.kickoffText, isLocked && styles.kickoffTextLocked]}>{formatKickoff(kickoffDate)}</Text>
-            {isLocked && <Lock size={12} color={colors.textPrimary} />}
+            <Text style={styles.kickoffText}>{formatKickoff(kickoffDate)}</Text>
           </View>
-        ) : null}
-
-        {isLive ? (
-          <View style={styles.liveRow}>
-            <Text style={styles.liveText}>LIVE</Text>
-            {isLocked && <Lock size={14} color={colors.primary} />}
-          </View>
-        ) : null}
+        ) : (
+          <Lock size={12} color={colors.textPrimary} />
+        )}
 
         {isFinal ? (
           <View style={styles.finalRow}>
-            <Text style={styles.finalText}>FINAL</Text>
             {existingPick?.points != null && (
               <Text style={[
                 styles.pointsEarnedInline,
@@ -244,33 +250,60 @@ export function SeasonMatchCard({
         ) : null}
       </View>
 
-      {/* ── Main row: rank circle | teams | flame ── */}
+      {/* ── Main row: rank circle (editable only) | teams | flame ── */}
       <View style={styles.mainRow}>
-        {/* Rank circle — dimmed on every card except the chosen HotPick once a
-            HotPick has been designated, so the one that counts stands out. */}
-        <View style={[styles.rankColumn, hotPickSelected && !isHotPick && styles.rankColumnDimmed]}>
-          <View
-            style={[
-              styles.rankCircle,
-              {backgroundColor: rankColor},
-              isHotPick && styles.rankCircleHotPick && {backgroundColor: rankColor},
-            ]}>
-            <Text style={styles.rankNumber}>{rank}</Text>
+        {/* Rank circle — EDITABLE state only. Once the card is read-only the
+            GameChip's own left PTS box carries the rank, so rendering the
+            circle too would show the same number twice. The circle survives in
+            the editable state because the rank is the whole point of the
+            decision you're making while picking, and it is fused to the
+            HotPick-dimming behaviour below. */}
+        {!isLocked ? (
+          <View style={[styles.rankColumn, hotPickSelected && !isHotPick && styles.rankColumnDimmed]}>
+            <View
+              style={[
+                styles.rankCircle,
+                {backgroundColor: rankColor},
+                isHotPick && styles.rankCircleHotPick && {backgroundColor: rankColor},
+              ]}>
+              <Text style={styles.rankNumber}>{rank}</Text>
+            </View>
+            {isHotPick ? (
+              <>
+                <Text style={[styles.rankLabel, {marginTop: 3}]}>HotPick</Text>
+                <Text style={[styles.rankLabel, {marginTop: -1}]}>Points</Text>
+              </>
+            ) : (
+              <Text style={[styles.rankLabel, {marginTop: 3}]}>Points</Text>
+            )}
           </View>
-          {isHotPick ? (
-            <>
-              <Text style={[styles.rankLabel, {marginTop: 3}]}>HotPick</Text>
-              <Text style={[styles.rankLabel, {marginTop: -1}]}>Points</Text>
-            </>
-          ) : (
-            <Text style={[styles.rankLabel, {marginTop: 3}]}>Points</Text>
-          )}
-        </View>
+        ) : null}
 
-        {/* Team buttons — away on top, home on bottom */}
+        {/* Teams — the display half.
+            READ-ONLY (locked / live / final): the GameChip renders it. It owns
+            the three states, the scores, the clock, and the FINAL result colour
+            (from the server's is_correct — never a score comparison).
+            EDITABLE: the tappable TeamRows stay exactly as they were, because
+            here the team name IS the pick target. Scores never appeared in this
+            branch anyway — a game with a score is live or final, which is
+            always locked, hence always the chip. */}
         <View style={styles.teamsColumn}>
-          <View style={styles.teamsWithScores}>
-            {/* Names column (tappable rows) */}
+          {isLocked ? (
+            <GameChip
+              game={game}
+              points={rank}
+              isCorrect={existingPick?.is_correct ?? null}
+              pickedSide={
+                pickedTeam === game.home_team
+                  ? 'home'
+                  : pickedTeam === game.away_team
+                    ? 'away'
+                    : null
+              }
+              awayName={awayTeamName}
+              homeName={homeTeamName}
+            />
+          ) : (
             <View style={styles.teamNamesCol}>
               <TeamRow
                 teamName={awayTeamName}
@@ -293,37 +326,7 @@ export function SeasonMatchCard({
                 onPress={() => selectTeam(game.home_team)}
               />
             </View>
-
-            {/* Scores + clock — fixed-width container so scores stay aligned between LIVE and FINAL */}
-            {(isLive || isFinal) && (
-              <View style={styles.scoreClockContainer}>
-                <View style={styles.scoresCol}>
-                  <View style={styles.inlineScoreWrap}>
-                    <Text style={[
-                      styles.inlineScore,
-                      isFinal && game.away_score != null && game.home_score != null && game.away_score > game.home_score && styles.inlineScoreWinner,
-                    ]}>
-                      {game.away_score ?? '—'}
-                    </Text>
-                  </View>
-                  <View style={styles.inlineScoreWrap}>
-                    <Text style={[
-                      styles.inlineScore,
-                      isFinal && game.home_score != null && game.away_score != null && game.home_score > game.away_score && styles.inlineScoreWinner,
-                    ]}>
-                      {game.home_score ?? '—'}
-                    </Text>
-                  </View>
-                </View>
-                {isLive && (game.current_period || game.game_clock) && (
-                  <Text style={styles.liveClockInline}>
-                    {game.current_period ? `Q${game.current_period}` : ''}
-                    {game.game_clock ? ` ${game.game_clock}` : ''}
-                  </Text>
-                )}
-              </View>
-            )}
-          </View>
+          )}
         </View>
 
         {/* Flame icon — outline when inactive, filled orange when HotPick */}
@@ -402,6 +405,12 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.primary,
   },
+  // Read-only path: the GameChip supplies the surface, outline and padding.
+  containerChip: {
+    backgroundColor: 'transparent',
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+  },
   containerLocked: {
     opacity: 0.7,
   },
@@ -418,32 +427,10 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: '600',
     color: colors.textSecondary,
   },
-  kickoffTextLocked: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.textPrimary,
-  },
-  liveRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  liveText: {
-    fontSize: 14,
-    fontWeight: '900',
-    fontStyle: 'italic',
-    color: colors.success,
-  },
   finalRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: 6,
-  },
-  finalText: {
-    fontSize: 14,
-    fontWeight: '900',
-    fontStyle: 'italic',
-    color: colors.error,
   },
   pointsEarnedInline: {
     // Match FINAL exactly: same size, weight, and italic styling.
@@ -517,28 +504,8 @@ const createStyles = (colors: any) => StyleSheet.create({
   teamsColumn: {
     flex: 1,
   },
-  teamsWithScores: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    gap: 6,
-  },
   teamNamesCol: {
     flex: 1,
-  },
-  scoreClockContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: 100,
-    gap: 4,
-  },
-  scoresCol: {
-    justifyContent: 'space-around',
-    alignItems: 'flex-end',
-    width: 36,
-  },
-  inlineScoreWrap: {
-    height: 32,
-    justifyContent: 'flex-end',
   },
   teamButton: {
     flexDirection: 'row',
@@ -586,16 +553,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
     marginLeft: 10,
   },
-  inlineScore: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: colors.textPrimary,
-    fontVariant: ['tabular-nums'],
-  },
-  inlineScoreWinner: {
-    color: colors.success,
-  },
-
   // @ separator row between teams
   teamsSeparator: {
     flexDirection: 'row',
@@ -608,12 +565,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: colors.textSecondary,
-  },
-  liveClockInline: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    fontVariant: ['tabular-nums'],
   },
 
   // Flame

@@ -87,6 +87,11 @@ export interface ThemeColors {
   live: string;             // Live-green dot for in-progress states
   loss: string;             // Negative delta numerals (mono)
   win: string;              // Positive delta numerals (mono)
+  // GameChip FINAL result — the picked team's score. Split per mode: the
+  // light values are dark enough to read on #EBEBEB, the dark values light
+  // enough to read on #1A1A1A. Both directions measured — see defaults.ts.
+  gameWon: string;          // Picked team's score, is_correct === true
+  gameLost: string;         // Picked team's score, is_correct === false
   onPrimary: string;        // Foreground on `primary` surface (flame CTA)
 
   // Semantic colors (always HotPick — never overridden by partners)

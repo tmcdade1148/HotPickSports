@@ -1,7 +1,10 @@
 // src/shell/components/home/teamColors.ts
-// NFL team brand color lookup — drives HotPickCinematic's team-color
-// diagonal split. Sports data, not theme. Lives outside hotpickDefaults.ts
-// per Hard Rule #9 separation (theme vs. sports data).
+// NFL team brand color + name lookup. Sports data, not theme. Lives outside
+// hotpickDefaults.ts per Hard Rule #9 separation (theme vs. sports data).
+//
+// `fullTeamName` / `partnerInitials` are the live exports (Home heroes, Pool
+// and Partner modules). `getTeamColors` fed HotPickCinematic's diagonal split,
+// which was deleted as dead code in Slice 3 — it is now used only internally.
 //
 // Source: design handoff (HomeScreens.jsx TEAMS const) + ESPN team palettes.
 // Expand as new teams enter the league. Missing keys fall back to dark gray.

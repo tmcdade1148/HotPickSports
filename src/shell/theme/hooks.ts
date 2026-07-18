@@ -72,6 +72,8 @@ export function useTheme(): {colors: ThemeColors; isDark: boolean} {
       live: extended.live,
       loss: extended.loss,
       win: extended.win,
+      gameWon: extended.game_won,
+      gameLost: extended.game_lost,
       /** Foreground color for content sitting on `primary` (flame CTA). */
       onPrimary: '#FFFFFF',
       ...semantic,

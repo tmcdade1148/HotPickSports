@@ -74,6 +74,13 @@ export const HOTPICK_EXTENDED_TOKENS = {
   live: '#22C55E',
   loss: '#DC2626',
   win: '#22C55E',
+  // GameChip FINAL result colours — the picked team's score. Deliberately NOT
+  // reusing win/loss: those are tuned for dark-surface delta numerals and fail
+  // AA as text on the LIGHT card (#22C55E is 2.1:1 on #EBEBEB). These carry a
+  // real value in BOTH objects so neither mode inherits the other's.
+  // LIGHT (on surface #EBEBEB): won 5.98:1 · lost 5.43:1. Measured 2026-07-18.
+  game_won: '#166534',
+  game_lost: '#B91C1C',
 } as const;
 
 export const HOTPICK_EXTENDED_TOKENS_DARK = {
@@ -84,6 +91,12 @@ export const HOTPICK_EXTENDED_TOKENS_DARK = {
   live: '#22C55E',
   loss: '#DC2626',
   win: '#22C55E',
+  // DARK twins. The light greens/reds fail on dark surfaces (#166534 is 1.8:1
+  // on #1A1A1A), so each gets a lighter value — the same fix shape as error →
+  // #F1655A. DARK (on surface #1A1A1A): won 9.99:1 · lost 5.59:1. Also clears
+  // AA on #141414 and #242424. Measured 2026-07-18.
+  game_won: '#4ADE80',
+  game_lost: '#F1655A',
 } as const;
 
 /**
