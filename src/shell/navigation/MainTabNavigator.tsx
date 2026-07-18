@@ -11,7 +11,7 @@ import {View,
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import type {BottomTabBarProps} from '@react-navigation/bottom-tabs';
 import {useNavigation} from '@react-navigation/native';
-import {SafeAreaView} from 'react-native-safe-area-context';
+import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {
   ListChecks,
   MessageCircle,
@@ -101,10 +101,36 @@ function isDarkBg(hex: string): boolean {
 }
 
 /**
+ * TopInsetScreen — top safe-area inset from the JS context, NOT the native
+ * <SafeAreaView>.
+ *
+ * The native SafeAreaView renders NativeSafeAreaView and never reads
+ * SafeAreaInsetsContext — it applies its top padding in a native layout pass
+ * that lands AFTER first paint. Tabs are lazily mounted (no `lazy` override, so
+ * bottom-tabs' default applies), so on the FIRST visit to a tab the header
+ * painted flush to the top and then snapped down.
+ *
+ * useSafeAreaInsets() reads the context that App.tsx seeds synchronously via
+ * initialMetrics={initialWindowMetrics}, so the inset is correct on frame 0.
+ * Both halves are load-bearing: don't remove the App.tsx initialMetrics, and
+ * don't convert this back to SafeAreaView. If metrics ever init null, the
+ * provider withholds children entirely rather than handing us a zero inset —
+ * one blank frame, never a wrong-inset frame.
+ */
+function TopInsetScreen({children}: {children: React.ReactNode}) {
+  const {colors} = useTheme();
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={{flex: 1, backgroundColor: colors.background, paddingTop: insets.top}}>
+      {children}
+    </View>
+  );
+}
+
+/**
  * PicksTab — Renders the correct picks screen based on active sport template.
  */
 function PicksTab() {
-  const {colors} = useTheme();
   const activeSport = useGlobalStore(s => s.activeSport);
   if (!activeSport) return <EmptyTabScreen label="Picks" />;
 
@@ -118,10 +144,10 @@ function PicksTab() {
   })();
 
   return (
-    <SafeAreaView style={{flex: 1, backgroundColor: colors.background}} edges={['top']}>
+    <TopInsetScreen>
       <PicksHeader />
       {screen}
-    </SafeAreaView>
+    </TopInsetScreen>
   );
 }
 
@@ -129,7 +155,6 @@ function PicksTab() {
  * LeaderboardTab — Renders the correct board screen based on active sport template.
  */
 function LeaderboardTab() {
-  const {colors} = useTheme();
   const activeSport = useGlobalStore(s => s.activeSport);
   const viewingPoolId = useViewingPoolId();
   // No Contest in scope → empty state, never a global/platform leaderboard.
@@ -145,10 +170,10 @@ function LeaderboardTab() {
   })();
 
   return (
-    <SafeAreaView style={{flex: 1, backgroundColor: colors.background}} edges={['top']}>
+    <TopInsetScreen>
       <PoolHeader />
       {screen}
-    </SafeAreaView>
+    </TopInsetScreen>
   );
 }
 
@@ -156,7 +181,6 @@ function LeaderboardTab() {
  * SmackTalkTab — Renders SmackTalk for the active pool.
  */
 function SmackTalkTab() {
-  const {colors} = useTheme();
   const activeSport = useGlobalStore(s => s.activeSport);
   // Same source as the Ladder — one viewingPoolId, no global-pool fallback.
   const smackPoolId = useViewingPoolId();
@@ -164,13 +188,13 @@ function SmackTalkTab() {
     return <EmptyTabScreen label={LEXICON.chirps.plural} />;
   }
   return (
-    <SafeAreaView style={{flex: 1, backgroundColor: colors.background}} edges={['top']}>
+    <TopInsetScreen>
       <PoolHeader />
       {/* key={smackPoolId} → remount on pool switch so the composer draft and
           the one-time welcome-prefill guard reset per pool. Without it the
           first pool's welcome opener leaks into every other pool's composer. */}
       <SmackTalkScreen key={smackPoolId} poolId={smackPoolId} />
-    </SafeAreaView>
+    </TopInsetScreen>
   );
 }
 
@@ -183,7 +207,7 @@ function HistoryTabWrapper(props: any) {
   const wordmark = isDarkBg(colors.background) ? wordmarkDark : wordmarkLight;
 
   return (
-    <SafeAreaView style={{flex: 1, backgroundColor: colors.background}} edges={['top']}>
+    <TopInsetScreen>
       <View style={{alignItems: 'center', marginBottom: spacing.xs, paddingTop: spacing.xs}}>
         {brand.isBranded && brand.logo.full ? (
           <Image
@@ -200,7 +224,7 @@ function HistoryTabWrapper(props: any) {
         )}
       </View>
       <HistoryScreen {...props} />
-    </SafeAreaView>
+    </TopInsetScreen>
   );
 }
 
@@ -213,7 +237,7 @@ function SettingsTabWrapper(props: any) {
   const wordmark = isDarkBg(colors.background) ? wordmarkDark : wordmarkLight;
 
   return (
-    <SafeAreaView style={{flex: 1, backgroundColor: colors.background}} edges={['top']}>
+    <TopInsetScreen>
       <View style={{alignItems: 'center', marginBottom: spacing.xs, paddingTop: spacing.xs}}>
         {brand.isBranded && brand.logo.full ? (
           <Image
@@ -230,7 +254,7 @@ function SettingsTabWrapper(props: any) {
         )}
       </View>
       <SettingsScreen {...props} />
-    </SafeAreaView>
+    </TopInsetScreen>
   );
 }
 
@@ -248,11 +272,10 @@ function SettingsTabWrapper(props: any) {
  * not as a top-of-screen banner.
  */
 function HomeTab(props: any) {
-  const {colors} = useTheme();
   return (
-    <SafeAreaView style={{flex: 1, backgroundColor: colors.background}} edges={['top']}>
+    <TopInsetScreen>
       <HomeScreen {...props} />
-    </SafeAreaView>
+    </TopInsetScreen>
   );
 }
 
