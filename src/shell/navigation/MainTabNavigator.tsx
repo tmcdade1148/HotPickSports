@@ -52,12 +52,11 @@ import {HistoryScreen} from '@shell/screens/HistoryScreen';
 
 const Tab = createBottomTabNavigator();
 
-// Alpha of the "B" linkage wash behind Ladder + Chirp (the two contest-scoped
-// tabs). Its own knob, deliberately NOT CHROME_ALPHA: this tint layers over an
-// already-translucent pill rather than an opaque surface, so it reads fainter
-// than the same number would elsewhere and will likely need bumping. Uses
-// colors.accentTeal, so it's teal in light mode and pale blue in dark.
-const LINK_TINT_ALPHA = 0.1;
+// Alpha of the "F" linkage brackets — the two vertical ticks flanking Ladder +
+// Chirp (the contest-scoped pair). Its own knob, deliberately NOT CHROME_ALPHA.
+// Uses colors.accentTeal, so it's teal in light mode and pale blue (#A5CCD9) in
+// dark — check both.
+const LINK_TICK_ALPHA = 0.5;
 
 // Dashboard tab no longer shows user name — all poolies identified by poolie_name in-app
 
@@ -356,31 +355,37 @@ function AppTabBar({state, descriptors, navigation}: BottomTabBarProps) {
       shadowColor: colors.ink,
       shadowOpacity: 0.18,
       shadowRadius: 12,
-      shadowOffset: {width: 0, height: -3},
+      // Right + down. Directional lift is iOS-only — Android's elevation has
+      // no direction and always casts evenly on all sides.
+      shadowOffset: {width: 3, height: 3},
     },
-    android: {elevation: 6},
+    // (a) No Android lift. Elevation has no direction, so it can't match the
+    // right+down iOS shadow — it would cast evenly on all four sides, and with
+    // the 14px inset every side is now exposed to the grey-rectangle artifact.
+    // At CHROME_ALPHA 0.80 the pill separates on alpha + inset alone. Change to
+    // `elevation: 2` for a faint even lift if Tom wants (b) instead.
+    android: {elevation: 0},
   });
 
-  // Home · Picks | [ Ladder · Chirp ] | Settings.
-  // The middle pair carries the B linkage wash — a soft rounded tint and NO
-  // border, ever. The border is precisely what read as a mistake; the wash is
-  // the grouped box minus that. flex:2 on the group keeps all five tabs equal
-  // width (2 units split by two flex:1 children = 1 unit each, same as the
-  // ungrouped tabs).
+  // Home · Picks |ᐧ Ladder · Chirp ᐧ| Settings.
+  // The "F" linkage: a short vertical tick on each side of the contest-scoped
+  // pair, tucked tight so it hugs Ladder + Chirp rather than reading as a
+  // neutral system divider. Rounded caps are the whole point — square ends read
+  // as a divider, round ends read as intentional. No box, no underline.
+  // flex:2 on the group keeps the five tabs equal width.
   const lead = state.routes.slice(0, 2);
   const linked = state.routes.slice(2, 4);
   const trail = state.routes.slice(4);
+  const tickColor = hexToRgba(colors.accentTeal, LINK_TICK_ALPHA);
 
   return (
     <View style={[s.pillLift, {backgroundColor: colors.chrome}, lift]}>
       <View style={s.pill}>
         {lead.map(renderTab)}
-        <View
-          style={[
-            s.linkGroup,
-            {backgroundColor: hexToRgba(colors.accentTeal, LINK_TINT_ALPHA)},
-          ]}>
+        <View style={s.linkGroup}>
+          <View style={[s.linkTick, {backgroundColor: tickColor}]} />
           {linked.map(renderTab)}
+          <View style={[s.linkTick, {backgroundColor: tickColor}]} />
         </View>
         {trail.map(renderTab)}
       </View>
@@ -398,8 +403,8 @@ const tabBarStyles = (_colors: any) => StyleSheet.create({
     borderRadius: 28, // = height/2 → a true pill
   },
   // Layer 2 — the clipping surface. Same radius, transparent (layer 1 paints
-  // it), overflow:'hidden' so the B tint's corners can never escape the
-  // rounded shape. No borderTop: the pill's edge is the separation now.
+  // it), overflow:'hidden' so nothing inside can escape the rounded shape.
+  // No borderTop: the pill's edge is the separation now.
   pill: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -407,14 +412,24 @@ const tabBarStyles = (_colors: any) => StyleSheet.create({
     borderRadius: 28,
     overflow: 'hidden',
   },
-  // B linkage wash behind Ladder + Chirp. Rounded to nest inside the pill,
-  // stretched to full pill height so the grouped tabs stay pixel-aligned with
-  // the ungrouped ones (any vertical inset here would shift their icons).
+  // The bracketed pair. Stretched to full pill height so the ticks have a full
+  // height to centre within, and alignItems mirrors the pill so the grouped
+  // tabs stay pixel-aligned with the ungrouped ones — any vertical inset or
+  // centring HERE would drop Ladder/Chirp's icons below the other three.
   linkGroup: {
     flex: 2,
     flexDirection: 'row',
     alignSelf: 'stretch',
-    borderRadius: 20,
+    alignItems: 'flex-start',
+  },
+  // The "F" tick. Rounded caps (radius ≥ half the width) so it reads as an
+  // intentional bracket, not a system divider. alignSelf centres the tick
+  // vertically without touching the tabs' top alignment.
+  linkTick: {
+    width: 1.5,
+    height: 34,
+    borderRadius: 1,
+    alignSelf: 'center',
   },
   tab: {
     flex: 1,
@@ -569,11 +584,11 @@ export function MainTabNavigator() {
         },
       }}
       tabBar={(props) => (
-        // Floating, semi-transparent bar on every screen (slice 2 #9/#10):
-        // absolutely positioned so content scrolls UNDER it; rgba (no expo-blur,
-        // no native). Screens reserve useNavReserve() at their scroll bottom so
-        // the last row clears the bar. 0.85 alpha is a starting value — tune on
-        // device.
+        // Floating PILL on every screen. This wrapper only positions it — the
+        // rounded pill inside is the only chrome, so content scrolls past it on
+        // the sides as well as underneath. rgba only; no expo-blur, nothing
+        // native. Screens reserve useNavReserve() at their scroll bottom so the
+        // last row clears the pill.
         <SafeAreaView
           edges={['bottom']}
           style={{

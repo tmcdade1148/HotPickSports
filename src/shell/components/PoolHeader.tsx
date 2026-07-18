@@ -163,7 +163,14 @@ const styles = StyleSheet.create({
   },
   nameRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    // BASELINE, not center. The Contest side is a text+chevron row while the
+    // Player side is naked text, so centering aligned the two BOXES and left
+    // the text bottoms off by the chevron's half-height. Baseline aligns the
+    // glyphs: the row takes its baseline from the Contest name Text (the first
+    // baseline-bearing child inside contestSwitch), so both names sit on one
+    // line. contestSwitch stays centered internally so the chevron still reads
+    // as paired with the text rather than dropping to the text's baseline.
+    alignItems: 'baseline',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingTop: 0,

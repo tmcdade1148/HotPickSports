@@ -49,7 +49,7 @@ export const HOTPICK_DARK_OVERRIDES = {
  * Tune this number here and every surface moves together — there is deliberately
  * no call-site arithmetic, because two equal literals drift and one source can't.
  */
-export const CHROME_ALPHA = 0.85;
+export const CHROME_ALPHA = 0.8;
 
 /**
  * Extended tokens — HotPick-managed structural and accent values that
