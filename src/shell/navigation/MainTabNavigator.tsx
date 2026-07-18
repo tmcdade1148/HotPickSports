@@ -33,7 +33,6 @@ import {PicksHeader} from '@shell/components/PicksHeader';
 import {spacing, typography, borderRadius} from '@shared/theme';
 import {LEXICON} from '@shared/lexicon';
 import {useForegroundRefetch} from '@shared/hooks/useForegroundRefetch';
-import {hexToRgba} from '@shared/utils/color';
 import {useViewingPoolId} from '@shell/stores/selectors/defaultPool';
 
 // Sport store imports for initialization
@@ -51,12 +50,6 @@ import {SeriesBoardScreen} from '@templates/series/screens/SeriesBoardScreen';
 import {HistoryScreen} from '@shell/screens/HistoryScreen';
 
 const Tab = createBottomTabNavigator();
-
-// Alpha of the "F" linkage brackets — the two vertical ticks flanking Ladder +
-// Chirp (the contest-scoped pair). Its own knob, deliberately NOT CHROME_ALPHA.
-// Uses colors.accentTeal, so it's teal in light mode and pale blue (#A5CCD9) in
-// dark — check both.
-const LINK_TICK_ALPHA = 0.5;
 
 // Dashboard tab no longer shows user name — all poolies identified by poolie_name in-app
 
@@ -367,28 +360,12 @@ function AppTabBar({state, descriptors, navigation}: BottomTabBarProps) {
     android: {elevation: 0},
   });
 
-  // Home · Picks |ᐧ Ladder · Chirp ᐧ| Settings.
-  // The "F" linkage: a short vertical tick on each side of the contest-scoped
-  // pair, tucked tight so it hugs Ladder + Chirp rather than reading as a
-  // neutral system divider. Rounded caps are the whole point — square ends read
-  // as a divider, round ends read as intentional. No box, no underline.
-  // flex:2 on the group keeps the five tabs equal width.
-  const lead = state.routes.slice(0, 2);
-  const linked = state.routes.slice(2, 4);
-  const trail = state.routes.slice(4);
-  const tickColor = hexToRgba(colors.accentTeal, LINK_TICK_ALPHA);
-
+  // Home · Picks · Ladder · Chirp · Settings — five evenly-spaced tabs, no
+  // dividers and no grouping. Each tab is flex:1, so the spacing is even
+  // across all five.
   return (
     <View style={[s.pillLift, {backgroundColor: colors.chrome}, lift]}>
-      <View style={s.pill}>
-        {lead.map(renderTab)}
-        <View style={s.linkGroup}>
-          <View style={[s.linkTick, {backgroundColor: tickColor}]} />
-          {linked.map(renderTab)}
-          <View style={[s.linkTick, {backgroundColor: tickColor}]} />
-        </View>
-        {trail.map(renderTab)}
-      </View>
+      <View style={s.pill}>{state.routes.map(renderTab)}</View>
     </View>
   );
 }
@@ -411,25 +388,6 @@ const tabBarStyles = (_colors: any) => StyleSheet.create({
     height: 56,
     borderRadius: 28,
     overflow: 'hidden',
-  },
-  // The bracketed pair. Stretched to full pill height so the ticks have a full
-  // height to centre within, and alignItems mirrors the pill so the grouped
-  // tabs stay pixel-aligned with the ungrouped ones — any vertical inset or
-  // centring HERE would drop Ladder/Chirp's icons below the other three.
-  linkGroup: {
-    flex: 2,
-    flexDirection: 'row',
-    alignSelf: 'stretch',
-    alignItems: 'flex-start',
-  },
-  // The "F" tick. Rounded caps (radius ≥ half the width) so it reads as an
-  // intentional bracket, not a system divider. alignSelf centres the tick
-  // vertically without touching the tabs' top alignment.
-  linkTick: {
-    width: 1.5,
-    height: 34,
-    borderRadius: 1,
-    alignSelf: 'center',
   },
   tab: {
     flex: 1,

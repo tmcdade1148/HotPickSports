@@ -1,122 +1,67 @@
-// Two-row header for the Picks tab.
+// Header for the Picks tab — composed from the SAME modules Home composes, so
+// the two headers are a pixel match.
 //
 //   HOT PICK SPORTS                       [ NFL26 · W08 ]
-//   TMCDADE
+//   TMCDADE                                  1,234 / SEASON PTS
 //
-// Row 1 mirrors HomeHeader / PoolHeader (wordmark + period pill). The Settings
-// gear moved to the bottom nav as a real tab (slice 2).
-// Row 2 is the shared PlayerName (poolie name, left) — same treatment as Home.
+// Deliberately does NOT include SystemMessageSlot, the third module in Home's
+// composition: it renders a Flame (rule 1 — flame only on the HotPick card) and
+// is Home-scoped by spec §6.4.1.
 
-import React from 'react';
-import {Text} from '@shared/components/AppText';
+import React, {useEffect} from 'react';
 import {StyleSheet, View} from 'react-native';
 import {useTheme} from '@shell/theme/hooks';
-import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
-import {COMPACT_PERIOD_LENGTH} from './home/shortPeriod';
-import {usePeriodLabel} from './home/usePeriodLabel';
-import {PlayerName} from './PlayerName';
-
-// Ceiling on OS accessibility font enlargement for the fixed-layout header row
-// (matches HomeHeader / PoolHeader). Tune on device.
-const HEADER_MAX_FONT_SCALE = 1.2;
+import {spacing} from '@shared/theme';
+import {useGlobalStore} from '@shell/stores/globalStore';
+import {HomeHeader} from './home/HomeHeader';
+import {IdentityBar} from './home/IdentityBar';
 
 export function PicksHeader() {
   const {colors} = useTheme();
-  const period = usePeriodLabel();
+
+  // IDENTITY is an invariant module — the season total must not read '—' just
+  // because Home happened not to mount first. This is a second CALLER of the
+  // existing loadSeasonTotal action (HomeScreen is the other), guarded on null
+  // so it never refetches what Home already loaded. Not a new selector:
+  // getState() is a one-shot read, not a subscription, so this adds no re-render
+  // path and no second season-points read.
+  //
+  // Mount-only deps are safe here: PicksTab does not render this header until
+  // `activeSport` exists, so user + competition are already resolved.
+  useEffect(() => {
+    const g = useGlobalStore.getState();
+    if (g.seasonTotal != null) return;
+    const userId = g.user?.id;
+    // activeSport.competition rather than nflStore's copy of it — same value
+    // (nflStore is initialized from it), and it keeps this shell component free
+    // of a sport-module import (Hard Rule #4).
+    const competition = g.activeSport?.competition;
+    if (!userId || !competition) return;
+    g.loadSeasonTotal(userId, competition).catch(() => {});
+  }, []);
 
   return (
-    // Shares Home's chrome transparency via `colors.chrome` so the two can
-    // never drift. NOTE: this header is still in NORMAL FLOW — nothing scrolls
-    // behind it, so the alpha is invisible here today. Converting it to a
-    // floating overlay (absolute + re-padding the screen by its measured
-    // height, the way HomeScreen does) is DEFERRED to slices 3-7 when we're
-    // already working in these screens. Deferred, not forgotten.
+    // Shares Home's chrome transparency via `colors.chrome` so the two can never
+    // drift. NOTE: this header is still in NORMAL FLOW — nothing scrolls behind
+    // it, so the alpha is invisible here today. The overlay conversion (absolute
+    // + re-padding the screen by its measured height, the way HomeScreen does)
+    // is DEFERRED to slices 3-7. Deferred, not forgotten.
+    //
+    // No onLayout here on purpose: Home measures its header height only to pad
+    // its own scroll. Picks doesn't need that.
     <View style={{backgroundColor: colors.chrome}}>
-      {/* Row 1 — HotPick wordmark + period pill */}
-      <View style={styles.topRow}>
-        <View style={styles.wordmarkRow}>
-          <Text maxFontSizeMultiplier={HEADER_MAX_FONT_SCALE} style={[displayType.display, styles.wordmark, {color: colors.primary}]}>HOT</Text>
-          <Text maxFontSizeMultiplier={HEADER_MAX_FONT_SCALE} style={[displayType.display, styles.wordmark, {color: colors.textPrimary}]}>PICK</Text>
-          <Text maxFontSizeMultiplier={HEADER_MAX_FONT_SCALE} style={[displayType.display, styles.wordmarkSmall, {color: colors.primary}]}> SPORTS</Text>
-        </View>
-        <View style={styles.rightCluster}>
-          <View style={[styles.pill, {borderColor: colors.primary}]}>
-            <Text
-              numberOfLines={1}
-              maxFontSizeMultiplier={HEADER_MAX_FONT_SCALE}
-              style={[
-                bodyType.bold,
-                period.length > COMPACT_PERIOD_LENGTH ? styles.pillTextCompact : styles.pillText,
-                {color: colors.primary},
-              ]}>
-              {period}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Row 2 — player name (shared treatment) */}
-      <View style={styles.nameRow}>
-        <PlayerName style={styles.nameLeft} />
-      </View>
+      <HomeHeader />
+      <IdentityBar style={styles.identityTighten} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-    paddingBottom: 0,
-  },
-  wordmarkRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-  },
-  wordmark: {
-    fontSize: 15,
-    letterSpacing: 0.5,
-  },
-  wordmarkSmall: {
-    fontSize: 9,
-    letterSpacing: 0.5,
-    marginLeft: 1,
-  },
-  rightCluster: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  pill: {
-    paddingHorizontal: (spacing.sm + 2) * 1.5,
-    paddingVertical: 6,
-    borderRadius: borderRadius.full,
-    borderWidth: 1,
-  },
-  pillText: {
-    fontSize: 16.5,
-    letterSpacing: 1.2,
-    fontStyle: 'italic',
-  },
-  pillTextCompact: {
-    fontSize: 13,
-    letterSpacing: 1.1,
-    fontStyle: 'italic',
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingTop: 0,
-    // Tightened so the player name sits closer to the week pills below.
+  // Picks needs a tighter gap under the identity row than Home does (Home uses
+  // spacing.sm) because the week pills sit directly below it. paddingBottom
+  // ONLY — IdentityBar owns its own two-column layout and must not be handed
+  // flex/row styling from outside.
+  identityTighten: {
     paddingBottom: spacing.xs,
-  },
-  nameLeft: {
-    flex: 1,
-    maxWidth: '50%',
-    minWidth: 0,
   },
 });

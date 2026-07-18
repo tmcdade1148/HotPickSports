@@ -5,6 +5,8 @@ import {
   SEMANTIC_COLORS_DARK,
   HOTPICK_EXTENDED_TOKENS,
   HOTPICK_EXTENDED_TOKENS_DARK,
+  HOTPICK_BRAND_COLORS,
+  HOTPICK_DARK_OVERRIDES,
   CHROME_ALPHA,
   deriveDarkColors,
 } from './defaults';
@@ -39,8 +41,15 @@ export function useTheme(): {colors: ThemeColors; isDark: boolean} {
   const semantic = isDark ? SEMANTIC_COLORS_DARK : SEMANTIC_COLORS;
   const extended = isDark ? HOTPICK_EXTENDED_TOKENS_DARK : HOTPICK_EXTENDED_TOKENS;
 
-  // HotPick light-blue accent (#A5CCD9) — consistent in light and dark.
-  const highlight = config.highlight_color ?? '#A5CCD9';
+  // Partner brand_configs may omit highlight_color; fall back to the HotPick
+  // token for the CURRENT MODE. highlight is not one value — it splits teal
+  // (light) / light-blue (dark), so a single literal here would be wrong in one
+  // mode and would drift from the tokens besides.
+  const highlight =
+    config.highlight_color ??
+    (isDark
+      ? HOTPICK_DARK_OVERRIDES.highlight_color
+      : HOTPICK_BRAND_COLORS.highlight);
 
   return {
     isDark,

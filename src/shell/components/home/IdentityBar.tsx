@@ -1,9 +1,19 @@
 // Two-column identity bar: poolie name (left) + SEASON PTS total (right).
 // Points pulses gray↔primary while the week is settling.
+//
+// SHARED by Home and Picks — both headers compose this module, so it stays the
+// single source of the season-points read. Lives in components/home/ by history,
+// not by scope; don't move it without updating both consumers.
 
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {Text} from '@shared/components/AppText';
-import {Animated, StyleSheet, View} from 'react-native';
+import {
+  Animated,
+  StyleSheet,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
@@ -19,7 +29,9 @@ const NAME_MIN_FONT = 12;
 const NAME_LINE = POINTS_LINE;
 const NAME_RIGHT_PAD = 6;
 
-export function IdentityBar() {
+// `style` is an OPTIONAL container override (Picks passes a tighter
+// paddingBottom). Home calls <IdentityBar /> with no props and is unchanged.
+export function IdentityBar({style}: {style?: StyleProp<ViewStyle>}) {
   const {colors} = useTheme();
 
   const userProfile = useGlobalStore(s => s.userProfile);
@@ -82,7 +94,7 @@ export function IdentityBar() {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, style]}>
       <View
         style={styles.left}
         onLayout={e => setLeftWidth(e.nativeEvent.layout.width)}

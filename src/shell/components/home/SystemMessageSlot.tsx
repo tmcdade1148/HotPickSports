@@ -15,7 +15,7 @@
 import React, {useCallback, useEffect, useState} from 'react';
 import {Text} from '@shared/components/AppText';
 import {Pressable, StyleSheet, View} from 'react-native';
-import {Flame, ChevronRight} from 'lucide-react-native';
+import {Megaphone, ChevronRight} from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useTheme} from '@shell/theme/hooks';
 import {supabase} from '@shared/config/supabase';
@@ -94,7 +94,7 @@ export function SystemMessageSlot() {
   if (dismissedIds.has(message.id)) return null;
 
   // Brief: flame-tinted pill. Border = flame @ 32%, bg = flame @ 6%.
-  // The flame circle (left) + chevron right serve the "tappable" affordance;
+  // The icon circle (left) + chevron right serve the "tappable" affordance;
   // long-press dismisses (kept from prior behavior).
   return (
     <Pressable
@@ -115,7 +115,7 @@ export function SystemMessageSlot() {
           styles.iconCircle,
           {backgroundColor: hexToRgba(colors.primary, 0.18)},
         ]}>
-        <Flame size={15} color={colors.primary} strokeWidth={2} />
+        <Megaphone size={15} color={colors.primary} strokeWidth={2} />
       </View>
       <Text
         style={[bodyType.regular, styles.message, {color: colors.textPrimary}]}
