@@ -36,13 +36,18 @@ export function HomeInbox() {
   const navigation = useNavigation<any>();
   const user = useGlobalStore(s => s.user);
 
-  // The hidden Platform Pool is where super-admin "All Users" broadcasts land.
-  // It lives on the nfl_2026 competition, but this banner must surface
-  // platform-wide announcements no matter which competition the user is
-  // currently viewing — so we resolve it from the user's FULL membership set
-  // below (competition-independent), NOT from the competition-scoped
-  // globalStore.userPools (which omits it on any other competition/sim).
-  const [platformPoolId, setPlatformPoolId] = useState<string | null>(null);
+  // The hidden Platform Pools are where super-admin "All Users" broadcasts land.
+  // This banner must surface platform-wide announcements no matter which
+  // competition the user is currently viewing — so we resolve them from the
+  // user's FULL membership set below (competition-independent), NOT from the
+  // competition-scoped globalStore.userPools (which omits them on any other
+  // competition/sim).
+  //
+  // A LIST, not a single id: there is more than one hidden platform pool
+  // (nfl_2026 AND nfl_2026_pre — a player belongs to both), so the previous
+  // `rows.find(...)` picked one nondeterministically and went blind to
+  // broadcasts on the other.
+  const [platformPoolIds, setPlatformPoolIds] = useState<string[]>([]);
 
   // Track join time per pool — a broadcast sent BEFORE the user joined a pool
   // is not "unread" for them (otherwise every new signup inherits old pool
@@ -54,41 +59,52 @@ export function HomeInbox() {
   // Load membership once when the user changes. The user's set of
   // active pool memberships is stable mid-session — membership joins/
   // leaves go through dedicated screens, not the Home Realtime path.
-  // NOT competition-scoped: we pull every active membership and locate the
-  // global+hidden Platform Pool from the joined flags, so the banner works
-  // regardless of the active sport/competition.
+  //
+  // Sourced from the SECURITY DEFINER RPC get_my_pool_memberships(), which is
+  // scoped to auth.uid() and returns the caller's own active memberships WITH
+  // pool flags — hidden pools included. This replaces a
+  // `pool_members -> pools!inner(...)` join: pools_select withholds the hidden
+  // Platform Pool from non-super-admins, so the INNER join dropped the entire
+  // membership row, the platform id never arrived, and the banner went dark.
   useEffect(() => {
     let cancelled = false;
     if (!user?.id) {
       setPools(null);
-      setPlatformPoolId(null);
+      setPlatformPoolIds([]);
       return;
     }
     (async () => {
-      const {data} = await supabase
-        .from('pool_members')
-        .select('pool_id, joined_at, pools!inner(is_global, is_hidden_from_users)')
-        .eq('user_id', user.id)
-        .eq('status', 'active');
+      const {data, error} = await supabase.rpc('get_my_pool_memberships');
       if (cancelled) return;
-      const rows = (data ?? []) as unknown as Array<{
+      // Fail safe: an RPC error or zero rows collapses to an empty set — the
+      // banner then renders nothing (guard in recompute). Never throws.
+      const rows = (error ? [] : (data ?? [])) as Array<{
         pool_id: string;
         joined_at: string | null;
-        pools: {is_global: boolean; is_hidden_from_users: boolean} | null;
+        is_global: boolean;
+        is_hidden_from_users: boolean;
       }>;
       setPools(rows.map(r => ({pool_id: r.pool_id, joined_at: r.joined_at})));
-      const platform = rows.find(
-        r => r.pools?.is_global && r.pools?.is_hidden_from_users,
+      setPlatformPoolIds(
+        rows
+          .filter(r => r.is_global && r.is_hidden_from_users)
+          .map(r => r.pool_id),
       );
-      setPlatformPoolId(platform?.pool_id ?? null);
     })();
     return () => { cancelled = true; };
   }, [user?.id]);
 
+  // Stable dependency key. `platformPoolIds` is a fresh array identity on every
+  // render, so depending on it directly would re-run recompute and re-subscribe
+  // the Realtime channel every render.
+  const platformKey = platformPoolIds.join(',');
+
   const recompute = useCallback(async () => {
-    // Scope to the Platform Pool only — this banner shows super-admin broadcasts.
-    const scoped = (pools ?? []).filter(p => p.pool_id === platformPoolId);
-    if (!user?.id || !platformPoolId || scoped.length === 0) {
+    // Scope to the platform pools ONLY — this banner shows super-admin
+    // broadcasts and must never surface Gaffer contest broadcasts. That
+    // narrowing lives here, not in the breadth of the membership list.
+    const scoped = (pools ?? []).filter(p => platformPoolIds.includes(p.pool_id));
+    if (!user?.id || platformPoolIds.length === 0 || scoped.length === 0) {
       setUnread(0);
       setLatestPreview(null);
       return;
@@ -143,7 +159,9 @@ export function HomeInbox() {
     }
     setUnread(unreadCount);
     setLatestPreview(mostRecentUnread?.message ?? null);
-  }, [user?.id, pools, platformPoolId]);
+    // platformKey is the stable stand-in for platformPoolIds (see above).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, pools, platformKey]);
 
   useEffect(() => {
     recompute();
@@ -153,7 +171,7 @@ export function HomeInbox() {
   // postgres_changes filter must be a single comma-list inside
   // `pool_id=in.(...)`. Channel re-binds when poolIds changes.
   useEffect(() => {
-    if (!user?.id || !platformPoolId) return;
+    if (!user?.id || platformPoolIds.length === 0) return;
     const channel = supabase
       .channel(`home-inbox-${user.id}`)
       .on(
@@ -162,7 +180,7 @@ export function HomeInbox() {
           event: 'INSERT',
           schema: 'public',
           table: 'organizer_notifications',
-          filter: `pool_id=eq.${platformPoolId}`,
+          filter: `pool_id=in.(${platformPoolIds.join(',')})`,
         },
         () => recompute(),
       )
@@ -180,7 +198,9 @@ export function HomeInbox() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id, platformPoolId, recompute]);
+    // platformKey is the stable stand-in for platformPoolIds (see above).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, platformKey, recompute]);
 
   if (unread === 0) return null;
 

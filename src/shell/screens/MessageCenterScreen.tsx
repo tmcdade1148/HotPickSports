@@ -74,22 +74,28 @@ export function MessageCenterScreen() {
       return;
     }
 
-    // Pull the user's full active pool membership directly — across
-    // every competition + including hidden pools like the Platform
-    // Pool. The global store's userPools slice is scoped to the
-    // active competition and would drop platform-wide broadcasts.
-    const {data: memberRows} = await supabase
-      .from('pool_members')
-      .select('pool_id, role, pools!inner(id, name, is_hidden_from_users)')
-      .eq('user_id', userId)
-      .eq('status', 'active');
+    // Pull the user's full active pool membership — across every competition
+    // and INCLUDING hidden pools like the Platform Pool. The global store's
+    // userPools slice is scoped to the active competition and would drop
+    // platform-wide broadcasts.
+    //
+    // Sourced from the SECURITY DEFINER RPC get_my_pool_memberships(), scoped
+    // to auth.uid(). This replaces a `pool_members -> pools!inner(...)` join:
+    // pools_select withholds the hidden Platform Pool from non-super-admins, so
+    // the INNER join dropped the whole membership row and its id never reached
+    // `.in('pool_id', poolIds)` — platform broadcasts could never match.
+    const {data: memberRows, error: memberErr} = await supabase.rpc(
+      'get_my_pool_memberships',
+    );
 
-    type RawRow = {
+    type MembershipRow = {
       pool_id: string;
+      competition: string | null;
+      name: string | null;
+      is_global: boolean;
+      is_hidden_from_users: boolean;
       role: string;
-      pools: {id: string; name: string | null; is_hidden_from_users: boolean}
-           | {id: string; name: string | null; is_hidden_from_users: boolean}[]
-           | null;
+      joined_at: string | null;
     };
 
     const poolIds: string[] = [];
@@ -98,13 +104,15 @@ export function MessageCenterScreen() {
     const organizedPoolIds: string[] = [];
     const nameMap: Record<string, string> = {};
     const hiddenById: Record<string, boolean> = {};
-    for (const r of ((memberRows ?? []) as unknown) as RawRow[]) {
-      const p = Array.isArray(r.pools) ? r.pools[0] : r.pools;
-      if (!p) continue;
-      poolIds.push(p.id);
-      if (r.role === 'organizer') organizedPoolIds.push(p.id);
-      hiddenById[p.id] = p.is_hidden_from_users;
-      nameMap[p.id] = p.is_hidden_from_users ? 'HotPick' : (p.name ?? 'Contest');
+    // Fail safe: an RPC error or zero rows just leaves this loop unrun, so
+    // poolIds stays empty and the early return below shows an empty inbox
+    // (plus any pending items). Never throws.
+    const membershipRows = ((memberErr ? [] : (memberRows ?? [])) as unknown) as MembershipRow[];
+    for (const r of membershipRows) {
+      poolIds.push(r.pool_id);
+      if (r.role === 'organizer') organizedPoolIds.push(r.pool_id);
+      hiddenById[r.pool_id] = r.is_hidden_from_users;
+      nameMap[r.pool_id] = r.is_hidden_from_users ? 'HotPick' : (r.name ?? 'Contest');
     }
 
     // Piece 2 — applicant's own pending applications. Independent of active
