@@ -15,6 +15,7 @@ import {supabase} from '@shared/config/supabase';
 import {spacing, borderRadius} from '@shared/theme';
 
 import {useTheme} from '@shell/theme';
+import {useNavReserve} from '@shared/hooks/useNavReserve';
 import {AvatarBadge} from '@shared/components/AvatarBadge';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useFocusEffect} from '@react-navigation/native';
@@ -40,6 +41,7 @@ export function SeasonBoardScreen() {
   const {colors} = useTheme();
   const styles = createStyles(colors);
   const config = useSeasonStore(s => s.config);
+  const navReserve = useNavReserve();
   const poolId = useSeasonStore(s => s.poolId);
   const currentWeek = useSeasonStore(s => s.currentWeek);
   const leaderboard = useSeasonStore(s => s.leaderboard);
@@ -515,7 +517,7 @@ export function SeasonBoardScreen() {
     <View style={styles.container}>
       <ScrollView
         style={{flex: 1}}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, {paddingBottom: navReserve}]}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={64}
         onScroll={updatePinned}>

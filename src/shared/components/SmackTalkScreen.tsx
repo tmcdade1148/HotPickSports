@@ -23,6 +23,7 @@ import {spacing, borderRadius} from '@shared/theme';
 
 import type {DbSmackMessage, DbSmackReaction} from '@shared/types/database';
 import {useTheme} from '@shell/theme';
+import {useNavReserve} from '@shared/hooks/useNavReserve';
 import {HotPickFlame} from '@shared/components/HotPickFlame';
 import {MentionAutocomplete} from '@shared/components/MentionAutocomplete';
 
@@ -84,6 +85,7 @@ function formatSmackTime(date: Date): string {
 
 export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
   const {colors} = useTheme();
+  const navReserve = useNavReserve();
   const styles = createStyles(colors);
   const [messages, setMessages] = useState<DbSmackMessage[]>([]);
   const [reactions, setReactions] = useState<Record<string, DbSmackReaction[]>>({});
@@ -885,7 +887,7 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
         </View>
       )}
 
-      <View style={styles.inputRow}>
+      <View style={[styles.inputRow, {paddingBottom: navReserve}]}>
         <TextInput
           style={styles.input}
           placeholder="Talk trash..."

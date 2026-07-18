@@ -7,11 +7,10 @@
 // Row 2: the shared PlayerName on the LEFT (same treatment as Home / Picks) and
 // the Contest name on the RIGHT (secondary, truncated).
 
-import React from 'react';
+import React, {useState} from 'react';
 import {Text} from '@shared/components/AppText';
-import {Pressable, StyleSheet, View} from 'react-native';
-import {Settings} from 'lucide-react-native';
-import {useNavigation} from '@react-navigation/native';
+import {StyleSheet, View, TouchableOpacity} from 'react-native';
+import {ChevronDown} from 'lucide-react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
@@ -19,6 +18,7 @@ import {LEXICON} from '@shared/lexicon';
 import {COMPACT_PERIOD_LENGTH} from './home/shortPeriod';
 import {usePeriodLabel} from './home/usePeriodLabel';
 import {PlayerName} from './PlayerName';
+import {ContestSwitchModal} from './ContestSwitchModal';
 
 // Ceiling on OS accessibility font enlargement for the fixed-layout header row
 // (matches HomeHeader / PicksHeader). Tune on device.
@@ -26,10 +26,11 @@ const HEADER_MAX_FONT_SCALE = 1.2;
 
 export function PoolHeader() {
   const {colors} = useTheme();
-  const navigation = useNavigation<any>();
   const visiblePools = useGlobalStore(s => s.visiblePools);
   const activePoolId = useGlobalStore(s => s.activePoolId);
   const activePool = visiblePools.find(p => p.id === activePoolId);
+  const hasVisiblePools = visiblePools.length > 0;
+  const [switchVisible, setSwitchVisible] = useState(false);
   const period = usePeriodLabel();
   const contestName = (
     activePool?.name ?? `Join a ${LEXICON.contest.singular}`
@@ -57,26 +58,43 @@ export function PoolHeader() {
               {period}
             </Text>
           </View>
-          <Pressable
-            onPress={() => navigation.navigate('SettingsTab', {expandPools: true})}
-            hitSlop={10}
-            style={({pressed}) => [styles.gearBtn, {opacity: pressed ? 0.6 : 1}]}
-            accessibilityRole="button"
-            accessibilityLabel="Open settings">
-            <Settings size={22} color={colors.textSecondary} strokeWidth={2} />
-          </Pressable>
         </View>
       </View>
 
-      {/* Row 2 — player name (left) + contest name (right) */}
+      {/* Row 2 — player name (left) + contest switcher (right).
+          The chevron IS the scope boundary: this header renders only on
+          Ladder/Chirp, and tapping it switches the contest both tabs follow
+          (shared ContestSwitchModal → setActivePoolId). Home/Picks/Settings
+          are contest-agnostic and never get this header. */}
       <View style={styles.nameRow}>
         <PlayerName style={styles.nameLeft} />
-        <Text
-          style={[displayType.display, styles.contestName, {color: colors.textSecondary}]}
-          numberOfLines={1}>
-          {contestName}
-        </Text>
+        {hasVisiblePools ? (
+          <TouchableOpacity
+            style={styles.contestSwitch}
+            onPress={() => setSwitchVisible(true)}
+            hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+            accessibilityRole="button"
+            accessibilityLabel="Switch Contest">
+            <Text
+              style={[displayType.display, styles.contestName, {color: colors.textSecondary}]}
+              numberOfLines={1}>
+              {contestName}
+            </Text>
+            <ChevronDown size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
+        ) : (
+          <Text
+            style={[displayType.display, styles.contestName, {color: colors.textSecondary}]}
+            numberOfLines={1}>
+            {contestName}
+          </Text>
+        )}
       </View>
+
+      <ContestSwitchModal
+        visible={switchVisible}
+        onClose={() => setSwitchVisible(false)}
+      />
     </View>
   );
 }
@@ -124,8 +142,13 @@ const styles = StyleSheet.create({
     letterSpacing: 1.1,
     fontStyle: 'italic',
   },
-  gearBtn: {
-    padding: 4,
+  contestSwitch: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 1,
+    maxWidth: '52%',
+    gap: 2,
+    justifyContent: 'flex-end',
   },
   nameRow: {
     flexDirection: 'row',

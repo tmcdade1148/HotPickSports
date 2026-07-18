@@ -9,6 +9,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {KeyRound, Plus} from 'lucide-react-native';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import {useGlobalStore} from '@shell/stores/globalStore';
+import {useNavReserve} from '@shared/hooks/useNavReserve';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {isScheduledStatus} from '@sports/nfl/utils/gameStatus';
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
@@ -20,7 +21,6 @@ import {SystemMessageSlot} from '@shell/components/home/SystemMessageSlot';
 import {HomeHeader} from '@shell/components/home/HomeHeader';
 import {IdentityBar} from '@shell/components/home/IdentityBar';
 import {ManagedLeagueModule} from '@shell/components/home/ManagedLeagueModule';
-import {JoinPublicContestButton} from '@shell/components/home/JoinPublicContestButton';
 import {StateHero} from '@shell/components/home/StateHero';
 import {HeroSkeleton} from '@shell/components/home/HeroSkeleton';
 import {CrossContestStrip} from '@shell/components/home/CrossContestStrip';
@@ -47,6 +47,7 @@ export function HomeScreen() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
+  const navReserve = useNavReserve();
 
   const userId       = useGlobalStore(s => s.user?.id);
   const visiblePools = useGlobalStore(s => s.visiblePools);
@@ -462,7 +463,7 @@ export function HomeScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
-          {paddingTop: headerHeight, paddingBottom: footerHeight + spacing.xxl},
+          {paddingTop: headerHeight, paddingBottom: footerHeight + spacing.xxl + navReserve},
         ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -501,9 +502,6 @@ export function HomeScreen() {
           <>
             {offCycleContests}
             {visiblePools.length > 0 ? <ReturningOffCycleActions /> : <OffSeasonActions />}
-            {/* Public-contest CTA sits directly under Join/Create. Self-hides
-                once the user is in any pool / no public contest is set. */}
-            <JoinPublicContestButton />
             <CrossContestStrip />
             {offCycleClubs ?? <ClubsTeaser />}
           </>
@@ -514,9 +512,6 @@ export function HomeScreen() {
             <PreseasonPicksOpenLine />
             {offCycleContests}
             {visiblePools.length > 0 ? <ReturningOffCycleActions /> : <PreSeasonActions />}
-            {/* Public-contest CTA sits directly under Join/Create. Self-hides
-                once the user is in any pool / no public contest is set. */}
-            <JoinPublicContestButton />
             <CrossContestStrip />
             {offCycleClubs ?? <ClubsTeaser />}
           </>
@@ -527,14 +522,6 @@ export function HomeScreen() {
         {/* Board Discovery Tile — routes partner board members (Chairman /
             Director) into League Tools. Self-hides when not on a board. */}
         <ManagedLeagueModule />
-
-        {/* Join-the-public-contest CTA for new users with no contests.
-            Self-hides once the user is in any pool. On off-cycle states it's
-            rendered up under the Join/Create pills instead (see above), so
-            here it's gated to the remaining states to avoid double-rendering. */}
-        {homeState !== 'off_season_idle' && homeState !== 'pre_season_games' && (
-          <JoinPublicContestButton />
-        )}
 
         {/* In-cycle YOUR CONTESTS section — replaced on off-cycle
             states (off_season_idle / pre_season_games) by the action

@@ -8,14 +8,12 @@
 //         "HOT" + "SPORTS" in primary flame; "PICK" in textPrimary
 // Mid   — period pill (NFL26 · W08 / PRESEASON / WC / SB / etc.)
 //         primary-bordered italic pill, season-year-aware (e.g. NFL26).
-// Right — Settings gear, opens app settings (replaces the bottom nav
-//         entry now that Home is full-bleed).
+// Right — period pill only. The Settings gear moved to the bottom nav as a
+//         real fifth tab (slice 2).
 
 import React from 'react';
 import {Text} from '@shared/components/AppText';
-import {Pressable, StyleSheet, View} from 'react-native';
-import {Settings} from 'lucide-react-native';
-import {useNavigation} from '@react-navigation/native';
+import {StyleSheet, View} from 'react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
@@ -29,7 +27,6 @@ const HEADER_MAX_FONT_SCALE = 1.2;
 
 export function HomeHeader() {
   const {colors} = useTheme();
-  const navigation = useNavigation<any>();
   const period = usePeriodLabel();
   // Persistent reminder for sandbox tester accounts (Operator Console Phase 2 §6c).
   // Brand-themed per Hard Rule #9 (the spec's literal #F28B30 would violate it).
@@ -67,17 +64,6 @@ export function HomeHeader() {
             {period}
           </Text>
         </View>
-        <Pressable
-          onPress={() => navigation.navigate('SettingsTab')}
-          hitSlop={10}
-          style={({pressed}) => [
-            styles.gearBtn,
-            {opacity: pressed ? 0.6 : 1},
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="Open settings">
-          <Settings size={22} color={colors.textSecondary} strokeWidth={2} />
-        </Pressable>
       </View>
     </View>
     {isTestAccount && (
@@ -138,9 +124,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     letterSpacing: 1.1,
     fontStyle: 'italic',
-  },
-  gearBtn: {
-    padding: 4,
   },
   testBannerWrap: {
     paddingHorizontal: spacing.lg,

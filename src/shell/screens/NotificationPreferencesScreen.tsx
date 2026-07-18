@@ -22,7 +22,7 @@ type PrefMap = Record<string, boolean>;
 
 const PREF_LABELS: Record<string, {label: string; description: string}> = {
   picks_deadline: {
-    label: 'Pick Deadlines',
+    label: 'Pick reminders',
     description: 'Reminders before your picks lock',
   },
   score_posted: {
@@ -42,7 +42,7 @@ const PREF_LABELS: Record<string, {label: string; description: string}> = {
     description: 'When someone replies to your message',
   },
   organizer_broadcast: {
-    label: 'Contest Broadcasts',
+    label: 'Contest announcements',
     description: 'Messages from your Gaffer',
   },
   streak_milestone: {
@@ -68,12 +68,11 @@ const PREF_ORDER = [
   'new_member_joined',
 ];
 
-// Only the types that actually have a server-side generator today get a toggle.
-// The rest (picks_deadline, score_posted, leaderboard_change, streak_milestone,
-// new_member_joined, smacktalk_mention, smacktalk_reply) are enqueued by nothing
-// yet, so showing a switch for them
-// would be a dead control. Add a type back here the moment its generator ships.
+// Toggles shown in Settings → Notifications, in order. `picks_deadline` is a
+// promise made on onboarding screen 2 ("pick reminders"), so the category needs
+// its own switch. Add a type here as its server-side generator ships.
 const VISIBLE_PREF_ORDER = [
+  'picks_deadline',
   'organizer_broadcast',
 ];
 

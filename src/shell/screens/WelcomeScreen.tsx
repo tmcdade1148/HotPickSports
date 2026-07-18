@@ -14,6 +14,7 @@ import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 import {signInWithApple, signInWithGoogle} from '@shell/services/socialAuth';
 import {runPostAuthFlow} from '@shell/services/postAuthFlow';
+import {VersionStamp} from '@shell/components/VersionStamp';
 
 export function WelcomeScreen({navigation}: any) {
   const {colors} = useTheme();
@@ -145,6 +146,10 @@ export function WelcomeScreen({navigation}: any) {
           </Text>
         </Text>
       </View>
+
+      {/* Version stamp — readable WITHOUT signing in (when you're stuck you
+          can't reach Settings). Low-contrast, pinned to the bottom. */}
+      <VersionStamp style={styles.versionStamp} />
     </SafeAreaView>
   );
 }
@@ -234,5 +239,11 @@ const createStyles = (colors: any) => StyleSheet.create({
   consentLink: {
     color: colors.primary,
     textDecorationLine: 'underline',
+  },
+  versionStamp: {
+    position: 'absolute',
+    bottom: spacing.md,
+    left: 0,
+    right: 0,
   },
 });

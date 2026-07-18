@@ -13,13 +13,13 @@ import {useNavigation} from '@react-navigation/native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {
   ListChecks,
-  ListOrdered,
   MessageCircle,
   Settings,
   Trophy,
   Home,
 } from 'lucide-react-native';
 import {BottomTabBar} from '@react-navigation/bottom-tabs';
+import {LadderIcon} from '@shell/components/LadderIcon';
 import {HomeScreen} from '@shell/screens/HomeScreen';
 import {SettingsScreen} from '@shell/screens/SettingsScreen';
 import {useTheme} from '@shell/theme';
@@ -27,12 +27,13 @@ import {useBrand} from '@shell/theme';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {consumePendingInviteCode} from '@shell/services/pendingInvite';
 import {PoweredByHotPick} from '@shell/components/PoweredByHotPick';
-import {PoolSwitcherBar} from '@shell/components/PoolSwitcherBar';
 import {PoolHeader} from '@shell/components/PoolHeader';
 import {PicksHeader} from '@shell/components/PicksHeader';
 import {spacing, typography, borderRadius} from '@shared/theme';
 import {LEXICON} from '@shared/lexicon';
 import {useForegroundRefetch} from '@shared/hooks/useForegroundRefetch';
+import {hexToRgba} from '@shared/utils/color';
+import {useViewingPoolId} from '@shell/stores/selectors/defaultPool';
 
 // Sport store imports for initialization
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
@@ -99,8 +100,6 @@ function isDarkBg(hex: string): boolean {
   return 0.299 * r + 0.587 * g + 0.114 * b < 0.5;
 }
 
-// TabHeader removed — replaced by shared PoolSwitcherBar component
-
 /**
  * PicksTab — Renders the correct picks screen based on active sport template.
  */
@@ -132,14 +131,16 @@ function PicksTab() {
 function LeaderboardTab() {
   const {colors} = useTheme();
   const activeSport = useGlobalStore(s => s.activeSport);
-  if (!activeSport) return <EmptyTabScreen label="Leaders" />;
+  const viewingPoolId = useViewingPoolId();
+  // No Contest in scope → empty state, never a global/platform leaderboard.
+  if (!activeSport || !viewingPoolId) return <EmptyTabScreen label={LEXICON.ladder.short} />;
 
   const screen = (() => {
     switch (activeSport.templateType) {
       case 'season': return <SeasonBoardScreen />;
       case 'tournament': return <TournamentBoardScreen />;
       case 'series': return <SeriesBoardScreen />;
-      default: return <EmptyTabScreen label="Leaders" />;
+      default: return <EmptyTabScreen label={LEXICON.ladder.short} />;
     }
   })();
 
@@ -157,11 +158,8 @@ function LeaderboardTab() {
 function SmackTalkTab() {
   const {colors} = useTheme();
   const activeSport = useGlobalStore(s => s.activeSport);
-  const activePoolId = useGlobalStore(s => s.activePoolId);
-  const userPools = useGlobalStore(s => s.userPools);
-  // Fall back to global pool if no active pool (user has no visible private pools)
-  const globalPool = userPools.find(p => p.is_global);
-  const smackPoolId = activePoolId || globalPool?.id || null;
+  // Same source as the Ladder — one viewingPoolId, no global-pool fallback.
+  const smackPoolId = useViewingPoolId();
   if (!activeSport || !smackPoolId) {
     return <EmptyTabScreen label={LEXICON.chirps.plural} />;
   }
@@ -259,12 +257,15 @@ function HomeTab(props: any) {
 }
 
 // ---------------------------------------------------------------------------
-// GroupedTabBar — custom tab bar that wraps Leaders + SmackTalk in one box
+// AppTabBar — flat five-equal-tab bar. The old grouped box (Leaders + Chirp
+// under one underline) was retired: it read as a mistake, not a design cue.
+// The contest-scope boundary moved to PoolHeader's chevron, where it carries
+// a NAME instead of a hint.
 // ---------------------------------------------------------------------------
 
-function GroupedTabBar({state, descriptors, navigation}: BottomTabBarProps) {
+function AppTabBar({state, descriptors, navigation}: BottomTabBarProps) {
   const {colors} = useTheme();
-  const s = groupedTabStyles(colors);
+  const s = tabBarStyles(colors);
   const smackUnreadCounts = useGlobalStore(st => st.smackUnreadCounts);
   const hasUnreadSmack = Object.values(smackUnreadCounts).some(c => c > 0);
 
@@ -320,83 +321,26 @@ function GroupedTabBar({state, descriptors, navigation}: BottomTabBarProps) {
     );
   };
 
-  // Settings is reachable via the gear in each tab's header (HomeHeader /
-  // PoolHeader / PicksHeader). Hide it from the bottom bar so the bar can
-  // focus on tab navigation, but keep the route registered.
-  const visibleRoutes = state.routes.filter(r => r.name !== 'SettingsTab');
-  const indexOfVisible = (visible: typeof state.routes[number]) =>
-    state.routes.findIndex(r => r.key === visible.key);
-
-  // Tab indices: 0=Home, 1=Games, 2=Leaders, 3=SmackTalk, 4+=trailing
-  const leading = visibleRoutes.slice(0, 2);
-  const grouped = visibleRoutes.slice(2, 4);
-  const trailing = visibleRoutes.slice(4);
-
-  // Hide Leaders + SmackTalk grouped box on Home AND Picks tabs — both are
-  // "pick-flow" surfaces where the user shouldn't be hopping over to the
-  // social side of the app. Routes stay registered so direct nav still works.
-  const activeRouteName = state.routes[state.index]?.name;
-  const hideGroupedTabs = activeRouteName === 'HomeTab' || activeRouteName === 'PicksTab';
-
+  // Five equal tabs, in registration order: Home · Picks · Ladder · Chirp ·
+  // Settings. No filtering (Settings is a real tab now), no grouped box, no
+  // per-tab hiding — the bar is identical on every screen.
   return (
-    <View style={[s.bar, {backgroundColor: colors.background, borderTopColor: colors.border}]}>
-      {leading.map((route, i) => {
-        const realIndex = indexOfVisible(route);
-        return (
-          <TouchableOpacity
-            key={route.key}
-            onPress={() => onTabPress(route, realIndex)}
-            style={i === 0 ? s.tabHome : s.tab}
-            accessibilityRole="button"
-            accessibilityState={state.index === realIndex ? {selected: true} : {}}>
-            {renderTabContent(route, realIndex)}
-          </TouchableOpacity>
-        );
-      })}
-
-      {hideGroupedTabs ? (
-        // Reserve the same flex slot the Leaders+SmackTalk box would
-        // occupy so Home + Games keep their left-anchored positions
-        // when the grouped tabs are hidden (Home and Picks tabs).
-        // Without this, the leading tabs would stretch to fill the
-        // gap and shift right.
-        <View style={s.groupBoxPlaceholder} />
-      ) : (
-        <View style={[s.groupBox, {borderBottomColor: colors.border}]}>
-          {grouped.map(route => {
-            const realIndex = indexOfVisible(route);
-            return (
-              <TouchableOpacity
-                key={route.key}
-                onPress={() => onTabPress(route, realIndex)}
-                style={s.groupTab}
-                accessibilityRole="button"
-                accessibilityState={state.index === realIndex ? {selected: true} : {}}>
-                {renderTabContent(route, realIndex)}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      )}
-
-      {trailing.map(route => {
-        const realIndex = indexOfVisible(route);
-        return (
-          <TouchableOpacity
-            key={route.key}
-            onPress={() => onTabPress(route, realIndex)}
-            style={s.tab}
-            accessibilityRole="button"
-            accessibilityState={state.index === realIndex ? {selected: true} : {}}>
-            {renderTabContent(route, realIndex)}
-          </TouchableOpacity>
-        );
-      })}
+    <View style={[s.bar, {backgroundColor: 'transparent', borderTopColor: colors.border}]}>
+      {state.routes.map((route, index) => (
+        <TouchableOpacity
+          key={route.key}
+          onPress={() => onTabPress(route, index)}
+          style={s.tab}
+          accessibilityRole="button"
+          accessibilityState={state.index === index ? {selected: true} : {}}>
+          {renderTabContent(route, index)}
+        </TouchableOpacity>
+      ))}
     </View>
   );
 }
 
-const groupedTabStyles = (colors: any) => StyleSheet.create({
+const tabBarStyles = (_colors: any) => StyleSheet.create({
   bar: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -407,30 +351,7 @@ const groupedTabStyles = (colors: any) => StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'flex-start',
-    paddingTop: 10,
-    paddingBottom: 4,
-  },
-  tabHome: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingLeft: 8,
-    paddingBottom: 6,
-  },
-  groupBox: {
-    flex: 2,
-    flexDirection: 'row',
-    borderBottomWidth: 3,
-    marginHorizontal: 2,
-  },
-  groupBoxPlaceholder: {
-    flex: 2,
-  },
-  groupTab: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    paddingTop: 10,
+    paddingTop: 8,
     paddingBottom: 4,
   },
   label: {
@@ -443,12 +364,12 @@ const groupedTabStyles = (colors: any) => StyleSheet.create({
 /**
  * MainTabNavigator — Persistent bottom tab bar across the entire app.
  *
- * 5 tabs:
- *   1. Home (far left) — labeled with user's name/poolie name
+ * 5 equal tabs, identical on every screen (Home included):
+ *   1. Home — home screen
  *   2. Picks — sport-specific picks screen
- *   3. Leaderboard — sport-specific board screen
- *   4. SmackTalk — pool-scoped chat
- *   5. Settings (far right) — app settings
+ *   3. Ladder (Leaderboard) — sport-specific board screen
+ *   4. Chirp (SmackTalk) — pool-scoped chat
+ *   5. Settings — app settings
  *
  * Picks, Leaderboard, and SmackTalk render sport-specific content
  * when an active sport exists, or an empty state when not.
@@ -463,7 +384,9 @@ export function MainTabNavigator() {
   useForegroundRefetch();
   const userProfile = useGlobalStore(s => s.userProfile);
   const activeSport = useGlobalStore(s => s.activeSport);
-  const activePoolId = useGlobalStore(s => s.activePoolId);
+  // Unified scope: the same viewingPoolId the Ladder + Chirp tabs read, so the
+  // season store initializes against exactly what those tabs display.
+  const viewingPoolId = useViewingPoolId();
   const hasHistoryFromStore = useGlobalStore(s => s.hasHistory);
   const nflCompetition = useNFLStore(s => s.competition);
   const loadUserHardware = useGlobalStore(s => s.loadUserHardware);
@@ -507,18 +430,18 @@ export function MainTabNavigator() {
   const hasHistory = hasHistoryDirect;
   // homeLabel removed — Dashboard tab uses icon only
 
-  // Initialize sport stores when activeSport or activePoolId changes
+  // Initialize sport stores when activeSport or viewingPoolId changes
   const seasonInitialize = useSeasonStore(s => s.initialize);
   const seasonConfig = useSeasonStore(s => s.config);
   const nflInitialize = useNFLStore(s => s.initialize);
   const didInit = useRef(false);
 
   useEffect(() => {
-    if (!activeSport || !activePoolId) return;
+    if (!activeSport || !viewingPoolId) return;
 
     if (activeSport.templateType === 'season') {
       // Re-initialize if sport, pool, or first init
-      const poolChanged = seasonConfig && useSeasonStore.getState().poolId !== activePoolId;
+      const poolChanged = seasonConfig && useSeasonStore.getState().poolId !== viewingPoolId;
       if (
         !seasonConfig ||
         seasonConfig.competition !== activeSport.competition ||
@@ -526,10 +449,10 @@ export function MainTabNavigator() {
         didInit.current === false
       ) {
         didInit.current = true;
-        seasonInitialize(activeSport, activePoolId);
+        seasonInitialize(activeSport, viewingPoolId);
       }
     }
-  }, [activeSport?.competition, activePoolId, seasonInitialize, seasonConfig?.competition]);
+  }, [activeSport?.competition, viewingPoolId, seasonInitialize, seasonConfig?.competition]);
 
   // nflStore initialization — was previously triggered by SeasonEventCard
   // before the Home Redesign deleted that component. Now driven directly
@@ -576,19 +499,25 @@ export function MainTabNavigator() {
           }
         },
       }}
-      tabBar={(props) => {
-        // Brief (redesign-v3): hide the entire bottom-nav region on Home —
-        // PoweredByHotPick included. Home owns the full screen; other tabs
-        // continue to show the bar.
-        const activeRouteName = props.state.routes[props.state.index]?.name;
-        if (activeRouteName === 'HomeTab') return null;
-        return (
-          <SafeAreaView style={{backgroundColor: colors.background}} edges={['bottom']}>
-            <PoweredByHotPick />
-            <GroupedTabBar {...props} />
-          </SafeAreaView>
-        );
-      }}
+      tabBar={(props) => (
+        // Floating, semi-transparent bar on every screen (slice 2 #9/#10):
+        // absolutely positioned so content scrolls UNDER it; rgba (no expo-blur,
+        // no native). Screens reserve useNavReserve() at their scroll bottom so
+        // the last row clears the bar. 0.85 alpha is a starting value — tune on
+        // device.
+        <SafeAreaView
+          edges={['bottom']}
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: hexToRgba(colors.background, 0.85),
+          }}>
+          <PoweredByHotPick />
+          <AppTabBar {...props} />
+        </SafeAreaView>
+      )}
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
@@ -607,11 +536,11 @@ export function MainTabNavigator() {
         name="HomeTab"
         component={HomeTab}
         options={{
-          // The raised center tab is Home. A Home glyph reads unambiguously as
-          // Home (the prior Target icon looked like an aim/target reticle).
-          tabBarLabel: () => null,
-          tabBarIcon: ({focused}) => (
-            <Home size={56} color={focused ? colors.primary : colors.textSecondary} strokeWidth={focused ? 2.5 : 1.5} style={{marginBottom: 0}} />
+          // Home is one of five equal tabs now (the old raised 56px center
+          // glyph belonged to the retired grouped layout).
+          tabBarLabel: 'Home',
+          tabBarIcon: ({color, size}) => (
+            <Home size={size} color={color} />
           ),
         }}
       />
@@ -619,7 +548,7 @@ export function MainTabNavigator() {
         name="PicksTab"
         component={PicksTab}
         options={{
-          tabBarLabel: 'Games/Picks',
+          tabBarLabel: 'Picks',
           tabBarIcon: ({color, size}) => (
             <ListChecks size={size} color={color} />
           ),
@@ -631,7 +560,7 @@ export function MainTabNavigator() {
         options={{
           tabBarLabel: LEXICON.ladder.short,
           tabBarIcon: ({color, size}) => (
-            <ListOrdered size={size} color={color} />
+            <LadderIcon size={size} color={color} />
           ),
         }}
       />

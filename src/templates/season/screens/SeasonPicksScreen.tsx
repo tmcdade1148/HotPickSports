@@ -13,6 +13,7 @@ import {useAuth} from '@shared/hooks/useAuth';
 import {spacing, borderRadius} from '@shared/theme';
 import type {DbSeasonGame} from '@shared/types/database';
 import {useTheme} from '@shell/theme';
+import {useNavReserve} from '@shared/hooks/useNavReserve';
 import {useNFLStore, type GameScore} from '@sports/nfl/stores/nflStore';
 import {computeLiveWeekEarned} from '@sports/nfl/utils/liveWeekScore';
 import {useGlobalStore} from '@shell/stores/globalStore';
@@ -80,6 +81,7 @@ function hasStarted(g: DbSeasonGame): boolean {
  */
 export function SeasonPicksScreen() {
   const {colors} = useTheme();
+  const navReserve = useNavReserve();
   const styles = createStyles(colors);
   const config = useSeasonStore(s => s.config);
   const games = useSeasonStore(s => s.games);
@@ -513,7 +515,7 @@ export function SeasonPicksScreen() {
             keyExtractor={item => item.game_id}
             renderItem={renderGame}
             renderSectionHeader={renderSectionHeader}
-            contentContainerStyle={styles.list}
+            contentContainerStyle={[styles.list, {paddingBottom: navReserve}]}
             ItemSeparatorComponent={() => (
               <View style={[styles.separator, {backgroundColor: colors.border}]} />
             )}

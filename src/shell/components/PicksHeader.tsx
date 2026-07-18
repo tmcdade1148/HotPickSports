@@ -1,16 +1,15 @@
 // Two-row header for the Picks tab.
 //
-//   HOT PICK SPORTS                       [ NFL26 · W08 ]  ⚙
+//   HOT PICK SPORTS                       [ NFL26 · W08 ]
 //   TMCDADE
 //
-// Row 1 mirrors HomeHeader / PoolHeader (wordmark + period pill + gear).
+// Row 1 mirrors HomeHeader / PoolHeader (wordmark + period pill). The Settings
+// gear moved to the bottom nav as a real tab (slice 2).
 // Row 2 is the shared PlayerName (poolie name, left) — same treatment as Home.
 
 import React from 'react';
 import {Text} from '@shared/components/AppText';
-import {Pressable, StyleSheet, View} from 'react-native';
-import {Settings} from 'lucide-react-native';
-import {useNavigation} from '@react-navigation/native';
+import {StyleSheet, View} from 'react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
 import {COMPACT_PERIOD_LENGTH} from './home/shortPeriod';
@@ -23,7 +22,6 @@ const HEADER_MAX_FONT_SCALE = 1.2;
 
 export function PicksHeader() {
   const {colors} = useTheme();
-  const navigation = useNavigation<any>();
   const period = usePeriodLabel();
 
   return (
@@ -48,14 +46,6 @@ export function PicksHeader() {
               {period}
             </Text>
           </View>
-          <Pressable
-            onPress={() => navigation.navigate('SettingsTab', {expandPools: true})}
-            hitSlop={10}
-            style={({pressed}) => [styles.gearBtn, {opacity: pressed ? 0.6 : 1}]}
-            accessibilityRole="button"
-            accessibilityLabel="Open settings">
-            <Settings size={22} color={colors.textSecondary} strokeWidth={2} />
-          </Pressable>
         </View>
       </View>
 
@@ -109,9 +99,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     letterSpacing: 1.1,
     fontStyle: 'italic',
-  },
-  gearBtn: {
-    padding: 4,
   },
   nameRow: {
     flexDirection: 'row',

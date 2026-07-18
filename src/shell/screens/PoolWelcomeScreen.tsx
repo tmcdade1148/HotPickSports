@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useGlobalStore} from '@shell/stores/globalStore';
+import {resolveDefaultPoolId} from '@shell/stores/selectors/defaultPool';
 import {
   resolvePendingInviteCodeOnLaunch,
   consumePendingInviteCode,
@@ -190,8 +191,13 @@ export function PoolWelcomeScreen({navigation}: any) {
     const pools = useGlobalStore.getState().userPools;
 
     if (pools.length > 0) {
-      const globalPool = pools.find(p => p.is_global);
-      setActivePoolId(globalPool?.id ?? pools[0].id);
+      // Seed the viewed contest from the star resolver (manual star → first
+      // created → first partner → first joined) instead of blindly taking the
+      // global pool. Same rule that paints the Settings star; never persists.
+      const {poolRoles, defaultPoolId} = useGlobalStore.getState();
+      setActivePoolId(
+        resolveDefaultPoolId(pools, poolRoles, defaultPoolId) ?? pools[0].id,
+      );
       const poolIds = pools.map(p => p.id);
       await fetchSmackUnreadCounts(user.id, poolIds);
     }

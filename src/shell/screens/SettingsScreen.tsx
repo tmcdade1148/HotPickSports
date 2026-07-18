@@ -44,6 +44,9 @@ import {spacing, borderRadius} from '@shared/theme';
 import {useColorScheme} from 'react-native';
 import type {BrandConfig} from '@shell/theme/types';
 import {HOTPICK_DEFAULTS, SEMANTIC_COLORS, SEMANTIC_COLORS_DARK, deriveDarkColors, isLightColor} from '@shell/theme/defaults';
+import {resolveDefaultPoolId} from '@shell/stores/selectors/defaultPool';
+import {VersionStamp} from '@shell/components/VersionStamp';
+import {useNavReserve} from '@shared/hooks/useNavReserve';
 import {getEventsByPriority, getEventByCompetition} from '@sports/registry';
 import {ContestActionPill, contestActionPillStyles} from '@shell/components/ContestActionPill';
 import {LEXICON} from '@shared/lexicon';
@@ -76,12 +79,15 @@ export function SettingsScreen({route}: any) {
   const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
   const setDefaultPoolId = useGlobalStore(s => s.setDefaultPoolId);
 
-  // Effective default: manual setting → first created → first partner pool → first joined
-  const effectiveDefaultPoolId = rawDefaultPoolId
-    ?? userPools.find(p => poolRoles[p.id] === 'organizer')?.id
-    ?? userPools.find(p => !!(p.brand_config as any)?.is_branded)?.id
-    ?? userPools[0]?.id
-    ?? null;
+  // Effective default (paints the star fill): shared resolver — manual star →
+  // first created → first partner → first joined. The SAME resolver now seeds
+  // the cold-start viewed contest (PoolWelcome), so the star and the boot
+  // scope agree. See @shell/stores/selectors/defaultPool.
+  const effectiveDefaultPoolId = resolveDefaultPoolId(
+    userPools,
+    poolRoles,
+    rawDefaultPoolId,
+  );
   const signOut = useGlobalStore(s => s.signOut);
   const flaggedCounts = useGlobalStore(s => s.flaggedCounts);
 
@@ -89,6 +95,7 @@ export function SettingsScreen({route}: any) {
   // But it must respect system dark/light mode.
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const navReserve = useNavReserve();
   const config = isDark ? deriveDarkColors(HOTPICK_DEFAULTS) : HOTPICK_DEFAULTS;
   const semantic = isDark ? SEMANTIC_COLORS_DARK : SEMANTIC_COLORS;
   const colors = {
@@ -199,7 +206,7 @@ export function SettingsScreen({route}: any) {
     <View style={[styles.container, {backgroundColor: colors.background}]}>
     <ScrollView
       style={styles.flex}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, {paddingBottom: navReserve}]}
       keyboardShouldPersistTaps="handled">
 
       {/* Profile card */}
@@ -701,6 +708,10 @@ export function SettingsScreen({route}: any) {
         <Trash2 size={16} color={colors.textSecondary} />
         <Text style={[styles.deleteText, {color: colors.textSecondary}]}>Delete Account</Text>
       </TouchableOpacity>
+
+      {/* Build stamp — mirrors the login-screen stamp so "did the OTA land?"
+          is answerable from inside the app too. */}
+      <VersionStamp style={{marginTop: spacing.lg, marginBottom: spacing.xl}} />
 
       {/* Competition picker — every competition the user can see, with a check
           on the active one. Replaces the old SIM ⇄ 2026 toggle so super-admins
