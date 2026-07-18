@@ -522,7 +522,13 @@ export function MainTabNavigator() {
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
+        // position:'absolute' tells RN to stop reserving flow height for the
+        // tab bar — our custom bar (the `tabBar` prop) is already absolutely
+        // positioned and floats, so without this RN left a dead band above it
+        // (verified on Android). Content now fills to the bottom and scrolls
+        // under the bar; useNavReserve() does the clearing.
         tabBarStyle: {
+          position: 'absolute',
           backgroundColor: colors.background,
           borderTopColor: colors.surface,
           borderTopWidth: 1,
