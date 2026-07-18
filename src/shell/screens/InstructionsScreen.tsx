@@ -147,7 +147,7 @@ export function InstructionsScreen() {
 
         <AccordionSection title="Creating a Contest" colors={colors}>
           <Text style={[styles.body, {color: colors.textSecondary}]}>
-            Anyone can create a Contest. Tap "Create a Contest" in Settings, give it a
+            Anyone can start a Contest. Tap "Start a Contest" in Settings, give it a
             name, and share the invite code with your group.
           </Text>
           <Text style={[styles.body, {color: colors.textSecondary, marginTop: spacing.sm}]}>

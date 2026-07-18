@@ -117,7 +117,7 @@ export function CreatePoolScreen({navigation}: any) {
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Text style={styles.backButton}>{'< Back'}</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>Create Contest</Text>
+          <Text style={styles.title}>Start Contest</Text>
         </View>
 
         <View style={styles.form}>
@@ -146,7 +146,7 @@ export function CreatePoolScreen({navigation}: any) {
             {creating ? (
               <ActivityIndicator color={colors.onPrimary} />
             ) : (
-              <Text style={styles.createButtonText}>Create Contest</Text>
+              <Text style={styles.createButtonText}>Start Contest</Text>
             )}
           </TouchableOpacity>
         </View>
