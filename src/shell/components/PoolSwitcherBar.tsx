@@ -59,7 +59,7 @@ export function PoolSwitcherBar({mode, onGoBack}: PoolSwitcherBarProps) {
 
   const goToSettings = () => {
     Alert.alert(
-      'Join or Create a Contest?',
+      'Join or Start a Contest?',
       'Head to Settings to join a Contest with an invite code or create your own.',
       [
         {text: 'Cancel', style: 'cancel'},
@@ -120,7 +120,7 @@ export function PoolSwitcherBar({mode, onGoBack}: PoolSwitcherBarProps) {
             <Text
               style={[styles.poolName, {color: colors.primary, fontWeight: '700'}]}
               numberOfLines={1}>
-              Join or Create a Contest
+              Join or Start a Contest
             </Text>
           </TouchableOpacity>
         )}

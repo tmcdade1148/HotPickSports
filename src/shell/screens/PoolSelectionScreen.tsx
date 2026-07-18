@@ -67,7 +67,7 @@ export function PoolSelectionScreen({navigation}: any) {
         <View style={styles.emptyState}>
           <Text style={styles.emptyTitle}>No Contests Yet</Text>
           <Text style={styles.emptyText}>
-            Create a Contest and invite friends, or join an existing Contest with
+            Start a Contest and invite friends, or join an existing Contest with
             an invite code.
           </Text>
         </View>

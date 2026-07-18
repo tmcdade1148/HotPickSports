@@ -63,7 +63,7 @@ export function AboutScreen() {
           <Text style={[styles.cardTitle, {color: colors.textPrimary}]}>Built for communities</Text>
           <Text style={[styles.body, {color: colors.textSecondary}]}>
             HotPick is designed for real communities — friend groups, offices,
-            fantasy leagues, sports bars, and local organizations. Create a Contest,
+            fantasy leagues, sports bars, and local organizations. Start a Contest,
             share your invite code, and let the Chirps begin.
           </Text>
         </View>

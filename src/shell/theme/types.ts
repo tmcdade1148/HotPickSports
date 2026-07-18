@@ -70,6 +70,10 @@ export interface ThemeColors {
   secondary: string;
   background: string;
   surface: string;
+  /** Translucent chrome fill — background at CHROME_ALPHA, pre-composited.
+   *  The single source for Home's header overlay, the nav bar, PoolHeader and
+   *  PicksHeader, so their transparency can never drift apart. */
+  chrome: string;
   highlight: string;
   textPrimary: string;
   textSecondary: string;

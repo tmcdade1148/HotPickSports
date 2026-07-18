@@ -1,9 +1,10 @@
 // Two-row pool-context header for Leaderboard + SmackTalk tabs.
 //
-//   HOT PICK SPORTS                  [ NFL26 · W08 ]  ⚙
-//   TMCDADE                                  MES QUE POOL
+//   HOT PICK SPORTS                  [ NFL26 · W08 ]
+//   TMCDADE                              MES QUE POOL ⌄
 //
-// Row 1 mirrors HomeHeader (wordmark + period pill + gear).
+// Row 1 mirrors HomeHeader (wordmark + period pill). The Settings gear moved
+// to the bottom nav as a real tab (slice 2).
 // Row 2: the shared PlayerName on the LEFT (same treatment as Home / Picks) and
 // the Contest name on the RIGHT (secondary, truncated).
 
@@ -37,8 +38,14 @@ export function PoolHeader() {
   ).toUpperCase();
 
   return (
-    <View>
-      {/* Row 1 — HotPick wordmark + period pill + gear (HomeHeader shape) */}
+    // Shares Home's chrome transparency via `colors.chrome` so the two can
+    // never drift. NOTE: this header is still in NORMAL FLOW — nothing scrolls
+    // behind it, so the alpha is invisible here today. Converting it to a
+    // floating overlay (absolute + re-padding the screen by its measured
+    // height, the way HomeScreen does) is DEFERRED to slices 3-7 when we're
+    // already working in these screens. Deferred, not forgotten.
+    <View style={{backgroundColor: colors.chrome}}>
+      {/* Row 1 — HotPick wordmark + period pill (HomeHeader shape) */}
       <View style={styles.topRow}>
         <View style={styles.wordmarkRow}>
           <Text maxFontSizeMultiplier={HEADER_MAX_FONT_SCALE} style={[displayType.display, styles.wordmark, {color: colors.primary}]}>HOT</Text>
@@ -142,11 +149,15 @@ const styles = StyleSheet.create({
     letterSpacing: 1.1,
     fontStyle: 'italic',
   },
+  // Single governor for how wide the Contest name + chevron may get. The Text
+  // inside must NOT carry its own maxWidth — a percentage there resolves
+  // against THIS box, not the row, so the two caps compounded (~48% of ~52%
+  // ≈ a quarter of the row) and truncated the name far too early.
   contestSwitch: {
     flexDirection: 'row',
     alignItems: 'center',
     flexShrink: 1,
-    maxWidth: '52%',
+    maxWidth: '58%',
     gap: 2,
     justifyContent: 'flex-end',
   },
@@ -168,7 +179,6 @@ const styles = StyleSheet.create({
   // smaller, truncated, capped so a long name can't crowd the player name.
   contestName: {
     flexShrink: 1,
-    maxWidth: '48%',
     textAlign: 'right',
     fontSize: 18,
     lineHeight: 22,

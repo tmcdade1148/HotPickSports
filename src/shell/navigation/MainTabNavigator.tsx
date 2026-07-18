@@ -4,6 +4,7 @@ import {
   supabase} from '@shared/config/supabase';
 import {View,
   Image,
+  Platform,
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
@@ -50,6 +51,13 @@ import {SeriesBoardScreen} from '@templates/series/screens/SeriesBoardScreen';
 import {HistoryScreen} from '@shell/screens/HistoryScreen';
 
 const Tab = createBottomTabNavigator();
+
+// Alpha of the "B" linkage wash behind Ladder + Chirp (the two contest-scoped
+// tabs). Its own knob, deliberately NOT CHROME_ALPHA: this tint layers over an
+// already-translucent pill rather than an opaque surface, so it reads fainter
+// than the same number would elsewhere and will likely need bumping. Uses
+// colors.accentTeal, so it's teal in light mode and pale blue in dark.
+const LINK_TINT_ALPHA = 0.1;
 
 // Dashboard tab no longer shows user name — all poolies identified by poolie_name in-app
 
@@ -321,34 +329,92 @@ function AppTabBar({state, descriptors, navigation}: BottomTabBarProps) {
     );
   };
 
-  // Five equal tabs, in registration order: Home · Picks · Ladder · Chirp ·
-  // Settings. No filtering (Settings is a real tab now), no grouped box, no
-  // per-tab hiding — the bar is identical on every screen.
+  const realIndex = (r: typeof state.routes[number]) =>
+    state.routes.findIndex(x => x.key === r.key);
+
+  const renderTab = (route: typeof state.routes[number]) => {
+    const index = realIndex(route);
+    return (
+      <TouchableOpacity
+        key={route.key}
+        onPress={() => onTabPress(route, index)}
+        style={s.tab}
+        accessibilityRole="button"
+        accessibilityState={state.index === index ? {selected: true} : {}}>
+        {renderTabContent(route, index)}
+      </TouchableOpacity>
+    );
+  };
+
+  // The LIFT lives on the pill, never on the outer wrapper — the wrapper is now
+  // fully transparent, and an elevated transparent View casts a rectangular
+  // shadow on its own bounds on Android (the documented "weird box", see
+  // HomeScreen's footerOverlay). The pill carries the background, so it's the
+  // only safe host for both the iOS shadow and the Android elevation.
+  const lift = Platform.select({
+    ios: {
+      shadowColor: colors.ink,
+      shadowOpacity: 0.18,
+      shadowRadius: 12,
+      shadowOffset: {width: 0, height: -3},
+    },
+    android: {elevation: 6},
+  });
+
+  // Home · Picks | [ Ladder · Chirp ] | Settings.
+  // The middle pair carries the B linkage wash — a soft rounded tint and NO
+  // border, ever. The border is precisely what read as a mistake; the wash is
+  // the grouped box minus that. flex:2 on the group keeps all five tabs equal
+  // width (2 units split by two flex:1 children = 1 unit each, same as the
+  // ungrouped tabs).
+  const lead = state.routes.slice(0, 2);
+  const linked = state.routes.slice(2, 4);
+  const trail = state.routes.slice(4);
+
   return (
-    <View style={s.bar}>
-      {state.routes.map((route, index) => (
-        <TouchableOpacity
-          key={route.key}
-          onPress={() => onTabPress(route, index)}
-          style={s.tab}
-          accessibilityRole="button"
-          accessibilityState={state.index === index ? {selected: true} : {}}>
-          {renderTabContent(route, index)}
-        </TouchableOpacity>
-      ))}
+    <View style={[s.pillLift, {backgroundColor: colors.chrome}, lift]}>
+      <View style={s.pill}>
+        {lead.map(renderTab)}
+        <View
+          style={[
+            s.linkGroup,
+            {backgroundColor: hexToRgba(colors.accentTeal, LINK_TINT_ALPHA)},
+          ]}>
+          {linked.map(renderTab)}
+        </View>
+        {trail.map(renderTab)}
+      </View>
     </View>
   );
 }
 
 const tabBarStyles = (_colors: any) => StyleSheet.create({
-  bar: {
+  // Layer 1 — the floating island's surface + lift. Holds the background
+  // (colors.chrome, applied inline) so both the iOS shadow and the Android
+  // elevation have a real surface to cast from. Deliberately NO
+  // overflow:'hidden' here: on iOS that would clip the very shadow we cast.
+  pillLift: {
+    marginHorizontal: 14,
+    borderRadius: 28, // = height/2 → a true pill
+  },
+  // Layer 2 — the clipping surface. Same radius, transparent (layer 1 paints
+  // it), overflow:'hidden' so the B tint's corners can never escape the
+  // rounded shape. No borderTop: the pill's edge is the separation now.
+  pill: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    // No borderTop. It was an edge the bar needed back when it was opaque; the
-    // floating rgba background now does that separation, and the leftover
-    // rendered as a hairline across the top of the bar.
-    backgroundColor: 'transparent',
     height: 56,
+    borderRadius: 28,
+    overflow: 'hidden',
+  },
+  // B linkage wash behind Ladder + Chirp. Rounded to nest inside the pill,
+  // stretched to full pill height so the grouped tabs stay pixel-aligned with
+  // the ungrouped ones (any vertical inset here would shift their icons).
+  linkGroup: {
+    flex: 2,
+    flexDirection: 'row',
+    alignSelf: 'stretch',
+    borderRadius: 20,
   },
   tab: {
     flex: 1,
@@ -511,11 +577,15 @@ export function MainTabNavigator() {
         <SafeAreaView
           edges={['bottom']}
           style={{
+            // Pure transparent positioning frame — NO background, NO shadow.
+            // The rounded pill inside is the only chrome; content scrolls past
+            // it on the sides as well as underneath. The background
+            // (colors.chrome) and the lift both live on the pill, because an
+            // elevated transparent View casts a rectangular shadow on Android.
             position: 'absolute',
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: hexToRgba(colors.background, 0.85),
           }}>
           <PoweredByHotPick />
           <AppTabBar {...props} />

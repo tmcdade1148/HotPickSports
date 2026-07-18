@@ -5,8 +5,10 @@ import {
   SEMANTIC_COLORS_DARK,
   HOTPICK_EXTENDED_TOKENS,
   HOTPICK_EXTENDED_TOKENS_DARK,
+  CHROME_ALPHA,
   deriveDarkColors,
 } from './defaults';
+import {hexToRgba} from '@shared/utils/color';
 import type {ThemeColors, BrandIdentity} from './types';
 
 /**
@@ -47,6 +49,9 @@ export function useTheme(): {colors: ThemeColors; isDark: boolean} {
       secondary: config.secondary_color,
       background: config.background_color,
       surface: config.surface_color,
+      // Pre-composited so no call site does its own alpha math — that's how the
+      // header ('E6' hex-suffix) and the nav (hexToRgba 0.85) drifted apart.
+      chrome: hexToRgba(config.background_color, CHROME_ALPHA),
       highlight,
       textPrimary: config.text_primary,
       textSecondary: config.text_secondary,

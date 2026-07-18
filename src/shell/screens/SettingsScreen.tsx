@@ -530,10 +530,10 @@ export function SettingsScreen({route}: any) {
             )}
             <ContestActionPill
               Icon={Plus}
-              label="Create a Contest"
+              label="Start a Contest"
               sublabel="and invite friends"
               onPress={handleCreatePool}
-              accessibilityLabel="Create a new Contest and invite friends"
+              accessibilityLabel="Start a new Contest and invite friends"
             />
           </View>
         </View>

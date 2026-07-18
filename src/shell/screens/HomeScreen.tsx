@@ -33,10 +33,9 @@ import {PartnerModule} from '@shell/components/home/PartnerModule';
 import {resolveHomeState} from '@shell/components/home/resolveHomeState';
 import {LEXICON} from '@shared/lexicon';
 
-// Opacity (hex alpha) applied to the theme background behind the fixed header
-// so page content is faintly visible scrolling under it. 'E6' ≈ 90%; lower it
-// for more transparency. Appended to the 6-digit theme hex.
-const HEADER_BG_ALPHA = 'E6';
+// The header's translucency now comes from the shared `colors.chrome` token
+// (theme: CHROME_ALPHA) so it can't drift from the nav bar. Tune it there, not
+// here — the old local 'E6' hex-suffix is gone deliberately.
 
 // The Home footer bar is fully clear (the page shows through it); only the
 // Join/Create pills carry a translucent frosted fill so they read as panels
@@ -579,7 +578,7 @@ export function HomeScreen() {
         )}
       </ScrollView>
       <View
-        style={[styles.headerOverlay, {backgroundColor: colors.background + HEADER_BG_ALPHA}]}
+        style={[styles.headerOverlay, {backgroundColor: colors.chrome}]}
         onLayout={e => setHeaderHeight(e.nativeEvent.layout.height)}>
         <HomeHeader />
         <SystemMessageSlot />
@@ -616,11 +615,11 @@ export function HomeScreen() {
             />
             <ContestActionPill
               Icon={Plus}
-              label="Create a Contest"
+              label="Start a Contest"
               sublabel="and invite friends"
               fillColor={colors.background + PILL_FILL_ALPHA}
               onPress={() => navigation.navigate('CreatePool')}
-              accessibilityLabel="Create a new Contest and invite friends"
+              accessibilityLabel="Start a new Contest and invite friends"
             />
           </View>
         </View>

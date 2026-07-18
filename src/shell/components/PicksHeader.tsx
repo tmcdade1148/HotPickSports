@@ -25,8 +25,14 @@ export function PicksHeader() {
   const period = usePeriodLabel();
 
   return (
-    <View>
-      {/* Row 1 — HotPick wordmark + period pill + gear */}
+    // Shares Home's chrome transparency via `colors.chrome` so the two can
+    // never drift. NOTE: this header is still in NORMAL FLOW — nothing scrolls
+    // behind it, so the alpha is invisible here today. Converting it to a
+    // floating overlay (absolute + re-padding the screen by its measured
+    // height, the way HomeScreen does) is DEFERRED to slices 3-7 when we're
+    // already working in these screens. Deferred, not forgotten.
+    <View style={{backgroundColor: colors.chrome}}>
+      {/* Row 1 — HotPick wordmark + period pill */}
       <View style={styles.topRow}>
         <View style={styles.wordmarkRow}>
           <Text maxFontSizeMultiplier={HEADER_MAX_FONT_SCALE} style={[displayType.display, styles.wordmark, {color: colors.primary}]}>HOT</Text>

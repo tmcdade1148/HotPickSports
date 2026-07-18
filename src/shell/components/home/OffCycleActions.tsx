@@ -135,10 +135,10 @@ function OffCycleActionStack({joinSubtitle}: {joinSubtitle: string}) {
         />
         <ContestActionPill
           Icon={Plus}
-          label="Create a Contest"
+          label="Start a Contest"
           sublabel="and invite friends"
           onPress={() => navigation.navigate('CreatePool')}
-          accessibilityLabel="Create a new Contest and invite friends"
+          accessibilityLabel="Start a new Contest and invite friends"
         />
       </View>
     </View>
@@ -173,10 +173,10 @@ export function ReturningOffCycleActions() {
         />
         <ContestActionPill
           Icon={Plus}
-          label="Create a Contest"
+          label="Start a Contest"
           sublabel="and invite friends"
           onPress={() => navigation.navigate('CreatePool')}
-          accessibilityLabel="Create a Contest and invite friends"
+          accessibilityLabel="Start a Contest and invite friends"
         />
       </View>
     </View>

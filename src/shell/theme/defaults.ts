@@ -41,6 +41,17 @@ export const HOTPICK_DARK_OVERRIDES = {
 } as const;
 
 /**
+ * CHROME_ALPHA — the ONE transparency value for app chrome.
+ *
+ * Every floating/translucent chrome surface (Home's header overlay, the nav
+ * bar, PoolHeader, PicksHeader) reads the derived `colors.chrome` token, which
+ * is `hexToRgba(background, CHROME_ALPHA)` resolved per mode in useTheme().
+ * Tune this number here and every surface moves together — there is deliberately
+ * no call-site arithmetic, because two equal literals drift and one source can't.
+ */
+export const CHROME_ALPHA = 0.85;
+
+/**
  * Extended tokens — HotPick-managed structural and accent values that
  * augment the brand colors. Spec §6.3 adds these to the redesign system.
  * Partners never override these; they're consistent across all pools.
