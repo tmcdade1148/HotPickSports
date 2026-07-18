@@ -325,7 +325,7 @@ function AppTabBar({state, descriptors, navigation}: BottomTabBarProps) {
   // Settings. No filtering (Settings is a real tab now), no grouped box, no
   // per-tab hiding — the bar is identical on every screen.
   return (
-    <View style={[s.bar, {backgroundColor: 'transparent', borderTopColor: colors.border}]}>
+    <View style={s.bar}>
       {state.routes.map((route, index) => (
         <TouchableOpacity
           key={route.key}
@@ -344,7 +344,10 @@ const tabBarStyles = (_colors: any) => StyleSheet.create({
   bar: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    borderTopWidth: 1,
+    // No borderTop. It was an edge the bar needed back when it was opaque; the
+    // floating rgba background now does that separation, and the leftover
+    // rendered as a hairline across the top of the bar.
+    backgroundColor: 'transparent',
     height: 56,
   },
   tab: {
