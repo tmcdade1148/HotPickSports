@@ -16,7 +16,6 @@ import {ordinal} from '@shared/utils/format';
 import {fullTeamName} from './teamColors';
 import {buildWeekRecap} from './weekRecap';
 import {WeeklyTrend} from './WeeklyTrend';
-import {WeekLockStrip} from './WeekLockStrip';
 import {GamesTagFlame} from '@shared/components/GamesTagFlame';
 
 // LAUNCH FLAG — the "You sit Nth in <Contest>" standing line is HIDDEN for launch.
@@ -97,15 +96,12 @@ export function CompleteHero() {
         styles.card,
         {backgroundColor: colors.surfaceElevated, borderColor: colors.border},
       ]}>
-      {/* Depleted pick-lock strip — every glyph reads as locked. Matches
-          PicksOpenHero's eyebrow row spacing exactly. HotPick card sits
-          directly below with no top margin so the gap is just the
-          eyebrowRow's marginBottom (12) — identical to PicksOpenHero. */}
-      <View style={styles.eyebrowRow}>
-        <WeekLockStrip />
-      </View>
-
-      {/* HotPick card — final-state coloring, FINAL chip in upper right. */}
+      {/* HotPick card — final-state coloring, FINAL chip in upper right.
+          The depleted lock strip that used to sit above it is deleted (slice
+          4). It was also this card's top spacing: the HotPick card carries no
+          marginTop, relying on the strip's eyebrowRow marginBottom of 12. That
+          gap is now explicit on the card itself (hotPickCard.marginTop) rather
+          than a side effect of a component that no longer exists. */}
       {userHotPick && userHotPickGame && (
         <View
           style={[
@@ -265,14 +261,6 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg + 2,
     borderWidth: 1,
   },
-  // Matches PicksOpenHero.eyebrowRow exactly — same horizontal layout
-  // and bottom spacing so the lock strip sits in the same visual slot.
-  eyebrowRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
   standingText: {
     fontSize: 14,
     lineHeight: 20,
@@ -291,9 +279,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: borderRadius.lg - 2,
     borderWidth: 1,
-    // No marginTop — eyebrowRow's marginBottom (12) above provides the
-    // exact same gap PicksOpenHero uses between the lock strip and the
-    // HotPick pill.
+    // Explicit top gap. This was previously inherited from the deleted lock
+    // strip's eyebrowRow marginBottom (12); with the strip gone the spacing is
+    // stated here so it can't silently collapse. Same 12 as before.
+    marginTop: 12,
     marginBottom: 14,
   },
   hotPickIconCircle: {

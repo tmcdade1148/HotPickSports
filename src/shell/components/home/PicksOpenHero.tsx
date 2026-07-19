@@ -15,12 +15,18 @@ import {useTheme} from '@shell/theme/hooks';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
-import {isFinalStatus, isLiveStatus} from '@sports/nfl/utils/gameStatus';
+// Only isFinalStatus survives here, and only for weekComplete (every game
+// FINAL) — a completion question, not a lock question. The week lock reads
+// isWeekLocked() below, per rule 11.
+import {isFinalStatus} from '@sports/nfl/utils/gameStatus';
 import {isSandboxCompetition} from '@shared/utils/competition';
 import {singleUnit} from './useCountdown';
 import {buildWeekRecap} from './weekRecap';
 import {WeeklyTrend} from './WeeklyTrend';
-import {WeekLockStrip} from './WeekLockStrip';
+// Rule 11: the ONE correct answer to "are picks locked." This is the first
+// import of it from src/shell/components/home/ — the gap the map named, where
+// Home and Picks answered one question from two places.
+import {isWeekLocked} from '@templates/season/utils/weekLock';
 import {GamesTagFlame} from '@shared/components/GamesTagFlame';
 
 // Fallback denominator only — preferred source is
@@ -51,52 +57,47 @@ export function PicksOpenHero() {
   const currentWeek      = useNFLStore(s => s.currentWeek);
   const liveScores       = useNFLStore(s => s.liveScores);
   const weekResult       = useNFLStore(s => s.weekResult);
-  // Full week game list — needed so allGamesLocked / weekComplete
-  // denominate against every game in the week, not just the ones that
-  // have advanced past 'scheduled' in liveScores.
+  // Full week game list. Feeds isWeekLocked() — which needs every game's
+  // kickoff to compute MIN(kickoff_at) — and weekComplete, which must
+  // denominate against the whole week rather than just the games that have
+  // advanced past 'scheduled' in liveScores.
   const seasonGames      = useSeasonStore(s => s.games);
 
   const isPicksOpenState = weekState === 'picks_open';
-  // "Picks locking" branch — first game has kicked off but some picks
-  // are still editable for later games this week. Backend `weekState`
-  // is the authority: trip the wave only when it's `locked` (the
-  // simulator/admin moved us out of picks_open). A pure-clock fallback
-  // creates false positives at week rollover when last week's kickoff
-  // timestamp is in the past for the new week — so we only fall through
-  // to the time check when weekState is NOT picks_open. That preserves
-  // the lag-tolerance for the games_live state without misfiring at the
-  // top of a fresh picks_open week.
-  const [nowMs, setNowMs] = useState(() => Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNowMs(Date.now()), 30_000);
-    return () => clearInterval(id);
-  }, []);
-  const isLockingWave =
-    weekState === 'locked' ||
-    (!isPicksOpenState &&
-      weekFirstKickoff != null &&
-      weekFirstKickoff.getTime() <= nowMs);
 
-  // Single walk over the full week's games. Denominator is the FULL
-  // week (seasonGames), not just liveScores — otherwise the early
-  // Thursday-Night-Final-only case false-fires weekComplete.
-  const {allGamesLocked, weekComplete} = useMemo(() => {
-    // In picks_open the week hasn't started — nothing is locked or complete.
-    // weekState is the authority (same guard as isLockingWave above). Without
-    // this, last week's still-cached final games (seasonGames lags the week
-    // rollover) make the hero render "WEEK N COMPLETE" at the top of a fresh
-    // picks_open week.
-    if (isPicksOpenState || seasonGames.length === 0) {
-      return {allGamesLocked: false, weekComplete: false};
-    }
-    let locked = true;
-    let allFinal = true;
+  // THE week lock — rule 11. isWeekLocked() (weekLock.ts) is MIN(kickoff_at)
+  // across the week's games, mirroring the server's enforce_pick_lock, and it
+  // is the ONLY correct answer to "are picks locked."
+  //
+  // This replaces `isLockingWave`, which was a second, hand-rolled
+  // MIN(kickoff) — a 30-second `nowMs` ticker compared against
+  // `weekFirstKickoff`, with a weekState guard bolted on. Two implementations
+  // of one question is exactly what rule 11 exists to prevent. It also
+  // replaces `allGamesLocked`, which walked every game's status: per-game
+  // status answers "is THIS game locked," never "is the WEEK locked" — the
+  // bug that made WeekLockStrip claim "11 of 16 still editable" after the
+  // server had shut all sixteen.
+  //
+  // No ticker needed here: useCountdownParts re-renders every 30s, so this
+  // re-evaluates on the same cadence the old nowMs interval provided.
+  const weekLocked = isWeekLocked(seasonGames);
+
+  // COMPLETION, not lock. "Every game is FINAL" is a different question from
+  // "is the week locked," and rule 11 doesn't govern it — a week is locked at
+  // first kickoff but not complete until the last whistle. This walk is kept
+  // (reduced to the all-final half) because the CTA's "WEEK N COMPLETE" state
+  // and its layout depend on it. Denominator is the FULL week (seasonGames),
+  // not just liveScores, or an early Thursday-Night-only final false-fires it.
+  const weekComplete = useMemo(() => {
+    // In picks_open the week hasn't started. Without this guard, last week's
+    // still-cached final games (seasonGames lags the week rollover) make the
+    // hero render "WEEK N COMPLETE" at the top of a fresh picks_open week.
+    if (isPicksOpenState || seasonGames.length === 0) return false;
     for (const g of seasonGames) {
       const status = liveScores[g.game_id]?.status ?? g.status ?? '';
-      if (!isFinalStatus(status)) allFinal = false;
-      if (!(isLiveStatus(status) || isFinalStatus(status))) locked = false;
+      if (!isFinalStatus(status)) return false;
     }
-    return {allGamesLocked: locked, weekComplete: allFinal};
+    return true;
   }, [isPicksOpenState, seasonGames, liveScores]);
 
   const picksSet = userPickCount ?? 0;
@@ -141,7 +142,7 @@ export function PicksOpenHero() {
     hotPickDesignated,
     hotPickIsFirstGame,
     minutesLeft,
-    kickedOff: isLockingWave,
+    kickedOff: weekLocked,
   });
 
   // Single fixed size — locked to compact per design call. This previously
@@ -162,19 +163,22 @@ export function PicksOpenHero() {
   if (weekComplete) {
     ctaLabel = `WEEK ${currentWeek} COMPLETE`;
     ctaAccessibilityLabel = `Week ${currentWeek} complete — see how it played out`;
-  } else if (allGamesLocked) {
-    ctaLabel = 'GO TO THE GAMES';
-    ctaAccessibilityLabel = 'Go to the games';
-  } else if (isLockingWave && picksSet > 0 && !allPicks) {
-    // First game has kicked off, user started picking but didn't
-    // finish. Locked-without-pick games count as losses (already
-    // dropped from picksTotal), so allPicks here means every
-    // *still-pickable* game has a pick. With zero picks we fall
-    // through to the default `MAKE YOUR PICKS` — the contextual
-    // message above the timer ("You've missed kickoff but it's not
-    // too late…") already carries the urgency in that case.
+  } else if (weekLocked && picksSet > 0 && !allPicks) {
+    // Week has locked, user started picking but didn't finish.
+    // Locked-without-pick games count as losses (already dropped from
+    // picksTotal), so allPicks here means every *still-pickable* game has a
+    // pick.
+    //
+    // ORDER MATTERS: this used to be gated on `isLockingWave` while the
+    // branch below was gated on `allGamesLocked` — two different conditions.
+    // Both now resolve to the single `weekLocked`, so the more specific case
+    // (partial picks) has to be tested BEFORE the general one, or it could
+    // never fire. Same two labels, same conditions, one source.
     ctaLabel = "YOU'RE MISSING A FEW PICKS";
     ctaAccessibilityLabel = "You're missing a few picks";
+  } else if (weekLocked) {
+    ctaLabel = 'GO TO THE GAMES';
+    ctaAccessibilityLabel = 'Go to the games';
   } else if (allPicks && hotPickDesignated) {
     ctaLabel = 'VIEW OR REVISE YOUR PICKS';
     ctaAccessibilityLabel = 'View or revise your picks';
@@ -194,32 +198,22 @@ export function PicksOpenHero() {
   const confirmLine = isPartial
     ? `You still have ${missedGames} pick${missedGames === 1 ? '' : 's'} to make`
     : allPicks && hotPickDesignated
-    ? allGamesLocked
+    ? weekLocked
       ? 'All your picks are in and locked.'
       : 'All your picks are in — revise anytime before kickoff.'
     : `${picksConfirm} · ${hotPickConfirm}`;
 
-  // The HotPick game's status still gates ACTION's own contextual message and
-  // countdown — there's nothing to count down to once that game is under way.
-  // Read via gameStatus.ts, which lowercases before comparing, so ESPN's
-  // 'FINAL' and the simulator's 'final' resolve the same (rule 10).
+  // ACTION reads NO per-game status any more. The message + countdown used to
+  // be gated on the HotPick GAME's live/final status — a per-game read
+  // answering a week question, and wrong in the obvious case: mid-Sunday with
+  // the week shut but the HotPick game not yet kicked off, it still counted
+  // down to a lock that had already happened. "Chip = its game. Lock = the
+  // week." The chip's own per-game reads live in HotPickModule, where they
+  // belong.
   //
-  // ACTION deliberately does NOT call getHotPickImpact any more. That util
-  // derives win/loss by comparing scores client-side (hotPickImpact.ts:80,
-  // `userScore > opponentScore`) — a rule-9 violation. It is now unreferenced
-  // app-wide and should be deleted in a follow-up.
-  //
-  // `hotPickCardShown` and the timer-suppression branch it fed are also gone.
-  // ACTION always renders its own countdown now — the map's "One countdown,
-  // ever" belongs to this module. The old arrangement had ACTION suppressing
-  // its timer based on another component's render condition, so two files had
-  // to agree with nothing keeping them in sync.
-  const hotPickScore = userHotPickGame
-    ? liveScores[userHotPickGame.game_id]
-    : undefined;
-  const hotPickStatus = hotPickScore?.status ?? userHotPickGame?.status;
-  const hotPickIsLive = isLiveStatus(hotPickStatus);
-  const hotPickIsFinal = isFinalStatus(hotPickStatus);
+  // ACTION also no longer calls getHotPickImpact — that util derives win/loss
+  // by comparing scores client-side (hotPickImpact.ts:80), a rule-9 violation.
+  // It is unreferenced app-wide and should be deleted in a follow-up.
 
   // Lead-in label stacked to the left of the big number — "PICKS START
   // LOCKING IN:" sized to match the unit suffix ("DAYS"). Shown in the
@@ -237,19 +231,14 @@ export function PicksOpenHero() {
           borderColor: colors.border,
         },
       ]}>
-      {/* Stacked-tally week strip — one glyph per game in kickoff order.
-          Green "•" = pick still editable, gray "–" = locked, flame "•" =
-          the user's HotPick game, bold weight = the user has a pick on
-          that game. Replaces the binary PICKS OPEN / PICKS LOCKING label
-          with a glanceable map of week progress. */}
-      <View style={styles.eyebrowRow}>
-        <WeekLockStrip />
-      </View>
+      {/* No eyebrow. WeekLockStrip is deleted — it was the rule-11 violation
+          (per-game status answering the week question, which is how it claimed
+          "11 of 16 still editable" after the server had shut all sixteen). The
+          tighter gap to the message below is intended. */}
 
-      {/* Contextual message + countdown are only relevant pre-kickoff.
-          Once the HotPick game is live or final there's nothing to count
-          down to — the HotPick module + score carry the state. */}
-      {!hotPickIsLive && !hotPickIsFinal && (
+      {/* Message + countdown are pre-LOCK content, gated on the WEEK lock —
+          not on any game's status. The moment isWeekLocked() flips, both go. */}
+      {!weekLocked && (
         <Text style={[bodyType.regular, styles.contextMessage, {color: colors.textSecondary}]}>
           {message}
         </Text>
@@ -258,10 +247,8 @@ export function PicksOpenHero() {
       {/* timer — digits at full size, unit letters at 0.4×, colons between.
           No adjustsFontSizeToFit: combined with nested-Text children of
           different fontSize, iOS shrinks the whole string to a tiny size.
-          The string is short enough that a fixed size always fits.
-          Suppressed when the HotPick card is shown — there the countdown
-          rides inline next to the kickoff time instead. */}
-      {!hotPickIsLive && !hotPickIsFinal && (
+          The string is short enough that a fixed size always fits. */}
+      {!weekLocked && (
         <View style={styles.timerRow}>
           {showLockingLabel && (sandboxCountdown || timer) && (
             // Two stacked single-line Texts rather than one Text with a "\n" +
@@ -353,8 +340,8 @@ export function PicksOpenHero() {
       <Pressable
         onPress={() => navigation.navigate('PicksTab')}
         style={({pressed}) => {
-          const isReviewMode = allPicks && hotPickDesignated && !isLockingWave;
-          const dimmed = isReviewMode || isLockingWave || allGamesLocked || weekComplete;
+          const isReviewMode = allPicks && hotPickDesignated && !weekLocked;
+          const dimmed = isReviewMode || weekLocked || weekComplete;
           const baseOpacity = dimmed ? 0.7 : 1;
           return [
             styles.cta,
