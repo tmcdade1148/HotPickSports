@@ -1,23 +1,23 @@
-// Home hero shared by picks_open, picks_locked, and games_live.
-// Renders the week-lock strip, contextual countdown, HotPick card, CTA,
-// and weekly-trend strip. CTA copy + state cues evolve with the week's
+// Home's ACTION module, shared by picks_open, picks_locked, and games_live.
+// Renders the week-lock strip, the contextual message, the countdown, the CTA,
+// and the weekly-trend strip. CTA copy + state cues evolve with the week's
 // progress (picks remaining, HotPick designated, games kicked off).
+//
+// The HotPick card is NOT here — it is its own module (HotPickModule),
+// rendered as a sibling directly beneath this one by StateHero.
 
-import React, {useEffect, useMemo, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {Text} from '@shared/components/AppText';
-import {Animated, Pressable, StyleSheet, View} from 'react-native';
-import {ArrowRight, Flame} from 'lucide-react-native';
+import {Pressable, StyleSheet, View} from 'react-native';
+import {ArrowRight} from 'lucide-react-native';
 import {useNavigation} from '@react-navigation/native';
 import {useTheme} from '@shell/theme/hooks';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
-import {getHotPickImpact} from '@sports/nfl/utils/hotPickImpact';
-import {isFinalStatus, isLiveStatus, isScheduledStatus} from '@sports/nfl/utils/gameStatus';
-import {hexToRgba} from '@shared/utils/color';
+import {isFinalStatus, isLiveStatus} from '@sports/nfl/utils/gameStatus';
 import {isSandboxCompetition} from '@shared/utils/competition';
 import {singleUnit} from './useCountdown';
-import {fullTeamName} from './teamColors';
 import {buildWeekRecap} from './weekRecap';
 import {WeeklyTrend} from './WeeklyTrend';
 import {WeekLockStrip} from './WeekLockStrip';
@@ -135,18 +135,6 @@ export function PicksOpenHero() {
   const competition = useSeasonStore(s => s.config?.competition);
   const sandboxCountdown = isSandboxCompetition(competition);
 
-  // Compact countdown label (single largest meaningful unit — app-wide rule:
-  // days → hours → minutes). Shown inline next to the HotPick kickoff time
-  // when the HotPick card is present, otherwise as the standalone big timer.
-  const countdownLabel = sandboxCountdown
-    ? '3 DAYS'
-    : timer
-    ? (() => {
-        const su = singleUnit(timer.days, timer.hours, timer.minutes);
-        return `${su.value} ${su.unit}${su.value === 1 ? '' : 's'}`.toUpperCase();
-      })()
-    : null;
-
   const message = buildContextualMessage({
     picksSet,
     totalPicks: picksTotal,
@@ -211,78 +199,27 @@ export function PicksOpenHero() {
       : 'All your picks are in — revise anytime before kickoff.'
     : `${picksConfirm} · ${hotPickConfirm}`;
 
-  // HotPick game preview — surfaces the actual matchup + kickoff once the
-  // user has designated a HotPick. picked_team is a 2-3 letter code; we
-  // resolve it to the full "Baltimore Ravens" form via the NFL team table.
-  const pickedTeam = fullTeamName(userHotPick?.picked_team);
-  const awayTeam   = fullTeamName(userHotPickGame?.away_team) ?? userHotPickGame?.away_team ?? '';
-  const homeTeam   = fullTeamName(userHotPickGame?.home_team) ?? userHotPickGame?.home_team ?? '';
-  // HotPick value = game's frozen rank (or live rank pre-lock). This is
-  // the multiplier-equivalent shown elsewhere as "Rank N HotPick".
-  const hotPickValue =
-    userHotPickGame?.frozen_rank ?? userHotPickGame?.rank ?? null;
-
-  const hotPickImpact = useMemo(() => {
-    if (!userHotPick || !userHotPickGame) return null;
-    return getHotPickImpact(
-      userHotPick,
-      userHotPickGame,
-      liveScores[userHotPickGame.game_id],
-    );
-  }, [userHotPick, userHotPickGame, liveScores]);
-
-  const hotPickIsLive =
-    hotPickImpact?.status === 'winning' ||
-    hotPickImpact?.status === 'losing' ||
-    hotPickImpact?.status === 'tied';
-  const hotPickIsFinal = hotPickImpact?.status === 'final';
-
-  // Negate the live "what you'd lose" delta; final/winning/tied already
-  // carry the right sign from the util.
-  const signedHotPickPoints = useMemo(() => {
-    if (!hotPickImpact || hotPickImpact.status === 'unavailable') return null;
-    return hotPickImpact.status === 'losing'
-      ? -hotPickImpact.points
-      : hotPickImpact.points;
-  }, [hotPickImpact]);
-
-  // The HotPick card hosts the inline countdown. When it's on screen we drop
-  // the standalone big timer (the countdown lives next to "Thu 8:20 PM"); when
-  // there's no card yet (no HotPick designated), the big timer still carries
-  // the countdown so the contextual message isn't left dangling.
-  const hotPickCardShown =
-    hotPickDesignated && !!userHotPickGame && !hotPickIsLive && !hotPickIsFinal;
-
-  const pulse = useRef(new Animated.Value(0.4)).current;
-  useEffect(() => {
-    if (!hotPickIsLive) {
-      pulse.setValue(0.4);
-      return;
-    }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, {toValue: 1, duration: 800, useNativeDriver: true}),
-        Animated.timing(pulse, {toValue: 0.4, duration: 800, useNativeDriver: true}),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [hotPickIsLive, pulse]);
-
-  const pillTint = useMemo(() => {
-    if (hotPickIsLive) return colors.win;
-    if (hotPickIsFinal) {
-      return (signedHotPickPoints ?? 0) >= 0 ? colors.win : colors.loss;
-    }
-    return colors.primary;
-  }, [hotPickIsLive, hotPickIsFinal, signedHotPickPoints, colors]);
-  const hotPickKickoffPretty = userHotPickGame?.kickoff_at
-    ? new Date(userHotPickGame.kickoff_at).toLocaleString(undefined, {
-        weekday: 'short',
-        hour: 'numeric',
-        minute: '2-digit',
-      })
-    : null;
+  // The HotPick game's status still gates ACTION's own contextual message and
+  // countdown — there's nothing to count down to once that game is under way.
+  // Read via gameStatus.ts, which lowercases before comparing, so ESPN's
+  // 'FINAL' and the simulator's 'final' resolve the same (rule 10).
+  //
+  // ACTION deliberately does NOT call getHotPickImpact any more. That util
+  // derives win/loss by comparing scores client-side (hotPickImpact.ts:80,
+  // `userScore > opponentScore`) — a rule-9 violation. It is now unreferenced
+  // app-wide and should be deleted in a follow-up.
+  //
+  // `hotPickCardShown` and the timer-suppression branch it fed are also gone.
+  // ACTION always renders its own countdown now — the map's "One countdown,
+  // ever" belongs to this module. The old arrangement had ACTION suppressing
+  // its timer based on another component's render condition, so two files had
+  // to agree with nothing keeping them in sync.
+  const hotPickScore = userHotPickGame
+    ? liveScores[userHotPickGame.game_id]
+    : undefined;
+  const hotPickStatus = hotPickScore?.status ?? userHotPickGame?.status;
+  const hotPickIsLive = isLiveStatus(hotPickStatus);
+  const hotPickIsFinal = isFinalStatus(hotPickStatus);
 
   // Lead-in label stacked to the left of the big number — "PICKS START
   // LOCKING IN:" sized to match the unit suffix ("DAYS"). Shown in the
@@ -324,7 +261,7 @@ export function PicksOpenHero() {
           The string is short enough that a fixed size always fits.
           Suppressed when the HotPick card is shown — there the countdown
           rides inline next to the kickoff time instead. */}
-      {!hotPickIsLive && !hotPickIsFinal && !hotPickCardShown && (
+      {!hotPickIsLive && !hotPickIsFinal && (
         <View style={styles.timerRow}>
           {showLockingLabel && (sandboxCountdown || timer) && (
             // Two stacked single-line Texts rather than one Text with a "\n" +
@@ -400,187 +337,10 @@ export function PicksOpenHero() {
         </View>
       )}
 
-      {/* HotPick game preview — only when a HotPick has been designated.
-          Shows the picked team + matchup + kickoff time so the user can
-          confirm at a glance what they locked in. */}
-      {hotPickDesignated && userHotPickGame && (
-        <Animated.View
-          style={[
-            styles.hotPickCard,
-            {
-              backgroundColor: hexToRgba(pillTint, 0.08),
-              borderColor: pillTint,
-              borderWidth: hotPickIsLive ? 2 : 1,
-              // Frame stays opaque — only the eyebrow ("YOUR HOTPICK IS LIVE") pulses.
-            },
-          ]}>
-          <Pressable
-            onPress={() => navigation.navigate('PicksTab')}
-            style={({pressed}) => [
-              styles.hotPickCardInner,
-              {opacity: pressed ? 0.85 : 1},
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel={`Your HotPick: ${pickedTeam ?? userHotPick?.picked_team ?? ''} in ${awayTeam} at ${homeTeam}`}>
-          <View
-            style={[
-              styles.hotPickIconCircle,
-              {backgroundColor: hexToRgba(pillTint, 0.18)},
-            ]}>
-            <Flame size={14} color={pillTint} strokeWidth={2.5} />
-          </View>
-          <View style={styles.hotPickBody}>
-            <View style={styles.hotPickHeaderRow}>
-              {hotPickIsLive ? (
-                // Whole eyebrow reads "YOUR HOTPICK IS LIVE" and pulses, with
-                // LIVE a touch larger. Animated.Text bypasses the
-                // @shared/components/AppText wrapper, so lock font-scaling here.
-                <Animated.Text
-                  allowFontScaling={false}
-                  style={[
-                    bodyType.bold,
-                    styles.hotPickEyebrow,
-                    {color: colors.win, opacity: pulse},
-                  ]}>
-                  YOUR HOTPICK IS{' '}
-                  <Text style={[bodyType.bold, styles.hotPickLiveWord]}>LIVE</Text>
-                </Animated.Text>
-              ) : (
-                <Text style={[bodyType.bold, styles.hotPickEyebrow, {color: pillTint}]}>
-                  YOUR HOTPICK
-                </Text>
-              )}
-              {hotPickIsFinal && (
-                <Text style={[bodyType.bold, styles.hotPickFinalLabel, {color: colors.loss}]}>
-                  FINAL
-                </Text>
-              )}
-            </View>
-            <View style={styles.hotPickTeamRow}>
-              {/* flex:1 wrapper gives the name a definite width to fill and
-                  ellipsize against. We deliberately DON'T use
-                  adjustsFontSizeToFit here: on iOS it mis-measures inside a
-                  row and shrinks the team name to the minimum even when it
-                  fits, rendering it tiny/unreadable. Full size + tail
-                  ellipsis is the reliable behavior. */}
-              <View style={styles.hotPickMatchupWrap}>
-                <Text
-                  style={[
-                    displayType.display,
-                    styles.hotPickMatchup,
-                    {color: colors.textPrimary},
-                  ]}
-                  numberOfLines={1}
-                  ellipsizeMode="tail">
-                  {pickedTeam || `${awayTeam} @ ${homeTeam}`}
-                </Text>
-              </View>
-              {hotPickValue != null && (
-                <Animated.View
-                  style={[
-                    styles.hotPickValueBadge,
-                    {
-                      backgroundColor: hexToRgba(pillTint, 0.18),
-                      borderColor: pillTint,
-                      borderWidth: hotPickIsLive ? 2 : 1,
-                      // Value pill stays opaque — pulse is isolated to the
-                      // eyebrow line so the points number stays legible.
-                    },
-                  ]}
-                  accessible
-                  accessibilityLabel={
-                    signedHotPickPoints != null
-                      ? `${signedHotPickPoints > 0 ? 'Plus' : ''}${signedHotPickPoints} points`
-                      : `Worth ${hotPickValue} points`
-                  }>
-                  {/* Use a flex row of two distinct Text components
-                      instead of inline-nested Text. Android renders the
-                      sibling "PTS" reliably this way; inline-nested was
-                      dropping it on some layouts. */}
-                  <View style={styles.hotPickValueRow}>
-                    <Text style={[displayType.display, styles.hotPickValueText, {color: pillTint}]}>
-                      {signedHotPickPoints != null
-                        ? `${signedHotPickPoints > 0 ? '+' : ''}${signedHotPickPoints}`
-                        : hotPickValue}
-                    </Text>
-                    <Text style={[bodyType.bold, styles.hotPickValueUnit, {color: pillTint}]}>
-                      PTS
-                    </Text>
-                  </View>
-                </Animated.View>
-              )}
-            </View>
-            {/* Team abbrevs + scores. Renders scores as soon as the
-                game has either a liveScores entry or non-null score
-                fields on the season_games row. */}
-            {(() => {
-              const lsHp = liveScores[userHotPickGame.game_id];
-              const dbHomeScore = userHotPickGame.home_score;
-              const dbAwayScore = userHotPickGame.away_score;
-              const status = lsHp?.status ?? userHotPickGame.status ?? '';
-              const started = !isScheduledStatus(status);
-              const showScores =
-                started &&
-                ((lsHp && (lsHp.homeScore != null || lsHp.awayScore != null)) ||
-                  dbHomeScore != null ||
-                  dbAwayScore != null);
-              const awayScore = lsHp?.awayScore ?? dbAwayScore ?? 0;
-              const homeScore = lsHp?.homeScore ?? dbHomeScore ?? 0;
-              return (
-                <Text
-                  style={[bodyType.regular, styles.hotPickMatchupSub, {color: colors.textTertiary}]}
-                  numberOfLines={1}>
-                  <Text
-                    style={{
-                      color: hotPickIsLive
-                        ? hexToRgba(colors.textPrimary, 0.8)
-                        : colors.textTertiary,
-                      fontWeight: hotPickIsLive ? '800' : '500',
-                    }}>
-                    {(userHotPickGame.away_team ?? '').toUpperCase()}
-                  </Text>
-                  {showScores && (
-                    <Text style={{color: colors.textPrimary, fontWeight: '700'}}>
-                      {' '}{awayScore}
-                    </Text>
-                  )}
-                  {' @ '}
-                  <Text
-                    style={{
-                      color: hotPickIsLive
-                        ? hexToRgba(colors.textPrimary, 0.8)
-                        : colors.textTertiary,
-                      fontWeight: hotPickIsLive ? '800' : '500',
-                    }}>
-                    {(userHotPickGame.home_team ?? '').toUpperCase()}
-                  </Text>
-                  {showScores && (
-                    <Text style={{color: colors.textPrimary, fontWeight: '700'}}>
-                      {' '}{homeScore}
-                    </Text>
-                  )}
-                </Text>
-              );
-            })()}
-            {/* Drop the kickoff line once the game is live or final —
-                "Thu 8:20 PM" is only useful as pre-game context. The
-                countdown rides inline to the right of the day/time
-                (e.g. "Thu 8:20 PM · 2h") so the contextual message's
-                "…kicks off in:" lead-in resolves here. */}
-            {hotPickKickoffPretty && !hotPickIsLive && !hotPickIsFinal && (
-              <Text style={[bodyType.regular, styles.hotPickKickoff, {color: colors.textSecondary}]}>
-                {hotPickKickoffPretty}
-                {countdownLabel && (
-                  <Text style={{color: colors.textPrimary, fontWeight: '700'}}>
-                    {'  ·  '}{countdownLabel}
-                  </Text>
-                )}
-              </Text>
-            )}
-          </View>
-          </Pressable>
-        </Animated.View>
-      )}
+      {/* The HOTPICK module used to render here, inside ACTION. It is now its
+          own sibling component (HotPickModule), rendered directly beneath this
+          one by StateHero. ACTION owns the countdown, the CTA and the week
+          progress; it no longer knows anything about the HotPick card. */}
 
       {/* CTA — label + emphasis flip once everything is locked in. When
           the user is done the action is no longer primary: dim the button
@@ -924,92 +684,6 @@ const styles = StyleSheet.create({
   ctaText: {
     fontSize: 18,
     letterSpacing: 0.5,
-  },
-  hotPickCard: {
-    borderRadius: borderRadius.lg - 2,
-    borderWidth: 1,
-    marginBottom: 14,
-  },
-  hotPickCardInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-  },
-  hotPickIconCircle: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  hotPickBody: {
-    flex: 1,
-    minWidth: 0,
-  },
-  hotPickHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 3,
-  },
-  hotPickEyebrow: {
-    fontSize: 10,
-    letterSpacing: 1.4,
-  },
-  hotPickLiveWord: {
-    fontSize: 13,
-    letterSpacing: 1.4,
-  },
-  // FINAL is 1.5× the eyebrow size, sits right next to YOUR HOTPICK.
-  hotPickFinalLabel: {
-    fontSize: 15,
-    letterSpacing: 1.4,
-  },
-  hotPickTeamRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  hotPickMatchupWrap: {
-    flex: 1,
-    minWidth: 0,
-  },
-  hotPickMatchup: {
-    fontSize: 16,
-    lineHeight: 18,
-  },
-  hotPickValueBadge: {
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: borderRadius.full,
-    borderWidth: 1,
-    flexShrink: 0,
-  },
-  hotPickValueText: {
-    fontSize: 13,
-    lineHeight: 14,
-  },
-  hotPickValueRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 3,
-  },
-  hotPickValueUnit: {
-    fontSize: 10,
-    letterSpacing: 0.4,
-  },
-  hotPickMatchupSub: {
-    fontSize: 11,
-    fontWeight: '500',
-    marginTop: 2,
-  },
-  hotPickKickoff: {
-    fontSize: 12,
-    fontWeight: '500',
-    marginTop: 3,
   },
   confirmLine: {
     fontSize: 12,

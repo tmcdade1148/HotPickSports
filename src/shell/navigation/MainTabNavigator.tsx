@@ -4,7 +4,6 @@ import {
   supabase} from '@shared/config/supabase';
 import {View,
   Image,
-  Platform,
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
@@ -31,6 +30,7 @@ import {PoweredByHotPick} from '@shell/components/PoweredByHotPick';
 import {PoolHeader} from '@shell/components/PoolHeader';
 import {PicksHeader} from '@shell/components/PicksHeader';
 import {spacing, typography, borderRadius} from '@shared/theme';
+import {PILL_HEIGHT, PILL_INSET, PILL_RADIUS, pillLift} from '@shared/theme/pill';
 import {LEXICON} from '@shared/lexicon';
 import {useForegroundRefetch} from '@shared/hooks/useForegroundRefetch';
 import {useViewingPoolId} from '@shell/stores/selectors/defaultPool';
@@ -366,22 +366,11 @@ function AppTabBar({state, descriptors, navigation}: BottomTabBarProps) {
   // shadow on its own bounds on Android (the documented "weird box", see
   // HomeScreen's footerOverlay). The pill carries the background, so it's the
   // only safe host for both the iOS shadow and the Android elevation.
-  const lift = Platform.select({
-    ios: {
-      shadowColor: colors.ink,
-      shadowOpacity: 0.18,
-      shadowRadius: 12,
-      // Right + down. Directional lift is iOS-only — Android's elevation has
-      // no direction and always casts evenly on all sides.
-      shadowOffset: {width: 3, height: 3},
-    },
-    // (a) No Android lift. Elevation has no direction, so it can't match the
-    // right+down iOS shadow — it would cast evenly on all four sides, and with
-    // the 14px inset every side is now exposed to the grey-rectangle artifact.
-    // At CHROME_ALPHA 0.80 the pill separates on alpha + inset alone. Change to
-    // `elevation: 2` for a faint even lift if Tom wants (b) instead.
-    android: {elevation: 0},
-  });
+  //
+  // Shared with the Picks submit pill via @shared/theme/pill so the two stacked
+  // pills can't drift apart. The rationale for `elevation: 0` on Android lives
+  // with the constant.
+  const lift = pillLift(colors.ink);
 
   // Home · Picks · Ladder · Chirp · Settings — five evenly-spaced tabs, no
   // dividers and no grouping. Each tab is flex:1, so the spacing is even
@@ -399,8 +388,8 @@ const tabBarStyles = (_colors: any) => StyleSheet.create({
   // elevation have a real surface to cast from. Deliberately NO
   // overflow:'hidden' here: on iOS that would clip the very shadow we cast.
   pillLift: {
-    marginHorizontal: 14,
-    borderRadius: 28, // = height/2 → a true pill
+    marginHorizontal: PILL_INSET,
+    borderRadius: PILL_RADIUS, // = height/2 → a true pill
   },
   // Layer 2 — the clipping surface. Same radius, transparent (layer 1 paints
   // it), overflow:'hidden' so nothing inside can escape the rounded shape.
@@ -408,8 +397,8 @@ const tabBarStyles = (_colors: any) => StyleSheet.create({
   pill: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    height: 56,
-    borderRadius: 28,
+    height: PILL_HEIGHT,
+    borderRadius: PILL_RADIUS,
     overflow: 'hidden',
   },
   tab: {

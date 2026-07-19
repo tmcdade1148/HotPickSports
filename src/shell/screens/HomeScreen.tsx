@@ -4,8 +4,7 @@
 
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {Text} from '@shared/components/AppText';
-import {Platform, RefreshControl, ScrollView, StyleSheet, View} from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {RefreshControl, ScrollView, StyleSheet, View} from 'react-native';
 import {KeyRound, Plus} from 'lucide-react-native';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import {useGlobalStore} from '@shell/stores/globalStore';
@@ -45,7 +44,8 @@ const PILL_FILL_ALPHA = 'CC';
 export function HomeScreen() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
-  const insets = useSafeAreaInsets();
+  // Bottom-inset handling now lives entirely in useNavReserve() (nav height +
+  // safe-area inset), so the screen no longer reads insets directly.
   const navReserve = useNavReserve();
 
   const userId       = useGlobalStore(s => s.user?.id);
@@ -109,6 +109,11 @@ export function HomeScreen() {
   const showHero         = true;
   const showPoolStack    = true;
   const showPartnerStack = true;
+
+  // Single gate for the pinned Join / Start-a-Contest bar. Hardcoded true for
+  // now; a phase rule is coming (hide it once the season is a few weeks old),
+  // and this is the one line that will carry it.
+  const showJoinCreate = true;
 
   // In-cycle = the regular YOUR CONTESTS / YOUR CLUBS layout (off-cycle states
   // own their own action stacks). The locked Join/Create footer + the in-cycle
@@ -462,7 +467,15 @@ export function HomeScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
-          {paddingTop: headerHeight, paddingBottom: footerHeight + spacing.xxl + navReserve},
+          {
+            paddingTop: headerHeight,
+            // footerHeight is MEASURED and now already contains navReserve (the
+            // pinned bar clears the nav itself), so adding navReserve again
+            // here would double-count it. When the bar isn't rendered there's
+            // nothing between content and the nav, so reserve it directly.
+            paddingBottom:
+              (footerHeight > 0 ? footerHeight : navReserve) + spacing.xxl,
+          },
         ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -585,23 +598,20 @@ export function HomeScreen() {
         <IdentityBar />
       </View>
 
-      {/* Locked, translucent Join/Create footer — pinned to the bottom of Home
-          (in-cycle only) so content scrolls visibly under it, matching the
-          header. Off-cycle states keep their own action stacks. Bottom inset
-          clears the home indicator; padding is kept tight per Tom. */}
-      {showPoolStack && isInCycle && (
+      {/* Locked, translucent Join / Start-a-Contest bar — pinned to the bottom
+          of Home (in-cycle only) so content scrolls visibly under it, matching
+          the header. Off-cycle states keep their own action stacks.
+
+          Clearance comes from useNavReserve() (nav height + bottom inset), NOT
+          a hardcoded pill height, so this follows the nav if its geometry
+          changes. The previous Platform.select on insets.bottom cleared the
+          home indicator but NOT the floating nav pill, which is why the pills
+          sat underneath it. */}
+      {showPoolStack && isInCycle && showJoinCreate && (
         <View
           style={[
             styles.footerOverlay,
-            // iOS sits lower (small clearance over the home indicator). Android
-            // keeps the original, roomier clearance — the trimmed iOS value put
-            // the pills too close to the bottom there.
-            {
-              paddingBottom: Platform.select({
-                ios: Math.max(insets.bottom - spacing.md, spacing.xs),
-                default: Math.max(insets.bottom, spacing.sm),
-              }),
-            },
+            {paddingBottom: navReserve + spacing.xs},
           ]}
           onLayout={e => setFooterHeight(e.nativeEvent.layout.height)}>
           <View style={styles.footerRow}>

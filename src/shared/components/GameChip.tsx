@@ -85,6 +85,17 @@ export interface GameChipProps {
    * (rule 9). A regular Picks game leaves this off and stays neutral+unsigned.
    */
   signedAtFinal?: boolean;
+  /**
+   * Whether the chip renders its OWN status row (LIVE + period/clock, FINAL).
+   * Default true, because on Picks and the Ladder nothing sits above the chip
+   * to say what state the game is in.
+   *
+   * Home's HOTPICK module passes false: its title line already carries the
+   * status, and two status lines on one card is a duplicate. Suppressing the
+   * row changes nothing else — the FINAL score colour, the PTS box, and the
+   * PRE kickoff line are all unaffected.
+   */
+  showStatus?: boolean;
 }
 
 /**
@@ -131,6 +142,7 @@ export function GameChip({
   homeName,
   points,
   signedAtFinal = false,
+  showStatus = true,
 }: GameChipProps) {
   const {colors} = useTheme();
 
@@ -197,6 +209,17 @@ export function GameChip({
     return () => loop.stop();
   }, [isLive, dotPulse]);
 
+  // Picked team stands out; the opponent reads as clearly secondary — lighter
+  // weight AND a muted colour, so the distinction survives greyscale and
+  // doesn't depend on colour alone. With no pick on the game, neither side is
+  // emphasised and both render primary.
+  const emphasis = (isPicked: boolean) =>
+    pickedSide === null || isPicked
+      ? {font: bodyType.bold, color: colors.textPrimary}
+      : {font: bodyType.regular, color: colors.textSecondary};
+  const awayEmphasis = emphasis(pickedSide === 'away');
+  const homeEmphasis = emphasis(pickedSide === 'home');
+
   const periodLabel = (() => {
     if (!isLive) return null;
     const parts: string[] = [];
@@ -228,7 +251,7 @@ export function GameChip({
       <View style={styles.gameBlock}>
       {/* Status line — the chip carries its OWN status, because on Picks and
           the Ladder there is no title above it to say what state this is. */}
-      {isLive ? (
+      {showStatus && isLive ? (
         <View style={styles.statusRow}>
           {/* The one moving thing in the chip. `opacity` is the only animated
               style, and it is applied to this dot alone. */}
@@ -249,7 +272,7 @@ export function GameChip({
         </View>
       ) : null}
 
-      {isFinal ? (
+      {showStatus && isFinal ? (
         <View style={styles.statusRow}>
           <Text style={[bodyType.bold, styles.statusText, {color: colors.textSecondary}]}>
             FINAL
@@ -262,12 +285,12 @@ export function GameChip({
       <View style={styles.matchupRow}>
         <View style={styles.namesCol}>
           <Text
-            style={[bodyType.bold, styles.teamName, {color: colors.textPrimary}]}
+            style={[awayEmphasis.font, styles.teamName, {color: awayEmphasis.color}]}
             numberOfLines={1}>
             {away.toUpperCase()}
           </Text>
           <Text
-            style={[bodyType.bold, styles.teamName, {color: colors.textPrimary}]}
+            style={[homeEmphasis.font, styles.teamName, {color: homeEmphasis.color}]}
             numberOfLines={1}>
             {`@ ${home}`.toUpperCase()}
           </Text>

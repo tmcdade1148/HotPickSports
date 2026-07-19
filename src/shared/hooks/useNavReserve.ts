@@ -1,4 +1,5 @@
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {PILL_HEIGHT} from '@shared/theme/pill';
 
 /**
  * The floating bottom nav overlays screen content (slice 2 #9/#10). Screens add
@@ -10,7 +11,11 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
  * nothing here. 0.85-alpha rgba background and the exact height are Tom's to
  * tune on device.
  */
-export const NAV_BAR_HEIGHT = 56;
+/**
+ * Re-exported from the shared pill geometry so the reserve and the nav pill
+ * itself can never disagree about how tall the bar is.
+ */
+export const NAV_BAR_HEIGHT = PILL_HEIGHT;
 
 export function useNavReserve(): number {
   const insets = useSafeAreaInsets();

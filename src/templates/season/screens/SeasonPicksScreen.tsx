@@ -11,6 +11,7 @@ import {PicksProgressHeader} from '../components/PicksProgressHeader';
 import {SubmitPicksFooter} from '../components/SubmitPicksFooter';
 import {useAuth} from '@shared/hooks/useAuth';
 import {spacing, borderRadius} from '@shared/theme';
+import {PILL_HEIGHT} from '@shared/theme/pill';
 import type {DbSeasonGame} from '@shared/types/database';
 import {useTheme} from '@shell/theme';
 import {useNavReserve} from '@shared/hooks/useNavReserve';
@@ -537,7 +538,14 @@ export function SeasonPicksScreen() {
             keyExtractor={item => item.game_id}
             renderItem={renderGame}
             renderSectionHeader={renderSectionHeader}
-            contentContainerStyle={[styles.list, {paddingBottom: navReserve}]}
+            // Clears BOTH stacked pills — the nav (navReserve) and the floating
+            // submit pill above it (its height + the gap it sits on) — so the
+            // last game card scrolls fully above the pair. The submit pill is
+            // absolutely positioned, so it reserves no flow height of its own.
+            contentContainerStyle={[
+              styles.list,
+              {paddingBottom: navReserve + spacing.xs + PILL_HEIGHT + spacing.md},
+            ]}
             ItemSeparatorComponent={() => (
               <View style={[styles.separator, {backgroundColor: colors.border}]} />
             )}
@@ -548,7 +556,16 @@ export function SeasonPicksScreen() {
 
       {/* Demo: once revealed, swap the submit button for a Ladder link. */}
       {isDemoActive && demoRevealed ? (
-        <View style={[styles.demoFooter, {backgroundColor: colors.background, borderTopColor: colors.border}]}>
+        <View
+          style={[
+            styles.demoFooter,
+            {
+              backgroundColor: colors.background,
+              borderTopColor: colors.border,
+              // Same slot as SubmitPicksFooter, same nav-pill clearance.
+              paddingBottom: navReserve + spacing.sm,
+            },
+          ]}>
           <TouchableOpacity
             style={[styles.demoLadderBtn, {backgroundColor: colors.primary}]}
             onPress={() => navigation.navigate('DemoResult')}

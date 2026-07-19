@@ -23,6 +23,7 @@
 import React from 'react';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {PicksOpenHero} from './PicksOpenHero';
+import {HotPickModule} from './HotPickModule';
 import {SettlingHero} from './SettlingHero';
 import {CompleteHero} from './CompleteHero';
 import {OffSeasonHero} from './OffSeasonHero';
@@ -83,9 +84,12 @@ export function StateHero({state}: StateHeroProps) {
 
 function heroFor(resolved: HomeState): React.ReactElement {
   switch (resolved) {
-    case 'picks_open':              return <PicksOpenHero />;
-    case 'picks_locked':            return <PicksOpenHero />;
-    case 'games_live':              return <PicksOpenHero />;
+    // ACTION (PicksOpenHero) then HOTPICK (HotPickModule) as siblings — the
+    // HotPick card sits directly BENEATH the action module, never inside it.
+    // HotPickModule renders null when there's no HotPick or no rank.
+    case 'picks_open':              return <><PicksOpenHero /><HotPickModule /></>;
+    case 'picks_locked':            return <><PicksOpenHero /><HotPickModule /></>;
+    case 'games_live':              return <><PicksOpenHero /><HotPickModule /></>;
     case 'settling':                return <SettlingHero />;
     case 'complete':                return <CompleteHero />;
     case 'off_season_idle':         return <OffSeasonHero />;

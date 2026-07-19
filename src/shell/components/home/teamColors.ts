@@ -47,7 +47,14 @@ const NFL_TEAMS: Record<string, TeamColors> = {
   SF:  {primary: '#AA0000', city: 'SAN FRANCISCO', name: '49ERS'},
   TB:  {primary: '#D50A0A', city: 'TAMPA BAY',     name: 'BUCCANEERS'},
   TEN: {primary: '#0C2340', city: 'TENNESSEE',     name: 'TITANS'},
+  // Washington ships under BOTH codes and both must resolve:
+  //   WSH — the live/sim data (nfl/config.ts) and what ESPN sends
+  //   WAS — the nfl_demo seed (20260601120000_demo_week_seed_nfl_demo.sql:95)
+  // Keying only one made the other fall through to FALLBACK, which is why the
+  // Home HotPick card rendered "@ WSH" instead of the team name. Renaming
+  // would simply have moved the bug onto the demo competition.
   WAS: {primary: '#5A1414', city: 'WASHINGTON',    name: 'COMMANDERS'},
+  WSH: {primary: '#5A1414', city: 'WASHINGTON',    name: 'COMMANDERS'},
 };
 
 const FALLBACK: TeamColors = {primary: '#1A1A1A', city: '', name: ''};

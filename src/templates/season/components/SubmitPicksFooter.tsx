@@ -3,17 +3,29 @@
 // hook so the 5-state machine (locked / no_picks / needs_hotpick /
 // in_progress / submitted) stays centralized — no duplication with the
 // (now-removed) tab-bar slot variant.
+//
+// It renders as a FLOATING PILL that mirrors the bottom nav and stacks directly
+// above it — same inset, radius, height and lift, all read from
+// @shared/theme/pill so the two can't drift. Two stacked pills, one shape.
+//
+// It was previously a flex footer: a sibling of the SectionList, outside the
+// scroll content but not absolutely positioned. It got no clearance from the
+// list's own `paddingBottom: navReserve` and sat flush at the screen bottom,
+// underneath the floating nav pill, which made the button unreachable.
 
 import React from 'react';
 import {Text} from '@shared/components/AppText';
 import {StyleSheet, TouchableOpacity, View} from 'react-native';
 import {CheckCircle, Clock, Flame, Lock, Target} from 'lucide-react-native';
 import {useTheme} from '@shell/theme';
+import {useNavReserve} from '@shared/hooks/useNavReserve';
 import {useSeasonSubmitState} from '@templates/season/hooks/useSeasonSubmitState';
-import {spacing, borderRadius} from '@shared/theme';
+import {spacing} from '@shared/theme';
+import {PILL_HEIGHT, PILL_INSET, PILL_RADIUS, pillLift} from '@shared/theme/pill';
 
 export function SubmitPicksFooter() {
   const {colors} = useTheme();
+  const navReserve = useNavReserve();
   const submit = useSeasonSubmitState();
 
   if (!submit.visible) return null;
@@ -50,49 +62,72 @@ export function SubmitPicksFooter() {
   const isDisabled = !submit.enabled && submit.state !== 'needs_hotpick';
 
   return (
-    <View style={[styles.wrapper, {backgroundColor: colors.background, borderTopColor: colors.border}]}>
-      <TouchableOpacity
+    // Layer 0 — transparent positioning frame. NO background and NO shadow: an
+    // elevated transparent View casts a rectangular shadow on Android. It only
+    // pins the pill above the nav.
+    <View
+      style={[styles.frame, {bottom: navReserve + spacing.xs}]}
+      pointerEvents="box-none">
+      {/* Layer 1 — surface + lift. Carries the fill so the shadow has a real
+          surface to cast from. No overflow:'hidden' here; on iOS that would
+          clip the very shadow we're casting. */}
+      <View
         style={[
-          styles.button,
+          styles.pillLift,
           {backgroundColor: bgColor},
-          submit.state === 'submitted' && styles.buttonSubmitted,
-        ]}
-        onPress={submit.onPress}
-        disabled={isDisabled}
-        activeOpacity={0.8}
-        accessibilityRole="button"
-        accessibilityLabel={submit.label}
-        accessibilityState={{disabled: isDisabled}}>
-        <StateIcon
-          size={18}
-          color={textColor}
-          fill={submit.state === 'submitted' ? textColor : 'none'}
-          strokeWidth={2}
-        />
-        <Text style={[styles.label, {color: textColor}]} numberOfLines={1}>
-          {submit.label}
-        </Text>
-      </TouchableOpacity>
+          submit.state === 'submitted' && styles.pillSubmitted,
+          pillLift(colors.ink),
+        ]}>
+        {/* Layer 2 — the clipping surface. Same radius, transparent (layer 1
+            paints it), overflow:'hidden' so the press ripple and contents stay
+            inside the rounded shape. */}
+        <TouchableOpacity
+          style={styles.pill}
+          onPress={submit.onPress}
+          disabled={isDisabled}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={submit.label}
+          accessibilityState={{disabled: isDisabled}}>
+          <StateIcon
+            size={18}
+            color={textColor}
+            fill={submit.state === 'submitted' ? textColor : 'none'}
+            strokeWidth={2}
+          />
+          <Text style={[styles.label, {color: textColor}]} numberOfLines={1}>
+            {submit.label}
+          </Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
+  // Layer 0 — pins the pill above the nav. `bottom` is applied inline from
+  // useNavReserve() so nav geometry changes propagate.
+  frame: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
   },
-  button: {
+  // Layer 1 — surface + lift. Geometry mirrors the nav pill exactly.
+  pillLift: {
+    marginHorizontal: PILL_INSET,
+    borderRadius: PILL_RADIUS,
+  },
+  // Layer 2 — clipping surface.
+  pill: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.md,
+    height: PILL_HEIGHT,
+    borderRadius: PILL_RADIUS,
+    overflow: 'hidden',
   },
-  buttonSubmitted: {
+  pillSubmitted: {
     opacity: 0.85,
   },
   label: {
