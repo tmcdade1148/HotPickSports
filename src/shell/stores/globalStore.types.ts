@@ -301,7 +301,23 @@ export interface GlobalState {
   ) => Promise<void>;
 
   // Last 4 weeks of pre-computed totals for the user.
-  recentWeeks: Array<{week: number; total: number; correctPicks: number; totalPicks: number}>;
+  /**
+   * Every scored week for the ACTIVE PHASE, ascending. Phase scope mirrors
+   * loadSeasonTotal so HISTORY's bars and IDENTITY's SEASON PTS can never
+   * describe different seasons (map §2).
+   *
+   * `correctPicks` / `totalPicks` are the RAW server values and include the
+   * HotPick game (a full slate is 16). Any display of "n of N Picks" must go
+   * through derivePickDisplay() in weekRecap.ts — the map forbids "7 of 16".
+   */
+  recentWeeks: Array<{
+    week: number;
+    total: number;
+    correctPicks: number;
+    totalPicks: number;
+    isHotPickCorrect: boolean | null;
+    hotPickRank: number | null;
+  }>;
   loadRecentWeeks: (userId: string, competition: string) => Promise<void>;
 
   // The user's TRUE season points total — user-scoped (no pool), summed from
@@ -317,8 +333,12 @@ export interface GlobalState {
   // Season-long HotPick hit rate — aggregated across every settled week
   // the user has played. `hits` = weeks where is_hotpick_correct is
   // true; `total` = settled weeks with a HotPick designated.
+  /**
+   * HotPick record. Derived inside loadRecentWeeks from the same rows the
+   * chart uses — there is no separate fetch. Null when no week has a resolved
+   * HotPick. Weeks with is_hotpick_correct = null count toward neither side.
+   */
   hotPickHitRate: {hits: number; total: number} | null;
-  loadHotPickHitRate: (userId: string, competition: string) => Promise<void>;
 
   // Pool Module indicators (per-pool unread counts + most-recent activity timestamp).
   // Aggregated in ONE query in loadPoolIndicators — never per-pool useEffect

@@ -92,6 +92,7 @@ export interface ThemeColors {
   // enough to read on #1A1A1A. Both directions measured — see defaults.ts.
   gameWon: string;          // Picked team's score, is_correct === true
   gameLost: string;         // Picked team's score, is_correct === false
+  hotpickMiss: string;      // HISTORY bar, is_hotpick_correct === false
   onPrimary: string;        // Foreground on `primary` surface (flame CTA)
 
   // Semantic colors (always HotPick — never overridden by partners)

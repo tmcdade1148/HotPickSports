@@ -81,6 +81,12 @@ export const HOTPICK_EXTENDED_TOKENS = {
   // LIGHT (on surface #EBEBEB): won 5.98:1 · lost 5.43:1. Measured 2026-07-18.
   game_won: '#166534',
   game_lost: '#B91C1C',
+  // HISTORY chart — the "flame missed" bar (map rule 5: height = week, colour
+  // = did the flame hit). Its OWN token, deliberately not an accentTeal alias:
+  // accentTeal is a CTA accent and would drag this colour along with any CTA
+  // retune. Bars are non-text graphics, so the WCAG bar is 3:1 (1.4.11), not
+  // 4.5:1. LIGHT on surface #EBEBEB: 3.13:1. Measured 2026-07-19.
+  hotpick_miss: '#5B8AA6',
 } as const;
 
 export const HOTPICK_EXTENDED_TOKENS_DARK = {
@@ -97,6 +103,11 @@ export const HOTPICK_EXTENDED_TOKENS_DARK = {
   // AA on #141414 and #242424. Measured 2026-07-18.
   game_won: '#4ADE80',
   game_lost: '#F1655A',
+  // DARK twin. The light blue is 1.9:1 on #1A1A1A — invisible. This is the
+  // same light-blue the CTA outline uses in dark, but declared INDEPENDENTLY
+  // here so retuning one never silently moves the other.
+  // DARK on surface #1A1A1A: 10.14:1. Measured 2026-07-19.
+  hotpick_miss: '#A5CCD9',
 } as const;
 
 /**

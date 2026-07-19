@@ -3,6 +3,7 @@
 // client never computes scores); no get() needed. Extracted verbatim.
 import type {StoreApi} from 'zustand';
 import {supabase} from '@shared/config/supabase';
+import {isWeekInProgress} from '@shared/utils/weekState';
 import type {GlobalState} from '../globalStore.types';
 
 type Set = StoreApi<GlobalState>['setState'];
@@ -13,11 +14,47 @@ type HomeRecapSlice = Pick<
   | 'recentWeeks'
   | 'hotPickHitRate'
   | 'seasonTotal'
-  | 'loadHotPickHitRate'
   | 'loadLastWeekHotPick'
   | 'loadRecentWeeks'
   | 'loadSeasonTotal'
 >;
+
+/**
+ * The phase/week scope both season reads share.
+ *
+ * Extracted so `loadSeasonTotal` and `loadRecentWeeks` can't disagree about
+ * WHICH season they're describing. Map §2: "One season total on the screen. If
+ * History shows a season number too, they're the same number or one is a lie."
+ * Regular season and playoffs are separate leaderboards; if HISTORY's bars were
+ * unscoped while IDENTITY's total was phase-scoped, the two would diverge the
+ * moment the playoffs started.
+ */
+async function readSeasonScope(competition: string): Promise<{
+  isPlayoffs: boolean;
+  weekInProgress: boolean;
+  currentWeek: number;
+}> {
+  const {data: cfgRows} = await supabase
+    .from('competition_config')
+    .select('key, value')
+    .eq('competition', competition)
+    .in('key', ['current_phase', 'week_state', 'current_week']);
+  const cfg = Object.fromEntries(
+    (cfgRows ?? []).map((r: any) => [r.key, r.value]),
+  );
+  const currentPhase =
+    typeof cfg.current_phase === 'string' ? cfg.current_phase : 'REGULAR';
+  const weekState = typeof cfg.week_state === 'string' ? cfg.week_state : null;
+  return {
+    isPlayoffs: currentPhase !== 'REGULAR',
+    // Single shared predicate — see @shared/utils/weekState. This now includes
+    // `settling`, which it previously did not: during settling the season
+    // total EXCLUDES the settling week, matching HISTORY's bars exactly.
+    // Approved behaviour change (slice 6b), and the fix for the 6a divergence.
+    weekInProgress: isWeekInProgress(weekState),
+    currentWeek: typeof cfg.current_week === 'number' ? cfg.current_week : 1,
+  };
+}
 
 export const createHomeRecapSlice = (set: Set): HomeRecapSlice => ({
   lastWeekHotPick: null,
@@ -31,23 +68,8 @@ export const createHomeRecapSlice = (set: Set): HomeRecapSlice => ({
     // in-progress week excluded) but WITHOUT the pool member / pool_start_date
     // filter, so it's the user's true season total independent of any pool.
     // Phase + week state come from competition_config (never hardcoded).
-    const {data: cfgRows} = await supabase
-      .from('competition_config')
-      .select('key, value')
-      .eq('competition', competition)
-      .in('key', ['current_phase', 'week_state', 'current_week']);
-    const cfg = Object.fromEntries(
-      (cfgRows ?? []).map((r: any) => [r.key, r.value]),
-    );
-    const currentPhase =
-      typeof cfg.current_phase === 'string' ? cfg.current_phase : 'REGULAR';
-    const isPlayoffs = currentPhase !== 'REGULAR';
-    const weekState =
-      typeof cfg.week_state === 'string' ? cfg.week_state : null;
-    const weekInProgress =
-      weekState === 'picks_open' || weekState === 'locked' || weekState === 'live';
-    const currentWeek =
-      typeof cfg.current_week === 'number' ? cfg.current_week : 1;
+    const {isPlayoffs, weekInProgress, currentWeek} =
+      await readSeasonScope(competition);
 
     // Regular season and playoffs are separate leaderboards — scope the total
     // to whichever phase is active, matching the pool leaderboard's behavior.
@@ -68,28 +90,6 @@ export const createHomeRecapSlice = (set: Set): HomeRecapSlice => ({
     }, 0);
     set({seasonTotal: total});
   },
-  loadHotPickHitRate: async (userId, competition) => {
-    // Weeks with is_hotpick_correct = null had no HotPick attempt and
-    // don't count toward numerator or denominator.
-    const {data} = await supabase
-      .from('season_user_totals')
-      .select('is_hotpick_correct')
-      .eq('user_id', userId)
-      .eq('competition', competition);
-    if (!data) {
-      set({hotPickHitRate: null});
-      return;
-    }
-    let hits = 0;
-    let total = 0;
-    for (const row of data as Array<{is_hotpick_correct: boolean | null}>) {
-      if (row.is_hotpick_correct == null) continue;
-      total += 1;
-      if (row.is_hotpick_correct) hits += 1;
-    }
-    set({hotPickHitRate: total > 0 ? {hits, total} : null});
-  },
-
   loadLastWeekHotPick: async (userId, competition, currentWeek) => {
     if (currentWeek <= 1) {
       set({lastWeekHotPick: null});
@@ -123,31 +123,64 @@ export const createHomeRecapSlice = (set: Set): HomeRecapSlice => ({
   },
 
   loadRecentWeeks: async (userId, competition) => {
-    // Pre-computed per-week totals. Last 4 weeks descending; display ascending.
-    const {data} = await supabase
+    // EVERY scored week for the active phase — the HISTORY chart plots the
+    // whole season, and the map's thesis ("~48% of bars go blue") only reads
+    // across one. The old `.limit(4)` existed for the 3-pill WeeklyTrend strip;
+    // that strip slices what it needs from this array itself.
+    //
+    // Phase scope is READ FROM THE SAME HELPER as loadSeasonTotal so HISTORY's
+    // bars and IDENTITY's SEASON PTS always describe the same season (map §2).
+    // User + competition scoped, never pool_id — scores are user-scoped and
+    // pools are a lens on them (Hard Rule #2).
+    const {isPlayoffs} = await readSeasonScope(competition);
+
+    let query = supabase
       .from('season_user_totals')
-      .select('week, week_points, correct_picks, total_picks')
+      .select(
+        'week, week_points, correct_picks, total_picks, is_hotpick_correct, hotpick_rank',
+      )
       .eq('user_id', userId)
-      .eq('competition', competition)
-      .order('week', {ascending: false})
-      .limit(4);
+      .eq('competition', competition);
+    query = isPlayoffs ? query.neq('phase', 'REGULAR') : query.eq('phase', 'REGULAR');
+
+    const {data} = await query.order('week', {ascending: false});
 
     const rows = (data ?? []) as Array<{
       week: number;
       week_points: number | null;
       correct_picks: number | null;
       total_picks: number | null;
+      is_hotpick_correct: boolean | null;
+      hotpick_rank: number | null;
     }>;
     // Per-week earned is `week_points`. `playoff_points` is NOT a separate
     // bucket — the scoring fn sets it equal to week_points for weeks ≥ 19 so
     // the playoff-scoped leaderboard can sum it. Adding both double-counts
     // playoff weeks (a +12 week rendered as +24).
     const ascending = [...rows].reverse().map(r => ({
-      week:         r.week,
-      total:        r.week_points ?? 0,
-      correctPicks: r.correct_picks ?? 0,
-      totalPicks:   r.total_picks ?? 0,
+      week:             r.week,
+      total:            r.week_points ?? 0,
+      correctPicks:     r.correct_picks ?? 0,
+      totalPicks:       r.total_picks ?? 0,
+      isHotPickCorrect: r.is_hotpick_correct,
+      hotPickRank:      r.hotpick_rank,
     }));
-    set({recentWeeks: ascending});
+
+    // HotPick record, derived from the SAME rows rather than its own query.
+    // `loadHotPickHitRate` used to fetch this separately — two reads of one
+    // fact, free to disagree. Weeks with is_hotpick_correct = null had no
+    // HotPick attempt and count toward neither numerator nor denominator.
+    let hits = 0;
+    let resolved = 0;
+    for (const r of ascending) {
+      if (r.isHotPickCorrect == null) continue;
+      resolved += 1;
+      if (r.isHotPickCorrect) hits += 1;
+    }
+
+    set({
+      recentWeeks: ascending,
+      hotPickHitRate: resolved > 0 ? {hits, total: resolved} : null,
+    });
   },
 });

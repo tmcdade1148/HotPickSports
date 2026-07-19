@@ -123,6 +123,7 @@ interface NFLState {
   fetchLiveScores: () => Promise<void>;
   fetchNextKickoff: () => Promise<void>;
   subscribeToLiveScores: () => () => void;
+  subscribeToUserSeasonScore: (userId: string) => () => void;
   subscribeToCompetitionConfig: () => () => void;
 }
 
@@ -775,6 +776,60 @@ export const useNFLStore = create<NFLState>((set, get) => ({
           if (wasAnyLive && !isAnyLive) {
             get().fetchNextKickoff();
           }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  },
+
+  /**
+   * Subscribe to this user's season_user_totals rows so the HISTORY head ticks
+   * as the server scores the week — no app reload, no polling.
+   *
+   * INSERT **and** UPDATE, deliberately. The week's first write is an
+   * upsert-INSERT: `scorePicks`' zero-row backfill creates a `week_points: 0`
+   * row for users who've picked but have no final games yet, and the first
+   * real score then UPDATEs it — but on a week where scoring runs before any
+   * backfill, the first write the client sees IS the insert. An UPDATE-only
+   * listener silently misses the first score of the week. That is exactly the
+   * HomeInbox dead-listener bug; it is not repeated here.
+   *
+   * The handler re-runs fetchUserSeasonScore rather than trusting the payload:
+   * one cheap authoritative read beats reconstructing phase-scoped totals from
+   * a single row, and it can't drift from the fetch path.
+   *
+   * Scoped user_id + competition. Never pool_id — scores are user-scoped
+   * (Hard Rule #2).
+   */
+  subscribeToUserSeasonScore: (userId: string) => {
+    const {competition} = get();
+    const channel = supabase
+      .channel(`user-season-totals-${competition}-${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'season_user_totals',
+          filter: `user_id=eq.${userId}`,
+        },
+        () => {
+          get().fetchUserSeasonScore(userId);
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'season_user_totals',
+          filter: `user_id=eq.${userId}`,
+        },
+        () => {
+          get().fetchUserSeasonScore(userId);
         },
       )
       .subscribe();

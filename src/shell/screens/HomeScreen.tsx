@@ -26,6 +26,7 @@ import {CrossContestStrip} from '@shell/components/home/CrossContestStrip';
 import {OffSeasonActions, PreSeasonActions, ReturningOffCycleActions} from '@shell/components/home/OffCycleActions';
 import {Insight} from '@shell/components/home/Insight';
 import {HomeInbox} from '@shell/components/home/HomeInbox';
+import {HistoryModule} from '@shell/components/home/HistoryModule';
 import {ContestCarousel} from '@shell/components/home/ContestCarousel';
 import {ContestActionPill} from '@shell/components/ContestActionPill';
 import {PartnerModule} from '@shell/components/home/PartnerModule';
@@ -60,7 +61,6 @@ export function HomeScreen() {
   const loadLastWeekHotPick   = useGlobalStore(s => s.loadLastWeekHotPick);
   const loadRecentWeeks       = useGlobalStore(s => s.loadRecentWeeks);
   const loadSeasonTotal       = useGlobalStore(s => s.loadSeasonTotal);
-  const loadHotPickHitRate    = useGlobalStore(s => s.loadHotPickHitRate);
   const loadPoolIndicators    = useGlobalStore(s => s.loadPoolIndicators);
   const loadUserRankByPool    = useGlobalStore(s => s.loadUserRankByPool);
   const loadPoolAffiliations  = useGlobalStore(s => s.loadPoolAffiliations);
@@ -75,6 +75,8 @@ export function HomeScreen() {
   const fetchWeekResult        = useNFLStore(s => s.fetchWeekResult);
   const fetchLiveScores        = useNFLStore(s => s.fetchLiveScores);
   const subscribeToLiveScores  = useNFLStore(s => s.subscribeToLiveScores);
+  const fetchUserSeasonScore   = useNFLStore(s => s.fetchUserSeasonScore);
+  const subscribeToUserSeasonScore = useNFLStore(s => s.subscribeToUserSeasonScore);
   const fetchHighestRankedGame = useNFLStore(s => s.fetchHighestRankedGame);
   const fetchSeasonUserPicks   = useSeasonStore(s => s.fetchUserPicks);
   const fetchSeasonWeekGames   = useSeasonStore(s => s.fetchWeekGames);
@@ -228,6 +230,9 @@ export function HomeScreen() {
       if (!userId || !competition) return;
       const nfl = useNFLStore.getState();
       nfl.fetchCompetitionConfig().catch(() => {});
+      // HISTORY head's live value — realtime is the primary path, this covers
+      // a missed event while Home was off-screen.
+      nfl.fetchUserSeasonScore(userId).catch(() => {});
       if (currentWeek > 0) {
         nfl.fetchUserPickStatus(userId).catch(() => {});
         nfl.fetchUserHotPick(userId, currentWeek).catch(() => {});
@@ -302,10 +307,11 @@ export function HomeScreen() {
   useEffect(() => {
     if (!userId || !competition) return;
     loadLastWeekHotPick(userId, competition, currentWeek).catch(() => {});
+    // loadRecentWeeks also derives hotPickHitRate from the same rows — the
+    // separate loadHotPickHitRate fetch is retired (one fetch, one source).
     loadRecentWeeks(userId, competition).catch(() => {});
     loadSeasonTotal(userId, competition).catch(() => {});
-    loadHotPickHitRate(userId, competition).catch(() => {});
-  }, [userId, competition, currentWeek, loadLastWeekHotPick, loadRecentWeeks, loadSeasonTotal, loadHotPickHitRate]);
+  }, [userId, competition, currentWeek, loadLastWeekHotPick, loadRecentWeeks, loadSeasonTotal]);
 
   useEffect(() => {
     if (!userId) return;
@@ -368,6 +374,18 @@ export function HomeScreen() {
     return unsub;
   }, [competition, currentWeek, fetchLiveScores, fetchHighestRankedGame, subscribeToLiveScores]);
 
+  // The HISTORY head's live value (nflStore.currentWeekPoints). The fetch
+  // existed with ZERO call sites — this is where it gets wired — and the
+  // realtime channel makes the head tick as the scoring cron writes, with no
+  // reload. Keyed on competition + userId so the channel tears down on sign-out
+  // (Home unmounts) and on a competition switch (effect re-runs).
+  useEffect(() => {
+    if (!userId || !competition) return;
+    fetchUserSeasonScore(userId).catch(() => {});
+    const unsub = subscribeToUserSeasonScore(userId);
+    return unsub;
+  }, [userId, competition, fetchUserSeasonScore, subscribeToUserSeasonScore]);
+
   // Bootstrap seasonStore.config from Home too — MainTabNavigator runs
   // initialize as well, but only after activeSport + activePoolId resolve.
   // On iOS that can land later than the first Home render.
@@ -416,7 +434,6 @@ export function HomeScreen() {
       fetchSeasonLeaderboard().catch(() => {});
       loadRecentWeeks(userId, competition).catch(() => {});
       loadSeasonTotal(userId, competition).catch(() => {});
-      loadHotPickHitRate(userId, competition).catch(() => {});
       fetchWeekResult(userId, currentWeek).catch(() => {});
     };
     tick();
@@ -430,7 +447,6 @@ export function HomeScreen() {
     fetchSeasonLeaderboard,
     loadRecentWeeks,
     loadSeasonTotal,
-    loadHotPickHitRate,
     fetchWeekResult,
   ]);
 
@@ -530,6 +546,12 @@ export function HomeScreen() {
         )}
 
         {showInsight && <Insight />}
+
+        {/* HISTORY (module 6) — sits after ACTION + HOTPICK and before
+            CONTESTS, per the map's module order. Renders NOTHING until the
+            first week settles (map row 1: "hide if none"), so it is simply
+            absent for every new tester rather than showing an empty chart. */}
+        <HistoryModule />
 
         {/* Board Discovery Tile — routes partner board members (Chairman /
             Director) into League Tools. Self-hides when not on a board. */}
