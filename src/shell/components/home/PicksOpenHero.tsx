@@ -21,8 +21,6 @@ import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
 import {isFinalStatus} from '@sports/nfl/utils/gameStatus';
 import {isSandboxCompetition} from '@shared/utils/competition';
 import {singleUnit} from './useCountdown';
-import {buildWeekRecap} from './weekRecap';
-import {WeeklyTrend} from './WeeklyTrend';
 // Rule 11: the ONE correct answer to "are picks locked." This is the first
 // import of it from src/shell/components/home/ — the gap the map named, where
 // Home and Picks answered one question from two places.
@@ -56,7 +54,6 @@ export function PicksOpenHero() {
   const currentPhase     = useNFLStore(s => s.currentPhase);
   const currentWeek      = useNFLStore(s => s.currentWeek);
   const liveScores       = useNFLStore(s => s.liveScores);
-  const weekResult       = useNFLStore(s => s.weekResult);
   // Full week game list. Feeds isWeekLocked() — which needs every game's
   // kickoff to compute MIN(kickoff_at) — and weekComplete, which must
   // denominate against the whole week rather than just the games that have
@@ -386,24 +383,10 @@ export function PicksOpenHero() {
         </View>
       </Pressable>
 
-      {/* Week recap — once the week has wrapped (all games final). Uses
-          weekResult when available; otherwise renders a generic recap so
-          the line is always visible alongside the WEEK X COMPLETE CTA. */}
-      {weekComplete && (
-        <Text
-          style={[
-            bodyType.regular,
-            styles.recapLine,
-            {color: colors.textSecondary},
-          ]}>
-          {buildWeekRecap(weekResult ?? {
-            weekPoints:    0,
-            correctPicks:  0,
-            totalPicks:    0,
-            hotPickCorrect: null,
-          })}
-        </Text>
-      )}
+      {/* ACTION's week-recap prose is deleted. It called buildWeekRecap with
+          RAW server counts, so it printed "7 of 16" — while HISTORY's recap
+          card, showing the same week, derives "6 of 15" per the map. Two
+          recaps disagreeing on one screen; HISTORY owns the recap. */}
 
       {/* Confirmation line — factual when complete, bold red warning
           when picks are partial so missed games are obvious. */}
@@ -420,9 +403,11 @@ export function PicksOpenHero() {
         </Text>
       )}
 
-      {/* Weekly trend strip — right-aligned, fills 1 → 2 → 3 slots as
-          weeks accumulate. Renders nothing in the no-data state. */}
-      <WeeklyTrend />
+      {/* WeeklyTrend (the 3 week-pills) is retired. HISTORY owns per-week
+          scores now, and the pills coloured week points green/red BY SIGN —
+          map rule 5 is explicit that colour means "did the flame hit," never
+          positive/negative, because the height already says the sign. Two
+          surfaces colouring one number by opposite rules, 40px apart. */}
     </View>
   );
 }
@@ -507,43 +492,6 @@ const styles = StyleSheet.create({
     padding: 18,
     borderRadius: borderRadius.lg + 2,
     borderWidth: 1,
-  },
-  eyebrowRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  eyebrowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  eyebrowRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  dotWrap: {
-    width: 14,
-    height: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dotGlow: {
-    position: 'absolute',
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  eyebrow: {
-    fontSize: 11,
-    letterSpacing: 1.8,
   },
   contextMessage: {
     fontSize: 14,
@@ -677,12 +625,5 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     textAlign: 'center',
     marginTop: 10,
-  },
-  recapLine: {
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '500',
-    textAlign: 'center',
-    marginTop: 12,
   },
 });

@@ -14,8 +14,6 @@ import {isFinalStatus} from '@sports/nfl/utils/gameStatus';
 import {hexToRgba} from '@shared/utils/color';
 import {ordinal} from '@shared/utils/format';
 import {fullTeamName} from './teamColors';
-import {buildWeekRecap} from './weekRecap';
-import {WeeklyTrend} from './WeeklyTrend';
 import {GamesTagFlame} from '@shared/components/GamesTagFlame';
 
 // LAUNCH FLAG — the "You sit Nth in <Contest>" standing line is HIDDEN for launch.
@@ -39,23 +37,6 @@ export function CompleteHero() {
 
   const newRank  = weekResult?.newRank;
   const poolName = activePool?.name ?? 'your Contest';
-
-  // Recap input — cascade through what's available so the recap is
-  // ALWAYS visible in complete state, even when weekResult or recentWeeks
-  // haven't hydrated.
-  const recentWeeks = useGlobalStore(s => s.recentWeeks);
-  const recapInput = useMemo(() => {
-    if (weekResult) return weekResult;
-    const row = recentWeeks.find(r => r.week === currentWeek);
-    return {
-      weekPoints:    row?.total ?? 0,
-      correctPicks:  0,
-      totalPicks:    0,
-      hotPickCorrect: null as boolean | null,
-      rankDelta:     0,
-      newRank:       0,
-    };
-  }, [weekResult, recentWeeks, currentWeek]);
 
   // HotPick — color the card by final outcome (green if correct, red if not).
   // Cascade through signals so the border is green/red as soon as the
@@ -239,16 +220,17 @@ export function CompleteHero() {
         </View>
       </Pressable>
 
-      {/* Week recap — brand-voice sentence recapping the user's week
-          (HotPick hit/miss, net points, picks correct). Always renders
-          in complete state — falls through to a generic message when
-          detailed weekResult/recentWeeks data isn't hydrated. */}
-      <Text style={[bodyType.regular, styles.recapLine, {color: colors.textSecondary}]}>
-        {buildWeekRecap(recapInput)}
-      </Text>
+      {/* The week-recap prose is deleted. It called buildWeekRecap with RAW
+          server counts, so it printed "of 16" — while HISTORY's recap card,
+          showing the same week, derives "of 15" per the map. In the complete
+          state both were on screen at once, disagreeing. HISTORY owns the
+          recap; this hero keeps the standing, the rank delta and the HotPick
+          card. */}
 
-      {/* Weekly trend strip — past weeks + current week earned. */}
-      <WeeklyTrend />
+      {/* WeeklyTrend (the 3 week-pills) is retired — HISTORY owns per-week
+          scores now. The recap line above is the card's last element; the
+          card's own 18px padding closes the bottom, so no spacing was lost
+          (the strip carried its own marginTop, not a bottom gap). */}
     </View>
   );
 }
@@ -384,12 +366,5 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     opacity: 0.78,
     marginTop: 1,
-  },
-  recapLine: {
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '500',
-    textAlign: 'center',
-    marginTop: 12,
   },
 });
