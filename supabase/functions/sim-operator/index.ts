@@ -166,6 +166,92 @@ function phaseForWeek(week: number): string {
   return week <= 18 ? "REGULAR" : week === 22 ? "SUPERBOWL" : "PLAYOFFS";
 }
 
+// ── kickoff time-shift ──────────────────────────────────────────────────────
+// The whole-week lock is PURE CLOCK: enforce_pick_lock (server trigger) and the
+// app's isWeekLocked() both answer "is the week locked?" with
+// now >= MIN(kickoff_at) — week_state is not consulted. So a simulator that
+// only flips week_state can no longer produce the locked state: the app kept
+// counting down to the sandbox's real calendar dates (October 2026), and once
+// those dates pass in real life, every sim week would read permanently locked
+// and enforce_pick_lock would reject auto_pick / seed_bots writes outright.
+//
+// The fix: the simulator simulates TIME by moving the schedule.
+//   'future' → slide the week so its first kickoff lands 2–9 days out
+//              (open picks: real countdown, picks writable, timebomb defused)
+//   'past'   → slide the week so its first kickoff has just passed
+//              (lock: the clock genuinely says locked, everywhere at once)
+//
+// Shifts are always WHOLE MULTIPLES OF 7 DAYS, so each game keeps its
+// day-of-week + hour and the wave ladder (Thu / Sun am / 1pm / 4pm / SNF / MNF)
+// stays intact. The reviewer sims' daily refresh cron
+// (refresh_reviewer_sim_countdown) does its own flattening re-anchor for week 8
+// and is deliberately left alone.
+const WEEK_MS = 7 * 24 * 3600 * 1000;
+async function shiftWeekKickoffs(
+  admin: any, competition: string, year: number, week: number, mode: "future" | "past",
+): Promise<{ shifted: number; weeks: number; first_kickoff: string | null }> {
+  const { data: games } = await admin.from("season_games")
+    .select("game_id, kickoff_at").eq("competition", competition).eq("season_year", year).eq("week", week);
+  const withKick = (games ?? []).filter((g: any) => g.kickoff_at);
+  if (!withKick.length) return { shifted: 0, weeks: 0, first_kickoff: null };
+
+  const firstMs = Math.min(...withKick.map((g: any) => new Date(g.kickoff_at).getTime()));
+  const now = Date.now();
+  // 'future': smallest k (can be negative) with first + k·7d >= now + 2d, so the
+  //           first kickoff lands in [now+2d, now+9d) — a countdown that reads
+  //           like a real week whether the schedule was months out or years stale.
+  // 'past':   largest k with first + k·7d <= now, so the first kickoff lands in
+  //           (now−7d, now] — the lock flipped moments-to-days ago, like Sunday.
+  const k = mode === "future"
+    ? Math.ceil((now + 2 * 24 * 3600 * 1000 - firstMs) / WEEK_MS)
+    : Math.floor((now - firstMs) / WEEK_MS);
+  if (k === 0) {
+    return { shifted: 0, weeks: 0, first_kickoff: new Date(firstMs).toISOString() };
+  }
+  for (const g of withKick) {
+    const t = new Date(new Date(g.kickoff_at).getTime() + k * WEEK_MS).toISOString();
+    await admin.from("season_games").update({ kickoff_at: t })
+      .eq("game_id", g.game_id).eq("competition", competition);
+  }
+  return { shifted: withKick.length, weeks: k, first_kickoff: new Date(firstMs + k * WEEK_MS).toISOString() };
+}
+
+// ── lock probe ("doorknob test") ────────────────────────────────────────────
+// After the past-shift locks a week, jiggle the door: attempt one pick write
+// that enforce_pick_lock MUST reject. check_pick_lock is a BEFORE trigger, so
+// it raises before any unique-constraint check — the verdict is unambiguous no
+// matter what picks already exist:
+//   lock error  → PASS (the week is genuinely shut server-side)
+//   success     → FAIL (delete the probe row, report loudly)
+//   other error → FAIL (something else rejected it; the lock did not fire)
+// Probe identity is bot #1 (sandbox constant) — never Tom, never a real user.
+async function probeLock(
+  admin: any, competition: string, year: number, week: number,
+): Promise<{ ok: boolean; verdict: string }> {
+  const { data: games } = await admin.from("season_games")
+    .select("game_id, home_team").eq("competition", competition).eq("season_year", year).eq("week", week)
+    .order("kickoff_at", { ascending: true }).limit(1);
+  const g = games && games[0];
+  if (!g) return { ok: false, verdict: "no games to probe" };
+
+  const probe = {
+    user_id: SEED_BOTS[0].id, game_id: g.game_id, competition, season_year: year, week,
+    picked_team: g.home_team, is_hotpick: false,
+  };
+  const { error } = await admin.from("season_picks").insert(probe);
+  if (error) {
+    const msg = String(error.message ?? error);
+    if (/locked for this week/i.test(msg)) {
+      return { ok: true, verdict: "lock probe REJECTED ✓ — enforce_pick_lock is holding" };
+    }
+    return { ok: false, verdict: `lock probe rejected by something OTHER than the week lock: ${msg}` };
+  }
+  // The write went through — the lock is NOT enforcing. Clean up the probe row.
+  await admin.from("season_picks").delete()
+    .eq("user_id", SEED_BOTS[0].id).eq("game_id", g.game_id).eq("competition", competition).eq("week", week);
+  return { ok: false, verdict: "lock probe ACCEPTED — LOCK NOT ENFORCING (probe row deleted)" };
+}
+
 // ── advance_week_state ───────────────────────────────────────────────────────
 // Drives the sandbox through one in-week step using real game mechanics.
 async function advanceWeekState(caller: any, admin: any, competition: string, authHeader: string) {
@@ -175,13 +261,28 @@ async function advanceWeekState(caller: any, admin: any, competition: string, au
   const year = Number(cfg.season_year ?? 2025);
   const phase = String(cfg.current_phase ?? "REGULAR");
 
+  // Kickoff-shift + lock-probe results, folded into the success response so the
+  // console can log them (message is what the console prints).
+  let shiftInfo: { shifted: number; weeks: number; first_kickoff: string | null } | null = null;
+  let lockProbe: { ok: boolean; verdict: string } | null = null;
+
   switch (ws) {
     case "idle":
-      // Open the current week (enter the in-week cycle).
+      // Open the current week (enter the in-week cycle). Slide the week so its
+      // first kickoff is 2–9 days out — the app shows a real countdown, picks
+      // are writable (the clock says unlocked), and stale calendar dates can
+      // never brick the sandbox.
+      shiftInfo = await shiftWeekKickoffs(admin, competition, year, week, "future");
       await setConfig(admin, competition, "week_state", "picks_open");
       break;
 
     case "picks_open":
+      // LOCK = a clock event now, not a label. Slide the week so its first
+      // kickoff has just passed: enforce_pick_lock (server) and isWeekLocked()
+      // (app Home + Picks) all flip at once, exactly like a real first kickoff.
+      // Then jiggle the doorknob — prove the server genuinely rejects a pick.
+      shiftInfo = await shiftWeekKickoffs(admin, competition, year, week, "past");
+      lockProbe = await probeLock(admin, competition, year, week);
       await setConfig(admin, competition, "week_state", "locked");
       break;
 
@@ -219,16 +320,42 @@ async function advanceWeekState(caller: any, admin: any, competition: string, au
       await admin.from("season_games")
         .update({ status: "scheduled", home_score: null, away_score: null, winner_team: null, is_finalized: false, current_period: null, game_clock: null })
         .eq("competition", competition).eq("season_year", year).eq("week", next);
+      // Slide the NEW week's kickoffs into the near future before opening it —
+      // same reason as the idle→picks_open shift.
+      const nextShift = await shiftWeekKickoffs(admin, competition, year, next, "future");
       await setConfig(admin, competition, "current_week", next);
       await setConfig(admin, competition, "week_state", "picks_open");
-      return json({ success: true, action: "advance_week_state", from: "complete", to_week: next, state: await getConfig(admin, competition) }, 200);
+      return json({
+        success: true, action: "advance_week_state", from: "complete", to_week: next,
+        shift: nextShift, message: shiftMessage(nextShift, null),
+        state: await getConfig(admin, competition),
+      }, 200);
     }
 
     default:
       return json({ success: false, error: `Cannot advance from week_state="${ws}"` }, 400);
   }
 
-  return json({ success: true, action: "advance_week_state", from: ws, state: await getConfig(admin, competition) }, 200);
+  return json({
+    success: true, action: "advance_week_state", from: ws,
+    shift: shiftInfo, lock_probe: lockProbe, message: shiftMessage(shiftInfo, lockProbe),
+    state: await getConfig(admin, competition),
+  }, 200);
+}
+
+// One console-loggable line summarizing what the shift/probe did.
+function shiftMessage(
+  shift: { shifted: number; weeks: number; first_kickoff: string | null } | null,
+  probe: { ok: boolean; verdict: string } | null,
+): string | undefined {
+  const parts: string[] = [];
+  if (shift && shift.shifted > 0) {
+    parts.push(`kickoffs shifted ${shift.weeks > 0 ? "+" : ""}${shift.weeks}w → first kickoff ${shift.first_kickoff}`);
+  } else if (shift) {
+    parts.push(`kickoffs already in place (first kickoff ${shift.first_kickoff ?? "n/a"})`);
+  }
+  if (probe) parts.push(probe.verdict);
+  return parts.length ? parts.join(" · ") : undefined;
 }
 
 async function finalizeGamesFromSource(admin: any, competition: string, year: number, week: number) {
@@ -485,9 +612,17 @@ async function jumpToWeek(admin: any, competition: string, targetWeek: any) {
   }
   if (rows.length) await admin.from("season_user_totals").upsert(rows, { onConflict: "user_id,competition,season_year,week", ignoreDuplicates: true });
 
+  // Land on a playable week: slide the target week's kickoffs into the near
+  // future (same rule as opening a week) so the countdown is real and picks
+  // are writable on arrival.
+  const shift = await shiftWeekKickoffs(admin, competition, year, target, "future");
   await setConfig(admin, competition, "current_week", target);
   await setConfig(admin, competition, "week_state", "picks_open");
-  return json({ success: true, action: "jump_to_week", from_week: current, to_week: target, skipped_rows: rows.length, state: await getConfig(admin, competition) }, 200);
+  return json({
+    success: true, action: "jump_to_week", from_week: current, to_week: target,
+    skipped_rows: rows.length, shift, message: shiftMessage(shift, null),
+    state: await getConfig(admin, competition),
+  }, 200);
 }
 
 // ── reset_to_off_season ───────────────────────────────────────────────────────

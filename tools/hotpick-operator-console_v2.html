@@ -3,25 +3,29 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HotPick — Operator Console (Phase 1 · Read-Only)</title>
+<title>HotPick — Operator Console</title>
 <!--
-  HotPick Sports — Operator Console · Phase 1 (Read-Only Monitor)
-  Spec: 260612_HotPick_OperatorConsole_Phase1_Spec
+  HotPick Sports — Operator Console · Phase 2 (Monitor + Sandbox Controls)
+  Specs: 260612_OperatorConsole_Phase1 (reads) + Phase2 (writes) + 260630_SeedBots
 
   WHAT THIS IS
     A single self-contained file Tom (super-admin) opens locally in a browser.
     It logs in with email/password via the PUBLISHABLE anon key, gets a scoped
-    session JWT, and reads competition state THROUGH RLS as his super-admin user.
+    session JWT, READS competition state through RLS, and drives the SANDBOX
+    sims through their weekly cycle via the sim-operator Edge Function.
 
   SECURITY (non-negotiable — see CLAUDE.md + spec §7)
     - No service_role key, no sb_secret, no cron secret. Ever. Reads go through
       the super-admin session JWT + existing RLS policies.
+    - ALL writes route through the sim-operator Edge Function, which re-checks
+      super-admin AND a hardcoded sandbox allowlist server-side. Production
+      (nfl_2026) is never writeable from here, no matter what this file sends.
     - Session lives in a JS variable only (memory). persistSession:false — no
       localStorage / sessionStorage. Closing or refreshing the tab => re-login.
-    - Phase 1 has ZERO writes and calls ZERO Edge Functions. Write controls,
-      step buttons, reset, and auto-pick are Phase 2 (separate spec + file).
     - The anon/publishable key below is public by design (already shipped in
       src/shared/config/supabase.ts). It is NOT a secret.
+    - Server data (names, error strings) is HTML-escaped via esc() before any
+      innerHTML sink — a poolie_name must never execute in this session.
 -->
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -217,7 +221,7 @@
   <div class="login-wrap" id="login-wrap">
     <div class="login-card">
       <div class="wordmark"><h1>HotPick</h1></div>
-      <div class="sub">Operator Console · Phase 1 · Read-Only</div>
+      <div class="sub">Operator Console · monitor + sandbox controls</div>
       <form id="login-form">
         <label for="email">Email</label>
         <input type="email" id="email" autocomplete="username" required>
@@ -249,6 +253,7 @@
       <div class="sb-item"><span class="sb-lbl">Phase</span><span class="pill" id="sb-phase">—</span></div>
       <div class="sb-item"><span class="sb-lbl">Week</span><span class="pill" id="sb-week" style="background:#2C3A52;color:#E8EAF0;">—</span></div>
       <div class="sb-item"><span class="sb-lbl">State</span><span class="pill" id="sb-state">—</span></div>
+      <div class="sb-item"><span class="sb-lbl">Week lock</span><span class="pill" id="sb-week-lock" style="background:#2C3A52;color:#C7D2E0;">—</span></div>
       <span class="scoring-lock" id="sb-scoring-lock" style="display:none;">SCORING LOCKED</span>
       <div class="spacer"></div>
       <span class="refresh-meta" id="sb-refreshed">—</span>
@@ -274,6 +279,11 @@
         <div class="section">
           <h2>Controls</h2>
           <div id="controls"><div class="empty">—</div></div>
+        </div>
+
+        <div class="section">
+          <h2>Reviewer Environments</h2>
+          <div id="reviewer-status"><div class="empty">—</div></div>
         </div>
       </aside>
 
@@ -417,6 +427,10 @@ let lastGames = [];
 
 // Auto-pick-before-step toggle — in memory only, resets to off on refresh.
 let autoPickBeforeStep = false;
+// One sim-operator action at a time. A double-clicked NEXT used to fire the
+// action twice (two waves kicked off, two week advances). While an op is in
+// flight every .ctl-btn is disabled and further calls are refused.
+let opInFlight = false;
 // Logged-in super-admin id + whether their picks exist for the current week
 // (drives the "picks made" indicator under Picks Open).
 let currentUserId = null;
@@ -424,18 +438,22 @@ let myPicksThisWeek = false;
 
 // Named stages the app's Home Screen card cycles through — used by the NOW PLAYING
 // banner so formatting issues can be called out by stage name + week_state token.
+// LOCK MODEL (rule 11): ONE lock for the whole week, at the FIRST kickoff.
+// enforce_pick_lock (server) and isWeekLocked() (app) both read the CLOCK —
+// now >= MIN(kickoff_at) — never week_state. sim-operator moves kickoff dates
+// to make each state real; this console just reports what the clock says.
 const STAGE_INFO = {
   idle:       { name: 'IDLE (off-cycle)', desc: 'Calm salutation · 0 pts · join/create CTA · SmackTalk pointer' },
-  picks_open: { name: 'PICKS OPEN',       desc: 'Countdown to kickoff · HotPick preview · "X of Y locked in"' },
-  locked:     { name: 'LOCKED',           desc: 'Board frozen (pencils-down preview) · picks lock per game at kickoff · brief in production' },
-  live:       { name: 'LIVE',             desc: 'HotPick live score · point impact · pool rank delta' },
+  picks_open: { name: 'PICKS OPEN',       desc: 'ACTION countdown to the week lock · HotPick module (flame + GameChip) · n of 16 picks set' },
+  locked:     { name: 'LOCKED',           desc: 'WHOLE WEEK locked at first kickoff — countdown + message gone, CTA dimmed · all 16 picks frozen at once' },
+  live:       { name: 'LIVE',             desc: 'HotPick chip LIVE (pulsing dot only — no signed points, no green/red during play) · HISTORY head ticks banked points' },
   settling:   { name: 'SETTLING',         desc: 'Weekly result · net points · rank movement · SmackTalk CTA' },
-  complete:   { name: 'COMPLETE',         desc: 'Season standings as a race · mini sparkline' },
+  complete:   { name: 'COMPLETE',         desc: 'Standing + rank delta + HotPick card (CompleteHero) · HISTORY owns the recap + bars' },
 };
 const REFRESH_MS = 30000;
 // Bump on each console change so you can confirm the loaded file is current
 // (file:// caching otherwise hides updates). Shown next to the wordmark.
-const CONSOLE_BUILD = 'build 2026-07-01.1 · settle-awards';
+const CONSOLE_BUILD = 'build 2026-07-19.2 · fresh-eyes';
 document.getElementById('build-stamp').textContent = CONSOLE_BUILD;
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -496,6 +514,14 @@ function cfg(key, fallback = null) {
   return row && row.value !== undefined ? row.value : fallback;
 }
 function normStatus(s) { return (s || '').toLowerCase(); }
+// HTML-escape for every non-constant value that lands in an innerHTML template.
+// This console runs with a SUPER-ADMIN session — a user-controlled string
+// (poolie_name, first_name, a server error message) must render as text, never
+// as markup. The log already does this via textContent; esc() covers the rest.
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
 
 // ───────────────────────────────────────────────────────────────────────────
 // Auth
@@ -578,6 +604,17 @@ async function initConsole() {
   await loadPools();
   await refreshAll();
   refreshTimer = setInterval(refreshAll, REFRESH_MS);
+
+  // Pause the 30s auto-refresh while the tab is hidden; catch up immediately
+  // on return. Saves a background tab from polling Supabase all afternoon.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+    } else if (userEmail && !refreshTimer) {
+      refreshAll();
+      refreshTimer = setInterval(refreshAll, REFRESH_MS);
+    }
+  });
 }
 
 async function loadPools() {
@@ -612,12 +649,18 @@ async function refreshAll() {
     renderStateBar();
     renderProdBanner();
     await fetchMyPicksThisWeek();
-    // renderGames sets lastGames first — the timeline + controls read it to build
-    // the game-day wave ladder, so games must be fresh before they render.
+    // renderGames sets lastGames first — the timeline + controls + week-lock chip
+    // read it, so games must be fresh before they render.
     await renderGames();
+    renderWeekLockChip();
+    {
+      const li = weekLockInfo();
+      if (li) log(`Week lock (first kickoff): ${fmtKick(li.firstMs)} — ${li.locked ? 'LOCKED' : 'not yet locked'}`, 'info');
+    }
     await Promise.all([
       renderReadinessAndTimeline(),
       renderLeaderboard(),
+      renderReviewerStatus(),
     ]);
     renderHomeScreenSpec();
     renderStageBanner();
@@ -674,6 +717,44 @@ function renderStateBar() {
   document.getElementById('sb-scoring-lock').style.display = locked ? 'inline-block' : 'none';
 }
 
+// ---- Week-lock chip ----
+// THE lock (rule 11): one lock for the whole week, at the first kickoff.
+// Computed from the CLOCK vs MIN(kickoff_at) over the current week's games —
+// the same answer enforce_pick_lock (server) and isWeekLocked() (app) give.
+// week_state is NOT consulted; if this chip and week_state ever disagree, the
+// chip is telling the truth and the sim needs its kickoffs shifted.
+function fmtUntil(ms) {
+  const m = Math.floor(Math.abs(ms) / 60000);
+  const d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60), mm = m % 60;
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${mm}m`;
+  return `${mm}m`;
+}
+function fmtKick(ts) {
+  return new Date(ts).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+function weekLockInfo() {
+  const withKick = (lastGames || []).filter(g => g.kickoff_at);
+  if (!withKick.length) return null;
+  const firstMs = Math.min(...withKick.map(g => new Date(g.kickoff_at).getTime()));
+  return { firstMs, locked: Date.now() >= firstMs };
+}
+function renderWeekLockChip() {
+  const el = document.getElementById('sb-week-lock');
+  const info = weekLockInfo();
+  if (!info) { el.textContent = '—'; el.className = 'pill'; el.style.cssText = 'background:#2C3A52;color:#C7D2E0;'; return; }
+  el.style.cssText = '';
+  if (info.locked) {
+    el.textContent = `🔒 LOCKED ${fmtUntil(Date.now() - info.firstMs)} ago`;
+    el.className = 'pill ws-locked';
+    el.title = `Whole week locked at first kickoff: ${fmtKick(info.firstMs)}`;
+  } else {
+    el.textContent = `locks in ${fmtUntil(info.firstMs - Date.now())}`;
+    el.className = 'pill ws-picks_open';
+    el.title = `Whole week locks at first kickoff: ${fmtKick(info.firstMs)}`;
+  }
+}
+
 function renderProdBanner() {
   const slot = document.getElementById('prod-banner-slot');
   const t = writeTier(selectedComp);
@@ -711,8 +792,8 @@ function readinessLine(label, status, count, unit, errText) {
   else if (s === 'failed') { icon = '✗'; cls = 'gate-fail'; }
   else { icon = '○'; cls = 'gate-pending'; }
   const detail = s === 'ok' && typeof count === 'number' ? `${count} ${unit}`
-    : s === 'failed' ? (errText || 'failed')
-    : (status ? status : 'not run');
+    : s === 'failed' ? esc(errText || 'failed')
+    : esc(status ? status : 'not run');
   return { ok: s === 'ok', failed: s === 'failed', html:
     `<div class="gate-row ${cls}"><span class="gate-icon">${icon}</span><span>${label}</span>
        <span style="margin-left:auto;font-size:11px;">${detail}</span></div>` };
@@ -741,8 +822,8 @@ function renderReadinessGate(week, r) {
   } else {
     html += `<div class="gate-verdict notready">NOT READY</div>`;
     if (!games.ok) html += `<div class="gate-reason">Games not imported — nfl-import-schedule has not completed this week.</div>`;
-    if (!odds.ok)  html += `<div class="gate-reason">Odds not ready — ${r.odds_error || 'nfl-fetch-odds has not completed this week.'}</div>`;
-    if (!ranks.ok) html += `<div class="gate-reason">Ranks not frozen — ${r.ranks_error || 'nfl-rank-games has not completed this week.'}</div>`;
+    if (!odds.ok)  html += `<div class="gate-reason">Odds not ready — ${esc(r.odds_error || 'nfl-fetch-odds has not completed this week.')}</div>`;
+    if (!ranks.ok) html += `<div class="gate-reason">Ranks not frozen — ${esc(r.ranks_error || 'nfl-rank-games has not completed this week.')}</div>`;
   }
   el.innerHTML = html;
 }
@@ -763,12 +844,17 @@ function waveLadder() {
   const curKey = liveWave ? `${liveWave}:final` : schedWave ? `${schedWave}:kickoff` : null;
 
   const steps = [];
+  let firstKickoffStep = true;
   for (const w of waves) {
     const wg = games.filter(g => detectWave(g.kickoff_at) === w);
     const started  = wg.some(g => gameStatusClass(g.status) !== 'scheduled'); // kicked off
     const allFinal = wg.every(g => gameStatusClass(g.status) === 'final');
-    steps.push({ key: `${w}:kickoff`, label: `${WAVE_LABEL[w]} — kickoff`, done: started });
+    // The FIRST kickoff of the week is THE week lock (rule 11) — all 16 picks
+    // freeze at this moment, so the ladder marks it.
+    const lockTag = firstKickoffStep ? '  🔒 week locks' : '';
+    steps.push({ key: `${w}:kickoff`, label: `${WAVE_LABEL[w]} — kickoff${lockTag}`, done: started });
     steps.push({ key: `${w}:final`,   label: `${WAVE_LABEL[w]} — final`,   done: allFinal });
+    firstKickoffStep = false;
   }
   return { steps, curKey };
 }
@@ -804,10 +890,11 @@ function renderTimeline(ws, r) {
   }
 
   html += macro('Picks open · picks_open', 1);
-  html += macro('Picks locked (preview only) · locked', 2);
-  // 'locked' is the app's pencils-down beat (the board freezes), NOT a per-pick
-  // lock. The real locks land per game at each kickoff in the wave ladder below.
-  html += `<div class="cp-note">App freezes the board in this beat, but picks lock per game at each kickoff below — near-instant in production.</div>`;
+  html += macro('Week locked · locked', 2);
+  // ONE lock for the whole week, at the first kickoff (rule 11). The server
+  // (enforce_pick_lock) and the app (isWeekLocked) both read the clock vs
+  // MIN(kickoff_at); sim-operator shifts kickoffs so this beat is real.
+  html += `<div class="cp-note">The WHOLE week locks at the first kickoff — all picks freeze at once. sim-operator shifts the week's kickoff dates so the clock genuinely says locked (and probes that the server rejects a pick).</div>`;
 
   // Live window = the game-day wave ladder. Only the wave on the clock lights up,
   // and only once we're actually live; at locked it previews as all-pending.
@@ -859,9 +946,9 @@ async function renderGames() {
     const fr = (g.frozen_rank ?? null) !== null ? `<span class="rank-pill">${g.frozen_rank}</span>` : '—';
     return `<tr>
       <td class="num">${g.rank ?? '—'}</td>
-      <td>${g.away_team ?? '?'}</td><td class="num">${g.away_score ?? '–'}</td>
-      <td>${g.home_team ?? '?'}</td><td class="num">${g.home_score ?? '–'}</td>
-      <td class="${stCls}">${(g.status || '—').toUpperCase()}</td>
+      <td>${esc(g.away_team ?? '?')}</td><td class="num">${g.away_score ?? '–'}</td>
+      <td>${esc(g.home_team ?? '?')}</td><td class="num">${g.home_score ?? '–'}</td>
+      <td class="${stCls}">${esc((g.status || '—').toUpperCase())}</td>
       <td>${fr}</td></tr>`;
   };
 
@@ -873,7 +960,11 @@ async function renderGames() {
     const nL = wg.filter(g => gameStatusClass(g.status) === 'live').length;
     const nS = wg.filter(g => gameStatusClass(g.status) === 'scheduled').length;
     const summary = nL ? `${nL} live` : nS && nF ? `${nF} final · ${nS} to play` : nS ? 'scheduled' : 'final';
-    html += `<div class="wave-head ${w === activeWave ? 'active' : ''}">${w === activeWave ? '▶ ' : ''}${WAVE_LABEL[w]} <span>${summary}</span></div>`;
+    // First kickoff of the wave — makes sim-operator's date shifts visible at
+    // a glance (and the earliest wave's time IS the week-lock moment).
+    const waveFirstMs = Math.min(...wg.filter(g => g.kickoff_at).map(g => new Date(g.kickoff_at).getTime()));
+    const kickLabel = Number.isFinite(waveFirstMs) ? ` · ${fmtKick(waveFirstMs)}` : '';
+    html += `<div class="wave-head ${w === activeWave ? 'active' : ''}">${w === activeWave ? '▶ ' : ''}${WAVE_LABEL[w]} <span>${summary}${kickLabel}</span></div>`;
     html += `<table class="grid"><tbody>${wg.map(gameRow).join('')}</tbody></table>`;
   }
   el.innerHTML = html;
@@ -892,7 +983,11 @@ async function renderLeaderboard() {
   const phase = String(cfg('current_phase', 'REGULAR'));
   const ws = String(cfg('week_state', 'idle'));
   const isPlayoffs = phase === 'PLAYOFFS' || phase === 'SUPERBOWL' || phase === 'SUPERBOWL_INTRO';
-  const weekInProgress = ['locked', 'live', 'settling'].includes(ws);
+  // Mirrors the app's canonical isWeekInProgress (src/shared/utils/weekState.ts):
+  // picks_open + locked + live + settling. The current week joins the season
+  // total only once it's COMPLETE — same rule as IDENTITY's SEASON PTS and
+  // HISTORY's bars, so this Ladder can never disagree with the app (map §2).
+  const weekInProgress = ['picks_open', 'locked', 'live', 'settling'].includes(ws);
 
   // 1) active members + pool start date
   const [membersRes, poolRes] = await Promise.all([
@@ -941,8 +1036,10 @@ async function renderLeaderboard() {
   let rows = '';
   list.forEach((e, i) => {
     const p = profById[e.user_id] || {};
-    const name = p.poolie_name || '(unknown)';
-    const tail = p.first_name ? ` — ${p.first_name}${p.last_name ? ' ' + p.last_name[0] + '.' : ''}` : '';
+    // esc() both names — poolie_name / first_name are USER-CONTROLLED and this
+    // table is innerHTML in a super-admin session.
+    const name = esc(p.poolie_name || '(unknown)');
+    const tail = p.first_name ? esc(` — ${p.first_name}${p.last_name ? ' ' + p.last_name[0] + '.' : ''}`) : '';
     const testBadge = p.is_test_account === true ? `<span class="test-badge">TEST</span>` : '';
     const wk = e.week === null ? '—' : e.week;
     const wkCls = typeof e.week === 'number' ? (e.week >= 0 ? 'pos' : 'neg') : '';
@@ -964,14 +1061,56 @@ async function renderLeaderboard() {
     </tr></thead><tbody>${rows}</tbody></table>`;
 }
 
+// ---- Reviewer Environments (drift check) ----
+// simA (Apple) and simG (Google) are pinned to REVIEWER_ANCHOR (Week 8,
+// picks_open) — reviewers can walk into either at any time, so this panel
+// answers "are they still where reviewers expect them?" at a glance. Their
+// week-8 kickoffs are re-anchored daily by the refresh_reviewer_sim_countdown
+// cron (left deliberately untouched by the week-lock work).
+async function renderReviewerStatus() {
+  const el = document.getElementById('reviewer-status');
+  const comps = REVIEWER_ENVS.map(e => e.comp);
+  const { data, error } = await sb
+    .from('competition_config').select('competition, key, value')
+    .in('competition', comps).in('key', ['current_week', 'week_state']);
+  if (error) { el.innerHTML = `<div class="empty">${translateError(error)}</div>`; return; }
+  const byComp = {};
+  for (const r of (data || [])) {
+    byComp[r.competition] = byComp[r.competition] || {};
+    byComp[r.competition][r.key] = r.value;
+  }
+  let html = '';
+  for (const env of REVIEWER_ENVS) {
+    const c = byComp[env.comp] || {};
+    const week = c.current_week, ws = c.week_state;
+    const ok = week === REVIEWER_ANCHOR.week && ws === REVIEWER_ANCHOR.week_state;
+    html += `<div class="rev-row">
+      <span class="rev-env">${env.label}</span>
+      <span class="rev-detail">W${week ?? '?'} · ${ws ?? '?'}</span>
+      <span class="rev-status ${ok ? 'ok' : 'drift'}">${ok ? 'OK' : `DRIFT — expected W${REVIEWER_ANCHOR.week} ${REVIEWER_ANCHOR.week_state}`}</span>
+    </div>`;
+  }
+  el.innerHTML = html || `<div class="empty">No reviewer environments found.</div>`;
+}
+
 // ---- Home Screen Spec Preview ----
-// Mirrors the LIVE app copy in src/shell/components/home/*, NOT the legacy
-// REFERENCE.md §11 salutation table. Key fact: picks_open / locked / live all
-// render ONE hero in the app — PicksOpenHero (StateHero.tsx:86-88) — whose prompt
-// is buildContextualMessage() and whose eyebrow is EDITABLE/LOCKED PICKS
-// (WeekLockStrip). settling uses the getContextGreeting() salutation pool;
-// complete renders CompleteHero (its own recap copy, no salutation pool). There's
-// no shared source with the app — re-sync by hand if that copy changes.
+// Mirrors the LIVE app copy in src/shell/components/home/*. Post-slice-4/5/6
+// reality (July 2026 Home Module Map build):
+//   • picks_open / locked / live render PicksOpenHero (ACTION) + HotPickModule
+//     + HistoryModule as SIBLINGS via StateHero — the HotPick card and the
+//     history chart are separate modules now, not part of the hero.
+//   • The eyebrow (WeekLockStrip, EDITABLE/LOCKED PICKS) is DELETED — rule 11.
+//   • ACTION's countdown + contextual message render only while the week is
+//     UNLOCKED (isWeekLocked() false = clock vs first kickoff); at lock both
+//     disappear and the CTA dims. week_state is not what they read.
+//   • No signed points and no green/red during live (rules 2/3) — the HotPick
+//     chip's PTS box stays neutral until FINAL; only the LIVE dot pulses.
+//   • HISTORY (bars + head + recap) owns per-week scores; WeeklyTrend and the
+//     heroes' own recap prose are deleted.
+// The check-home-spec-sync CI script extracts every double-quoted phrase below
+// and requires it to appear verbatim in app source — quote ONLY real copy, and
+// keep apostrophe-bearing strings OUT of double quotes (the script reads the
+// raw file, so JS escapes would corrupt the phrase).
 const HOME_SCREEN_SPECS = {
   idle: { title: 'IDLE (off-cycle)',
     note: 'Off-cycle phases each render their own hero (OffSeason / PreSeason / bridge) — exact copy varies by phase.',
@@ -980,46 +1119,55 @@ const HOME_SCREEN_SPECS = {
     absent: ['No countdown', 'No live data'], cta: 'Join or create a pool' },
 
   picks_open: { title: 'PICKS OPEN',
-    note: 'Unified editable-picks hero (PicksOpenHero). The prompt is contextual — it shifts with your picks, HotPick, and time left.',
-    eyebrow: 'EDITABLE PICKS',
+    note: 'ACTION (PicksOpenHero): contextual message + countdown to the WEEK lock (first kickoff). No eyebrow — WeekLockStrip is deleted (rule 11). HotPickModule + HistoryModule render below as separate modules.',
     headlines: [
       '"Make your picks. First game kicks off in:"  — no picks yet',
-      '"{n} of {total} picks in — you still need a HotPick. First kickoff in:"',
+      '{n} of {total} picks in — you still need a HotPick (template)',
+      '"All picks in — you still need a HotPick. First kickoff in:"',
       '"Feeling good about your HotPick?"  — all picks in + HotPick set',
       '"Picks are set."  — deadline tightening',
       '"Locked & loaded."  — final minutes',
-      '"Bold call — your HotPick is the first game."',
+      '"Bold call — your HotPick is the first game."  (urgent: "Bold HotPick.")',
     ],
-    elements: ['HotPick card: matchup + inline kickoff countdown', 'Confirm line: "All your picks are in — revise anytime before kickoff." (→ "…and locked." once all games lock)'],
-    cta: 'MAKE YOUR PICKS → FINISH YOUR PICKS → VIEW OR REVISE YOUR PICKS' },
+    elements: [
+      'HotPick module below ACTION: flame + "Your HotPick" title, GameChip with neutral PTS box (never signed pre-FINAL)',
+      'Confirm line: "All picks set" / "HotPick still needed" pairs, or "All your picks are in — revise anytime before kickoff."',
+      'HISTORY: 6-column bar grid + head (last finished week)',
+    ],
+    cta: '"MAKE YOUR PICKS" → "FINISH YOUR PICKS" → "VIEW OR REVISE YOUR PICKS"' },
 
-  locked: { title: 'LOCKED (pencils-down preview)',
-    note: 'Same hero as PICKS OPEN — this beat is near-instant in production (see the locked note in Controls / Timeline).',
-    eyebrow: 'EDITABLE PICKS  /  LOCKED PICKS',
-    headlines: ['"Feeling good about your HotPick?"', '"Picks are set."', '"Locked & loaded."'],
-    elements: ['HotPick card with kickoff countdown', 'Confirm line: "All your picks are in — revise anytime before kickoff." (→ "…and locked." once all games lock)'],
-    cta: 'VIEW OR REVISE YOUR PICKS' },
+  locked: { title: 'LOCKED (whole week, at first kickoff)',
+    note: 'ONE lock for the whole week — isWeekLocked() flips at the first kickoff and ACTION drops its countdown AND message at that moment. CTA dims. All 16 picks are frozen at once; there is no per-game unlock.',
+    headlines: [],
+    elements: [
+      'Confirm line: "All your picks are in and locked."',
+      'HotPick module: chip in PRE (kickoff shown on the chip itself)',
+      'HISTORY head still shows the most recent FINISHED week',
+    ],
+    cta: '"GO TO THE GAMES"  · partial picks: YOU’RE MISSING A FEW PICKS' },
 
   live: { title: 'LIVE',
-    note: 'Same unified hero (PicksOpenHero). Picks for games that have NOT kicked off stay editable; the prompt + eyebrow react wave by wave.',
-    eyebrow: 'EDITABLE PICKS  →  LOCKED PICKS (once all your games lock)',
-    headlines: [
-      '"Feeling good about your HotPick?"  — your HotPick game hasn\'t started yet',
-      '"You\'ve missed kickoff but it\'s not too late to pick some real winners."  — kicked off, no picks',
-      '"{n}/{total} done. Finish up."',
+    note: 'ACTION stays minimal (no countdown, no message — the week is locked). The HotPick chip carries the live state; HISTORY head ticks banked points as waves go final.',
+    headlines: [],
+    elements: [
+      'HotPick module: LIVE dot (the ONLY animation) + live score on the chip — PTS box stays neutral and unsigned during play (rules 2/3)',
+      'HISTORY head: this week, actual earned only — server-scored, never projected',
+      'Picks screen mirrors the same lock via the shared isWeekLocked()',
     ],
-    elements: ['Live score on in-progress games + "GAME IN PROGRESS"', 'HotPick live point impact', 'HotPick card shows live rank value'],
-    cta: 'GO TO THE GAMES' },
+    cta: '"GO TO THE GAMES"' },
 
   settling: { title: 'SETTLING',
-    note: 'SettlingHero — greeting comes from the getContextGreeting() salutation pool.',
+    note: 'SettlingHero — greeting comes from the getContextGreeting() salutation pool. (Its recap line still prints raw counts — flagged for the derivePickDisplay follow-up.)',
     salutations: ['"The record doesn\'t lie"', '"It\'s official"', '"Week closed"'],
     elements: ['Weekly result: net points', 'Rank movement with named players', 'SmackTalk CTA'], cta: 'See the damage' },
 
   complete: { title: 'COMPLETE (between weeks)',
-    note: 'CompleteHero — its own recap copy, not a salutation pool.',
-    headlines: ['"You sit {ordinal} in {pool}."', 'Rank delta — ↑ / ↓ N from last week', 'Brand-voice week recap (HotPick hit/miss · net points · picks correct)'],
-    elements: ['Standing + rank delta', 'HotPick hit/miss recap + value', 'Season trend strip'],
+    note: 'CompleteHero: standing + rank delta + HotPick card. Its own recap prose is DELETED — HISTORY owns the recap (derived counts, never the raw of-16 form).',
+    headlines: ['You sit {ordinal} in {pool} (template)', 'Rank delta — ↑ / ↓ N from last week'],
+    elements: [
+      'Standing + rank delta + HotPick card with FINAL colouring',
+      'HISTORY: completed week held in the head until the next week opens, then it becomes a bar; recap card + season line below',
+    ],
     cta: 'WEEK N COMPLETE · review your picks' },
 };
 
@@ -1033,8 +1181,8 @@ function renderHomeScreenSpec() {
   const spec = HOME_SCREEN_SPECS[effective] || HOME_SCREEN_SPECS.idle;
   let html = `<div class="hs-block"><div class="hs-state-name">${spec.title} CARD</div>`;
   if (phaseForcesIdle && cfg('week_state') && cfg('week_state') !== 'idle') {
-    html += `<div class="hs-warn">Phase <strong>${phase}</strong> is outside the weekly cycle —
-      <code>week_state="${cfg('week_state')}"</code> is ignored; the app shows the idle card.</div>`;
+    html += `<div class="hs-warn">Phase <strong>${esc(phase)}</strong> is outside the weekly cycle —
+      <code>week_state="${esc(cfg('week_state'))}"</code> is ignored; the app shows the idle card.</div>`;
   }
   if (spec.note) html += `<div class="hs-line hs-line-absent" style="font-style:italic;margin:2px 0 6px;">${spec.note}</div>`;
   if (spec.eyebrow) { html += `<div class="hs-section">Eyebrow</div><div class="hs-line">${spec.eyebrow}</div>`; }
@@ -1074,7 +1222,10 @@ document.getElementById('hs-toggle').addEventListener('click', () => {
 // ───────────────────────────────────────────────────────────────────────────
 function currentStepLabel() {
   const ws = String(cfg('week_state', 'idle'));
-  return ({ idle: 'Open Picks', picks_open: 'Lock / Kickoff', locked: 'Go Live', live: 'Settle', settling: 'Complete Week', complete: 'Next Week' })[ws] || 'Advance';
+  // picks_open → locked is THE lock: sim-operator shifts the week's kickoffs
+  // into the past so the clock genuinely locks, then probes that the server
+  // rejects a pick write.
+  return ({ idle: 'Open Picks', picks_open: 'Lock week (first kickoff)', locked: 'Go Live', live: 'Settle', settling: 'Complete Week', complete: 'Next Week' })[ws] || 'Advance';
 }
 
 // NOW PLAYING banner — names the current app Home-card stage + week_state token.
@@ -1085,15 +1236,26 @@ function renderStageBanner() {
   let ws = String(cfg('week_state', 'idle'));
   if (!WEEKLY_CYCLE_PHASES.includes(phase)) ws = 'idle'; // off-cycle phases force the idle card
   const info = STAGE_INFO[ws] || STAGE_INFO.idle;
-  el.className = 'stage-banner';
+  // '.playing' lights the banner's edge green during the live window — the CSS
+  // existed but was never wired.
+  el.className = 'stage-banner' + (ws === 'live' ? ' playing' : '');
   el.innerHTML =
     `<div class="stage-kicker">Now playing · app Home Screen card</div>
-     <div class="stage-name">${info.name} <span class="stage-token">week_state="${ws}" · ${phase}</span></div>
+     <div class="stage-name">${info.name} <span class="stage-token">week_state="${esc(ws)}" · ${esc(phase)}</span></div>
      <div class="stage-desc">${info.desc}</div>`;
 }
 
 function renderControls() {
   const el = document.getElementById('controls');
+  // Don't yank the keyboard out of the operator's hands: if a rebuild lands
+  // while an INPUT/SELECT inside Controls has focus (typing a seed count,
+  // picking a HotPick result), skip it — the next refresh re-renders. Buttons
+  // are fine to lose focus, so ops still repaint the panel when they finish.
+  const ae = document.activeElement;
+  if (ae && el.contains(ae) && (ae.tagName === 'INPUT' || ae.tagName === 'SELECT')) {
+    if (!opInFlight) el.querySelectorAll('.ctl-btn').forEach(b => { b.disabled = false; });
+    return;
+  }
   const comp = selectedComp;
   const tier = writeTier(comp);
   if (!isWritable(comp)) {
@@ -1140,10 +1302,25 @@ function renderControls() {
     html += line;
   });
 
-  // 'locked' freezes the whole board in the app, but it's a cosmetic pencils-down
-  // beat — the real pick locks land per game at each kickoff (wave ladder above).
+  // 'locked' is THE lock: the whole week froze at the first kickoff. The clock
+  // (not week_state) is the authority — sim-operator shifted the kickoffs so
+  // now >= first kickoff, and the lock probe proved the server rejects picks.
   if (ws === 'locked') {
-    html += `<div class="ctl-disabled-note" style="margin-top:6px;">Pencils-down preview — the app freezes the board here, but picks lock per game at each kickoff. NEXT kicks one off.</div>`;
+    html += `<div class="ctl-disabled-note" style="margin-top:6px;">Week locked — ALL picks froze at the first kickoff (one lock, whole week). The server now rejects pick writes. NEXT kicks off the first wave.</div>`;
+  }
+
+  // Clock-vs-state drift — the exact failure mode the week-lock chip exists to
+  // expose. week_state and the clock (MIN kickoff_at) are separate authorities,
+  // and the app + server obey the CLOCK; warn when the two disagree.
+  {
+    const li = weekLockInfo();
+    if (li && inCycle) {
+      if (ws === 'picks_open' && li.locked) {
+        html += `<div class="gate-reason">⚠ Clock says LOCKED (first kickoff passed) while state is picks_open — the app shows locked UI and the server REJECTS pick writes (auto-pick / Seed Bots will fail). Press "Lock week" to sync; the next Open Picks re-futures the dates.</div>`;
+      } else if ((ws === 'locked' || ws === 'live' || ws === 'settling') && !li.locked) {
+        html += `<div class="gate-reason">⚠ Clock says NOT locked (first kickoff ${fmtKick(li.firstMs)}) while state is ${ws} — the app's Home won't show locked UI. This heals once the Lock step's kickoff shift runs (deployed sim-operator).</div>`;
+      }
+    }
   }
 
   if (!inCycle) {
@@ -1190,7 +1367,7 @@ function renderControls() {
 
   const jumpDefault = typeof week === 'number' ? Math.min(22, week + 1) : 1;
   html += `<div class="ctl-group"><div class="ctl-label">Jump to week (forward only)</div>
-    <div class="ctl-row"><input id="jump-week" type="number" min="1" max="22" value="${jumpDefault}" class="ctl-num">
+    <div class="ctl-row"><input id="jump-week" type="number" min="1" max="22" value="${jumpDefault}" class="ctl-num" onkeydown="if(event.key==='Enter'){event.preventDefault();opJump();}">
     <button class="ctl-btn" style="flex:1;margin:0;" onclick="opJump()">Jump</button></div></div>`;
 
   html += `<label class="ctl-toggle"><input type="checkbox" ${autoPickBeforeStep ? 'checked' : ''} onchange="toggleAutoPick(this)"> Auto-pick my picks before each step</label>`;
@@ -1220,6 +1397,7 @@ async function invokeOp(action, opts) {
 async function callSimOperator(action, opts = {}) {
   const comp = selectedComp;
   if (!isWritable(comp)) { log(`Refused: ${comp} is read-only`, 'error'); return; }
+  if (opInFlight) { log('Busy — previous action still running', 'warn'); return; }
 
   // Reviewer-environment confirm — every write action, no "don't show again".
   if (REVIEWER_COMPS.includes(comp)) {
@@ -1228,35 +1406,41 @@ async function callSimOperator(action, opts = {}) {
     if (!ok) { log(`Cancelled "${opts.label || action}" on ${comp}`, 'warn'); return; }
   }
 
-  // Auto-pick before a step (spec §6a): skip on "already submitted", abort on any other error.
-  if (opts.isStep && autoPickBeforeStep) {
-    const ap = await invokeOp('auto_pick_tom', {});
-    if (ap && ap.success) log(`Auto-picked ${ap.picks_submitted} games`, 'info');
-    else if (ap && /already submitted/i.test(ap.error || '')) { /* fine — proceed */ }
-    else { log(`Auto-pick failed: ${(ap && ap.error) || 'error'} — step aborted`, 'error'); return; }
-  }
+  opInFlight = true;
+  document.querySelectorAll('#controls .ctl-btn').forEach(b => { b.disabled = true; });
+  try {
+    // Auto-pick before a step (spec §6a): skip on "already submitted", abort on any other error.
+    if (opts.isStep && autoPickBeforeStep) {
+      const ap = await invokeOp('auto_pick_tom', {});
+      if (ap && ap.success) log(`Auto-picked ${ap.picks_submitted} games`, 'info');
+      else if (ap && /already submitted/i.test(ap.error || '')) { /* fine — proceed */ }
+      else { log(`Auto-pick failed: ${(ap && ap.error) || 'error'} — step aborted`, 'error'); return; }
+    }
 
-  const res = await invokeOp(action, opts);
-  if (res && res.success) {
-    log(`${opts.label || action} ✓${res.message ? ' — ' + res.message : ''}`, 'success');
-    await refreshAll();
-  } else {
-    log(`${opts.label || action} failed: ${(res && res.error) || 'error'}`, 'error');
+    const res = await invokeOp(action, opts);
+    if (res && res.success) {
+      log(`${opts.label || action} ✓${res.message ? ' — ' + res.message : ''}`, 'success');
+      await refreshAll();
+    } else {
+      log(`${opts.label || action} failed: ${(res && res.error) || 'error'}`, 'error');
+    }
+  } finally {
+    opInFlight = false;
+    renderControls(); // re-enable buttons on every exit path
   }
 }
 
 function opStep() { callSimOperator('advance_week_state', { isStep: true, label: currentStepLabel() }); }
 function opAutoPick() { callSimOperator('auto_pick_tom', { label: 'Auto-pick my picks' }); }
 
-// What the next game-day sub-step will do, computed from the current games (the
-// server is authoritative; this is for the button label only).
+// What the next game-day sub-step will do — derived from the SAME ladder the
+// timeline and controls render (waveLadder's curKey), so the button label and
+// the highlighted rung can never disagree. One computation, not two copies.
 function gameDayNextLabel() {
-  const g = lastGames || [];
-  const liveWave = WAVE_ORDER.find(w => g.some(x => detectWave(x.kickoff_at) === w && gameStatusClass(x.status) === 'live'));
-  if (liveWave) return `NEXT → final ${WAVE_LABEL[liveWave]}`;
-  const schedWave = WAVE_ORDER.find(w => g.some(x => detectWave(x.kickoff_at) === w && gameStatusClass(x.status) === 'scheduled'));
-  if (schedWave) return `NEXT → kickoff ${WAVE_LABEL[schedWave]}`;
-  return 'NEXT → settle week';
+  const { curKey } = waveLadder();
+  if (!curKey) return 'NEXT → settle week';
+  const [wave, step] = curKey.split(':');
+  return step === 'final' ? `NEXT → final ${WAVE_LABEL[wave]}` : `NEXT → kickoff ${WAVE_LABEL[wave]}`;
 }
 // NEXT button: game-day waves during the live window, macro week_state otherwise.
 function opNext() {
@@ -1289,13 +1473,17 @@ function opJump() {
 // group at picks_open. Writes picks for the 8 bots only; the existing scorer turns
 // them into points on Complete (260630_HotPick_SeedBots_Spec).
 function renderSeedPanel(week) {
+  // Max correct = this week's ACTUAL slate minus the HotPick game — weeks run
+  // 13–16 games, so a hardcoded 15 both over-promised short weeks and
+  // under-used full ones.
+  const maxCorrect = Math.max(1, (lastGames && lastGames.length ? lastGames.length : 16) - 1);
   let h = `<div class="ctl-group"><div class="ctl-label">Seed Bots — Week ${week} · SANDBOX</div>`;
-  h += `<div class="ctl-disabled-note" style="margin:0 0 8px;">Per-bot: # correct (0–15) + HotPick (win/lose/none). Score falls out on Complete. Writes picks for the 8 bots only — never you, never super-admin. Pressing twice is safe (bots with picks are skipped).</div>`;
+  h += `<div class="ctl-disabled-note" style="margin:0 0 8px;">Per-bot: # correct (0–${maxCorrect}, this week has ${lastGames.length} games) + HotPick (win/lose/none). Score falls out on Complete. Writes picks for the 8 bots only — never you, never super-admin. Pressing twice is safe (bots with picks are skipped).</div>`;
   SEED_BOTS_UI.forEach((b, i) => {
     const d = seedDraft[i] || (seedDraft[i] = { correct: 6, hotpick: 'win' });
     h += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
       <span style="flex:1;font-size:12px;color:#cdd6e2;">${b.name}</span>
-      <input type="number" min="0" max="15" value="${d.correct}" class="ctl-num" style="width:56px;" title="# correct picks" oninput="seedSet(${i},'correct',this.value)">
+      <input type="number" min="0" max="${maxCorrect}" value="${d.correct}" class="ctl-num" style="width:56px;" title="# correct picks" oninput="seedSet(${i},'correct',this.value)">
       <select class="ctl-num" style="width:78px;" title="HotPick result" onchange="seedSet(${i},'hotpick',this.value)">
         ${['win', 'lose', 'none'].map(o => `<option value="${o}" ${d.hotpick === o ? 'selected' : ''}>${o}</option>`).join('')}
       </select>
@@ -1310,29 +1498,38 @@ function renderSeedPanel(week) {
 async function opSeedBots() {
   const comp = selectedComp;
   if (comp !== SEED_BOTS_COMP) { log(`Seed Bots is locked to ${SEED_BOTS_COMP}`, 'error'); return; }
+  if (opInFlight) { log('Busy — previous action still running', 'warn'); return; }
   const week = cfg('current_week', '?');
+  const maxCorrect = Math.max(1, (lastGames && lastGames.length ? lastGames.length : 16) - 1);
   const targets = {};
   const lines = [];
   SEED_BOTS_UI.forEach((b, i) => {
     const d = seedDraft[i] || { correct: 6, hotpick: 'win' };
-    const correct = Math.max(0, Math.min(15, parseInt(d.correct, 10) || 0));
+    const correct = Math.max(0, Math.min(maxCorrect, parseInt(d.correct, 10) || 0));
     targets[b.id] = { correct, hotpick: d.hotpick };
     lines.push(`${b.name}: ${correct} correct · HotPick ${d.hotpick}`);
   });
   if (!window.confirm(`Seed the 8 bots for ${comp} · Week ${week}?\n\n${lines.join('\n')}\n\nWrites picks only (the scorer makes points on Complete). Bots that already have picks are skipped.`)) {
     log('Seed Bots cancelled', 'warn'); return;
   }
-  const res = await invokeOp('seed_bots', { targets });
-  if (res && res.success) {
-    log(`Seed Bots ✓ — ${res.message}`, 'success');
-    (res.seeded || []).forEach(s => {
-      const clamp = (s.requested_correct != null && s.requested_correct !== s.correct) ? ` (requested ${s.requested_correct}, clamped)` : '';
-      log(`  • ${s.name}: ${s.correct} correct + HotPick ${s.hotpick} → ${s.expected_points} pts${clamp}`, 'info');
-    });
-    (res.skipped || []).forEach(s => log(`  • ${s.name}: skipped (${s.reason})`, 'warn'));
-    await refreshAll();
-  } else {
-    log(`Seed Bots failed: ${(res && res.error) || 'error'}`, 'error');
+  opInFlight = true;
+  document.querySelectorAll('#controls .ctl-btn').forEach(b => { b.disabled = true; });
+  try {
+    const res = await invokeOp('seed_bots', { targets });
+    if (res && res.success) {
+      log(`Seed Bots ✓ — ${res.message}`, 'success');
+      (res.seeded || []).forEach(s => {
+        const clamp = (s.requested_correct != null && s.requested_correct !== s.correct) ? ` (requested ${s.requested_correct}, clamped)` : '';
+        log(`  • ${s.name}: ${s.correct} correct + HotPick ${s.hotpick} → ${s.expected_points} pts${clamp}`, 'info');
+      });
+      (res.skipped || []).forEach(s => log(`  • ${s.name}: skipped (${s.reason})`, 'warn'));
+      await refreshAll();
+    } else {
+      log(`Seed Bots failed: ${(res && res.error) || 'error'}`, 'error');
+    }
+  } finally {
+    opInFlight = false;
+    renderControls();
   }
 }
 
