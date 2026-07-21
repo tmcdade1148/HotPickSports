@@ -1,5 +1,6 @@
 import React from 'react';
-import {Text, StyleSheet} from 'react-native';
+import {Text} from '@shared/components/AppText';
+import {StyleSheet} from 'react-native';
 import Constants from 'expo-constants';
 import * as Updates from 'expo-updates';
 import {useTheme} from '@shell/theme';
