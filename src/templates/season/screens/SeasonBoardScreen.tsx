@@ -308,9 +308,11 @@ export function SeasonBoardScreen() {
   if (currentPhase === 'PRE_SEASON') {
     return (
       <View style={styles.loading}>
-        <Text style={{fontSize: 18, fontWeight: '600', color: colors.textPrimary, marginBottom: 8}}>The Ladder</Text>
+        <Text style={{fontSize: 18, fontWeight: '600', color: colors.textPrimary, marginBottom: 8, textAlign: 'center', paddingHorizontal: 32}}>
+          Something tells me you'll be right at the top of this ladder.
+        </Text>
         <Text style={{fontSize: 14, color: colors.textSecondary, textAlign: 'center', paddingHorizontal: 32}}>
-          The Ladder will come alive once the season kicks of and we have some scores.
+          Once your picks lock, you'll be able to see just how much better you are at picking winners.
         </Text>
       </View>
     );

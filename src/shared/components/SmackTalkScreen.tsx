@@ -812,9 +812,9 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
         // Tap-to-dismiss: when the chat is empty there's no FlatList to
         // drag, so the empty state itself dismisses the keyboard on tap.
         <Pressable style={styles.emptyState} onPress={Keyboard.dismiss}>
-          <Text style={styles.emptyTitle}>Chirps</Text>
+          <Text style={styles.emptyTitle}>All quiet in here now.</Text>
           <Text style={styles.emptyText}>
-            No messages yet. Be the first to talk trash!
+            But this is where you find out what your friends really think of your team.
           </Text>
         </Pressable>
       ) : (

@@ -158,7 +158,16 @@ function LeaderboardTab() {
   const activeSport = useGlobalStore(s => s.activeSport);
   const viewingPoolId = useViewingPoolId();
   // No Contest in scope → empty state, never a global/platform leaderboard.
-  if (!activeSport || !viewingPoolId) return <EmptyTabScreen label={LEXICON.ladder.short} />;
+  // Wrap it in the same TopInsetScreen + PoolHeader as the populated tab so the
+  // no-Contest state isn't headerless (Slice 7c).
+  if (!activeSport || !viewingPoolId) {
+    return (
+      <TopInsetScreen>
+        <PoolHeader />
+        <EmptyTabScreen label={LEXICON.ladder.short} />
+      </TopInsetScreen>
+    );
+  }
 
   const screen = (() => {
     switch (activeSport.templateType) {
@@ -185,7 +194,14 @@ function SmackTalkTab() {
   // Same source as the Ladder — one viewingPoolId, no global-pool fallback.
   const smackPoolId = useViewingPoolId();
   if (!activeSport || !smackPoolId) {
-    return <EmptyTabScreen label={LEXICON.chirps.plural} />;
+    // No Contest in scope — give it the same header as the populated tab so it
+    // isn't headerless (Slice 7c).
+    return (
+      <TopInsetScreen>
+        <PoolHeader />
+        <EmptyTabScreen label={LEXICON.chirps.plural} />
+      </TopInsetScreen>
+    );
   }
   return (
     <TopInsetScreen>

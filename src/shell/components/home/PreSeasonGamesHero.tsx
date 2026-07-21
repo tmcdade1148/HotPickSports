@@ -1,12 +1,15 @@
 // src/shell/components/home/PreSeasonGamesHero.tsx
-// Pre-season home variant per the OffseasonPreseasonHome spec
-// (May 29, 2026). The kickoff countdown carries over from the off-season hero
-// (shared KickoffCountdown) so it stays prominent through pre-season. The
-// action stack + the "Week 1 picks open …" line live in HomeScreen. All
-// sport-specific copy reads from activeSport.sportIdentity.
+// Pre-season home variant per the OffseasonPreseasonHome spec (May 29, 2026),
+// updated for Slice 7c. The kickoff countdown carries over from the off-season
+// hero (shared KickoffCountdown) so it stays prominent through pre-season. The
+// demo button, the docked Join/Start footer, and the "Week 1 picks open …" line
+// all live in HomeScreen. All sport-specific copy reads from
+// activeSport.sportIdentity.
 //
-// Note on preseason picks: per Tom (May 2026) preseason picks / scores are NOT
-// persisted to the season totals — they reset for the regular season.
+// Note on preseason picks: PRE_SEASON is an idle bridge — NO picks are possible
+// in the phase (admin_advance_season_phase forces week_state='idle',
+// picks_open=false; CLAUDE.md Hard Rule #22). The August preseason GAMEPLAY is a
+// separate competition (nfl_2026_pre) running in REGULAR, not this hero.
 
 import React from 'react';
 import {Text} from '@shared/components/AppText';
@@ -23,19 +26,10 @@ export function PreSeasonGamesHero() {
   const identity    = activeSport?.sportIdentity;
 
   const headline = identity?.preseasonHeadline ?? "THE FIELD'S OPEN.";
-  const heroSub  = identity?.preseasonHeroSub  ?? 'Practice picks all month. Scores reset for the regular season.';
+  const heroSub  = identity?.preseasonHeroSub  ?? 'The regular season is almost here.';
 
   return (
     <View style={styles.wrap}>
-      {/* Status eyebrow — small green dot + nudge toward the regular season.
-          Static indicator, not animated (compliance §7). */}
-      <View style={styles.eyebrowRow}>
-        <View style={[styles.statusDot, {backgroundColor: colors.success}]} />
-        <Text style={[bodyType.bold, styles.eyebrowLabel, {color: colors.success}]}>
-          Closing in on the regular season.
-        </Text>
-      </View>
-
       <Text style={[displayType.display, styles.headline, {color: colors.textPrimary}]}>
         {headline}
       </Text>
@@ -55,22 +49,6 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     paddingBottom: 0,
     gap: spacing.xs,
-  },
-  eyebrowRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: spacing.xs,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  eyebrowLabel: {
-    flex: 1,
-    fontSize: 11,
-    letterSpacing: 0.3,
   },
   headline: {
     fontSize: 36,

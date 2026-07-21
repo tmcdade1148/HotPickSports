@@ -15,6 +15,7 @@ import {PILL_HEIGHT} from '@shared/theme/pill';
 import type {DbSeasonGame} from '@shared/types/database';
 import {useTheme} from '@shell/theme';
 import {useNavReserve} from '@shared/hooks/useNavReserve';
+import {ordinalSuffix} from '@shared/utils/format';
 import {useNFLStore, type GameScore} from '@sports/nfl/stores/nflStore';
 import {computeLiveWeekEarned} from '@sports/nfl/utils/liveWeekScore';
 import {useGlobalStore} from '@shell/stores/globalStore';
@@ -98,6 +99,7 @@ export function SeasonPicksScreen() {
   const dbCurrentWeek = useNFLStore(s => s.currentWeek);
   const weekState = useNFLStore(s => s.weekState);
   const currentPhase = useNFLStore(s => s.currentPhase);
+  const picksOpenAt = useNFLStore(s => s.picksOpenAt);
   const activePoolId = useGlobalStore(s => s.activePoolId);
   const subscribeToGameScores = useSeasonStore(s => s.subscribeToGameScores);
 
@@ -400,11 +402,18 @@ export function SeasonPicksScreen() {
             title: 'Nothing to pick yet.',
             body: "That week's done. The next one's coming.",
           };
-        default: // OFF_SEASON, PRE_SEASON
+        default: {
+          // OFF_SEASON, PRE_SEASON — the storefront "you're undefeated" framing.
+          // Date reads from season_picks_open_at (never hardcoded), same
+          // formatter as PreseasonPicksOpenLine on Home.
+          const picksOpenLabel = picksOpenAt
+            ? `${picksOpenAt.toLocaleDateString('en-US', {month: 'long'})} ${picksOpenAt.getDate()}${ordinalSuffix(picksOpenAt.getDate())}`
+            : 'September 2nd';
           return {
-            title: 'Nothing to pick yet.',
-            body: "The schedule's set. Home's counting the days.",
+            title: 'Your perfect record starts here.',
+            body: `Picks open ${picksOpenLabel}. Commitments are made on Thursdays, and all weekend you stress about it. For now, you're undefeated.`,
           };
+        }
       }
     })();
     return (

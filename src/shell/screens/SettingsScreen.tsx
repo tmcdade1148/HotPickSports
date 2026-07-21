@@ -14,8 +14,6 @@ import Clipboard from '@react-native-clipboard/clipboard';
 import {useNavigation} from '@react-navigation/native';
 import {
   User,
-  Plus,
-  KeyRound,
   LogOut,
   ChevronRight,
   ChevronDown,
@@ -48,7 +46,8 @@ import {resolveDefaultPoolId} from '@shell/stores/selectors/defaultPool';
 import {VersionStamp} from '@shell/components/VersionStamp';
 import {useNavReserve} from '@shared/hooks/useNavReserve';
 import {getEventsByPriority, getEventByCompetition} from '@sports/registry';
-import {ContestActionPill, contestActionPillStyles} from '@shell/components/ContestActionPill';
+import {contestActionPillStyles} from '@shell/components/ContestActionPill';
+import {ContestActions} from '@shell/components/ContestActions';
 import {LEXICON} from '@shared/lexicon';
 
 export function SettingsScreen({route}: any) {
@@ -518,24 +517,11 @@ export function SettingsScreen({route}: any) {
 
           {/* Join / Create pills — same affordance as the Home screen. Join is
               hidden for super-admins (creators-only); Create always shows. */}
-          <View style={contestActionPillStyles.row}>
-            {!userProfile?.is_super_admin && (
-              <ContestActionPill
-                Icon={KeyRound}
-                label="Join a Contest"
-                sublabel="with invite code"
-                onPress={() => navigation.navigate('JoinPool')}
-                accessibilityLabel="Join a Contest with an invite code"
-              />
-            )}
-            <ContestActionPill
-              Icon={Plus}
-              label="Start a Contest"
-              sublabel="and invite friends"
-              onPress={handleCreatePool}
-              accessibilityLabel="Start a new Contest and invite friends"
-            />
-          </View>
+          <ContestActions
+            showJoin={!userProfile?.is_super_admin}
+            onStartPress={handleCreatePool}
+            style={contestActionPillStyles.row}
+          />
         </View>
       )}
 

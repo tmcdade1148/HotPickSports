@@ -25,7 +25,7 @@ export function CrossContestStrip() {
         Pick once. Live everywhere.
       </Text>
       <Text style={[bodyType.regular, styles.body, {color: colors.primary}]}>
-        One set of calls, tested in every Contest you're in at the same time. Be right in all of them or wrong in all of them.
+        Your picks, carried into every Contest you're in. One record, everywhere.
       </Text>
     </View>
   );

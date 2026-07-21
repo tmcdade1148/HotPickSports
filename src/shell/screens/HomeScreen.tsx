@@ -5,8 +5,7 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {Text} from '@shared/components/AppText';
 import {RefreshControl, ScrollView, StyleSheet, View} from 'react-native';
-import {KeyRound, Plus} from 'lucide-react-native';
-import {useFocusEffect, useNavigation} from '@react-navigation/native';
+import {useFocusEffect} from '@react-navigation/native';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {useNavReserve} from '@shared/hooks/useNavReserve';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
@@ -24,12 +23,12 @@ import {StateHero} from '@shell/components/home/StateHero';
 import {ContextualLine} from '@shell/components/home/ContextualLine';
 import {HeroSkeleton} from '@shell/components/home/HeroSkeleton';
 import {CrossContestStrip} from '@shell/components/home/CrossContestStrip';
-import {OffSeasonActions, PreSeasonActions, ReturningOffCycleActions} from '@shell/components/home/OffCycleActions';
+import {DemoButton} from '@shell/components/home/DemoButton';
 import {Insight} from '@shell/components/home/Insight';
 import {HomeInbox} from '@shell/components/home/HomeInbox';
 import {HistoryModule} from '@shell/components/home/HistoryModule';
 import {ContestCarousel} from '@shell/components/home/ContestCarousel';
-import {ContestActionPill} from '@shell/components/ContestActionPill';
+import {ContestActions} from '@shell/components/ContestActions';
 import {PartnerModule} from '@shell/components/home/PartnerModule';
 import {resolveHomeRow} from '@shell/components/home/homeRows';
 import {LEXICON} from '@shared/lexicon';
@@ -45,7 +44,6 @@ const PILL_FILL_ALPHA = 'CC';
 
 export function HomeScreen() {
   const {colors} = useTheme();
-  const navigation = useNavigation<any>();
   // Bottom-inset handling now lives entirely in useNavReserve() (nav height +
   // safe-area inset), so the screen no longer reads insets directly.
   const navReserve = useNavReserve();
@@ -535,17 +533,20 @@ export function HomeScreen() {
             <HeroSkeleton />
           ))}
 
-        {/* Off-cycle layout per the OffseasonPreseasonHome spec
-            (May 29, 2026): action stack → cross-Contest strip →
-            Clubs teaser. The pool list + Join/Create-as-list-affordance
-            from the regular YOUR CONTESTS section don't apply here;
-            the action stack owns Create/Join, and the Clubs teaser
-            shrinks to one line. RecruiterBand is silent in the spec,
-            so we drop it from these states. */}
+        {/* Off-cycle layout (Slice 7c): picks-open line → demo button →
+            Contests → cross-Contest strip → Clubs teaser. Join/Start now live
+            in the docked footer below (shared with regular season), not an
+            inline action stack. The Clubs teaser shrinks to one line;
+            RecruiterBand is dropped from these states. */}
         {configLoaded && (homeRow === 'off_far' || homeRow === 'off_near') && (
           <>
+            {/* Config-driven "Week 1 picks go LIVE …" line, under the hero's
+                countdown (reused from pre-season; reads season_picks_open_at). */}
+            <PreseasonPicksOpenLine />
+            {/* Demo CTA — shown to ALL users now (Slice 7c), above Contests.
+                Join/Start moved to the docked footer below. */}
+            <DemoButton />
             {offCycleContests}
-            {visiblePools.length > 0 ? <ReturningOffCycleActions /> : <OffSeasonActions />}
             <CrossContestStrip />
             {offCycleClubs ?? <ClubsTeaser />}
           </>
@@ -554,8 +555,10 @@ export function HomeScreen() {
           <>
             {/* Directly under the hero's kickoff countdown. */}
             <PreseasonPicksOpenLine />
+            {/* Demo CTA above Contests, shown to ALL users (Slice 7c).
+                Join/Start moved to the docked footer below. */}
+            <DemoButton />
             {offCycleContests}
-            {visiblePools.length > 0 ? <ReturningOffCycleActions /> : <PreSeasonActions />}
             <CrossContestStrip />
             {offCycleClubs ?? <ClubsTeaser />}
           </>
@@ -638,39 +641,22 @@ export function HomeScreen() {
       </View>
 
       {/* Locked, translucent Join / Start-a-Contest bar — pinned to the bottom
-          of Home (in-cycle only) so content scrolls visibly under it, matching
-          the header. Off-cycle states keep their own action stacks.
+          of Home on every config-loaded state (in-cycle AND off/pre-season, per
+          Slice 7c) so content scrolls visibly under it, matching the header.
 
           Clearance comes from useNavReserve() (nav height + bottom inset), NOT
           a hardcoded pill height, so this follows the nav if its geometry
           changes. The previous Platform.select on insets.bottom cleared the
           home indicator but NOT the floating nav pill, which is why the pills
           sat underneath it. */}
-      {showPoolStack && isInCycle && showJoinCreate && (
+      {configLoaded && showJoinCreate && (
         <View
           style={[
             styles.footerOverlay,
             {paddingBottom: navReserve + spacing.xs},
           ]}
           onLayout={e => setFooterHeight(e.nativeEvent.layout.height)}>
-          <View style={styles.footerRow}>
-            <ContestActionPill
-              Icon={KeyRound}
-              label="Join a Contest"
-              sublabel="with invite code"
-              fillColor={colors.background + PILL_FILL_ALPHA}
-              onPress={() => navigation.navigate('JoinPool')}
-              accessibilityLabel="Join a Contest with an invite code"
-            />
-            <ContestActionPill
-              Icon={Plus}
-              label="Start a Contest"
-              sublabel="and invite friends"
-              fillColor={colors.background + PILL_FILL_ALPHA}
-              onPress={() => navigation.navigate('CreatePool')}
-              accessibilityLabel="Start a new Contest and invite friends"
-            />
-          </View>
+          <ContestActions fillColor={colors.background + PILL_FILL_ALPHA} />
         </View>
       )}
     </View>
@@ -768,10 +754,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     paddingTop: spacing.sm,
     paddingHorizontal: spacing.lg,
-  },
-  footerRow: {
-    flexDirection: 'row',
-    gap: 10,
   },
   section: {marginTop: spacing.md},
   sectionTitle: {

@@ -32,8 +32,8 @@ export const nflSeason: SeasonConfig = {
     offseasonHeadline:       "YEP, WE'RE COUNTING THE DAYS TOO.",
     offseasonHeroSub:        'Plenty of time to set up your Contest and get everyone in before kickoff.',
     offseasonCountdownLabel: 'DAYS UNTIL NFL 2026 KICKS OFF',
-    preseasonHeadline:       "IT'S STARTING TO GET REAL.",
-    preseasonHeroSub:        'Set up your Contest for the season, or take a few practice picks to see how it runs. Nothing counts yet. Scores reset for the regular season.',
+    preseasonHeadline:       'This is the easy part.',
+    preseasonHeroSub:        "When you need to commit to a HotPick before the games lock, you'll look back at this time fondly.",
     preseasonCountdownLabel: 'Regular season games kickoff in',
   },
 

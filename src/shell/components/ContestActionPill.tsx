@@ -44,7 +44,13 @@ export function ContestActionPill({
   busy = false,
   fillColor,
 }: ContestActionPillProps) {
-  const {colors} = useTheme();
+  const {colors, isDark} = useTheme();
+  // Secondary-CTA accent, per mode (tokens only, never literals): the accent_teal
+  // token in light — amber washes out on white — and the secondary (amber) token
+  // in dark, which is the wanted look. Outline, icon, fill-tint, and label all use
+  // it so each mode reads cohesive. (accent_teal in dark is light-blue, which is
+  // why we branch to secondary there rather than reuse accent_teal.)
+  const accent = isDark ? colors.secondary : colors.accentTeal;
   return (
     <Pressable
       onPress={onPress}
@@ -52,20 +58,20 @@ export function ContestActionPill({
       style={({pressed}) => [
         styles.btn,
         {
-          backgroundColor: fillColor ?? hexToRgba(colors.ctaAccentOutline, 0.08),
-          borderColor: colors.ctaAccentOutline,
+          backgroundColor: fillColor ?? hexToRgba(accent, 0.08),
+          borderColor: accent,
           opacity: pressed || busy ? 0.7 : 1,
         },
       ]}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}>
       {busy ? (
-        <ActivityIndicator size="small" color={colors.ctaAccentOutline} />
+        <ActivityIndicator size="small" color={accent} />
       ) : (
-        <Icon size={18} color={colors.ctaAccentOutline} strokeWidth={2.25} />
+        <Icon size={18} color={accent} strokeWidth={2.25} />
       )}
       <View style={styles.label}>
-        <Text style={[bodyType.bold, styles.primary, {color: colors.ctaAccentText}]}>
+        <Text style={[bodyType.bold, styles.primary, {color: accent}]}>
           {label}
         </Text>
         {!!sublabel && (
