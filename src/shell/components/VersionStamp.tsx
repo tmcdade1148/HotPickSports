@@ -9,7 +9,7 @@ import {useTheme} from '@shell/theme';
  *
  * The app version (1.1.0) is stable across every OTA and tells you nothing on
  * its own — the value that MOVES is `Updates.createdAt` (when the running
- * bundle was published). `isEmbedded` distinguishes "the OTA didn't land" from
+ * bundle was published). `isEmbeddedLaunch` distinguishes "the OTA didn't land" from
  * "this build can't take OTAs at all."
  *
  *   v1.1.0 · preview · Jul 17 15:10 · OTA
@@ -36,7 +36,7 @@ export function VersionStamp({style}: {style?: any}) {
   // Check isEnabled FIRST. A dev build (Xcode / expo-updates disabled) cannot
   // take an OTA at all, so channel/date are empty and "OTA" would be a lie —
   // the exact wrong answer to the only question this stamp exists to answer.
-  // isEmbedded is the wrong test here: it asks embedded-vs-downloaded, which
+  // isEmbeddedLaunch is the wrong test here: it asks embedded-vs-downloaded, which
   // only means anything once updates ARE enabled. When disabled we say "dev"
   // and skip channel/date entirely rather than print empty separators.
   let enabled = false;
@@ -48,7 +48,7 @@ export function VersionStamp({style}: {style?: any}) {
     if (enabled) {
       createdAt = Updates.createdAt;
       channel = Updates.channel;
-      embedded = Updates.isEmbedded;
+      embedded = Updates.isEmbeddedLaunch;
     }
   } catch {
     // updates module unavailable — treated as disabled (dev) below
