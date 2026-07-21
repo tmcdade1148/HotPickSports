@@ -12,7 +12,6 @@ import {useNavigation} from '@react-navigation/native';
 import {useTheme} from '@shell/theme/hooks';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {displayType, bodyType, monoType, spacing, borderRadius} from '@shared/theme';
-import {buildWeekRecap} from './weekRecap';
 
 // The greeting line that used to sit here is gone — the contextual line is now a
 // single producer (ContextualLine) rendered once above the hero by HomeScreen.
@@ -56,12 +55,6 @@ export function SettlingHero() {
           </Text>
         </View>
 
-        {weekResult && (
-          <Text style={[bodyType.regular, styles.detail, {color: colors.textSecondary}]}>
-            {buildWeekRecap(weekResult)}
-          </Text>
-        )}
-
         {pathBackNarrative ? (
           <Text style={[bodyType.regular, styles.narrative, {color: colors.textPrimary}]}>
             {pathBackNarrative}
@@ -97,7 +90,6 @@ const styles = StyleSheet.create({
   },
   resultRow:   {flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm},
   ptsLabel:    {fontSize: 24},
-  detail:      {fontSize: 13, marginTop: spacing.sm},
   narrative:   {fontSize: 14, marginTop: spacing.sm, lineHeight: 20},
   cta: {
     paddingVertical: spacing.md - 2,

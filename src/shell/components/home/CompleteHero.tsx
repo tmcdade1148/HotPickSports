@@ -1,19 +1,16 @@
-// Complete-state hero: depleted week-lock strip, standing context,
-// final-state HotPick card, dimmed CTA, recap line, weekly trend.
+// Complete-state hero: standing context, dimmed CTA. HISTORY owns the
+// finished-week HotPick, recap, and weekly trend (v4.1 handoff at settling).
 
-import React, {useMemo} from 'react';
+import React from 'react';
 import {Text} from '@shared/components/AppText';
 import {Pressable, StyleSheet, View} from 'react-native';
-import {ArrowRight, Flame} from 'lucide-react-native';
+import {ArrowRight} from 'lucide-react-native';
 import {useNavigation} from '@react-navigation/native';
 import {useTheme} from '@shell/theme/hooks';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {displayType, bodyType, monoType, spacing, borderRadius} from '@shared/theme';
-import {isFinalStatus} from '@sports/nfl/utils/gameStatus';
-import {hexToRgba} from '@shared/utils/color';
 import {ordinal} from '@shared/utils/format';
-import {fullTeamName} from './teamColors';
 import {GamesTagFlame} from '@shared/components/GamesTagFlame';
 
 // LAUNCH FLAG — the "You sit Nth in <Contest>" standing line is HIDDEN for launch.
@@ -29,8 +26,6 @@ export function CompleteHero() {
 
   const weekResult      = useNFLStore(s => s.weekResult);
   const currentWeek     = useNFLStore(s => s.currentWeek);
-  const userHotPick     = useNFLStore(s => s.userHotPick);
-  const userHotPickGame = useNFLStore(s => s.userHotPickGame);
   const activePoolId    = useGlobalStore(s => s.activePoolId);
   const visiblePools    = useGlobalStore(s => s.visiblePools);
   const activePool      = visiblePools.find(p => p.id === activePoolId);
@@ -38,142 +33,12 @@ export function CompleteHero() {
   const newRank  = weekResult?.newRank;
   const poolName = activePool?.name ?? 'your Contest';
 
-  // HotPick — color the card by final outcome (green if correct, red if not).
-  // Cascade through signals so the border is green/red as soon as the
-  // outcome is known, even if weekResult hasn't hydrated:
-  //   1. weekResult.hotPickCorrect (authoritative once scoring's done)
-  //   2. Derived from liveScores[hotPickGame] vs userHotPick.picked_team
-  const liveScores = useNFLStore(s => s.liveScores);
-  const hotPickCorrect = useMemo(() => {
-    if (weekResult?.hotPickCorrect != null) return weekResult.hotPickCorrect;
-    if (!userHotPick || !userHotPickGame) return null;
-    const score = liveScores[userHotPickGame.game_id];
-    if (!score) return null;
-    if (!isFinalStatus(score.status)) return null;
-    const pickedHome = userHotPick.picked_team === userHotPickGame.home_team;
-    const userScore = pickedHome ? score.homeScore : score.awayScore;
-    const oppScore  = pickedHome ? score.awayScore : score.homeScore;
-    return userScore > oppScore;
-  }, [weekResult, userHotPick, userHotPickGame, liveScores]);
-  const hotPickValue =
-    userHotPickGame?.frozen_rank ?? userHotPickGame?.rank ?? null;
-  const hotPickTint =
-    hotPickCorrect == null
-      ? colors.primary
-      : hotPickCorrect
-      ? colors.win
-      : colors.loss;
-  const pickedTeam = fullTeamName(userHotPick?.picked_team);
-  const signedHotPickPoints =
-    hotPickValue == null || hotPickCorrect == null
-      ? null
-      : hotPickCorrect
-      ? hotPickValue
-      : -hotPickValue;
-
   return (
     <View
       style={[
         styles.card,
         {backgroundColor: colors.surfaceElevated, borderColor: colors.border},
       ]}>
-      {/* HotPick card — final-state coloring, FINAL chip in upper right.
-          The depleted lock strip that used to sit above it is deleted (slice
-          4). It was also this card's top spacing: the HotPick card carries no
-          marginTop, relying on the strip's eyebrowRow marginBottom of 12. That
-          gap is now explicit on the card itself (hotPickCard.marginTop) rather
-          than a side effect of a component that no longer exists. */}
-      {userHotPick && userHotPickGame && (
-        <View
-          style={[
-            styles.hotPickCard,
-            {
-              backgroundColor: hexToRgba(hotPickTint, 0.08),
-              borderColor: hotPickTint,
-            },
-          ]}>
-          <View
-            style={[
-              styles.hotPickIconCircle,
-              {backgroundColor: hexToRgba(hotPickTint, 0.18)},
-            ]}>
-            <Flame size={14} color={hotPickTint} strokeWidth={2.5} />
-          </View>
-          <View style={styles.hotPickBody}>
-            <View style={styles.hotPickHeaderRow}>
-              <Text style={[bodyType.bold, styles.hotPickEyebrow, {color: hotPickTint}]}>
-                YOUR HOTPICK
-              </Text>
-              <Text style={[bodyType.bold, styles.hotPickFinalLabel, {color: colors.loss}]}>
-                FINAL
-              </Text>
-            </View>
-            <View style={styles.hotPickTeamRow}>
-              {/* flex:1 wrapper gives the name a definite width to fill and
-                  ellipsize against. We deliberately DON'T use
-                  adjustsFontSizeToFit here: on iOS it mis-measures inside a
-                  row and shrinks the team name to the minimum even when it
-                  fits, rendering it tiny/unreadable. Full size + tail
-                  ellipsis is the reliable behavior. */}
-              <View style={styles.hotPickMatchupWrap}>
-                <Text
-                  style={[
-                    displayType.display,
-                    styles.hotPickMatchup,
-                    {color: colors.textPrimary},
-                  ]}
-                  numberOfLines={1}
-                  ellipsizeMode="tail">
-                  {pickedTeam || userHotPick.picked_team}
-                </Text>
-              </View>
-              {hotPickValue != null && (
-                <View
-                  style={[
-                    styles.hotPickValueBadge,
-                    {
-                      backgroundColor: hexToRgba(hotPickTint, 0.18),
-                      borderColor: hotPickTint,
-                    },
-                  ]}>
-                  <Text style={[displayType.display, styles.hotPickValueText, {color: hotPickTint}]}>
-                    {signedHotPickPoints != null
-                      ? `${signedHotPickPoints > 0 ? '+' : ''}${signedHotPickPoints}`
-                      : hotPickValue}
-                    <Text style={styles.hotPickValueUnit}> PTS</Text>
-                  </Text>
-                </View>
-              )}
-            </View>
-            {(() => {
-              const lsHp = liveScores[userHotPickGame.game_id];
-              const awayScore = lsHp?.awayScore ?? userHotPickGame.away_score;
-              const homeScore = lsHp?.homeScore ?? userHotPickGame.home_score;
-              const showScores = awayScore != null || homeScore != null;
-              return (
-                <Text
-                  style={[bodyType.regular, styles.hotPickMatchupSub, {color: colors.textTertiary}]}
-                  numberOfLines={1}>
-                  <Text>{(userHotPickGame.away_team ?? '').toUpperCase()}</Text>
-                  {showScores && (
-                    <Text style={{color: colors.textPrimary, fontWeight: '700'}}>
-                      {' '}{awayScore ?? 0}
-                    </Text>
-                  )}
-                  {' @ '}
-                  <Text>{(userHotPickGame.home_team ?? '').toUpperCase()}</Text>
-                  {showScores && (
-                    <Text style={{color: colors.textPrimary, fontWeight: '700'}}>
-                      {' '}{homeScore ?? 0}
-                    </Text>
-                  )}
-                </Text>
-              );
-            })()}
-          </View>
-        </View>
-      )}
-
       {/* Standing context — sits between CTA and trend strip, same spot
           PicksOpenHero uses for its confirmation line. */}
       {SHOW_STANDING_LINE && typeof newRank === 'number' && (
@@ -224,8 +89,7 @@ export function CompleteHero() {
           server counts, so it printed "of 16" — while HISTORY's recap card,
           showing the same week, derives "of 15" per the map. In the complete
           state both were on screen at once, disagreeing. HISTORY owns the
-          recap; this hero keeps the standing, the rank delta and the HotPick
-          card. */}
+          recap; this hero keeps the standing and the rank delta. */}
 
       {/* WeeklyTrend (the 3 week-pills) is retired — HISTORY owns per-week
           scores now. The recap line above is the card's last element; the
@@ -252,79 +116,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginTop: 2,
     marginBottom: 12,
-  },
-  hotPickCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: borderRadius.lg - 2,
-    borderWidth: 1,
-    // Explicit top gap. This was previously inherited from the deleted lock
-    // strip's eyebrowRow marginBottom (12); with the strip gone the spacing is
-    // stated here so it can't silently collapse. Same 12 as before.
-    marginTop: 12,
-    marginBottom: 14,
-  },
-  hotPickIconCircle: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  hotPickBody: {
-    flex: 1,
-    minWidth: 0,
-  },
-  hotPickHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 3,
-  },
-  hotPickEyebrow: {
-    fontSize: 10,
-    letterSpacing: 1.4,
-  },
-  hotPickFinalLabel: {
-    fontSize: 15,
-    letterSpacing: 1.4,
-  },
-  hotPickTeamRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  hotPickMatchupWrap: {
-    flex: 1,
-    minWidth: 0,
-  },
-  hotPickMatchup: {
-    fontSize: 16,
-    lineHeight: 18,
-  },
-  hotPickMatchupSub: {
-    fontSize: 11,
-    fontWeight: '500',
-    marginTop: 2,
-  },
-  hotPickValueBadge: {
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: borderRadius.full,
-    borderWidth: 1,
-    flexShrink: 0,
-  },
-  hotPickValueText: {
-    fontSize: 13,
-    lineHeight: 14,
-  },
-  hotPickValueUnit: {
-    fontSize: 9,
-    letterSpacing: 0.4,
   },
   cta: {
     flexDirection: 'row',
