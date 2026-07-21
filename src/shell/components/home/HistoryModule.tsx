@@ -1,419 +1,570 @@
-// HistoryModule — Home's HISTORY module (Home Module Map v4, module 6).
-// Slice 6a: the STATIC surface — bar timeline, recap card, season line, and
-// tap-drives-recap. The live head / morph is 6b and is deliberately absent.
+// HistoryModule — Home's HISTORY module (Home Module Map v4 §6, Tom's
+// July 2026 layout pass).
 //
-// The canon this module exists to make visible: "the season is the unit, not
-// the week," and "the good read loses about half the time." ~48% of bars go
-// blue. That's the argument, not a bug.
+// TWO CARDS, mirrored:
+//   LAST WEEK RECAP — orange panel on the LEFT (rounded left), detail rows right
+//   YOUR HISTORY    — bar timeline left, orange HEAD panel on the RIGHT
+// The past anchors left; the live end of the timeline anchors right.
 //
-// Rules it holds:
-//   Rule 5  — height = week_points, colour = did the flame hit. NEVER
-//             positive/negative colour: the height already says the sign.
-//   Rule 2  — signed values are correct HERE. Every week rendered is finished,
-//             so the sign is a result, not a projection.
-//   §2      — the season total is IDENTITY's. This module never sums its bars.
-//   §6      — recap is the most recent FINISHED week by default.
+// The rules it holds:
+//   Rule 5  — bar height = week_points (negatives hang BELOW the zero axis),
+//             colour = did the flame hit. Orange = hit, blue = missed. NEVER
+//             positive/negative colour — the height already says the sign.
+//   Rule 2  — no "+" anywhere. A positive number is bare (16, 22); only a
+//             genuine negative carries its minus (−13). Nothing reads as a
+//             potential swing.
+//   §2      — the module never sums its own bars into a season total.
 //   Rule 1  — the flame is allowed here: at week complete it stops being your
-//             call and becomes your story ("it moves to the History recap").
+//             call and becomes your story.
+//
+// THE HEAD IS PERMANENT and always describes the CURRENT week — it never
+// borrows a finished week's number. The rightmost bar is always the previous
+// week. That partition is why nothing can appear twice.
 
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useMemo, useState} from 'react';
 import {Text} from '@shared/components/AppText';
-import {Pressable, StyleSheet, View} from 'react-native';
-import {useFocusEffect} from '@react-navigation/native';
+import {ScrollView, StyleSheet, View} from 'react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useTheme} from '@shell/theme/hooks';
-import {bodyType, displayType, spacing, borderRadius} from '@shared/theme';
-import {isWeekInProgress} from '@shared/utils/weekState';
+import {bodyType, displayType, spacing, borderRadius, sectionHeaderType} from '@shared/theme';
+import {fullTeamName} from './teamColors';
 import {derivePickDisplay} from './weekRecap';
 
-// A FIXED 6-COLUMN GRID: 5 graph columns + the head. Equal widths, flexed to
-// the container, so the layout is identical in every week of the season.
+// Four week slots visible at rest; older weeks live in the carousel behind
+// them. The head sits OUTSIDE the scroller so it can never scroll away.
+const VISIBLE_SLOTS = 4;
+// Head panel as a share of the card width (~28% in the reference layout).
+const HEAD_RATIO = 0.28;
+// ── Vertical scale ──
+// A point is a FIXED number of pixels, and each zone is only as tall as the
+// data in view actually needs. Reserving both extremes up front cost ~58px of
+// empty space below the axis on an all-positive season.
 //
-// The columns are POSITIONAL SLOTS KEYED BY WEEK, not a list of the rows we
-// happen to have. That distinction is the whole point: the previous build
-// mapped over the fetched rows, so a week with no scored row simply wasn't
-// emitted and its neighbours closed the gap — a player who missed a week saw
-// an unbroken season and couldn't tell. Deriving the slots from a week RANGE
-// and looking each week's row up by number means a real week can never be
-// silently dropped, and a missing one is visible as a hole.
-const GRAPH_COLUMNS = 5;
-const HALF_HEIGHT = 44; // usable bar zone above AND below the axis
-const MIN_BAR = 3;      // a ±1 week still has to be visible
+// The scale is pinned to the theoretical best week so the cap is reached
+// exactly at a perfect one: 15 base Picks + a rank-16 HotPick = 31. The worst
+// week is a rank-16 HotPick miss with nothing else landing = −16, which is why
+// the chart is legitimately taller above the line than below — the upside is
+// nearly twice the downside, and the map says so ("Perfect week 31, worst −16.
+// The HotPick is the only thing that can subtract").
+//
+// Consequence worth knowing: bar heights are now ABSOLUTE. A +24 is the same
+// height whatever else is on screen, so weeks stay comparable as the carousel
+// scrolls — previously every bar rescaled to whichever week happened to be in
+// view.
+const MAX_ZONE_H = 58;        // the cap — roughly today's height
+const PERFECT_WEEK = 31;      // 15 Picks + rank-16 HotPick
+const PX_PER_POINT = MAX_ZONE_H / PERFECT_WEEK;
+const MIN_BAR = 4;            // a ±1 week still has to be visible
 
-/** States in which the HEAD shows THIS week's running total rather than the
- *  most recent finished week. Map §6 Big-number table. */
-const HEAD_SHOWS_THIS_WEEK = ['live', 'settling', 'complete'];
+/** Pixel height for a points magnitude, floored so ±1 shows and capped at the zone. */
+function barHeight(points: number): number {
+  if (points === 0) return 0;
+  return Math.max(MIN_BAR, Math.min(MAX_ZONE_H, Math.round(Math.abs(points) * PX_PER_POINT)));
+}
+
+// Phases where HISTORY does not exist at all.
+const HIDDEN_PHASES = ['OFF_SEASON', 'PRE_SEASON'];
+// Phases whose weeks are the PLAYOFF set. The data layer already scopes
+// season_user_totals by phase, so "playoffs start fresh" needs no extra
+// filtering here — the rows simply change underneath.
+const PLAYOFF_PHASES = ['PLAYOFFS', 'SUPERBOWL_INTRO', 'SUPERBOWL', 'SEASON_COMPLETE'];
+// Playoff rounds read as rounds, not week numbers.
+const ROUND_LABEL: Record<number, string> = {19: 'WC', 20: 'DIV', 21: 'CONF', 22: 'SB'};
+const PLAYOFF_FIRST_WEEK = 19;
+
+/** Sub-label under the head's week — what the current week is doing. */
+function headStateLabel(weekState: string | null | undefined, regularComplete: boolean): string {
+  if (regularComplete) return 'up next';
+  switch (weekState) {
+    case 'picks_open': return 'picks open';
+    case 'locked':     return 'locked';
+    case 'live':       return 'in progress';
+    // All games are final but the server is still scoring — the number can
+    // still move, so calling it "final" here would be a beat early.
+    case 'settling':   return 'in progress';
+    case 'complete':   return 'final';
+    default:           return '';
+  }
+}
+
+/** Bar label — "W7" in the regular season, "WC"/"DIV"/"CONF"/"SB" in playoffs. */
+function weekLabel(week: number, isPlayoffs: boolean): string {
+  if (isPlayoffs) return ROUND_LABEL[week] ?? `W${week}`;
+  return `W${week}`;
+}
+
+/** Panel label — the same idea with room to spell it out: "WEEK 7" / "WC". */
+function panelWeekLabel(week: number, isPlayoffs: boolean): string {
+  if (isPlayoffs) return ROUND_LABEL[week] ?? `WEEK ${week}`;
+  return `WEEK ${week}`;
+}
+
+/** No plus signs, ever. A real negative keeps its minus (U+2212). */
+function fmtPoints(n: number): string {
+  return n < 0 ? `−${Math.abs(n)}` : String(n);
+}
+
+type WeekRow = {
+  week: number;
+  total: number;
+  correctPicks: number;
+  totalPicks: number;
+  isHotPickCorrect: boolean | null;
+  hotPickRank: number | null;
+};
+type Cell =
+  | {kind: 'week'; week: number; data: WeekRow | null}
+  | {kind: 'marker'}
+  // An unfilled grid position early in a season. Draws its share of the zero
+  // axis and nothing else — no bar, no label. The grid is always four columns
+  // wide so the axis reads as one continuous line from the first week.
+  | {kind: 'padding'};
 
 export function HistoryModule() {
   const {colors} = useTheme();
-  const recentWeeks = useGlobalStore(s => s.recentWeeks);
-  const hitRate = useGlobalStore(s => s.hotPickHitRate);
+  const recentWeeks = useGlobalStore(s => s.recentWeeks) as WeekRow[];
+  const lastWeekHotPick = useGlobalStore(s => s.lastWeekHotPick);
+  // Current week's HotPick — supplies the picked team for the settling/complete
+  // recap, where lastWeekHotPick (fetched for currentWeek−1) doesn't apply.
+  const userHotPick = useNFLStore(s => s.userHotPick);
   const weekState = useNFLStore(s => s.weekState);
   const currentWeek = useNFLStore(s => s.currentWeek);
-  // Server-computed running total for the current week. Points banked from
-  // games already FINAL as of the last scoring run — never a projection.
+  const currentPhase = useNFLStore(s => s.currentPhase);
+  // Server-computed running total for the current week — points banked from
+  // games already FINAL as of the last scoring run. Never a projection.
   const currentWeekPoints = useNFLStore(s => s.currentWeekPoints);
 
-  // Which week the recap is showing. null = default (most recent finished).
-  const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
+  // Card width drives the head/slot split. Measured rather than assumed so the
+  // four slots stay equal on any device.
+  const [cardW, setCardW] = useState(0);
 
-  // Selection is a transient inspection, not a preference — coming back to
-  // Home should always land on the default week.
-  useFocusEffect(
-    useCallback(() => {
-      setSelectedWeek(null);
-    }, []),
-  );
+  const phase = String(currentPhase ?? '');
+  const isPlayoffs = PLAYOFF_PHASES.includes(phase);
+  const isRegularComplete = phase === 'REGULAR_COMPLETE';
+  // Once the week is scored (all games final), it stops being "in play" and
+  // its result is real. From here the current week joins the timeline as a bar
+  // AND drives the recap — the same shared boundary in both places.
+  const weekSettled = weekState === 'settling' || weekState === 'complete';
 
-  // Which week the HEAD owns, and therefore which week is NOT a bar.
-  //
-  // The two must partition exactly: a week is either the head's or a bar's,
-  // never both and never neither. That's why the bar filter below is written
-  // as "not the head's week" rather than its own state test — one condition,
-  // so the two can't drift apart.
-  //
-  // isWeekInProgress covers picks_open/locked/live/settling. `complete` is NOT
-  // in progress, but the head still holds it (map: the head keeps the completed
-  // week's final number until the next week opens, then it becomes a bar with
-  // the same number — a seamless rotation). Hence the explicit list.
-  const headOwnsCurrentWeek =
-    currentWeek > 0 &&
-    (isWeekInProgress(weekState) || HEAD_SHOWS_THIS_WEEK.includes(weekState ?? ''));
+  // The bars. Normally the FINISHED weeks only — the head owns the current
+  // week, which is why a week can't be both a bar and the head. Two exceptions:
+  //   • settling / complete — the current week IS scored now, so it also lands
+  //     on the timeline as the rightmost bar (Tom, Jul 2026: "populate the
+  //     history chart with the week's result"). The head still shows it too;
+  //     they're the big-number and the shape views of the same week.
+  //   • REGULAR_COMPLETE — the regular season is over, so week 18 is finished
+  //     and belongs on the timeline while the head has moved to the playoffs.
+  const weeks = useMemo(() => {
+    if (isRegularComplete) return [...recentWeeks].sort((a, b) => a.week - b.week);
+    const cutoff = weekSettled ? currentWeek : currentWeek - 1;
+    return recentWeeks.filter(w => w.week <= cutoff).sort((a, b) => a.week - b.week);
+  }, [recentWeeks, currentWeek, isRegularComplete, weekSettled]);
 
-  // FINISHED weeks — everything the head doesn't own. Because the head's claim
-  // is the single condition, no week can be double-counted or dropped.
-  const weeks = useMemo(
-    () => recentWeeks.filter(w => !(headOwnsCurrentWeek && w.week === currentWeek)),
-    [recentWeeks, headOwnsCurrentWeek, currentWeek],
-  );
-
-  // What the head displays. Map §6 Big-number table:
-  //   live / settling / complete → THIS week's server number (0 is legitimate
-  //     during live — "nothing banked yet")
-  //   picks_open / locked / idle → the most recent FINISHED week
-  // "Never a zero for an unplayed week" falls out of this: an idle head reads
-  // a SETTLED row, never the zero-row backfill, because the switch is on STATE
-  // and not on whether a row exists.
-  const headShowsThisWeek = HEAD_SHOWS_THIS_WEEK.includes(weekState ?? '');
-
-  // ── THE 5 GRAPH SLOTS ──
-  //
-  // Built from a week RANGE ending at the newest finished week, then each slot
-  // looks up its row by week number. Filling from the RIGHT: newest finished
-  // week lands in the last slot (nearest the head), older weeks push left, and
-  // any shortfall becomes empty padding on the LEFT.
-  //
-  //   after W1 final:  [ ][ ][ ][ ][W1]
-  //   after W2 final:  [ ][ ][ ][W1][W2]
-  //   5+ weeks:        oldest drops off the left as the newest enters
-  //
-  // A slot whose week has NO row (a missed week — the player made no picks, so
-  // scoring never wrote one) still holds its position: labelled, no bar. The
-  // timeline cannot collapse, which is the structural fix for the dropped-week
-  // bug. `week: null` is padding only — those carry no label at all.
-  const slots = useMemo(() => {
-    const byWeek = new Map(weeks.map(w => [w.week, w]));
-    const newest = weeks.length > 0 ? weeks[weeks.length - 1].week : null;
-    if (newest == null) {
-      return Array.from({length: GRAPH_COLUMNS}, () => ({week: null, data: null}));
+  // Cells, oldest → newest. A week inside the range with no scored row (the
+  // player made no picks) still holds its position: labelled, no bar. The
+  // timeline never closes over a missed week.
+  const cells: Cell[] = useMemo(() => {
+    const out: Cell[] = [];
+    if (weeks.length > 0) {
+      const byWeek = new Map(weeks.map(w => [w.week, w]));
+      const oldest = weeks[0].week;
+      const newest = weeks[weeks.length - 1].week;
+      for (let w = oldest; w <= newest; w++) {
+        out.push({kind: 'week', week: w, data: byWeek.get(w) ?? null});
+      }
     }
-    // Clamp so week 0 / negatives never become slots early in a season.
-    const oldest = Math.max(1, newest - (GRAPH_COLUMNS - 1));
-    const real: Array<{week: number | null; data: (typeof weeks)[number] | null}> = [];
-    for (let w = oldest; w <= newest; w++) {
-      real.push({week: w, data: byWeek.get(w) ?? null});
+    // End-of-regular-season marker takes the slot nearest the head, pushing
+    // the final weeks left.
+    if (isRegularComplete) out.push({kind: 'marker'});
+    // Pad the LEFT so the grid is always at least four columns. Early in a
+    // season the filled weeks sit right, against the head, and the empty
+    // positions still carry the axis — so the line runs the full width from
+    // week one instead of appearing to grow with the data.
+    while (out.length < VISIBLE_SLOTS) out.unshift({kind: 'padding'});
+    return out;
+  }, [weeks, isRegularComplete]);
+
+  // Each zone is sized to the biggest week IN VIEW on its own side of the
+  // axis — so an all-positive season collapses the lower zone to nothing
+  // instead of holding ~58px open for a negative that never arrives, and the
+  // module only grows as tall as the scores actually demand.
+  const {posH, negH} = useMemo(() => {
+    const vis = cells.slice(-VISIBLE_SLOTS);
+    let maxPos = 0;
+    let maxNeg = 0;
+    for (const c of vis) {
+      if (c.kind !== 'week' || !c.data) continue;
+      const t = c.data.total;
+      if (t > 0 && t > maxPos) maxPos = t;
+      if (t < 0 && -t > maxNeg) maxNeg = -t;
     }
-    const padding = Array.from({length: Math.max(0, GRAPH_COLUMNS - real.length)}, () => ({
-      week: null,
-      data: null,
-    }));
-    return [...padding, ...real];
-  }, [weeks]);
+    return {posH: barHeight(maxPos), negH: barHeight(maxNeg)};
+  }, [cells]);
 
-  // Scale bars against the weeks actually ON SCREEN, so the visible window
-  // always uses the full height rather than being flattened by an off-screen
-  // outlier week.
-  const maxAbs = useMemo(
-    () =>
-      Math.max(
-        1,
-        ...slots.map(s => (s.data ? Math.abs(s.data.total) : 0)),
-      ),
-    [slots],
+  // ── THE RECAP ──
+  // From SETTLING onward the recap describes THIS week, not last week: every
+  // game is final, the server has scored it, and making the player wait for
+  // the next week to open before they can see their own result is the wrong
+  // beat. It then stays on that week through `complete` and naturally becomes
+  // "last week" when the next week opens — same row, no jump.
+  //
+  // Before settling it's the most recent FINISHED week, which is also the
+  // rightmost bar. Recap = the detail, bar = the shape — and from settling on,
+  // both describe the current week (weekSettled put it into `weeks`, so the
+  // rightmost bar is already the current week here too).
+  const currentRow = useMemo(
+    () => recentWeeks.find(w => w.week === currentWeek) ?? null,
+    [recentWeeks, currentWeek],
   );
+  const recap =
+    (weekSettled ? currentRow : null) ??
+    (weeks.length > 0 ? weeks[weeks.length - 1] : null);
 
-  const defaultWeek = weeks.length > 0 ? weeks[weeks.length - 1] : null;
-  const shown =
-    (selectedWeek != null ? weeks.find(w => w.week === selectedWeek) : null) ??
-    defaultWeek;
-  const isDefaultShown = shown != null && shown.week === defaultWeek?.week;
+  // The HotPick's picked team, from whichever store holds that week's pick:
+  //   • current week  → userHotPick (fetched for currentWeek)
+  //   • previous week → lastWeekHotPick (fetched for currentWeek − 1)
+  // Any other week has no team on hand, so the line is omitted rather than
+  // showing the wrong week's team.
+  const recapTeamCode =
+    recap == null
+      ? null
+      : recap.week === currentWeek
+        ? userHotPick?.picked_team ?? null
+        : recap.week === currentWeek - 1
+          ? lastWeekHotPick?.team ?? null
+          : null;
+  const recapTeam = recapTeamCode
+    ? (fullTeamName(recapTeamCode) ?? recapTeamCode).toUpperCase()
+    : null;
 
-  const avgRank = useMemo(() => {
-    const ranks = weeks
-      .map(w => w.hotPickRank)
-      .filter((r): r is number => r != null);
-    if (ranks.length === 0) return null;
-    return ranks.reduce((a, b) => a + b, 0) / ranks.length;
-  }, [weeks]);
+  // ── HEAD ── permanent, always the CURRENT week.
+  // In REGULAR_COMPLETE the regular season is done and the playoffs haven't
+  // begun, so it points at Wild Card with nothing banked yet.
+  const headWeekNum = isRegularComplete ? PLAYOFF_FIRST_WEEK : currentWeek;
+  const headPoints = isRegularComplete ? 0 : currentWeekPoints;
+  const headWeekLabel = panelWeekLabel(headWeekNum, isPlayoffs || isRegularComplete);
+  const headState = headStateLabel(weekState, isRegularComplete);
 
-  // The head's value + label. In idle states it reads the most recent FINISHED
-  // week — a settled number, so a 0 can never come from the zero-row backfill.
-  const headWeek = headShowsThisWeek ? currentWeek : defaultWeek?.week ?? null;
-  const headPoints = headShowsThisWeek ? currentWeekPoints : defaultWeek?.total ?? null;
+  // Hidden entirely in the off-season and pre-season — there is no season to
+  // show. Also hidden before the very first week is playable.
+  if (HIDDEN_PHASES.includes(phase)) return null;
+  if (currentWeek <= 0) return null;
 
-  // VISIBILITY. Map row 1: "hide if none."
-  //   • Idle states with no finished week  → hidden (every new tester, until
-  //     their first week settles). No empty chart, no zero placeholder.
-  //   • live / settling / complete         → SHOWN even with zero bars, because
-  //     the head itself is the content (week 1 renders a lone head).
-  const hasBars = weeks.length > 0;
-  if (!hasBars && !headShowsThisWeek) return null;
-  if (headWeek == null || headPoints == null) return null;
+  const headW = cardW > 0 ? Math.round(cardW * HEAD_RATIO) : 0;
+  const slotW = cardW > 0 ? (cardW - headW) / VISIBLE_SLOTS : 0;
 
-  // The HotPick's own contribution is its rank, signed by the outcome. The
-  // rest of the week's points are the base Picks — derived by subtraction so
-  // the two lines always add to the week total shown in the header.
-  // `shown` is null only in the lone-head case (live/settling with no settled
-  // week yet), where there is no week to recap.
-  const hotPickPoints =
-    shown == null || shown.hotPickRank == null || shown.isHotPickCorrect == null
+  // Recap arithmetic. The HotPick's own contribution is its rank signed by the
+  // outcome; the base Picks are the remainder, so the two rows always add to
+  // the number in the orange panel.
+  const hpPoints =
+    recap == null || recap.hotPickRank == null || recap.isHotPickCorrect == null
       ? 0
-      : shown.isHotPickCorrect
-        ? shown.hotPickRank
-        : -shown.hotPickRank;
-  const picksPoints = shown == null ? 0 : shown.total - hotPickPoints;
-  const picks = shown == null ? {correct: 0, total: 0} : derivePickDisplay(shown);
-
-  const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : '0');
+      : recap.isHotPickCorrect
+        ? recap.hotPickRank
+        : -recap.hotPickRank;
+  const picksPoints = recap == null ? 0 : recap.total - hpPoints;
+  const picks = recap == null ? {correct: 0, total: 0} : derivePickDisplay(recap);
+  const hpWon = recap?.isHotPickCorrect === true;
+  const hpLost = recap?.isHotPickCorrect === false;
+  const hpColor = hpWon ? colors.gameWon : hpLost ? colors.gameLost : colors.textTertiary;
 
   return (
-    <View style={styles.section}>
-      <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textTertiary}]}>
-        HISTORY
-      </Text>
-
-      {/* ── The grid ── 6 equal columns, no scrolling: 5 week slots + the head.
-          Every column is flex:1, so the whole thing is width-independent and
-          the layout never changes shape as the season fills. */}
-      <View style={styles.grid}>
-        {slots.map((slot, i) => {
-          const w = slot.data;
-          const isSelected = w != null && shown != null && w.week === shown.week;
-          // Three distinct column kinds, and the distinction is the point:
-          //   • padding   (week == null) — no week exists here yet. No label.
-          //   • missed    (week set, data null) — a REAL week with no scored
-          //     row. Labelled, no bar: the gap is visible, and the timeline
-          //     does not close over it.
-          //   • played    (data set) — label + bar.
-          const isPadding = slot.week == null;
-          // A row can also exist with no slate (total_picks = 0), which draws
-          // no bar for the same reason a missed week doesn't.
-          const noSlate = w == null || w.totalPicks <= 0;
-          const barColor =
-            w?.isHotPickCorrect === true
-              ? colors.primary
-              : w?.isHotPickCorrect === false
-                ? colors.hotpickMiss
-                : colors.textTertiary; // points, but no HotPick resolution
-          const magnitude =
-            w == null || w.total === 0
-              ? 0
-              : Math.max(
-                  MIN_BAR,
-                  Math.round((Math.abs(w.total) / maxAbs) * (HALF_HEIGHT - 4)),
-                );
-
-          // Only a week with a row has anything to recap, so padding and
-          // missed weeks are inert rather than opening an empty card.
-          const tappable = w != null;
-
-          return (
-            <Pressable
-              // Padding slots have no week, so index keys them. They are
-              // positional and interchangeable, so this is stable.
-              key={slot.week ?? `pad-${i}`}
-              onPress={
-                tappable
-                  ? () => setSelectedWeek(isSelected ? null : w.week)
-                  : undefined
-              }
-              disabled={!tappable}
-              style={styles.col}
-              accessibilityRole={tappable ? 'button' : undefined}
-              accessibilityLabel={
-                isPadding
-                  ? undefined
-                  : w == null
-                    ? `Week ${slot.week}, no picks made`
-                    : `Week ${w.week}, ${w.total} points`
-              }
-              accessibilityState={tappable ? {selected: isSelected} : undefined}>
-              <View style={styles.posZone}>
-                {!noSlate && w != null && w.total > 0 && (
-                  <View style={[styles.bar, {height: magnitude, backgroundColor: barColor}]} />
-                )}
-              </View>
-              <View style={[styles.axis, {backgroundColor: colors.border}]} />
-              <View style={styles.negZone}>
-                {!noSlate && w != null && w.total < 0 && (
-                  <View style={[styles.bar, {height: magnitude, backgroundColor: barColor}]} />
-                )}
-              </View>
-              {/* Label comes from the SLOT's week, not from the row — one
-                  source, so a label can never disagree with its bar. Padding
-                  columns get none. */}
+    <View style={styles.wrap}>
+      {/* ── LAST WEEK RECAP ── */}
+      {recap != null && (
+        <>
+          <Text style={[bodyType.bold, styles.sectionLabel, {color: colors.textTertiary}]}>
+            YOUR RECAP
+          </Text>
+          <View style={[styles.card, styles.recapCard, {backgroundColor: colors.surface}]}>
+            {/* Orange panel, LEFT. Always orange regardless of the number's
+                sign — outcome colour lives on the rows, not the panel. */}
+            <View style={[styles.panel, styles.panelLeft, {backgroundColor: colors.primary}]}>
+              {/* No adjustsFontSizeToFit: this codebase has a documented iOS
+                  bug where it mis-measures inside a flex row and shrinks text
+                  to the minimum even when it fits. Fixed size + a tight
+                  numberOfLines is the reliable behaviour here. */}
               <Text
-                style={[
-                  bodyType.bold,
-                  styles.weekLabel,
-                  {color: isSelected ? colors.textPrimary : colors.textTertiary},
-                ]}
+                style={[displayType.display, styles.panelNumber, {color: colors.onPrimary}]}
                 numberOfLines={1}>
-                {isPadding ? '' : `W${slot.week}`}
+                {fmtPoints(recap.total)}
               </Text>
-            </Pressable>
-          );
-        })}
-        {/* ── THE HEAD ── column 6, permanent fixture at the right edge. Same
-            flex:1 width as the five week slots, so the grid stays even.
+              <Text style={[bodyType.bold, styles.panelPts, {color: colors.onPrimary}]}>
+                PTS
+              </Text>
+              <Text style={[bodyType.bold, styles.panelWeek, {color: colors.onPrimary}]}>
+                {panelWeekLabel(recap.week, isPlayoffs)}
+              </Text>
+            </View>
 
-            It shows a SERVER number and nothing else — during live/settling
-            that's week_points as of the last scoring run (points banked from
-            games already FINAL), never a projection and never client math.
+            <View style={styles.recapBody}>
+              <View style={styles.recapRow}>
+                <View style={styles.recapLabelCol}>
+                  <Text style={[displayType.display, styles.recapLabel, {color: colors.textPrimary}]}>
+                    {'HOTPICK 🔥'}
+                  </Text>
+                  {recapTeam ? (
+                    <Text
+                      style={[displayType.display, styles.recapTeam, {color: colors.textTertiary}]}
+                      numberOfLines={1}>
+                      {recapTeam}
+                    </Text>
+                  ) : null}
+                </View>
+                <Text style={[displayType.display, styles.recapMid, {color: hpColor}]}>
+                  {hpWon ? 'WIN' : hpLost ? 'LOSS' : '—'}
+                </Text>
+                <Text style={[displayType.display, styles.recapValue, {color: hpColor}]}>
+                  {fmtPoints(hpPoints)}
+                </Text>
+              </View>
 
-            Always colors.primary: hit/miss colour belongs to bars, where the
-            week has actually resolved. No pulse, no flash, no animation
-            (rule 3 — displays hold still until FINAL). */}
-        <View style={styles.head}>
-          <View style={styles.headValueZone}>
-            <Text
-              style={[displayType.display, styles.headNumber, {color: colors.primary}]}
-              numberOfLines={1}>
-              {headPoints}
-            </Text>
-            <Text style={[bodyType.bold, styles.headUnit, {color: colors.primary}]}>
-              PTS
-            </Text>
+              <View style={styles.recapRow}>
+                <View style={styles.recapLabelCol}>
+                  <Text style={[displayType.display, styles.recapLabel, {color: colors.textPrimary}]}>
+                    PICKS
+                  </Text>
+                </View>
+                <Text style={[bodyType.regular, styles.recapMidPlain, {color: colors.textTertiary}]}>
+                  {`${picks.correct} of ${picks.total}`}
+                </Text>
+                <Text
+                  style={[
+                    displayType.display,
+                    styles.recapValue,
+                    {color: picksPoints < 0 ? colors.gameLost : colors.gameWon},
+                  ]}>
+                  {fmtPoints(picksPoints)}
+                </Text>
+              </View>
+            </View>
           </View>
-          <View style={[styles.axis, {backgroundColor: colors.border}]} />
-          <View style={styles.negZone} />
+        </>
+      )}
+
+      {/* ── YOUR HISTORY ── */}
+      <Text style={[bodyType.bold, styles.sectionLabel, {color: colors.textTertiary}]}>
+        YOUR HISTORY
+      </Text>
+      <View
+        style={[styles.card, styles.chartCard, {backgroundColor: colors.surface}]}
+        onLayout={e => setCardW(e.nativeEvent.layout.width)}>
+        {/* Timeline. Four slots at rest; older weeks scroll behind them, with
+            the newest pinned right (contentContainer anchors to flex-end). */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{width: cardW - headW}}
+          contentContainerStyle={styles.scrollContent}>
+          {cardW > 0 &&
+            cells.map((cell, i) => {
+              if (cell.kind === 'marker') {
+                return (
+                  <View key="marker" style={[styles.slot, {width: slotW}]}>
+                    <View style={[styles.markerWrap, {height: posH + 1 + negH}]}>
+                      {['END OF', 'REG.', 'SEASON'].map(line => (
+                        <Text
+                          key={line}
+                          style={[displayType.display, styles.markerText, {color: colors.textTertiary}]}
+                          numberOfLines={1}>
+                          {line}
+                        </Text>
+                      ))}
+                    </View>
+                  </View>
+                );
+              }
+              if (cell.kind === 'padding') {
+                // Empty grid position: axis only. No bar, no label — an
+                // unlabelled blank means "no week here yet", while a LABELLED
+                // blank means "week played, no picks made". The two must stay
+                // distinguishable.
+                return (
+                  <View key={`pad-${i}`} style={[styles.slot, {width: slotW}]}>
+                    <View style={[styles.posZone, {height: posH}]} />
+                    <View style={[styles.axis, {backgroundColor: colors.border}]} />
+                    <View style={[styles.negZone, {height: negH}]} />
+                    <Text style={[displayType.display, styles.slotLabel]}> </Text>
+                  </View>
+                );
+              }
+              const w = cell.data;
+              // A slot with no row is a MISSED week: labelled, no bar. The gap
+              // is the point — a skipped week must stay visible.
+              const noSlate = w == null || w.totalPicks <= 0;
+              const barColor =
+                w?.isHotPickCorrect === true
+                  ? colors.primary
+                  : w?.isHotPickCorrect === false
+                    ? colors.hotpickMiss
+                    : colors.textTertiary; // scored, but no HotPick resolved
+              // Absolute height — a fixed pixels-per-point, so this bar reads
+              // the same whatever else is in view.
+              const mag = w == null ? 0 : barHeight(w.total);
+
+              return (
+                <View key={`${cell.week}-${i}`} style={[styles.slot, {width: slotW}]}>
+                  <View style={[styles.posZone, {height: posH}]}>
+                    {!noSlate && w != null && w.total > 0 && (
+                      <View style={[styles.bar, {height: mag, backgroundColor: barColor}]} />
+                    )}
+                  </View>
+                  <View style={[styles.axis, {backgroundColor: colors.border}]} />
+                  <View style={[styles.negZone, {height: negH}]}>
+                    {!noSlate && w != null && w.total < 0 && (
+                      <View style={[styles.bar, {height: mag, backgroundColor: barColor}]} />
+                    )}
+                  </View>
+                  <Text
+                    style={[displayType.display, styles.slotLabel, {color: colors.textTertiary}]}
+                    numberOfLines={1}>
+                    {weekLabel(cell.week, isPlayoffs)}
+                  </Text>
+                </View>
+              );
+            })}
+        </ScrollView>
+
+        {/* Orange HEAD panel, RIGHT. Permanent — always the current week,
+            never a borrowed finished week. Shows a SERVER number: banked
+            points from games already final, never a projection. */}
+        <View style={[styles.panel, styles.panelRight, {backgroundColor: colors.primary, width: headW}]}>
           <Text
-            style={[bodyType.bold, styles.weekLabel, {color: colors.textSecondary}]}
+            style={[displayType.display, styles.panelNumber, {color: colors.onPrimary}]}
             numberOfLines={1}>
-            {`W${headWeek}`}
+            {fmtPoints(headPoints)}
           </Text>
+          <Text style={[bodyType.bold, styles.panelPts, {color: colors.onPrimary}]}>
+            PTS
+          </Text>
+          <Text style={[bodyType.bold, styles.panelWeek, {color: colors.onPrimary}]}>
+            {headWeekLabel}
+          </Text>
+          {headState ? (
+            <Text style={[displayType.display, styles.panelState, {color: colors.onPrimary}]}>
+              {headState}
+            </Text>
+          ) : null}
         </View>
       </View>
-
-      {/* ── Recap card — the detail surface for whichever week is shown.
-          Absent in the lone-head case: with no settled week there is nothing
-          to recap, and an empty card would be the placeholder the map's
-          "hide if none" rule exists to prevent. ── */}
-      {shown != null && (
-      <View style={[styles.recap, {backgroundColor: colors.surface, borderColor: colors.border}]}>
-        <Text style={[bodyType.bold, styles.recapHeader, {color: colors.textSecondary}]}>
-          {isDefaultShown ? 'LAST WEEK' : `WEEK ${shown.week}`}
-          <Text style={{color: colors.textTertiary}}>{'  ·  '}</Text>
-          {`${shown.total} PTS`}
-        </Text>
-
-        <View style={styles.recapRow}>
-          <Text style={[bodyType.bold, styles.recapLabel, {color: colors.textPrimary}]}>
-            {'🔥 HotPick'}
-          </Text>
-          <Text style={[bodyType.bold, styles.recapMid, {color: colors.textSecondary}]}>
-            {shown.isHotPickCorrect == null
-              ? '—'
-              : shown.isHotPickCorrect
-                ? 'WIN'
-                : 'MISS'}
-          </Text>
-          <Text
-            style={[
-              displayType.display,
-              styles.recapValue,
-              {
-                color:
-                  hotPickPoints > 0
-                    ? colors.gameWon
-                    : hotPickPoints < 0
-                      ? colors.gameLost
-                      : colors.textTertiary,
-              },
-            ]}>
-            {signed(hotPickPoints)}
-          </Text>
-        </View>
-
-        <View style={styles.recapRow}>
-          <Text style={[bodyType.regular, styles.recapLabel, {color: colors.textSecondary}]}>
-            Picks
-          </Text>
-          <Text style={[bodyType.regular, styles.recapMid, {color: colors.textSecondary}]}>
-            {`${picks.correct} of ${picks.total}`}
-          </Text>
-          <Text style={[displayType.display, styles.recapValue, {color: colors.textPrimary}]}>
-            {signed(picksPoints)}
-          </Text>
-        </View>
-      </View>
-      )}
-
-      {/* ── Season line ── Record = are you good. Average rank = who you are. */}
-      {(hitRate != null || avgRank != null) && (
-        <Text style={[bodyType.regular, styles.seasonLine, {color: colors.textSecondary}]}>
-          {hitRate != null && `HotPick record ${hitRate.hits}-${hitRate.total - hitRate.hits}`}
-          {hitRate != null && avgRank != null && '  ·  '}
-          {avgRank != null && `average rank ${avgRank.toFixed(1)}`}
-        </Text>
-      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  section: {
+  wrap: {
     marginHorizontal: spacing.lg,
     marginTop: spacing.lg,
   },
-  sectionTitle: {
-    fontSize: 11,
-    letterSpacing: 1.2,
-    marginBottom: spacing.sm,
+  sectionLabel: {
+    // Shared token — matches YOUR CONTESTS / YOUR LEAGUES exactly.
+    ...sectionHeaderType,
+    marginBottom: 10,
   },
-  // 6 equal columns. No scrolling: this is a fixed window on the last five
-  // finished weeks plus the head.
-  grid: {
+  card: {
+    borderRadius: borderRadius.lg,
+    overflow: 'hidden', // lets the orange panels bleed to the card's edges
     flexDirection: 'row',
-    alignItems: 'flex-end',
   },
-  col: {
+  recapCard: {
+    marginBottom: spacing.lg,
+    minHeight: 88,
+  },
+  chartCard: {
+    alignItems: 'stretch',
+  },
+  // ── Orange panels — full card height, rounded on their outer side only.
+  panel: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: 6,
+  },
+  panelLeft: {
+    width: 84,
+  },
+  panelRight: {
+    // width applied inline from the measured card
+  },
+  panelNumber: {
+    fontSize: 34,
+    lineHeight: 38,
+  },
+  // "PTS" sits tight under the number — it's a unit on that number, not a
+  // separate line — so the week label below it carries the larger gap.
+  panelPts: {
+    fontSize: 11,
+    letterSpacing: 1.4,
+    marginTop: -2,
+  },
+  panelWeek: {
+    fontSize: 11,
+    letterSpacing: 1,
+    marginTop: 6,
+  },
+  panelState: {
+    fontSize: 10,
+    letterSpacing: 0.4,
+    marginTop: 6,
+    opacity: 0.9,
+  },
+  // ── Recap rows
+  recapBody: {
     flex: 1,
+    justifyContent: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    gap: 6,
+  },
+  recapRow: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  // alignSelf:'stretch' is LOAD-BEARING. The parent column sets
-  // alignItems:'center', which overrides the default 'stretch' and leaves these
-  // zones shrink-to-fit — an INDEFINITE width. The bar's percentage width then
-  // resolves against nothing and collapses to 0, which is what made every bar
-  // invisible while the axis (the one child that already stretched) still drew.
-  // Stretching here gives the zones the column's definite width, which is what
-  // the percentage needs.
-  //
-  // alignItems:'center' is then required too: stretching the zone re-inherits
-  // the default cross-axis alignment, which would pin a fixed-width child to
-  // the left edge. This keeps the bar centred in its column.
-  //
-  // justifyContent anchors each bar to the axis: 'flex-end' grows the positive
-  // bar upward from the zero line, 'flex-start' grows the negative bar down.
+  recapLabelCol: {
+    flex: 1,
+  },
+  recapLabel: {
+    fontSize: 15,
+  },
+  recapTeam: {
+    fontSize: 11,
+    marginTop: 1,
+  },
+  recapMid: {
+    fontSize: 14,
+    width: 62,
+    textAlign: 'right',
+  },
+  recapMidPlain: {
+    fontSize: 13,
+    width: 62,
+    textAlign: 'right',
+  },
+  recapValue: {
+    fontSize: 20,
+    width: 54,
+    textAlign: 'right',
+  },
+  // ── Timeline
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'flex-end',
+    alignItems: 'flex-end',
+    paddingVertical: spacing.md,
+  },
+  slot: {
+    alignItems: 'center',
+  },
+  // Heights are applied inline (posH / negH) — each zone is only as tall as
+  // the data in view needs, so an all-positive season doesn't hold empty
+  // space open below the axis.
   posZone: {
-    height: HALF_HEIGHT,
     alignSelf: 'stretch',
     alignItems: 'center',
     justifyContent: 'flex-end',
   },
   negZone: {
-    height: HALF_HEIGHT,
     alignSelf: 'stretch',
     alignItems: 'center',
     justifyContent: 'flex-start',
@@ -422,66 +573,22 @@ const styles = StyleSheet.create({
     height: 1,
     alignSelf: 'stretch',
   },
-  // Scales to the column rather than a fixed pixel width, so the bars stay
-  // proportional on any screen size.
   bar: {
-    width: '46%',
-    borderRadius: 2,
+    width: '68%',
+    borderRadius: 6,
   },
-  weekLabel: {
-    fontSize: 10,
-    letterSpacing: 0.6,
-    marginTop: 4,
-  },
-  // THE HEAD — column 6. Same flex:1 footprint as a week slot so the axis line
-  // runs straight through at the same baseline.
-  head: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  headValueZone: {
-    height: HALF_HEIGHT,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-  },
-  headNumber: {
-    fontSize: 22,
-    lineHeight: 24,
-  },
-  headUnit: {
-    fontSize: 9,
-    letterSpacing: 1,
-    marginTop: 1,
-  },
-  recap: {
-    marginTop: spacing.md,
-    padding: spacing.md,
-    borderRadius: borderRadius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    gap: 4,
-  },
-  recapHeader: {
-    fontSize: 11,
-    letterSpacing: 1.2,
-    marginBottom: 4,
-  },
-  recapRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-  },
-  recapLabel: {
-    fontSize: 13,
-    width: 96,
-  },
-  recapMid: {
-    fontSize: 13,
-    flex: 1,
-  },
-  recapValue: {
-    fontSize: 15,
-  },
-  seasonLine: {
+  slotLabel: {
     fontSize: 12,
-    marginTop: spacing.sm,
+    marginTop: 6,
+  },
+  // Height applied inline to match the axis span exactly.
+  markerWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  markerText: {
+    fontSize: 10,
+    letterSpacing: 0.4,
+    lineHeight: 13,
   },
 });

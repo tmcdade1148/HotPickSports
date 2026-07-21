@@ -19,15 +19,29 @@ import {useTheme} from '@shell/theme/hooks';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {displayType, bodyType, spacing} from '@shared/theme';
 import {KickoffCountdown} from './KickoffCountdown';
+import {HOME_ROWS} from './homeRows';
 
-export function OffSeasonHero() {
+/**
+ * Off-season hero — rows 1 (off_far) and 2 (off_near).
+ *
+ * far  (default): sportIdentity headline/sub + kickoff countdown (days-to-kickoff).
+ * near (nearPicksOpen): the map's row-2 headline/sub ("ALMOST TIME." …) + a
+ *      picks-open countdown (days until picks open). The ≤7-days-out window.
+ */
+export function OffSeasonHero({nearPicksOpen}: {nearPicksOpen?: boolean}) {
   const {colors} = useTheme();
 
   const activeSport = useGlobalStore(s => s.activeSport);
   const identity    = activeSport?.sportIdentity;
 
-  const headline = identity?.offseasonHeadline ?? 'THE SEASON IS ON ITS WAY BACK.';
-  const heroSub  = identity?.offseasonHeroSub  ?? 'Plenty of time to set up your Contest and get everyone in before kickoff.';
+  // Row-2 copy is verbatim from the map's copy library, housed in the state
+  // table (HOME_ROWS.off_near). Far-mode copy stays sport-agnostic via sportIdentity.
+  const headline = nearPicksOpen
+    ? HOME_ROWS.off_near.headline!
+    : identity?.offseasonHeadline ?? 'THE SEASON IS ON ITS WAY BACK.';
+  const heroSub = nearPicksOpen
+    ? HOME_ROWS.off_near.heroSub!
+    : identity?.offseasonHeroSub ?? 'Plenty of time to set up your Contest and get everyone in before kickoff.';
 
   return (
     <View style={styles.wrap}>
@@ -37,7 +51,7 @@ export function OffSeasonHero() {
       <Text style={[bodyType.regular, styles.heroSub, {color: colors.textSecondary}]}>
         {heroSub}
       </Text>
-      <KickoffCountdown />
+      <KickoffCountdown target={nearPicksOpen ? 'picksOpen' : 'kickoff'} />
     </View>
   );
 }

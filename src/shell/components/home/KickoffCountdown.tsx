@@ -1,9 +1,13 @@
 // src/shell/components/home/KickoffCountdown.tsx
-// The big regular-season kickoff countdown — a single large number showing the
-// largest meaningful unit (days → hours inside the last day → minutes inside
-// the last hour), with a unit-aware label. Shown on BOTH the off-season and
-// pre-season home heroes so the kickoff countdown carries straight across both
-// off-cycle phases. Targets season_opener_date (via nflStore).
+// The big off-cycle countdown — a single large number showing the largest
+// meaningful unit (days → hours inside the last day → minutes inside the last
+// hour), with a unit-aware label.
+//
+// Two target modes (map's ACTION column, rows 1–2):
+//   'kickoff'   → days until kickoff (season_opener_date). Rows 1 (off_far) and
+//                 3 (preseason). Label from sportIdentity (sport-agnostic).
+//   'picksOpen' → days until PICKS open (season_picks_open_at). Row 2 (off_near),
+//                 the ≤7-days-out window. Label: "DAYS UNTIL PICKS OPEN".
 
 import React from 'react';
 import {Text} from '@shared/components/AppText';
@@ -14,22 +18,27 @@ import {useGlobalStore} from '@shell/stores/globalStore';
 import {displayType, bodyType, monoType, spacing} from '@shared/theme';
 import {useCountdown} from './useCountdown';
 
-export function KickoffCountdown() {
+export function KickoffCountdown({target: mode = 'kickoff'}: {target?: 'kickoff' | 'picksOpen'}) {
   const {colors} = useTheme();
   const picksOpenAt    = useNFLStore(s => s.picksOpenAt);
   const seasonOpenerAt = useNFLStore(s => s.seasonOpenerAt);
   const activeSport    = useGlobalStore(s => s.activeSport);
   const identity       = activeSport?.sportIdentity;
 
-  const target = seasonOpenerAt ?? picksOpenAt;
+  // picksOpen mode counts down to picks opening; kickoff mode to the opener
+  // (falling back to picksOpenAt only when the opener date isn't set).
+  const target = mode === 'picksOpen' ? picksOpenAt : (seasonOpenerAt ?? picksOpenAt);
   const {unitValue, unit} = useCountdown(target);
 
-  // The config label normally reads "DAYS UNTIL …"; swap its leading unit word
-  // to match the unit shown (e.g. "HOURS UNTIL …" inside the last day). No-op
-  // for days, or when the label doesn't start with a unit word.
+  // The base label reads "DAYS UNTIL …"; swap its leading unit word to match the
+  // unit shown (e.g. "HOURS UNTIL …" inside the last day). No-op for days, or
+  // when the label doesn't start with a unit word. Kickoff mode keeps the
+  // sport-agnostic sportIdentity label; picks-open mode uses the map's row-2 copy.
   const unitWord = unit === 'day' ? 'DAYS' : unit === 'hour' ? 'HOURS' : 'MINUTES';
-  const cdLabel = (identity?.offseasonCountdownLabel ?? 'DAYS UNTIL KICKOFF')
-    .replace(/^(DAYS|HOURS|MINUTES)\b/i, unitWord);
+  const baseLabel = mode === 'picksOpen'
+    ? 'DAYS UNTIL PICKS OPEN'
+    : (identity?.offseasonCountdownLabel ?? 'DAYS UNTIL KICKOFF');
+  const cdLabel = baseLabel.replace(/^(DAYS|HOURS|MINUTES)\b/i, unitWord);
 
   return (
     <View style={styles.countdownBlock}>

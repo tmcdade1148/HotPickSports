@@ -12,27 +12,23 @@ import {useNavigation} from '@react-navigation/native';
 import {useTheme} from '@shell/theme/hooks';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {displayType, bodyType, monoType, spacing, borderRadius} from '@shared/theme';
-import {getContextGreeting} from './salutation';
 import {buildWeekRecap} from './weekRecap';
 
+// The greeting line that used to sit here is gone — the contextual line is now a
+// single producer (ContextualLine) rendered once above the hero by HomeScreen.
 export function SettlingHero() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
 
   const weekResult         = useNFLStore(s => s.weekResult);
-  const currentPhase       = useNFLStore(s => s.currentPhase);
   const currentWeek        = useNFLStore(s => s.currentWeek);
   const pathBackNarrative  = useNFLStore(s => s.pathBackNarrative);
 
-  const greeting = getContextGreeting(currentPhase, 'settling', 0, null);
   const points = weekResult?.weekPoints ?? 0;
   const isPositive = points >= 0;
 
   return (
     <View style={styles.wrap}>
-      <Text style={[bodyType.regular, styles.salutation, {color: colors.textSecondary}]}>
-        {greeting}
-      </Text>
       <Text style={[bodyType.bold, styles.eyebrow, {color: colors.textTertiary}]}>
         YOUR WEEK {currentWeek} RESULT
       </Text>
@@ -91,7 +87,6 @@ export function SettlingHero() {
 
 const styles = StyleSheet.create({
   wrap:        {paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.lg, gap: spacing.md},
-  salutation:  {fontSize: 26},
   // Matches the "YOUR CONTESTS" section title (fontSize 11 / letterSpacing 1.8
   // / textTertiary) so the result title reads as a section header.
   eyebrow:     {fontSize: 11, letterSpacing: 1.8},

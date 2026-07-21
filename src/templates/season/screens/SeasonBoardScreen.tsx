@@ -2,12 +2,12 @@ import React, {useEffect, useState, useRef, useCallback} from 'react';
 import {Text} from '@shared/components/AppText';
 import {
   View,
-  ScrollView,
+  FlatList,
   ActivityIndicator,
   TouchableOpacity,
-  Dimensions,
   StyleSheet,
 } from 'react-native';
+import type {ViewToken} from 'react-native';
 import {useSeasonStore} from '../stores/seasonStore';
 import type {SeasonLeaderboardEntry, WeekLeaderboardEntry} from '../stores/seasonStore';
 import {useAuth} from '@shared/hooks/useAuth';
@@ -26,16 +26,20 @@ import {PlayerSlateAccordion} from '../components/PlayerSlateAccordion';
 import type {PlayerSlateState} from '../components/PlayerSlateAccordion';
 import {LEXICON} from '@shared/lexicon';
 
-const {width: SCREEN_WIDTH} = Dimensions.get('window');
-
 /**
  * SeasonBoardScreen — Dual leaderboard: Season + Week views.
  *
  * Per CLAUDE.md §5:
  * - Season-side: cumulative scores from pool_start_date to present
- * - Week-side: current week scores with HotPick detail
+ * - Week-side: current week scores with HotPick detail (tap a row to reveal a
+ *   player's full slate)
  * - Both always available via toggle — never show only one
- * - Toggle tap or horizontal swipe to switch
+ *
+ * ONE list, switched by the toggle (the old horizontal swipe-pager nested a
+ * variable-height list inside a paging ScrollView inside a vertical ScrollView
+ * — expanding a slate made the pager drift off-page, the list "disappear", and
+ * the reveal land below the fold. A single FlatList with scrollToIndex fixes
+ * all of that: the reveal comes to you and the list holds still.)
  */
 export function SeasonBoardScreen() {
   const {colors} = useTheme();
@@ -112,24 +116,25 @@ export function SeasonBoardScreen() {
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [slates, setSlates] = useState<Record<string, PlayerSlateState>>({});
 
-  // Scroll-aware pinning: measureInWindow gives screen-space Y that
-  // works reliably across nested ScrollViews. Compare the real row's
-  // screen Y against the pinned row's screen Y to decide visibility.
-  const mySeasonRowRef = useRef<View>(null);
-  const myWeekRowRef = useRef<View>(null);
+  // Pinned "You" row: shown when the user's own row is scrolled out of view.
+  // FlatList reports which rows are on screen via onViewableItemsChanged — far
+  // simpler and more reliable than the old measureInWindow-across-nested-
+  // ScrollViews dance. The callback must stay STABLE (FlatList forbids swapping
+  // it), so it reads the current user id from a ref rather than closing over it.
   const [showPinnedRow, setShowPinnedRow] = useState(false);
-  // Screen height minus tab bar — the Y threshold below which the row is off-screen
-  const screenThreshold = useRef(Dimensions.get('window').height - 120);
-
-  const updatePinned = useCallback(() => {
-    const ref = activeTab === 'season' ? mySeasonRowRef : myWeekRowRef;
-    if (!ref.current) return;
-    ref.current.measureInWindow((_x, y) => {
-      // Row is off-screen when its top is below the visible area
-      setShowPinnedRow(y > screenThreshold.current);
-    });
-  }, [activeTab]);
-  const scrollRef = useRef<ScrollView>(null);
+  const listRef = useRef<FlatList<any>>(null);
+  const userIdRef = useRef<string | undefined>(undefined);
+  const viewabilityConfig = useRef({itemVisiblePercentThreshold: 50}).current;
+  const onViewableItemsChanged = useRef(
+    ({viewableItems}: {viewableItems: ViewToken[]}) => {
+      const me = userIdRef.current;
+      setShowPinnedRow(
+        me != null && !viewableItems.some(v => (v.item as any)?.user_id === me),
+      );
+    },
+  ).current;
+  // Keep the stable viewability callback's user id fresh without re-creating it.
+  userIdRef.current = user?.id;
 
   // Subscribe to poolId changes in the season store via Zustand subscribe
   // This fires AFTER initialize() sets the new poolId — no race condition
@@ -268,23 +273,12 @@ export function SeasonBoardScreen() {
     setExpandedUserId(null);
   }, [displayedWeek]);
 
-  // Re-check pinned visibility after tab switch or data change.
-  useEffect(() => {
-    updatePinned();
-  }, [activeTab, leaderboard, weekLeaderboard, updatePinned]);
-
   const switchTab = (tab: 'season' | 'week') => {
+    // Collapse any open slate and jump back to the top so the two tabs never
+    // inherit each other's scroll position or a stale expansion.
+    setExpandedUserId(null);
     setActiveTab(tab);
-    scrollRef.current?.scrollTo({
-      x: tab === 'season' ? 0 : SCREEN_WIDTH,
-      animated: true,
-    });
-  };
-
-  const handleScrollEnd = (e: any) => {
-    const offsetX = e.nativeEvent.contentOffset.x;
-    const newTab = offsetX > SCREEN_WIDTH / 2 ? 'week' : 'season';
-    setActiveTab(newTab);
+    listRef.current?.scrollToOffset({offset: 0, animated: false});
   };
 
   const currentPhase = useNFLStore(s => s.currentPhase);
@@ -351,8 +345,7 @@ export function SeasonBoardScreen() {
     return (
       <View
         key={item.user_id}
-        style={[styles.row, isMe && styles.rowHighlight]}
-        ref={isMe ? mySeasonRowRef : undefined}>
+        style={[styles.row, isMe && styles.rowHighlight]}>
         <Text style={[styles.rank, isMe && styles.textHighlight]}>{rankLabel}</Text>
         <AvatarBadge avatarKey={userAvatars[item.user_id]} name={userNames[item.user_id] ?? 'P'} size={24} />
         <View style={styles.userInfo}>
@@ -422,6 +415,17 @@ export function SeasonBoardScreen() {
       return;
     }
     setExpandedUserId(targetUserId);
+
+    // Bring the tapped row toward the top so the slate revealed below it is
+    // actually on screen — the old layout dropped it below the fold. viewPosition
+    // 0.12 leaves the row near the top with room for the accordion underneath.
+    const idx = weekLeaderboard.findIndex(e => e.user_id === targetUserId);
+    if (idx >= 0) {
+      requestAnimationFrame(() => {
+        listRef.current?.scrollToIndex({index: idx, viewPosition: 0.12, animated: true});
+      });
+    }
+
     const week = displayedWeek;
     const key = `${targetUserId}:${week}`;
     // Lazy; cache SUCCESSES (and in-flight) only. An 'error' entry falls through
@@ -446,8 +450,7 @@ export function SeasonBoardScreen() {
           onPress={isMe ? undefined : () => toggleExpand(item.user_id)}
           disabled={isMe}>
           <View
-            style={[styles.row, isMe && styles.rowHighlight]}
-            ref={isMe ? myWeekRowRef : undefined}>
+            style={[styles.row, isMe && styles.rowHighlight]}>
         <Text style={[styles.rank, isMe && styles.textHighlight]}>{rank}</Text>
         <AvatarBadge avatarKey={userAvatars[item.user_id]} name={userNames[item.user_id] ?? 'P'} size={24} />
         <View style={styles.userInfo}>
@@ -507,117 +510,124 @@ export function SeasonBoardScreen() {
             games={weekGames}
             slate={slates[slateKey]}
             isNonPrivate={isNonPrivate}
+            teams={config?.teams}
           />
         )}
       </View>
     );
   };
 
-  return (
-    <View style={styles.container}>
-      <ScrollView
-        style={{flex: 1}}
-        contentContainerStyle={[styles.scrollContent, {paddingBottom: navReserve}]}
-        showsVerticalScrollIndicator={false}
-        scrollEventThrottle={64}
-        onScroll={updatePinned}>
-        {/* Toggle */}
-        <View style={styles.toggleContainer}>
+  // One list, chosen by the toggle. The old horizontal swipe-pager is gone.
+  const activeData: any[] = activeTab === 'season' ? leaderboard : weekLeaderboard;
+
+  const listHeader = (
+    <View>
+      <View style={styles.toggleContainer}>
+        <TouchableOpacity
+          style={[styles.toggleTab, activeTab === 'season' && styles.toggleTabActive]}
+          onPress={() => switchTab('season')}>
+          <Text style={[
+            styles.toggleText,
+            activeTab === 'season' && styles.toggleTextActive,
+          ]}>
+            Points thru Week {lastFinalizedWeek}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.toggleTab, activeTab === 'week' && styles.toggleTabActive]}
+          onPress={() => switchTab('week')}>
+          <Text style={[
+            styles.toggleText,
+            activeTab === 'week' && styles.toggleTextActive,
+          ]}>
+            Week {displayedWeek} Points
+          </Text>
+        </TouchableOpacity>
+      </View>
+      {activeTab === 'week' && showLockCountdown && (
+        <View style={styles.lockBanner}>
+          <Text style={styles.lockBannerText}>
+            {`WEEK ${currentWeek} ${LEXICON.picks.toUpperCase()} LOCK IN ${unitText.toUpperCase()}`}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+
+  const listEmpty =
+    activeTab === 'season' ? (
+      leaderboardError ? (
+        // Surfaced fetch error — visible + recoverable, NEVER a silent blank
+        // list (the #360 regression). Distinct from the genuine empty below.
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyText}>{leaderboardError}</Text>
           <TouchableOpacity
-            style={[styles.toggleTab, activeTab === 'season' && styles.toggleTabActive]}
-            onPress={() => switchTab('season')}>
-            <Text style={[
-              styles.toggleText,
-              activeTab === 'season' && styles.toggleTextActive,
-            ]}>
-              Points thru Week {lastFinalizedWeek}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.toggleTab, activeTab === 'week' && styles.toggleTabActive]}
-            onPress={() => switchTab('week')}>
-            <Text style={[
-              styles.toggleText,
-              activeTab === 'week' && styles.toggleTextActive,
-            ]}>
-              Week {displayedWeek} Points
-            </Text>
+            onPress={() => {
+              fetchLeaderboard();
+              fetchWeekLeaderboard();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading the Ladder"
+            style={{
+              marginTop: 12,
+              paddingHorizontal: 20,
+              paddingVertical: 8,
+              borderRadius: borderRadius.md,
+              backgroundColor: colors.primary,
+            }}>
+            <Text style={{color: '#FFFFFF', fontWeight: '600'}}>Retry</Text>
           </TouchableOpacity>
         </View>
+      ) : (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyText}>
+            {currentWeek === 1 &&
+              (weekState === 'picks_open' || weekState === 'locked' || weekState === 'live')
+              ? 'The season leaderboard updates after all Week 1 scores are in.'
+              : 'Scores will appear here once games are completed.'}
+          </Text>
+        </View>
+      )
+    ) : (
+      <View style={styles.emptyState}>
+        <Text style={styles.emptyText}>
+          Week {displayedWeek} scores will appear once games are played.
+        </Text>
+      </View>
+    );
 
-        {/* Swipeable panels */}
-        <ScrollView
-          ref={scrollRef}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          onMomentumScrollEnd={handleScrollEnd}
-          scrollEventThrottle={16}>
-
-          {/* Season panel */}
-          <View style={{width: SCREEN_WIDTH}}>
-            <View style={styles.leaderboard}>
-              {leaderboardError ? (
-                // Surfaced fetch error — visible + recoverable, NEVER a silent
-                // blank list (the #360 regression). Distinct from the genuine
-                // empty state below.
-                <View style={styles.emptyState}>
-                  <Text style={styles.emptyText}>{leaderboardError}</Text>
-                  <TouchableOpacity
-                    onPress={() => {
-                      fetchLeaderboard();
-                      fetchWeekLeaderboard();
-                    }}
-                    accessibilityRole="button"
-                    accessibilityLabel="Retry loading the Ladder"
-                    style={{
-                      marginTop: 12,
-                      paddingHorizontal: 20,
-                      paddingVertical: 8,
-                      borderRadius: borderRadius.md,
-                      backgroundColor: colors.primary,
-                    }}>
-                    <Text style={{color: '#FFFFFF', fontWeight: '600'}}>Retry</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : leaderboard.length === 0 ? (
-                <View style={styles.emptyState}>
-                  <Text style={styles.emptyText}>
-                    {currentWeek === 1 &&
-                      (weekState === 'picks_open' || weekState === 'locked' || weekState === 'live')
-                      ? 'The season leaderboard updates after all Week 1 scores are in.'
-                      : 'Scores will appear here once games are completed.'}
-                  </Text>
-                </View>
-              ) : (
-                leaderboard.map((item, index) => renderSeasonRow({item, index}))
-              )}
-            </View>
-          </View>
-
-          {/* Week panel */}
-          <View style={{width: SCREEN_WIDTH}}>
-            <View style={styles.leaderboard}>
-              {showLockCountdown && (
-                <View style={styles.lockBanner}>
-                  <Text style={styles.lockBannerText}>
-                    {`WEEK ${currentWeek} ${LEXICON.picks.toUpperCase()} LOCK IN ${unitText.toUpperCase()}`}
-                  </Text>
-                </View>
-              )}
-              {weekLeaderboard.length === 0 ? (
-                <View style={styles.emptyState}>
-                  <Text style={styles.emptyText}>
-                    Week {displayedWeek} scores will appear once games are played.
-                  </Text>
-                </View>
-              ) : (
-                weekLeaderboard.map((item, index) => renderWeekRow({item, index}))
-              )}
-            </View>
-          </View>
-        </ScrollView>
-      </ScrollView>
+  return (
+    <View style={styles.container}>
+      <FlatList
+        ref={listRef}
+        style={{flex: 1}}
+        data={activeData}
+        keyExtractor={(item) => item.user_id}
+        // Union renderItem — data is season OR week rows depending on the tab.
+        renderItem={(activeTab === 'season' ? renderSeasonRow : renderWeekRow) as any}
+        // Week rows re-render when the open slate changes.
+        extraData={expandedUserId}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={listEmpty}
+        contentContainerStyle={[styles.listContent, {paddingBottom: navReserve}]}
+        showsVerticalScrollIndicator={false}
+        viewabilityConfig={viewabilityConfig}
+        onViewableItemsChanged={onViewableItemsChanged}
+        onScrollToIndexFailed={info => {
+          // Target row isn't measured yet — jump to an estimate, then land it.
+          listRef.current?.scrollToOffset({
+            offset: info.averageItemLength * info.index,
+            animated: false,
+          });
+          setTimeout(() => {
+            listRef.current?.scrollToIndex({
+              index: info.index,
+              viewPosition: 0.12,
+              animated: true,
+            });
+          }, 60);
+        }}
+      />
 
       {/* Pinned "You" row — shows only when user's row has scrolled off screen */}
       {(() => {
@@ -653,8 +663,11 @@ const createStyles = (colors: any) => StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  scrollContent: {
-    paddingBottom: spacing.xl,
+  // Horizontal inset for the whole list (rows, header, empty state) — replaces
+  // the old per-panel `leaderboard` padding now that there's one FlatList.
+  listContent: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
   },
   loading: {
     flex: 1,
@@ -664,7 +677,6 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   toggleContainer: {
     flexDirection: 'row',
-    marginHorizontal: spacing.md,
     marginTop: spacing.sm,
     marginBottom: spacing.md,
     backgroundColor: colors.surface,
@@ -687,9 +699,6 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   toggleTextActive: {
     color: colors.onPrimary,
-  },
-  leaderboard: {
-    padding: spacing.md,
   },
   lockBanner: {
     backgroundColor: colors.primary,

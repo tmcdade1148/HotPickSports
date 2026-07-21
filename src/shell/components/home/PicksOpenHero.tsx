@@ -1,7 +1,12 @@
 // Home's ACTION module, shared by picks_open, picks_locked, and games_live.
-// Renders the week-lock strip, the contextual message, the countdown, the CTA,
-// and the weekly-trend strip. CTA copy + state cues evolve with the week's
-// progress (picks remaining, HotPick designated, games kicked off).
+// Renders the countdown, the CTA and the picks-confirmation line. CTA copy +
+// state cues evolve with the week's progress (picks remaining, HotPick
+// designated, games kicked off).
+//
+// The contextual line is NOT here any more — it is a single producer
+// (ContextualLine) rendered once above the hero by HomeScreen (map §3). The old
+// per-hero buildContextualMessage is deleted; it also vanished the moment the
+// week locked, which is why the line was missing in the locked/live states.
 //
 // The HotPick card is NOT here — it is its own module (HotPickModule),
 // rendered as a sibling directly beneath this one by StateHero.
@@ -37,9 +42,6 @@ const PICKS_TOTAL_FALLBACK = 16;
 // The earlier full↔compact switch fired late in hydration and visibly
 // flashed (see timerSize below).
 const TIMER_FONT_COMPACT = 38;
-// Urgency buckets used by the contextual message picker.
-const URGENT_MINUTES = 6 * 60;   // under 6 hours → "not much time left"
-const TIGHT_MINUTES  = 24 * 60;  // under 24 hours → "tight"
 
 export function PicksOpenHero() {
   const {colors} = useTheme();
@@ -108,39 +110,27 @@ export function PicksOpenHero() {
 
   // Countdown target: HotPick game if known (else first kickoff).
   // Equality compared at minute granularity to absorb server drift.
-  const {target, hotPickIsFirstGame} = useMemo(() => {
+  const {target} = useMemo(() => {
     const hpKickoff = userHotPickGame?.kickoff_at
       ? new Date(userHotPickGame.kickoff_at)
       : null;
 
     if (!hotPickDesignated || !hpKickoff) {
-      return {target: weekFirstKickoff, hotPickIsFirstGame: false};
+      return {target: weekFirstKickoff};
     }
     const isFirst =
       weekFirstKickoff != null &&
       Math.abs(hpKickoff.getTime() - weekFirstKickoff.getTime()) < 60_000;
-    return {target: isFirst ? weekFirstKickoff : hpKickoff, hotPickIsFirstGame: isFirst};
+    return {target: isFirst ? weekFirstKickoff : hpKickoff};
   }, [hotPickDesignated, userHotPickGame, weekFirstKickoff]);
 
   const timer = useCountdownParts(target);
-  const minutesLeft = timer
-    ? timer.days * 24 * 60 + timer.hours * 60 + timer.minutes
-    : null;
 
   // Reviewer sandboxes (nfl_2025_simA / simG) show a fixed "3 DAYS" countdown
   // rather than a live one — the sim is a frozen Week-8 demo, so the headline
   // should always read 3 days regardless of when the games happen to be dated.
   const competition = useSeasonStore(s => s.config?.competition);
   const sandboxCountdown = isSandboxCompetition(competition);
-
-  const message = buildContextualMessage({
-    picksSet,
-    totalPicks: picksTotal,
-    hotPickDesignated,
-    hotPickIsFirstGame,
-    minutesLeft,
-    kickedOff: weekLocked,
-  });
 
   // Single fixed size — locked to compact per design call. This previously
   // switched (full when no picks → compact once picks made), but the switch
@@ -230,16 +220,12 @@ export function PicksOpenHero() {
       ]}>
       {/* No eyebrow. WeekLockStrip is deleted — it was the rule-11 violation
           (per-game status answering the week question, which is how it claimed
-          "11 of 16 still editable" after the server had shut all sixteen). The
-          tighter gap to the message below is intended. */}
+          "11 of 16 still editable" after the server had shut all sixteen). */}
 
-      {/* Message + countdown are pre-LOCK content, gated on the WEEK lock —
-          not on any game's status. The moment isWeekLocked() flips, both go. */}
-      {!weekLocked && (
-        <Text style={[bodyType.regular, styles.contextMessage, {color: colors.textSecondary}]}>
-          {message}
-        </Text>
-      )}
+      {/* The contextual message that used to sit here is gone — it's now the
+          single ContextualLine above the hero (map §3). The countdown is
+          pre-LOCK content, gated on the WEEK lock — not on any game's status.
+          The moment isWeekLocked() flips, it goes. */}
 
       {/* timer — digits at full size, unit letters at 0.4×, colons between.
           No adjustsFontSizeToFit: combined with nested-Text children of
@@ -412,59 +398,11 @@ export function PicksOpenHero() {
   );
 }
 
-/**
- * Pick the right copy for the picks-open hero based on the user's state.
- *
- * When no HotPick is designated the standalone big timer still renders, so
- * those strings end with a colon introducing the countdown below. Once a
- * HotPick is designated the countdown moves inline into the HotPick card, so
- * those strings stand alone with no "kicks off in:" lead-in.
- *
- * SYNC: the Operator Console (tools/hotpick-operator-console_v2.html) AND
- * REFERENCE.md §11 hand-mirror these headlines. If you change copy here,
- * update both and run `node tools/check-home-spec-sync.mjs` (it guards both).
- */
-function buildContextualMessage(opts: {
-  picksSet: number;
-  totalPicks: number;
-  hotPickDesignated: boolean;
-  hotPickIsFirstGame: boolean;
-  minutesLeft: number | null;
-  kickedOff: boolean;
-}): string {
-  const {picksSet, totalPicks, hotPickDesignated, hotPickIsFirstGame, minutesLeft, kickedOff} = opts;
-  const allPicks = picksSet >= totalPicks;
-  const noPicks = picksSet === 0;
-  const urgent = minutesLeft != null && minutesLeft < URGENT_MINUTES;
-  const tight  = minutesLeft != null && minutesLeft < TIGHT_MINUTES;
-
-  if (!hotPickDesignated) {
-    if (kickedOff && noPicks) {
-      return "You've missed kickoff but it's not too late to pick some real winners.";
-    }
-    if (urgent && !allPicks) return "You're here — might as well make your picks.";
-    if (urgent && allPicks)  return 'Almost out of time — set your HotPick. First kickoff in:';
-    if (noPicks)             return 'Make your picks. First game kicks off in:';
-    if (allPicks)            return 'All picks in — you still need a HotPick. First kickoff in:';
-    return `${picksSet} of ${totalPicks} picks in — you still need a HotPick. First kickoff in:`;
-  }
-
-  // HotPick designated → the countdown rides inline next to the kickoff time
-  // in the HotPick card below, so these messages stand alone (no "kicks off
-  // in:" lead-in).
-  if (hotPickIsFirstGame) {
-    return urgent
-      ? 'Bold HotPick.'
-      : 'Bold call — your HotPick is the first game.';
-  }
-  if (allPicks) {
-    if (urgent) return 'Locked & loaded.';
-    if (tight)  return 'Picks are set.';
-    return 'Feeling good about your HotPick?';
-  }
-  if (urgent) return `${picksSet}/${totalPicks} done. Finish up.`;
-  return `${picksSet} of ${totalPicks} in.`;
-}
+// buildContextualMessage is DELETED (slice 7a). The contextual line is now a
+// single producer — ContextualLine, reading the state table — rendered once
+// above the hero by HomeScreen. Its retired verbatim strings are still mirrored
+// by the Operator Console and are retained (RETIRED_MIRRORED_COPY in homeRows.ts)
+// so check-home-spec-sync stays green until that mirror is updated.
 
 function useCountdownParts(
   target: Date | null,
@@ -492,12 +430,6 @@ const styles = StyleSheet.create({
     padding: 18,
     borderRadius: borderRadius.lg + 2,
     borderWidth: 1,
-  },
-  contextMessage: {
-    fontSize: 14,
-    lineHeight: 19,
-    fontWeight: '500',
-    marginBottom: 8,
   },
   timer: {
     letterSpacing: -0.5,

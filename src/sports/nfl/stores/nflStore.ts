@@ -8,13 +8,27 @@ import type {DbSeasonPick, DbSeasonGame} from '@shared/types/database';
 // Types
 // ---------------------------------------------------------------------------
 
-/** Week state machine: picks_open → locked → live → settling → complete */
+/** Week state machine: picks_open → locked → live → settling → complete.
+ *  'idle' is the out-of-cycle value the admin RPC writes in PRE_SEASON (and any
+ *  non-weekly phase) — a real state the resolver maps to the preseason/off-cycle
+ *  rows, not a cycle step. */
 export type WeekState =
   | 'picks_open'
   | 'locked'
   | 'live'
   | 'settling'
-  | 'complete';
+  | 'complete'
+  | 'idle';
+
+/** The known week_state values, for validating raw competition_config strings. */
+const KNOWN_WEEK_STATES: ReadonlySet<string> = new Set([
+  'picks_open',
+  'locked',
+  'live',
+  'settling',
+  'complete',
+  'idle',
+]);
 
 export interface GameScore {
   homeScore: number;
@@ -283,9 +297,21 @@ export const useNFLStore = create<NFLState>((set, get) => ({
     const seasonYear =
       typeof cfg.season_year === 'number' ? cfg.season_year : get().seasonYear;
 
-    // Derive weekState from config values
+    // Derive weekState from config values. Validate rather than blind-cast: an
+    // unknown week_state must NOT masquerade as a known cycle step (esp.
+    // 'picks_open', which would render the picks hero for a state we don't
+    // model). Warn loudly (dev only) and pass the raw value through so the Home
+    // resolver (resolveHomeRow) hits its deliberate fallback + its own warning.
     let weekState: WeekState = 'picks_open';
     if (cfg.week_state && typeof cfg.week_state === 'string') {
+      if (!KNOWN_WEEK_STATES.has(cfg.week_state) && __DEV__) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[nflStore] Unrecognized competition_config.week_state="${cfg.week_state}" ` +
+            `(current_phase="${typeof cfg.current_phase === 'string' ? cfg.current_phase : '?'}"). ` +
+            'Passing through to the Home resolver fallback; add it to WeekState if this is real.',
+        );
+      }
       weekState = cfg.week_state as WeekState;
     }
 

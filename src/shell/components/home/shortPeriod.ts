@@ -32,12 +32,14 @@ export function shortPeriod(
       ? String(seasonYear).slice(-2)
       : '26';
   const sport = `NFL${suffix}`;
+  // Badge strings match the map's Badge column (HOME_ROWS[row].badge). All three
+  // corrected labels are ≤12 chars, so they render at the full pill font.
   if (phase === 'OFF_SEASON')        return `${sport} · OFFSEASON`;
   if (phase === 'PRE_SEASON')        return `${sport} · PRESEASON`;
-  if (phase === 'REGULAR_COMPLETE')  return `${sport} · WK 18 DONE`;
-  if (phase === 'SUPERBOWL_INTRO')   return `${sport} · SB WEEK`;
+  if (phase === 'REGULAR_COMPLETE')  return `${sport} · REG DONE`;
+  if (phase === 'SUPERBOWL_INTRO')   return `${sport} · SB`;
   if (phase === 'SUPERBOWL')         return `${sport} · SB`;
-  if (phase === 'SEASON_COMPLETE')   return `${sport} · SEASON DONE`;
+  if (phase === 'SEASON_COMPLETE')   return `${sport} · DONE`;
 
   if (phase === 'PLAYOFFS' && typeof week === 'number') {
     const offset = week - playoffStart;

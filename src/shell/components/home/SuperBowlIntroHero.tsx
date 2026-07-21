@@ -13,23 +13,19 @@ import {useTheme} from '@shell/theme/hooks';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {displayType, bodyType, monoType, spacing, borderRadius} from '@shared/theme';
 import {useCountdown} from './useCountdown';
-import {getContextGreeting} from './salutation';
 
+// The greeting line is gone — the contextual line is now a single producer
+// (ContextualLine) rendered once above the hero by HomeScreen.
 export function SuperBowlIntroHero() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
 
   const picksOpenAt  = useNFLStore(s => s.picksOpenAt);
-  const currentPhase = useNFLStore(s => s.currentPhase);
   const {unitValue, unit, isExpired} = useCountdown(picksOpenAt);
   const unitWord = unit === 'day' ? 'days' : unit === 'hour' ? 'hours' : 'min';
-  const greeting = getContextGreeting(currentPhase, 'idle', 0, null);
 
   return (
     <View style={styles.wrap}>
-      <Text style={[bodyType.regular, styles.salutation, {color: colors.textSecondary}]}>
-        {greeting}
-      </Text>
       <Text style={[bodyType.bold, styles.eyebrow, {color: colors.primary}]}>
         SUPER BOWL WEEK
       </Text>
@@ -74,7 +70,6 @@ export function SuperBowlIntroHero() {
 
 const styles = StyleSheet.create({
   wrap:       {paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.lg, gap: spacing.md},
-  salutation: {fontSize: 13},
   eyebrow:    {fontSize: 11, letterSpacing: 2},
   countdownCard: {
     padding: spacing.md,

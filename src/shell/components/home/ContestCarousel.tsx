@@ -22,7 +22,7 @@ import {
 } from 'react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useGlobalStore} from '@shell/stores/globalStore';
-import {bodyType, spacing} from '@shared/theme';
+import {bodyType, spacing, sectionHeaderType} from '@shared/theme';
 import {LEXICON} from '@shared/lexicon';
 import type {DbPool} from '@shared/types/database';
 import {PoolModule} from './PoolModule';
@@ -129,8 +129,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   title: {
-    fontSize: 11,
-    letterSpacing: 1.8,
+    ...sectionHeaderType,
   },
   dots: {
     flexDirection: 'row',

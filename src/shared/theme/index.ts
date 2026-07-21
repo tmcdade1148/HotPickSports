@@ -84,6 +84,20 @@ export const bodyType = {
 } as const;
 
 /**
+ * Module header — the "YOUR CONTESTS" / "YOUR LEAGUES" / "YOUR HISTORY" label
+ * that sits above a Home module.
+ *
+ * ONE definition, because this had already been hand-copied into three files
+ * and a fourth (HISTORY) drifted to letterSpacing 1.2. Pair it with
+ * `bodyType.bold` and `colors.textTertiary`; spacing (padding / margin) stays
+ * local to each screen, since only the TYPE is shared.
+ */
+export const sectionHeaderType = {
+  fontSize: 11,
+  letterSpacing: 1.8,
+} as const;
+
+/**
  * Mono — system monospace. Scores, deltas, countdown digits, timestamps.
  * No fontFamily set so RN picks SF Mono / Roboto Mono per platform.
  */

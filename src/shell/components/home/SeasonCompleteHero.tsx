@@ -13,33 +13,27 @@ import {Text} from '@shared/components/AppText';
 import {Pressable, StyleSheet, View} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {useTheme} from '@shell/theme/hooks';
-import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {displayType, bodyType, monoType, spacing, borderRadius} from '@shared/theme';
-import {getContextGreeting} from './salutation';
 
+// The greeting line is gone — the contextual line is now a single producer
+// (ContextualLine) rendered once above the hero by HomeScreen.
 export function SeasonCompleteHero() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
 
   const userId       = useGlobalStore(s => s.user?.id);
   const userHardware = useGlobalStore(s => s.userHardware);
-  const currentPhase = useNFLStore(s => s.currentPhase);
   const seasonTotal  = useSeasonStore(
     s => (userId ? s.getUserScore(userId)?.total_points : undefined) ?? 0,
   );
-
-  const greeting = getContextGreeting(currentPhase, 'idle', 0, null);
 
   // Awards earned this season (post-launch competition only).
   const seasonAwards = userHardware.filter(h => h.category === 'season').length;
 
   return (
     <View style={styles.wrap}>
-      <Text style={[bodyType.regular, styles.salutation, {color: colors.textSecondary}]}>
-        {greeting}
-      </Text>
       <Text style={[bodyType.bold, styles.eyebrow, {color: colors.textSecondary}]}>
         SEASON COMPLETE
       </Text>
@@ -100,7 +94,6 @@ export function SeasonCompleteHero() {
 
 const styles = StyleSheet.create({
   wrap:       {paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.lg, gap: spacing.md},
-  salutation: {fontSize: 13},
   eyebrow:    {fontSize: 11, letterSpacing: 2},
   card: {
     padding: spacing.lg,

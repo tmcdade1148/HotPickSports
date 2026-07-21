@@ -13,7 +13,7 @@ import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {isScheduledStatus} from '@sports/nfl/utils/gameStatus';
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {useTheme} from '@shell/theme/hooks';
-import {spacing, bodyType} from '@shared/theme';
+import {spacing, bodyType, sectionHeaderType} from '@shared/theme';
 import {ordinalSuffix} from '@shared/utils/format';
 
 import {SystemMessageSlot} from '@shell/components/home/SystemMessageSlot';
@@ -21,6 +21,7 @@ import {HomeHeader} from '@shell/components/home/HomeHeader';
 import {IdentityBar} from '@shell/components/home/IdentityBar';
 import {ManagedLeagueModule} from '@shell/components/home/ManagedLeagueModule';
 import {StateHero} from '@shell/components/home/StateHero';
+import {ContextualLine} from '@shell/components/home/ContextualLine';
 import {HeroSkeleton} from '@shell/components/home/HeroSkeleton';
 import {CrossContestStrip} from '@shell/components/home/CrossContestStrip';
 import {OffSeasonActions, PreSeasonActions, ReturningOffCycleActions} from '@shell/components/home/OffCycleActions';
@@ -30,7 +31,7 @@ import {HistoryModule} from '@shell/components/home/HistoryModule';
 import {ContestCarousel} from '@shell/components/home/ContestCarousel';
 import {ContestActionPill} from '@shell/components/ContestActionPill';
 import {PartnerModule} from '@shell/components/home/PartnerModule';
-import {resolveHomeState} from '@shell/components/home/resolveHomeState';
+import {resolveHomeRow} from '@shell/components/home/homeRows';
 import {LEXICON} from '@shared/lexicon';
 
 // The header's translucency now comes from the shared `colors.chrome` token
@@ -57,6 +58,7 @@ export function HomeScreen() {
   const currentWeek  = useNFLStore(s => s.currentWeek);
   const competition  = useNFLStore(s => s.competition);
   const configLoaded = useNFLStore(s => s.configLoaded);
+  const picksOpenAt  = useNFLStore(s => s.picksOpenAt);
 
   const loadLastWeekHotPick   = useGlobalStore(s => s.loadLastWeekHotPick);
   const loadRecentWeeks       = useGlobalStore(s => s.loadRecentWeeks);
@@ -88,10 +90,17 @@ export function HomeScreen() {
   const activePoolId           = useGlobalStore(s => s.activePoolId);
   const subscribeToCompetitionConfig = useNFLStore(s => s.subscribeToCompetitionConfig);
 
-  const homeState = useMemo(
-    () => resolveHomeState(currentPhase, weekState),
-    [currentPhase, weekState],
-  );
+  // Fractional days until picks open — splits the off-season into far (>7d) and
+  // near (≤7d) rows. Same timestamp KickoffCountdown targets in picks-open mode.
+  // Computed inline (no useMemo): the value depends on Date.now(), so a memo
+  // would recompute every render anyway. resolveHomeRow is pure + cheap, and it
+  // returns a stable string, so the effects that depend on homeRow don't re-fire
+  // between renders. The off-far/off-near boundary is a day-scale transition, so
+  // a per-render read (vs a ticking clock) is precise enough.
+  const daysToPicksOpen = picksOpenAt
+    ? (picksOpenAt.getTime() - Date.now()) / 86_400_000
+    : null;
+  const homeRow = resolveHomeRow(currentPhase, weekState, daysToPicksOpen);
 
   // Gate on configLoaded: until the real competition_config loads, the store
   // holds its defaults (REGULAR / picks_open / week 1), which would briefly
@@ -99,9 +108,9 @@ export function HomeScreen() {
   // PRE_SEASON) resolves on a cold launch / reviewer reload.
   const isPicksFlow =
     configLoaded &&
-    (homeState === 'picks_open'   ||
-     homeState === 'picks_locked' ||
-     homeState === 'games_live');
+    (homeRow === 'picks_open' ||
+     homeRow === 'locked'     ||
+     homeRow === 'live');
   const showInsight      = isPicksFlow;
   // Everyone sees the hero + YOUR CONTESTS + YOUR CLUBS — the
   // off-cycle hero (OffSeasonHero etc.) plus the section headers and
@@ -122,8 +131,9 @@ export function HomeScreen() {
   // sections share this gate.
   const isInCycle =
     configLoaded &&
-    homeState !== 'off_season_idle' &&
-    homeState !== 'pre_season_games';
+    homeRow !== 'off_far' &&
+    homeRow !== 'off_near' &&
+    homeRow !== 'pre_bridge';
 
   // ---------------------------------------------------------------------------
   // Partition pools for the Pool stack + Partner stack.
@@ -196,10 +206,10 @@ export function HomeScreen() {
     [liveScores],
   );
   const pastKickoff =
-    homeState === 'picks_locked' ||
-    homeState === 'games_live'   ||
-    homeState === 'settling'     ||
-    homeState === 'complete';
+    homeRow === 'locked'   ||
+    homeRow === 'live'     ||
+    homeRow === 'settling' ||
+    homeRow === 'complete';
 
   // Re-subscribe whenever the active competition changes. The channel filters
   // competition_config UPDATEs by `competition=eq.<id>`, captured at call time
@@ -413,22 +423,22 @@ export function HomeScreen() {
   useEffect(() => {
     if (!seasonConfig) return;
     fetchSeasonLeaderboard().catch(() => {});
-  }, [seasonConfig, currentWeek, homeState, fetchSeasonLeaderboard]);
+  }, [seasonConfig, currentWeek, homeRow, fetchSeasonLeaderboard]);
 
   // Populate this week's result for the settling/complete heroes ("This week
   // +N pts"). Reads the user's season_user_totals row; without this weekResult
   // stays null and the hero shows +0.
   useEffect(() => {
     if (!userId || !competition || currentWeek <= 0) return;
-    if (homeState !== 'settling' && homeState !== 'complete') return;
+    if (homeRow !== 'settling' && homeRow !== 'complete') return;
     fetchWeekResult(userId, currentWeek).catch(() => {});
-  }, [userId, competition, currentWeek, homeState, configLoaded, fetchWeekResult]);
+  }, [userId, competition, currentWeek, homeRow, configLoaded, fetchWeekResult]);
 
   // While the backend is computing final scores, season_user_totals
   // updates aren't pushed via Realtime — poll the season aggregates so
   // SEASON PTS / recent weeks / hit rate roll forward.
   useEffect(() => {
-    if (homeState !== 'settling') return;
+    if (homeRow !== 'settling') return;
     if (!userId || !competition) return;
     const tick = () => {
       fetchSeasonLeaderboard().catch(() => {});
@@ -440,7 +450,7 @@ export function HomeScreen() {
     const id = setInterval(tick, 10_000);
     return () => clearInterval(id);
   }, [
-    homeState,
+    homeRow,
     userId,
     competition,
     currentWeek,
@@ -510,9 +520,15 @@ export function HomeScreen() {
             unread. */}
         <HomeInbox />
 
+        {/* CONTEXTUAL LINE (map module 3) — one line, above the hero. Single
+            producer, reading the state table; renders nothing for rows whose
+            contextual pool is empty. Gated on configLoaded so it doesn't flash
+            the default-state line before the real phase resolves. */}
+        {configLoaded && <ContextualLine row={homeRow} />}
+
         {showHero &&
           (configLoaded ? (
-            <StateHero state={homeState} />
+            <StateHero row={homeRow} />
           ) : (
             // Hero-shaped skeleton until config resolves, so we never flash
             // the default-state (Week 1 picks-open) hero on a cold launch.
@@ -526,7 +542,7 @@ export function HomeScreen() {
             the action stack owns Create/Join, and the Clubs teaser
             shrinks to one line. RecruiterBand is silent in the spec,
             so we drop it from these states. */}
-        {configLoaded && homeState === 'off_season_idle' && (
+        {configLoaded && (homeRow === 'off_far' || homeRow === 'off_near') && (
           <>
             {offCycleContests}
             {visiblePools.length > 0 ? <ReturningOffCycleActions /> : <OffSeasonActions />}
@@ -534,7 +550,7 @@ export function HomeScreen() {
             {offCycleClubs ?? <ClubsTeaser />}
           </>
         )}
-        {configLoaded && homeState === 'pre_season_games' && (
+        {configLoaded && homeRow === 'pre_bridge' && (
           <>
             {/* Directly under the hero's kickoff countdown. */}
             <PreseasonPicksOpenLine />
@@ -589,8 +605,9 @@ export function HomeScreen() {
 
         {configLoaded
           && showPartnerStack
-          && homeState !== 'off_season_idle'
-          && homeState !== 'pre_season_games' && (
+          && homeRow !== 'off_far'
+          && homeRow !== 'off_near'
+          && homeRow !== 'pre_bridge' && (
           // In-cycle YOUR CLUBS section with the full Gaffer / Perks
           // explainer. Off-cycle states use the shrunken one-line
           // ClubsTeaser per spec.
@@ -758,8 +775,8 @@ const styles = StyleSheet.create({
   },
   section: {marginTop: spacing.md},
   sectionTitle: {
-    fontSize: 11,
-    letterSpacing: 1.8,
+    // Type from the shared token so every module header matches.
+    ...sectionHeaderType,
     paddingHorizontal: spacing.lg,
     marginBottom: 10,
   },

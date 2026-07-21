@@ -20,6 +20,12 @@ type HomeRecapSlice = Pick<
 >;
 
 /**
+ * Phases whose rows are the PLAYOFF set. REGULAR_COMPLETE is deliberately NOT
+ * here — see readSeasonScope. Mirrored in HistoryModule.
+ */
+const PLAYOFF_PHASES = ['PLAYOFFS', 'SUPERBOWL_INTRO', 'SUPERBOWL', 'SEASON_COMPLETE'];
+
+/**
  * The phase/week scope both season reads share.
  *
  * Extracted so `loadSeasonTotal` and `loadRecentWeeks` can't disagree about
@@ -46,7 +52,14 @@ async function readSeasonScope(competition: string): Promise<{
     typeof cfg.current_phase === 'string' ? cfg.current_phase : 'REGULAR';
   const weekState = typeof cfg.week_state === 'string' ? cfg.week_state : null;
   return {
-    isPlayoffs: currentPhase !== 'REGULAR',
+    // Only the TRUE playoff phases read the playoff row set. This was
+    // `currentPhase !== 'REGULAR'`, which swept REGULAR_COMPLETE in with the
+    // playoffs — but REGULAR_COMPLETE is the bridge AFTER the regular season
+    // and BEFORE the playoffs: no playoff rows exist yet, so both HISTORY and
+    // the season total came back empty there. The regular season stays the
+    // scope until the playoffs actually start. Matches the Operator Console's
+    // own leaderboard scoping, which never counted REGULAR_COMPLETE either.
+    isPlayoffs: PLAYOFF_PHASES.includes(currentPhase),
     // Single shared predicate — see @shared/utils/weekState. This now includes
     // `settling`, which it previously did not: during settling the season
     // total EXCLUDES the settling week, matching HISTORY's bars exactly.

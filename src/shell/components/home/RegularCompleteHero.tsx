@@ -12,19 +12,18 @@ import {Text} from '@shared/components/AppText';
 import {Pressable, StyleSheet, View} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {useTheme} from '@shell/theme/hooks';
-import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
-import {getContextGreeting} from './salutation';
 
 const MEDALS = ['\u{1F947}', '\u{1F948}', '\u{1F949}']; // 🥇 🥈 🥉
 
+// The greeting line is gone — the contextual line is now a single producer
+// (ContextualLine) rendered once above the hero by HomeScreen.
 export function RegularCompleteHero() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
 
-  const currentPhase = useNFLStore(s => s.currentPhase);
   const userId       = useGlobalStore(s => s.user?.id);
 
   const podium     = useSeasonStore(s => s.regularSeasonPodium);
@@ -35,15 +34,11 @@ export function RegularCompleteHero() {
     if (userId) loadPodium(userId).catch(() => {});
   }, [userId, loadPodium]);
 
-  const greeting = getContextGreeting(currentPhase, 'idle', 0, null);
   const winner = podium[0];
   const userIsWinner = !!winner && winner.user_id === userId;
 
   return (
     <View style={styles.wrap}>
-      <Text style={[bodyType.regular, styles.salutation, {color: colors.textSecondary}]}>
-        {greeting}
-      </Text>
       <Text style={[bodyType.bold, styles.eyebrow, {color: colors.textSecondary}]}>
         REGULAR SEASON COMPLETE
       </Text>
@@ -120,7 +115,6 @@ export function RegularCompleteHero() {
 
 const styles = StyleSheet.create({
   wrap:       {paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.lg, gap: spacing.md},
-  salutation: {fontSize: 13},
   eyebrow:    {fontSize: 11, letterSpacing: 2},
   card: {
     padding: spacing.lg,
