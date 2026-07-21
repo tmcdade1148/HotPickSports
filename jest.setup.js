@@ -40,3 +40,18 @@ jest.mock('expo-constants', () => ({
   default: {expoConfig: {version: '0.0.0-test'}},
 }));
 
+// expo-updates resolves its native module eagerly at IMPORT time —
+// build/ExpoUpdates.js does `requireNativeModule('ExpoUpdates')` (the throwing
+// variant), which raises "Cannot find native module 'ExpoUpdates'" in the node
+// environment. That fails to LOAD any suite that renders VersionStamp (→ App,
+// WelcomeScreen, SettingsScreen). VersionStamp's try/catch guards only the
+// render-time reads, not the import, so it can't catch this. Mock the members it
+// reads; isEnabled:false renders the "dev" branch and short-circuits the rest.
+jest.mock('expo-updates', () => ({
+  __esModule: true,
+  isEnabled: false,
+  isEmbeddedLaunch: false,
+  channel: null,
+  createdAt: null,
+}));
+
