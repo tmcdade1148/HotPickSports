@@ -25,19 +25,27 @@
 // none, where the state showed none) and are flagged in the 7a report for Tom to
 // author later.
 
-/** The eleven rows of the map's week-state table. */
+/** The eleven rows of the map's week-state table, plus one placeholder bridge. */
 export type HomeRow =
-  | 'off_far'      // 1  OFF_SEASON, >7d to picks-open
-  | 'off_near'     // 2  OFF_SEASON, ≤7d to picks-open
-  | 'pre_bridge'   // 3  PRE_SEASON (resting bridge; RPC forces week_state='idle')
-  | 'picks_open'   // 4  REGULAR/PLAYOFFS/SUPERBOWL + picks_open
-  | 'locked'       // 5  + locked
-  | 'live'         // 6  + live
-  | 'settling'     // 7  + settling
-  | 'complete'     // 8  + complete
-  | 'reg_done'     // 9  REGULAR_COMPLETE
-  | 'sb_intro'     // 10 SUPERBOWL_INTRO
-  | 'season_done'; // 11 SEASON_COMPLETE
+  | 'off_far'         // 1  OFF_SEASON, >7d to picks-open
+  | 'off_near'        // 2  OFF_SEASON, ≤7d to picks-open
+  | 'pre_bridge'      // 3  PRE_SEASON (resting bridge; RPC forces week_state='idle')
+  | 'picks_open'      // 4  REGULAR/PLAYOFFS/SUPERBOWL + picks_open
+  | 'locked'          // 5  + locked
+  | 'live'            // 6  + live
+  | 'settling'        // 7  + settling
+  | 'complete'        // 8  + complete
+  | 'reg_done'        // 9  REGULAR_COMPLETE
+  | 'sb_intro'        // 10 SUPERBOWL_INTRO
+  | 'season_done'     // 11 SEASON_COMPLETE
+  // PLACEHOLDER SCAFFOLDING (not a map row). The playoff pre-picks gap —
+  // (PLAYOFFS|SUPERBOWL) + week_state='idle' — is a real, production-reachable
+  // state (admin_advance_season_phase carries REGULAR_COMPLETE's idle into
+  // PLAYOFFS until open_week_picks runs). It used to fall through to off_far (the
+  // off-season screen). This row gives it a real bridge. The FINAL playoff
+  // experience is a September design task (Tom's call); the copy + hero here are
+  // intentional placeholders, flagged as such.
+  | 'playoff_bridge';
 
 /** ACTION module behaviour for the row (which hero / countdown target). */
 export type ActionMode =
@@ -213,6 +221,19 @@ export const HOME_ROWS: Record<HomeRow, HomeRowSpec> = {
     history: 'final_week',
     contextual: SEASON_DONE_LINE,
   },
+  // PLACEHOLDER · playoff pre-picks bridge — (PLAYOFFS|SUPERBOWL) + idle.
+  // Reuses the SuperBowlIntroHero bridge (countdown to picksOpenAt + "See your
+  // playoff run"), NOT the off-season countdown. badge stays phase-driven
+  // (shortPeriod → WC/DIV/CONF/SB) so badge and hero now agree. Copy below is a
+  // PLACEHOLDER for Tom's brand-voice + September playoff design pass.
+  playoff_bridge: {
+    badge: 'PLAYOFF', // marker only — real badge (WC/DIV/CONF/SB) comes from shortPeriod
+    action: 'bridge',
+    hotpick: 'hidden',
+    history: 'last_finished', // a returning playoff player has finished regular weeks
+    contextual: [], // Tom writes canonical copy; the bridge hero carries the placeholder headline
+    headline: 'PLAYOFF FOOTBALL', // PLACEHOLDER — not final voice
+  },
 };
 
 /** Off-season split boundary: ≤ 7 days (168h) to picks-open ⇒ the "near" row. */
@@ -250,6 +271,13 @@ export function warnUnknownHomeState(
   }
 }
 
+/** The off-season "picks open soon" split: ≤7d to picks-open ⇒ near, else far. */
+function offSeasonSplit(daysToPicksOpen: number | null): HomeRow {
+  return daysToPicksOpen != null && daysToPicksOpen <= OFF_NEAR_DAYS
+    ? 'off_near'
+    : 'off_far';
+}
+
 /**
  * THE ONE resolver — maps (current_phase, week_state, daysToPicksOpen) to a
  * HomeRow. Replaces resolveHomeState AND StateHero.resolveFromConfig (the
@@ -267,11 +295,7 @@ export function resolveHomeRow(
   daysToPicksOpen: number | null,
 ): HomeRow {
   // Phase-level off-cycle states take precedence over weekState.
-  if (phase === 'OFF_SEASON') {
-    return daysToPicksOpen != null && daysToPicksOpen <= OFF_NEAR_DAYS
-      ? 'off_near'
-      : 'off_far';
-  }
+  if (phase === 'OFF_SEASON') return offSeasonSplit(daysToPicksOpen);
   // PRE_SEASON is the resting bridge — the admin RPC forces week_state='idle'
   // here, so (PRE_SEASON, 'idle') is the EXPECTED pairing and resolves cleanly,
   // never through the unknown-state fallback.
@@ -284,9 +308,28 @@ export function resolveHomeRow(
   if (WEEKLY_CYCLE_PHASES.has(phase)) {
     const row = WEEKSTATE_ROW[weekState];
     if (row) return row;
-    // In-cycle phase but an unmodelled week_state (e.g. 'idle' mid-cycle, or a
-    // typo). Warn and fall back — never render the picks hero for a state we
-    // don't understand.
+
+    // THE PRE-PICKS GAP. An in-cycle phase whose week_state is still 'idle'
+    // because admin_advance_season_phase carries the prior bridge phase's idle
+    // into REGULAR/PLAYOFFS/SUPERBOWL until open_week_picks runs. These are REAL,
+    // production-reachable states — map them explicitly so they NEVER hit the
+    // unknown-state fallback/warn (that fall-through was the playoffs-shows-
+    // off-season bug). See the resolveHomeRow reachability guard test.
+    if (weekState === 'idle') {
+      // PLAYOFFS / SUPERBOWL before their picks open → the playoff bridge
+      // (placeholder). Fixes the badge-vs-hero disagreement: the badge already
+      // reads WC/DIV/CONF/SB (shortPeriod), and now the hero is a playoff bridge
+      // rather than the off-season countdown.
+      if (phase === 'PLAYOFFS' || phase === 'SUPERBOWL') return 'playoff_bridge';
+      // REGULAR before week-1 picks open → the same "picks open soon" countdown
+      // as the off-season near/far split. This is the regular-season ENTRY gap;
+      // pre-7a behaviour showed the off-season hero here too. A dedicated
+      // "season opening" bridge could replace this later (flagged for Tom).
+      return offSeasonSplit(daysToPicksOpen); // phase === 'REGULAR'
+    }
+
+    // A genuinely unmodelled week_state inside a cycle phase (typo, new value).
+    // Warn and fall back — never render the picks hero for a state we don't know.
     warnUnknownHomeState(phase, weekState);
     return 'off_far';
   }

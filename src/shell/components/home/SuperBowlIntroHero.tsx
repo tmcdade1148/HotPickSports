@@ -16,7 +16,16 @@ import {useCountdown} from './useCountdown';
 
 // The greeting line is gone — the contextual line is now a single producer
 // (ContextualLine) rendered once above the hero by HomeScreen.
-export function SuperBowlIntroHero() {
+//
+// Reused as the placeholder PLAYOFF BRIDGE (map row 'playoff_bridge', the
+// PLAYOFFS/SUPERBOWL pre-picks gap): the eyebrow + headline are props so
+// StateHero can feed playoff copy. Defaults keep the SUPERBOWL_INTRO usage
+// byte-identical. This is a resting bridge — it counts down to picksOpenAt (NOT
+// the off-season kickoff date) and its CTA is "See your playoff run".
+export function SuperBowlIntroHero({
+  eyebrow = 'SUPER BOWL WEEK',
+  headline = 'ONE GAME. EVERYTHING.',
+}: {eyebrow?: string; headline?: string} = {}) {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
 
@@ -27,7 +36,7 @@ export function SuperBowlIntroHero() {
   return (
     <View style={styles.wrap}>
       <Text style={[bodyType.bold, styles.eyebrow, {color: colors.primary}]}>
-        SUPER BOWL WEEK
+        {eyebrow}
       </Text>
 
       <Text
@@ -35,7 +44,7 @@ export function SuperBowlIntroHero() {
           displayType.display,
           {fontSize: displayType.size.h2, color: colors.textPrimary},
         ]}>
-        ONE GAME. EVERYTHING.
+        {headline}
       </Text>
 
       {!isExpired && (

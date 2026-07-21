@@ -77,7 +77,7 @@ describe('resolveHomeRow — map week-state table (11 rows)', () => {
     expect(resolveHomeRow('SEASON_COMPLETE', 'idle', null)).toBe('season_done');
   });
 
-  test('all 11 rows are reachable from valid inputs', () => {
+  test('all 12 rows are reachable from valid inputs', () => {
     const reached = new Set<HomeRow>([
       resolveHomeRow('OFF_SEASON', 'idle', FAR),
       resolveHomeRow('OFF_SEASON', 'idle', NEAR),
@@ -90,8 +90,9 @@ describe('resolveHomeRow — map week-state table (11 rows)', () => {
       resolveHomeRow('REGULAR_COMPLETE', 'idle', null),
       resolveHomeRow('SUPERBOWL_INTRO', 'idle', null),
       resolveHomeRow('SEASON_COMPLETE', 'idle', null),
+      resolveHomeRow('PLAYOFFS', 'idle', null), // playoff_bridge (pre-picks gap)
     ]);
-    expect(reached.size).toBe(11);
+    expect(reached.size).toBe(12);
     // the reached set is exactly the HOME_ROWS keys — no row unreachable, none extra.
     expect([...reached].sort()).toEqual((Object.keys(HOME_ROWS) as HomeRow[]).sort());
   });
@@ -110,11 +111,6 @@ describe('resolveHomeRow — unknown-state policy (never a silent default)', () 
     expect(String(warnSpy.mock.calls[0][0])).toContain('banana');
   });
 
-  test('in-cycle phase + idle (not a cycle state) → off_far AND warns', () => {
-    expect(resolveHomeRow('REGULAR', 'idle', null)).toBe('off_far');
-    expect(warnSpy).toHaveBeenCalledTimes(1);
-  });
-
   test('wholly unknown phase → off_far AND warns naming the pair', () => {
     expect(resolveHomeRow('WHATEVER', 'whenever', null)).toBe('off_far');
     expect(warnSpy).toHaveBeenCalledTimes(1);
@@ -123,11 +119,108 @@ describe('resolveHomeRow — unknown-state policy (never a silent default)', () 
     expect(msg).toContain('whenever');
   });
 
+  // An unknown phase that happens to carry week_state='idle' is NOT the
+  // production pre-picks gap (only REGULAR/PLAYOFFS/SUPERBOWL are) — it must
+  // still warn, not be silently absorbed.
+  test('unknown phase + idle → off_far AND warns', () => {
+    expect(resolveHomeRow('WHATEVER', 'idle', null)).toBe('off_far');
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+  });
+
   test('recognised pairings never warn', () => {
     resolveHomeRow('REGULAR', 'picks_open', null);
     resolveHomeRow('OFF_SEASON', 'idle', FAR);
     resolveHomeRow('PRE_SEASON', 'idle', null);
     resolveHomeRow('SEASON_COMPLETE', 'idle', null);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('resolveHomeRow — Bug 2 fix: the playoff pre-picks gap (mapped, not fallback)', () => {
+  let warnSpy: jest.SpyInstance;
+  beforeEach(() => {
+    warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+  afterEach(() => warnSpy.mockRestore());
+
+  // 5a — the fix. PLAYOFFS/SUPERBOWL before picks open used to fall through to
+  // off_far (the off-season screen). Now they map to the playoff bridge, and the
+  // unknown-state warning must NOT fire (they're explicitly mapped).
+  test('(PLAYOFFS, idle) → playoff_bridge, no warn', () => {
+    expect(resolveHomeRow('PLAYOFFS', 'idle', null)).toBe('playoff_bridge');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+  test('(SUPERBOWL, idle) → playoff_bridge, no warn', () => {
+    expect(resolveHomeRow('SUPERBOWL', 'idle', null)).toBe('playoff_bridge');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+  // The playoff cycle itself still routes on week_state, unchanged.
+  test('PLAYOFFS/SUPERBOWL cycle week_states still route normally', () => {
+    expect(resolveHomeRow('PLAYOFFS', 'picks_open', null)).toBe('picks_open');
+    expect(resolveHomeRow('PLAYOFFS', 'live', null)).toBe('live');
+    expect(resolveHomeRow('SUPERBOWL', 'complete', null)).toBe('complete');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+  // REGULAR's own pre-picks gap (week-1 not open yet) maps to the off-season
+  // "picks open soon" split — also explicit, also no warn.
+  test('(REGULAR, idle) → off-season split, no warn', () => {
+    expect(resolveHomeRow('REGULAR', 'idle', 30)).toBe('off_far');
+    expect(resolveHomeRow('REGULAR', 'idle', 3)).toBe('off_near');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('resolveHomeRow — Bug 1 is deliberate (phase wins over a stray week_state)', () => {
+  let warnSpy: jest.SpyInstance;
+  beforeEach(() => {
+    warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+  afterEach(() => warnSpy.mockRestore());
+
+  // Bug 1 was a sim-procedure artifact: driving week_state to locked/live while
+  // the phase is still OFF_SEASON. A real player's config never has this combo
+  // (off-season has no games). resolveHomeRow INTENTIONALLY lets the phase win —
+  // OFF_SEASON → off_far — and does NOT warn (it's a defined branch, not the
+  // unknown-state fallback). Pinned so nobody "fixes" it into a warn or a flip.
+  test('(OFF_SEASON, locked/live) → off_far, intentional, no warn', () => {
+    expect(resolveHomeRow('OFF_SEASON', 'locked', null)).toBe('off_far');
+    expect(resolveHomeRow('OFF_SEASON', 'live', null)).toBe('off_far');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('resolveHomeRow — reachability guard (would have caught Bug 2 pre-device)', () => {
+  let warnSpy: jest.SpyInstance;
+  beforeEach(() => {
+    warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+  afterEach(() => warnSpy.mockRestore());
+
+  // EVERY (phase, week_state) pair the server can actually produce. If any of
+  // these hits the unknown-state fallback (warnUnknownHomeState fires), this
+  // test FAILS — the fallback is reserved for genuinely impossible combos only.
+  // Derived from the config machines: admin_advance_season_phase (idle for
+  // bridge phases; carries existing week_state into REGULAR/PLAYOFFS/SUPERBOWL),
+  // open_week_picks / admin_advance_week / sim-operator (the in-week cycle).
+  const CYCLE_STATES = ['picks_open', 'locked', 'live', 'settling', 'complete', 'idle'];
+  const PRODUCTION_REACHABLE: Array<[string, string]> = [
+    ['OFF_SEASON', 'idle'],
+    ['PRE_SEASON', 'idle'],
+    ...CYCLE_STATES.map(ws => ['REGULAR', ws] as [string, string]),
+    ['REGULAR_COMPLETE', 'idle'],
+    ...CYCLE_STATES.map(ws => ['PLAYOFFS', ws] as [string, string]),
+    ...CYCLE_STATES.map(ws => ['SUPERBOWL', ws] as [string, string]),
+    ['SEASON_COMPLETE', 'idle'],
+  ];
+
+  const VALID_ROWS = new Set(Object.keys(HOME_ROWS));
+
+  test('no production-reachable (phase, week_state) hits the fallback/warn', () => {
+    for (const [phase, ws] of PRODUCTION_REACHABLE) {
+      const row = resolveHomeRow(phase, ws, 30); // 30d → off_far when a split applies
+      expect(VALID_ROWS.has(row)).toBe(true);
+    }
+    // The whole point: the unknown-state warning never fired for any real combo.
     expect(warnSpy).not.toHaveBeenCalled();
   });
 });
@@ -157,6 +250,7 @@ describe('HOME_ROWS — §2 invariant (Identity/History agreement)', () => {
     reg_done: 'last_finished',
     sb_intro: 'last_finished',
     season_done: 'final_week',
+    playoff_bridge: 'last_finished',
   };
 
   test('every row matches the map Big-number table', () => {

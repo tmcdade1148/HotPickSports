@@ -29,7 +29,7 @@ import {RegularCompleteHero} from './RegularCompleteHero';
 import {SuperBowlIntroHero} from './SuperBowlIntroHero';
 import {SeasonCompleteHero} from './SeasonCompleteHero';
 import {PlayoffBanner} from './PlayoffBanner';
-import type {HomeRow} from './homeRows';
+import {HOME_ROWS, type HomeRow} from './homeRows';
 
 export interface StateHeroProps {
   /** The resolved row from HomeScreen (globalStore-level resolveHomeRow). */
@@ -83,6 +83,10 @@ function heroFor(row: HomeRow): React.ReactElement {
     case 'reg_done':    return <RegularCompleteHero />;
     case 'sb_intro':    return <SuperBowlIntroHero />;
     case 'season_done': return <SeasonCompleteHero />;
+    // Placeholder playoff bridge — reuses the SuperBowlIntroHero bridge with
+    // playoff copy (eyebrow literal + headline from the table). Both PLACEHOLDER.
+    case 'playoff_bridge':
+      return <SuperBowlIntroHero eyebrow="PLAYOFFS" headline={HOME_ROWS.playoff_bridge.headline!} />;
     default:            return <OffSeasonHero />;
   }
 }
