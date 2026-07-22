@@ -90,20 +90,16 @@ export function DemoResultScreen() {
 
   const myRank = ladder.findIndex(r => r.isUser) + 1;
 
-  const handleDone = async () => {
-    // Wipe the run server-side so the demo is a clean slate, then leave.
-    try {
-      await supabase.rpc('reset_demo');
-    } catch {
-      // non-critical
-    }
+  const handleDone = () => {
     exitDemo();
     // Hold HISTORY from flashing the demo's leftover week until the real config
     // re-inits (Item B) — exitDemo restores activeSport but not nflStore.
-    useNFLStore.setState({configLoaded: false});
+    useNFLStore.getState().markConfigStale();
     // reset, not navigate — clears the demo/onboarding + Welcome screens
     // beneath Home so a back-gesture/swipe can't pop back to the login screen.
     navigation.reset({index: 0, routes: [{name: 'Home'}]});
+    // Server cleanup runs in the background — never blocks the exit.
+    Promise.resolve(supabase.rpc('reset_demo')).catch(() => {});
   };
   const handleTryAgain = async () => {
     // Wipe the previous run (server picks + scores), clear the local reveal,

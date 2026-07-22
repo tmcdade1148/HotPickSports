@@ -118,15 +118,13 @@ export function SeasonPicksScreen() {
   // outside). Mirrors DemoResultScreen.handleDone: best-effort server reset,
   // restore the pre-demo selection, hold HISTORY from the demo's leftover week
   // (Item B), then reset the stack to Home.
-  const handleExitHome = async () => {
-    try {
-      await supabase.rpc('reset_demo');
-    } catch {
-      // non-critical
-    }
+  const handleExitHome = () => {
+    // Navigate FIRST so the Picks screen never flashes during the reset; the
+    // server cleanup runs in the background (non-blocking, errors swallowed).
     exitDemo();
-    useNFLStore.setState({configLoaded: false});
+    useNFLStore.getState().markConfigStale();
     navigation.reset({index: 0, routes: [{name: 'Home'}]});
+    Promise.resolve(supabase.rpc('reset_demo')).catch(() => {});
   };
 
   // Check if all games are final for this week

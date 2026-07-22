@@ -120,6 +120,10 @@ interface NFLState {
 
   // Actions
   initialize: (competition: string) => Promise<void>;
+  /** Force the config-loaded gate closed (HISTORY holds) until the next
+   *  initialize() re-fetches config. Used by the demo-exit paths — exitDemo
+   *  restores activeSport but leaves this store on the demo's played week. */
+  markConfigStale: () => void;
   setWeekState: (state: WeekState) => void;
   setCurrentWeek: (week: number) => void;
   setLiveScore: (gameId: string, score: GameScore) => void;
@@ -179,6 +183,8 @@ export const useNFLStore = create<NFLState>((set, get) => ({
   hotPickGameStatus: null,
   nextKickoff: null,
   configLoaded: false,
+
+  markConfigStale: () => set({configLoaded: false}),
 
   initialize: async (competition: string) => {
     const alreadyInitialized = get().competition === competition && get().currentWeek > 0;
