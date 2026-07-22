@@ -39,22 +39,33 @@ function HotPickBadge({rank}: {rank: number}) {
   );
 }
 
-function ModalShell({children}: {children: React.ReactNode}) {
+function ModalShell({children, onBackdropPress}: {children: React.ReactNode; onBackdropPress?: () => void}) {
   const {colors} = useTheme();
+  const cardStyle = [styles.card, {backgroundColor: colors.background, borderColor: colors.border}];
+  // With onBackdropPress, a tap on the dimmed margin exits; a no-op Pressable on
+  // the card captures touches so taps ON the card don't bubble to the backdrop.
+  // accessible={false} keeps the backdrop out of the screen-reader order.
+  if (onBackdropPress) {
+    return (
+      <Pressable style={styles.backdrop} onPress={onBackdropPress} accessible={false}>
+        <Pressable style={cardStyle} onPress={() => {}}>
+          {children}
+        </Pressable>
+      </Pressable>
+    );
+  }
   return (
     <View style={styles.backdrop}>
-      <View style={[styles.card, {backgroundColor: colors.background, borderColor: colors.border}]}>
-        {children}
-      </View>
+      <View style={cardStyle}>{children}</View>
     </View>
   );
 }
 
-export function DemoIntroModal({visible, onClose}: {visible: boolean; onClose: () => void}) {
+export function DemoIntroModal({visible, onClose, onExitHome}: {visible: boolean; onClose: () => void; onExitHome: () => void}) {
   const {colors} = useTheme();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <ModalShell>
+      <ModalShell onBackdropPress={onExitHome}>
         <Text style={[displayType.display, styles.title, {color: colors.textPrimary}]}>
           HOW SCORING WORKS
         </Text>
@@ -116,11 +127,13 @@ export function DemoScoreModal({
   result,
   onClose,
   onViewLadder,
+  onExitHome,
 }: {
   visible: boolean;
   result: DemoScoreResult | null;
   onClose: () => void;
   onViewLadder: () => void;
+  onExitHome: () => void;
 }) {
   const {colors} = useTheme();
   if (!result) return null;
@@ -132,7 +145,7 @@ export function DemoScoreModal({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <ModalShell>
+      <ModalShell onBackdropPress={onExitHome}>
         <Text style={[bodyType.bold, styles.kicker, {color: colors.textSecondary}]}>
           YOUR DEMO WEEK
         </Text>

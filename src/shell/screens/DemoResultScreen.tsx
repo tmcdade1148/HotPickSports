@@ -18,6 +18,7 @@ import {useAuth} from '@shared/hooks/useAuth';
 import {useTheme} from '@shell/theme';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
+import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {DEMO_COMPETITION} from '@sports/registry';
 import {LEXICON} from '@shared/lexicon';
 import {ordinal} from '@shared/utils/format';
@@ -97,6 +98,9 @@ export function DemoResultScreen() {
       // non-critical
     }
     exitDemo();
+    // Hold HISTORY from flashing the demo's leftover week until the real config
+    // re-inits (Item B) — exitDemo restores activeSport but not nflStore.
+    useNFLStore.setState({configLoaded: false});
     // reset, not navigate — clears the demo/onboarding + Welcome screens
     // beneath Home so a back-gesture/swipe can't pop back to the login screen.
     navigation.reset({index: 0, routes: [{name: 'Home'}]});

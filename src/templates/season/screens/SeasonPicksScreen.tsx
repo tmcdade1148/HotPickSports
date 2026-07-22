@@ -112,6 +112,22 @@ export function SeasonPicksScreen() {
   const demoRevealed = demoResult != null; // results shown once a result exists
   const dismissDemoIntro = useGlobalStore(s => s.dismissDemoIntro);
   const dismissDemoScore = useGlobalStore(s => s.dismissDemoScore);
+  const exitDemo = useGlobalStore(s => s.exitDemo);
+
+  // Exit the demo straight to Home — shared by both popup escape hatches (tap
+  // outside). Mirrors DemoResultScreen.handleDone: best-effort server reset,
+  // restore the pre-demo selection, hold HISTORY from the demo's leftover week
+  // (Item B), then reset the stack to Home.
+  const handleExitHome = async () => {
+    try {
+      await supabase.rpc('reset_demo');
+    } catch {
+      // non-critical
+    }
+    exitDemo();
+    useNFLStore.setState({configLoaded: false});
+    navigation.reset({index: 0, routes: [{name: 'Home'}]});
+  };
 
   // Check if all games are final for this week
   const allGamesFinal = games.length > 0 && games.every(g => {
@@ -592,11 +608,12 @@ export function SeasonPicksScreen() {
       {/* Demo onboarding modals — inert unless the demo is active. */}
       {isDemoActive && (
         <>
-          <DemoIntroModal visible={demoIntroOpen} onClose={dismissDemoIntro} />
+          <DemoIntroModal visible={demoIntroOpen} onClose={dismissDemoIntro} onExitHome={handleExitHome} />
           <DemoScoreModal
             visible={demoScoreOpen}
             result={demoResult}
             onClose={dismissDemoScore}
+            onExitHome={handleExitHome}
             onViewLadder={() => {
               dismissDemoScore();
               navigation.navigate('DemoResult');

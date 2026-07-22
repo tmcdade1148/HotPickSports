@@ -134,6 +134,7 @@ export function HistoryModule() {
   // Server-computed running total for the current week — points banked from
   // games already FINAL as of the last scoring run. Never a projection.
   const currentWeekPoints = useNFLStore(s => s.currentWeekPoints);
+  const configLoaded = useNFLStore(s => s.configLoaded);
 
   // Card width drives the head/slot split. Measured rather than assumed so the
   // four slots stay equal on any device.
@@ -246,6 +247,10 @@ export function HistoryModule() {
   const headWeekLabel = panelWeekLabel(headWeekNum, isPlayoffs || isRegularComplete);
   const headState = headStateLabel(weekState, isRegularComplete);
 
+  // Hold while a competition config is loading (e.g. the moment the onboarding
+  // demo exits — nflStore still holds the demo's played week until the real
+  // config re-inits). Rendering here would flash the demo's leftover history.
+  if (!configLoaded) return null;
   // Hidden entirely in the off-season and pre-season — there is no season to
   // show. Also hidden before the very first week is playable.
   if (HIDDEN_PHASES.includes(phase)) return null;
