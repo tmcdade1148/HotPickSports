@@ -64,7 +64,7 @@ function ModalShell({children, onBackdropPress}: {children: React.ReactNode; onB
 export function DemoIntroModal({visible, onClose, onExitHome}: {visible: boolean; onClose: () => void; onExitHome: () => void}) {
   const {colors} = useTheme();
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
       <ModalShell onBackdropPress={onExitHome}>
         <Text style={[displayType.display, styles.title, {color: colors.textPrimary}]}>
           HOW SCORING WORKS
@@ -144,7 +144,7 @@ export function DemoScoreModal({
   const regularPicks = Math.max(0, totalPicks - 1); // all picks minus the HotPick
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
       <ModalShell onBackdropPress={onExitHome}>
         <Text style={[bodyType.bold, styles.kicker, {color: colors.textSecondary}]}>
           YOUR DEMO WEEK
