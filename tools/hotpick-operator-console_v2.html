@@ -453,7 +453,7 @@ const STAGE_INFO = {
 const REFRESH_MS = 30000;
 // Bump on each console change so you can confirm the loaded file is current
 // (file:// caching otherwise hides updates). Shown next to the wordmark.
-const CONSOLE_BUILD = 'build 2026-07-19.2 · fresh-eyes';
+const CONSOLE_BUILD = 'build 2026-07-21.1 · autopick-idle-guard';
 document.getElementById('build-stamp').textContent = CONSOLE_BUILD;
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -1287,7 +1287,7 @@ function renderControls() {
     if (st === 'picks_open' && (cur || autoPickBeforeStep)) {
       line += myPicksThisWeek
         ? `<div class="picks-made yes">✓ Your picks are in for week ${week}</div>`
-        : (autoPickBeforeStep ? `<div class="picks-made no">Auto-pick will run on NEXT</div>` : '');
+        : (autoPickBeforeStep && cur ? `<div class="picks-made no">Auto-pick will run on NEXT</div>` : '');
     }
     // Under "live", expand the game-day wave ladder (kickoff + final per wave)
     // during the game-day window so it's clear which wave NEXT will act on. The
@@ -1409,8 +1409,16 @@ async function callSimOperator(action, opts = {}) {
   opInFlight = true;
   document.querySelectorAll('#controls .ctl-btn').forEach(b => { b.disabled = true; });
   try {
-    // Auto-pick before a step (spec §6a): skip on "already submitted", abort on any other error.
-    if (opts.isStep && autoPickBeforeStep) {
+    // Auto-pick before a step (spec §6a) — ONLY when the week is picks_open AND the
+    // clock hasn't locked it. auto_pick_tom needs 'scheduled' games AND now < first
+    // kickoff, which holds only at picks_open. Running it before the idle→picks_open
+    // step is self-defeating: the week is still on stale sim dates (clock-locked) with
+    // no open picks, so it fails — and the abort kills the very step (advance_week_state)
+    // that shifts the kickoffs forward and OPENS the week, wedging the sim in idle.
+    // Its purpose is to get picks in right before the picks_open→lock transition.
+    const apLock = weekLockInfo();
+    const canAutoPick = String(cfg('week_state', 'idle')) === 'picks_open' && (!apLock || !apLock.locked);
+    if (opts.isStep && autoPickBeforeStep && canAutoPick) {
       const ap = await invokeOp('auto_pick_tom', {});
       if (ap && ap.success) log(`Auto-picked ${ap.picks_submitted} games`, 'info');
       else if (ap && /already submitted/i.test(ap.error || '')) { /* fine — proceed */ }
