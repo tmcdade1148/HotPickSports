@@ -30,10 +30,10 @@ export const nflSeason: SeasonConfig = {
     // Copy block per the OffseasonPreseasonHome spec (May 29, 2026).
     // Lexicon-locked strings — match exactly, no rewording.
     offseasonHeadline:       "YEP, WE'RE COUNTING THE DAYS TOO.",
-    offseasonHeroSub:        'Plenty of time to set up your Contest and get everyone in before kickoff.',
+    offseasonHeroSub:        "It's never too early to start early. Start a Contest and round up your crew while it's quiet.",
     offseasonCountdownLabel: 'DAYS UNTIL NFL 2026 KICKS OFF',
     preseasonHeadline:       'This is the easy part.',
-    preseasonHeroSub:        "When you need to commit to a HotPick before the games lock, you'll look back at this time fondly.",
+    preseasonHeroSub:        "Soon it's HotPicks and heartbreak. Until then, start a Contest and get everyone in.",
     preseasonCountdownLabel: 'Regular season games kickoff in',
   },
 

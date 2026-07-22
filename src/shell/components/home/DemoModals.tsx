@@ -70,9 +70,9 @@ export function DemoIntroModal({visible, onClose}: {visible: boolean; onClose: (
         <View style={styles.ruleRow}>
           <Flame size={18} color={colors.primary} fill={colors.primary} style={{marginTop: 1}} />
           <Text style={[bodyType.regular, styles.ruleText, {color: colors.textPrimary}]}>
-            Tap the flame to make one game your{' '}
-            <Text style={{fontWeight: '800'}}>HotPick</Text>. The number in the badge is how
-            many points that game is worth.
+            Every week you must pick a{' '}
+            <Text style={{fontWeight: '800'}}>HotPick</Text> — tap the flame to choose one
+            game. The number in the badge is how many points that game is worth.
           </Text>
         </View>
 

@@ -93,7 +93,7 @@ export function useSeasonSubmitState(): SeasonSubmitState {
           : "PICKS ARE LOCKED";
       case 'no_picks':      return 'Start picking your winners';
       case 'needs_hotpick': return 'Select your HotPick';
-      case 'in_progress':   return isDemo ? 'See your result' : 'Submit your picks';
+      case 'in_progress':   return isDemo ? 'Play the week and see your results.' : 'Submit your picks';
       case 'submitted':     return 'Submitted';
     }
   })();
