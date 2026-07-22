@@ -91,7 +91,7 @@ export function SeasonBoardScreen() {
     ? currentWeek
     : currentWeek - 1;
 
-  const [activeTab, setActiveTab] = useState<'season' | 'week'>('season');
+  const [activeTab, setActiveTab] = useState<'season' | 'week'>('week');
 
   // Board-owned week lock time (MIN kickoff for the displayed week), fetched
   // via get_week_lock_time so the HotPick-reveal trigger is phase-safe and
@@ -304,19 +304,6 @@ export function SeasonBoardScreen() {
     prevTotals.forEach((e, i) => { map[e.user_id] = i + 1; });
     return map;
   }, [leaderboard]);
-
-  if (currentPhase === 'PRE_SEASON') {
-    return (
-      <View style={styles.loading}>
-        <Text style={{fontSize: 18, fontWeight: '600', color: colors.textPrimary, marginBottom: 8, textAlign: 'center', paddingHorizontal: 32}}>
-          Something tells me you'll be right at the top of this ladder.
-        </Text>
-        <Text style={{fontSize: 14, color: colors.textSecondary, textAlign: 'center', paddingHorizontal: 32}}>
-          Once your picks lock, you'll be able to see just how much better you are at picking winners.
-        </Text>
-      </View>
-    );
-  }
 
   if (!config || isLoading) {
     return (
@@ -556,6 +543,22 @@ export function SeasonBoardScreen() {
     </View>
   );
 
+  // Off-/pre-season: the ladder has no scores yet — show the same aspirational
+  // copy on both toggle sides (replaces the old full-screen PRE_SEASON early-
+  // return; now keeps the tabs visible and also covers OFF_SEASON). Mid-season
+  // keeps the functional "scores will appear" messages below.
+  const isPreLaunch = currentPhase === 'OFF_SEASON' || currentPhase === 'PRE_SEASON';
+  const prelaunchEmpty = (
+    <View style={styles.emptyState}>
+      <Text style={{fontSize: 18, fontWeight: '600', color: colors.textPrimary, marginBottom: 8, textAlign: 'center', paddingHorizontal: 32}}>
+        Something tells me you'll be right at the top of this ladder.
+      </Text>
+      <Text style={{fontSize: 14, color: colors.textSecondary, textAlign: 'center', paddingHorizontal: 32}}>
+        Once your picks lock, you'll be able to see just how much better you are at picking winners.
+      </Text>
+    </View>
+  );
+
   const listEmpty =
     activeTab === 'season' ? (
       leaderboardError ? (
@@ -580,7 +583,7 @@ export function SeasonBoardScreen() {
             <Text style={{color: '#FFFFFF', fontWeight: '600'}}>Retry</Text>
           </TouchableOpacity>
         </View>
-      ) : (
+      ) : isPreLaunch ? prelaunchEmpty : (
         <View style={styles.emptyState}>
           <Text style={styles.emptyText}>
             {currentWeek === 1 &&
@@ -590,7 +593,7 @@ export function SeasonBoardScreen() {
           </Text>
         </View>
       )
-    ) : (
+    ) : isPreLaunch ? prelaunchEmpty : (
       <View style={styles.emptyState}>
         <Text style={styles.emptyText}>
           Week {displayedWeek} scores will appear once games are played.
@@ -611,7 +614,7 @@ export function SeasonBoardScreen() {
         extraData={expandedUserId}
         ListHeaderComponent={listHeader}
         ListEmptyComponent={listEmpty}
-        contentContainerStyle={[styles.listContent, {paddingBottom: navReserve}]}
+        contentContainerStyle={[styles.listContent, {flexGrow: 1, paddingBottom: navReserve}]}
         showsVerticalScrollIndicator={false}
         viewabilityConfig={viewabilityConfig}
         onViewableItemsChanged={onViewableItemsChanged}
@@ -840,9 +843,9 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.primary,
   },
   emptyState: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: spacing.xl,
   },
   emptyText: {
     fontSize: 14,
