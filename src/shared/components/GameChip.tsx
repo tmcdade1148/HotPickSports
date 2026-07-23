@@ -377,6 +377,8 @@ export function GameChip({
             </View>
           ) : isFinal ? (
             <View style={styles.statusRow}>
+              {/* Static dot — mirrors the LIVE dot's size/gap but never pulses. */}
+              <View style={[styles.liveDot, {backgroundColor: colors.gameLost}]} />
               <Text style={[styles.statusText, {color: colors.gameLost}]}>FINAL</Text>
             </View>
           ) : (

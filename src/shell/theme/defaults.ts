@@ -95,10 +95,10 @@ export const HOTPICK_EXTENDED_TOKENS_DARK = {
   live: '#22C55E',
   // DARK twins. The light greens/reds fail on dark surfaces (#166534 is 1.8:1
   // on #1A1A1A), so each gets a lighter value — the same fix shape as error →
-  // #F1655A. DARK (on surface #1A1A1A): won 9.99:1 · lost 5.59:1. Also clears
+  // #F1655A. DARK (on surface #1A1A1A): won 9.99:1 · lost ~5.2:1 (game_lost is #FA4D5E, redder than the HotPick orange #F66321 in dark). Also clears
   // AA on #141414 and #242424. Measured 2026-07-18.
   game_won: '#4ADE80',
-  game_lost: '#F1655A',
+  game_lost: '#FA4D5E',
   // DARK twin. The light blue is 1.9:1 on #1A1A1A — invisible. This is the
   // same light-blue the CTA outline uses in dark, but declared INDEPENDENTLY
   // here so retuning one never silently moves the other.
