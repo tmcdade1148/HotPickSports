@@ -108,7 +108,7 @@ export function HotPickModule() {
             <Animated.View
               style={[styles.liveDot, {backgroundColor: colors.live, opacity: dotPulse}]}
             />
-            <Text style={[bodyType.bold, styles.statusWord, {color: colors.live}]}>
+            <Text style={[bodyType.bold, styles.statusWord, {color: colors.gameWon}]}>
               LIVE
             </Text>
             {periodLabel && (
@@ -119,7 +119,7 @@ export function HotPickModule() {
           </>
         )}
         {isFinal && (
-          <Text style={[bodyType.bold, styles.statusWord, {color: colors.textSecondary}]}>
+          <Text style={[bodyType.bold, styles.statusWord, {color: colors.gameLost}]}>
             • FINAL
           </Text>
         )}
@@ -135,7 +135,8 @@ export function HotPickModule() {
         earnedPoints={userHotPick.points}
         winnerTeam={userHotPickGame.winner_team}
         pointsLabel="HotPick Points"
-        boxTint={{background: colors.primary, text: colors.onPrimary}}
+        pickedNameColor={colors.primary}
+        boxTint={isFinal ? undefined : {background: colors.primary, text: colors.onPrimary}}
         showStatus={false}
         pickedSide={
           userHotPick.picked_team === userHotPickGame.home_team

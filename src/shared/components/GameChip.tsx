@@ -1,54 +1,46 @@
-// GameChip — ONE read-only component for rendering a single game.
-// Home Module Map slice 3, updated by the Game Chip Redesign (v1.2, 2026-07-22).
-// Three states: PRE / LIVE / FINAL.
+// GameChip — the ONE renderer for a game row, picks-open through FINAL.
+// Unified Game Chip (spec v2.1, 2026-07-23): the editable card and the locked
+// chip are the same component now. An `editable` flag turns the team rows and
+// the flame into tap targets; otherwise the identical layout renders read-only.
+// SeasonMatchCard owns pick/HotPick state and passes DOWN presentation values +
+// handlers — this file renders them and decides nothing.
 //
-// This chip DISPLAYS a game. It never inputs, never computes, never fetches.
-// Anything interactive (tap-to-pick, set-HotPick) belongs to the wrapper — see
-// SeasonMatchCard. The flame and lock icons are the wrapper's too; this file has
-// neither.
+// The chip stays DUMB. It never learns what "HotPick" means. It receives:
+//   - panel tint (boxTint), name colour (pickedNameColor), flame variant, lock,
+//     outline colour — all computed by the wrapper from the state matrix.
+//   - the resolve inputs (earnedPoints, winnerTeam) and renders them through the
+//     gates below, never deriving a result itself.
 //
-// The rules this component makes structural rather than remembered:
+// Rules made structural rather than remembered:
+//   Rule 9  — win/loss and points come from the SERVER. The box resolves ONLY on
+//             `isFinal && earnedPoints !== null`; a score greens ONLY on
+//             `isFinal && winnerTeam !== null`. No away_score/home_score
+//             comparison exists in this file.
+//   Rule 10 — status via gameStatus.ts (lowercases before comparing).
+//   LIVE compliance gate — during LIVE the box shows the neutral stake: no sign,
+//             no green/red. Enforced by the isFinal gate above (isFinal is false
+//             during LIVE, so the box can only show `points`).
 //
-//   Rule 9  — win/loss and points come from the SERVER, never a client
-//             comparison. The box resolves ONLY on `isFinal && earnedPoints !==
-//             null`, and a score greens ONLY on `isFinal && winnerTeam !== null`.
-//             isFinal is the OUTER gate: the scored-picks table can drift (a
-//             FINAL-set points value while is_correct is still null, or a stray
-//             points on a non-final row), so isFinal stops any stray points /
-//             winner value rendering a result before the game is truly final.
-//             In the FINAL-but-not-yet-scored window earnedPoints/winnerTeam are
-//             still null, so the chip shows the neutral stake and no green. There
-//             is deliberately NO away_score/home_score comparison in this file.
-//   Rule 10 — status is read through gameStatus.ts, which lowercases before
-//             comparing. ESPN writes 'FINAL', the simulator writes 'final'; both
-//             land in the same branch here.
-//   Rule 1  — no flame. Ever. The flame/lock live in SeasonMatchCard's column.
-//   Rule 2  — the left box is unsigned and neutral until the game is FINAL and
-//             the server has scored the pick (isFinal && earnedPoints !== null).
-//             It shows the STAKE (rank or 1) until then, so a signed or coloured
-//             number cannot appear during PRE/LIVE.
-//   Rule 3  — nothing goes green/red before FINAL, and the only thing that moves
-//             is the LIVE dot's opacity. Scores render during LIVE but stay
-//             uncoloured (winnerTeam is null until FINAL). (The dot pulses per
-//             Tom's explicit call, 2026-07-18.)
-//
-// FINAL result signals: the winning team's score is greened (from winner_team),
-// and the box shows the server's earned points, signed and coloured by its sign.
-// No ✓/✗ marks — colour IS the signal. A standard win's +1 is green; a HotPick
-// miss's −rank is the only red a chip can show.
+// Two colour SYSTEMS, never crossed:
+//   - RESULT colour = the box number. gameWon for a gain, gameLost ONLY for a
+//     HotPick miss. Panels and scores never go red.
+//   - STATUS colour = the LIVE/FINAL label. gameWon = in progress, gameLost =
+//     ended (red on wins too — it describes game state, not outcome).
 
 import React, {useEffect, useRef} from 'react';
 import {Text} from '@shared/components/AppText';
-import {Animated, StyleSheet, View} from 'react-native';
+import {Animated, StyleSheet, TouchableOpacity, View} from 'react-native';
+import type {TextStyle} from 'react-native';
 import {useTheme} from '@shell/theme';
-import {bodyType, borderRadius, spacing} from '@shared/theme';
+import {bodyType, borderRadius, displayType, spacing} from '@shared/theme';
 import {isFinalStatus, isLiveStatus} from '@sports/nfl/utils/gameStatus';
+import {ChipFlameColor} from '@shared/components/ChipFlameColor';
+import {ChipFlameDeselected} from '@shared/components/ChipFlameDeselected';
+import {ChipLock} from '@shared/components/ChipLock';
 
 /**
- * The normalized game shape the chip consumes — snake_case, matching
- * `DbSeasonGame`, because that is what most render sites already speak.
- * Live-score payloads arrive camelCase from nflStore; use `fromGameScore`
- * below to fold one into this shape rather than teaching the chip two shapes.
+ * Normalized game shape — snake_case, matching `DbSeasonGame`. Live-score
+ * payloads arrive camelCase from nflStore; fold one in via `fromGameScore`.
  */
 export interface GameChipGame {
   away_team: string;
@@ -63,67 +55,55 @@ export interface GameChipGame {
 
 export interface GameChipProps {
   game: GameChipGame;
-  /**
-   * Server-computed earned points (`season_picks.points`). REQUIRED — not
-   * optional — so rule 9 holds by construction: the box cannot show a result
-   * the server didn't supply. `null` = no pick or not yet scored, and renders
-   * the neutral STAKE (see `points`) instead of a signed/coloured value.
-   */
-  earnedPoints: number | null;
-  /**
-   * Winning team code (`season_games.winner_team`). REQUIRED. A score greens
-   * only when this is non-null and matches that side — never from an
-   * away_score/home_score comparison (rule 9). `null` before FINAL+scored.
-   */
-  winnerTeam: string | null;
-  /**
-   * Which side the Player picked, so the chip knows which name to emphasise.
-   * `null` = no pick, so neither side is emphasised.
-   */
+
+  // ── Interactivity ────────────────────────────────────────────────────────
+  /** When true, team rows and the flame become tap targets. Default false. */
+  editable?: boolean;
+  /** Team tap → select. Called with the team CODE. Editable only. */
+  onSelectTeam?: (teamCode: string) => void;
+  /** Flame tap → designate HotPick. The guard lives in the wrapper. Editable only. */
+  onPressFlame?: () => void;
+
+  // ── Presentation (wrapper-computed; the chip never branches on HotPick) ────
+  /** Which side the Player picked — drives which name is emphasised. */
   pickedSide: 'home' | 'away' | null;
-  /** Display nicknames. Fall back to the raw team codes on the game. */
+  /** Colour for the PICKED name (teal / orange). Opponent stays muted; with no
+   *  pick both names render neutral. */
+  pickedNameColor?: string;
+  /** Panel {background,text}. Orange for a HotPick-carrying chip; omit = neutral. */
+  boxTint?: {background: string; text: string};
+  /** Pill border colour override (orange for a HotPick chip). Omit = grey hairline. */
+  outlineColor?: string;
+  /** Flame artwork in the right slot. Default 'none'. */
+  flame?: 'none' | 'deselected' | 'lit';
+  /** Overlay/show a lock in the flame slot (read-only states). Default false. */
+  lock?: boolean;
+
+  // ── Panel content ─────────────────────────────────────────────────────────
+  /** Top number before the server scores the pick — the STAKE (rank or 1). */
+  points: number;
+  /** Label under the number ("HotPick Points" / "PT"). Hidden when stacked. */
+  pointsLabel: string;
+  /** When set, the panel stacks: number over a rule over this (the frozen rank). */
+  stackedRank?: number | null;
+  /** Server earned points (`season_picks.points`). null until scored. Rule 9. */
+  earnedPoints: number | null;
+  /** Winning team code (`season_games.winner_team`). null until FINAL. Rule 9. */
+  winnerTeam: string | null;
+
+  // ── Display ───────────────────────────────────────────────────────────────
   awayName?: string;
   homeName?: string;
-  /** Team records, e.g. "10-2". Rendered as small muted text beside the name. */
   awayRecord?: string | null;
   homeRecord?: string | null;
-  /**
-   * The number in the left box BEFORE the server scores the pick — the STAKE.
-   * REQUIRED — the box renders on every instance. On a standard Picks game this
-   * is 1; on a HotPick it is the game's rank (`frozen_rank ?? rank`).
-   */
-  points: number;
-  /**
-   * The label under the box value, supplied by the wrapper ("HotPick Points" or
-   * "PT"). REQUIRED. The chip renders it verbatim and never derives it — it
-   * carries the label, not the HotPick STATUS, so no later branch here can
-   * reach for "is this a HotPick" and pull wrapper logic back into the chip.
-   */
-  pointsLabel: string;
-  /**
-   * Presentation-only box tint {background, text}. Supplied by the wrapper
-   * (orange + on-primary for a HotPick box; omitted for a standard box, which
-   * falls back to the neutral surface). The chip applies the colours it is
-   * handed and decides nothing - it carries the box's COLOURS, not the HotPick
-   * status. The FINAL resolve still colours the number green/red over this
-   * background; `text` is the pre-resolve (neutral) number + label colour.
-   */
-  boxTint?: {background: string; text: string};
-  /**
-   * Whether the chip renders its OWN status row (LIVE + period/clock, FINAL).
-   * Default true, because on Picks and the Ladder nothing sits above the chip
-   * to say what state the game is in.
-   *
-   * Home's HOTPICK module passes false: its title line already carries the
-   * status, and two status lines on one card is a duplicate.
-   */
+  /** Whether the chip renders its own status row. Default true. Home's HotPick
+   *  card passes false (its title carries the status). */
   showStatus?: boolean;
 }
 
 /**
  * Adapter: nflStore's camelCase live-score payload → the chip's snake_case
- * fields. Spread the result over a base game to get one contract:
- *   <GameChip game={{...dbGame, ...fromGameScore(liveScores[id])}} ... />
+ * fields. Spread over a base game: `{...dbGame, ...fromGameScore(liveScores[id])}`.
  */
 export function fromGameScore(score?: {
   homeScore: number;
@@ -158,22 +138,29 @@ function formatKickoff(iso: string): string {
 
 export function GameChip({
   game,
+  editable = false,
+  onSelectTeam,
+  onPressFlame,
+  pickedSide,
+  pickedNameColor,
+  boxTint,
+  outlineColor,
+  flame = 'none',
+  lock = false,
+  points,
+  pointsLabel,
+  stackedRank,
   earnedPoints,
   winnerTeam,
-  pickedSide,
   awayName,
   homeName,
   awayRecord,
   homeRecord,
-  points,
-  pointsLabel,
-  boxTint,
   showStatus = true,
 }: GameChipProps) {
   const {colors} = useTheme();
 
-  // Rule 10 — both predicates lowercase before comparing, so 'FINAL' (ESPN)
-  // and 'final' (sim) resolve identically. Never compare game.status directly.
+  // Rule 10 — both predicates lowercase before comparing.
   const isFinal = isLiveStatus(game.status) ? false : isFinalStatus(game.status);
   const isLive = isLiveStatus(game.status);
   const showScores = isLive || isFinal;
@@ -181,12 +168,9 @@ export function GameChip({
   const away = awayName ?? game.away_team;
   const home = homeName ?? game.home_team;
 
-  // Left box (rule 2 / rule 9). Resolves ONLY on isFinal && earnedPoints !== null.
-  // isFinal is the outer guard: scored-picks state can drift (points set while a
-  // game isn't truly final / is_correct still null), so it stops a stray points
-  // value rendering a signed/coloured result before FINAL. In the FINAL-but-not-
-  // yet-scored window earnedPoints is still null, so the box shows the neutral
-  // stake. The `−` is a true minus, matching the app.
+  // Box (rule 9 + LIVE gate). Resolves ONLY at FINAL with a scored value; until
+  // then it shows the neutral stake, so a signed/coloured number is impossible
+  // during PRE/LIVE and in the FINAL-but-not-yet-scored window.
   const boxValue =
     isFinal && earnedPoints !== null
       ? earnedPoints > 0
@@ -204,10 +188,13 @@ export function GameChip({
           : colors.textPrimary
       : boxTint?.text ?? colors.textPrimary;
 
-  // Score colour (rule 3 / rule 9). Only the WINNER's score greens, and only at
-  // FINAL (isFinal && winnerTeam !== null) — never from a score comparison, and
-  // never red. The isFinal gate matches the box, so a stray winner value can't
-  // green a score before the game is final.
+  // The "pts" label under the number: white on an orange panel; at FINAL it
+  // follows the resolved number's colour (green hit / red miss); muted otherwise.
+  const labelColor =
+    boxTint?.text ??
+    (isFinal && earnedPoints !== null ? boxColor : colors.textSecondary);
+
+  // Score colour (rule 9). Only the WINNER's score greens, and only at FINAL.
   const awayScoreColor =
     isFinal && winnerTeam !== null && game.away_team === winnerTeam
       ? colors.gameWon
@@ -217,10 +204,20 @@ export function GameChip({
       ? colors.gameWon
       : colors.textPrimary;
 
-  // LIVE dot pulse — the ONLY animated value in this component. It drives the
-  // dot's opacity and nothing else: it is not composed into any text, score,
-  // or container style, so it cannot leak. Stops and resets whenever the game
-  // isn't live, so a finished game never leaves a loop running.
+  // Name treatment: with no pick both render neutral, equal weight; otherwise the
+  // picked name takes `pickedNameColor` heavy and the opponent goes muted+lighter.
+  const nameStyle = (isPicked: boolean) => {
+    if (pickedSide === null) {
+      return {font: displayType.display, color: colors.textPrimary, size: 16};
+    }
+    return isPicked
+      ? {font: displayType.display, color: pickedNameColor ?? colors.textPrimary, size: 16}
+      : {font: {...displayType.display, fontWeight: '400' as const}, color: colors.textSecondary, size: 13};
+  };
+  const awayNm = nameStyle(pickedSide === 'away');
+  const homeNm = nameStyle(pickedSide === 'home');
+
+  // LIVE dot pulse — the only animated value; drives this dot's opacity alone.
   const dotPulse = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     if (!isLive) {
@@ -229,31 +226,13 @@ export function GameChip({
     }
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(dotPulse, {
-          toValue: 0.3,
-          duration: 550,
-          useNativeDriver: true,
-        }),
-        Animated.timing(dotPulse, {
-          toValue: 1,
-          duration: 550,
-          useNativeDriver: true,
-        }),
+        Animated.timing(dotPulse, {toValue: 0.3, duration: 550, useNativeDriver: true}),
+        Animated.timing(dotPulse, {toValue: 1, duration: 550, useNativeDriver: true}),
       ]),
     );
     loop.start();
     return () => loop.stop();
   }, [isLive, dotPulse]);
-
-  // Picked team stands out by SIZE + WEIGHT + TINT, so the distinction survives
-  // greyscale and doesn't depend on colour alone (spec §6.2). With no pick,
-  // neither side is emphasised and both render primary.
-  const emphasis = (isPicked: boolean) =>
-    pickedSide === null || isPicked
-      ? {font: bodyType.bold, color: colors.textPrimary, size: 16}
-      : {font: bodyType.regular, color: colors.textSecondary, size: 13};
-  const awayEmphasis = emphasis(pickedSide === 'away');
-  const homeEmphasis = emphasis(pickedSide === 'home');
 
   const periodLabel = (() => {
     if (!isLive) return null;
@@ -263,123 +242,159 @@ export function GameChip({
     return parts.length > 0 ? parts.join(' · ') : null;
   })();
 
+  // One team's name line — a tap target when editable, a plain line otherwise
+  // (spec §6.3: never render a disabled TouchableOpacity — omit it).
+  const renderTeam = (
+    label: string,
+    code: string,
+    record: string | null | undefined,
+    nm: {font: TextStyle; color: string; size: number},
+  ) => {
+    const inner = (
+      <View style={styles.nameRow}>
+        <Text
+          style={[nm.font, styles.teamName, {color: nm.color, fontSize: nm.size}]}
+          numberOfLines={1}>
+          {label.toUpperCase()}
+        </Text>
+        {record ? (
+          <Text style={[bodyType.regular, styles.record, {color: colors.textSecondary}]}>
+            {record}
+          </Text>
+        ) : null}
+      </View>
+    );
+    return editable ? (
+      <TouchableOpacity
+        style={styles.nameTap}
+        activeOpacity={0.6}
+        onPress={() => onSelectTeam?.(code)}>
+        {inner}
+      </TouchableOpacity>
+    ) : (
+      inner
+    );
+  };
+
+  // Flame slot — rendered only when there's a flame or a lock to show (Home's
+  // HotPick card passes neither, so the slot collapses). Flame 50 in every
+  // state so the chip doesn't jump at lock. Tap target only when editable.
+  const flameContent = (
+    <>
+      {flame === 'lit' ? (
+        <View style={lock ? styles.dimFlame : null}>
+          <ChipFlameColor size={50} />
+        </View>
+      ) : flame === 'deselected' ? (
+        <ChipFlameDeselected size={50} color={colors.textTertiary} />
+      ) : lock ? (
+        <ChipLock size={46} color={colors.textPrimary} />
+      ) : null}
+      {lock && flame === 'lit' ? (
+        <View style={styles.lockOverlay}>
+          <ChipLock size={46} color={colors.textPrimary} />
+        </View>
+      ) : null}
+    </>
+  );
+  const flameSlot =
+    flame === 'none' && !lock ? null : editable ? (
+      <TouchableOpacity style={styles.flameSlot} activeOpacity={0.6} onPress={onPressFlame}>
+        {flameContent}
+      </TouchableOpacity>
+    ) : (
+      <View style={styles.flameSlot}>{flameContent}</View>
+    );
+
   return (
-    // The chip IS the whole card: one outlined pill holding [box] | divider |
-    // [game block]. Reproduced identically wherever a game renders, so callers
-    // should not wrap it in a second card.
-    <View style={[styles.pill, {borderColor: colors.border, backgroundColor: colors.surface}]}>
-      {/* Left box — permanent, on every instance. Neutral stake until FINAL +
-          scored; then signed + coloured. The label ("HotPick Points" or "PT") is
-          passed in by the wrapper — the chip renders it verbatim and carries no
-          HotPick status. No flame here: the flame/lock live in SeasonMatchCard's
-          column (rule 1). */}
+    // The chip IS the whole card: [panel] | divider | [game block] | [flame slot],
+    // one outlined pill. The outline goes orange for a HotPick chip (wrapper).
+    <View
+      style={[
+        styles.pill,
+        {
+          backgroundColor: colors.surface,
+          borderColor: outlineColor ?? colors.border,
+          borderWidth: outlineColor ? 2 : StyleSheet.hairlineWidth,
+        },
+      ]}>
+      {/* Left panel — full-bleed, rounded to the pill corner. Neutral stake until
+          FINAL + scored, then signed + coloured. Stacks the frozen rank beneath
+          when `stackedRank` is set. White-on-orange when tinted. */}
       <View style={[styles.ptsBox, {backgroundColor: boxTint?.background ?? colors.surfaceElevated}]}>
         <Text style={[bodyType.bold, styles.ptsValue, {color: boxColor}]}>
           {boxValue}
         </Text>
-        <Text style={[bodyType.bold, styles.ptsLabel, {color: boxTint?.text ?? colors.textSecondary}]}>
-          {pointsLabel}
-        </Text>
+        {stackedRank != null ? (
+          <>
+            <View style={[styles.panelDivider, {backgroundColor: boxTint?.text ?? colors.border}]} />
+            <Text style={[bodyType.bold, styles.stackedRank, {color: boxTint?.text ?? colors.textSecondary}]}>
+              {stackedRank}
+            </Text>
+          </>
+        ) : (
+          <Text style={[bodyType.bold, styles.ptsLabel, {color: labelColor}]}>
+            {pointsLabel}
+          </Text>
+        )}
       </View>
 
       <View style={[styles.divider, {backgroundColor: colors.border}]} />
 
       <View style={styles.gameBlock}>
-      {/* Status line — the chip carries its OWN status, because on Picks and
-          the Ladder there is no title above it to say what state this is. */}
-      {showStatus && isLive ? (
-        <View style={styles.statusRow}>
-          {/* The one moving thing in the chip. `opacity` is the only animated
-              style, and it is applied to this dot alone. */}
-          <Animated.View
-            style={[
-              styles.liveDot,
-              {backgroundColor: colors.live, opacity: dotPulse},
-            ]}
-          />
-          <Text style={[bodyType.bold, styles.statusText, {color: colors.live}]}>
-            LIVE
-          </Text>
-          {periodLabel ? (
-            <Text style={[bodyType.regular, styles.statusMeta, {color: colors.textSecondary}]}>
-              {periodLabel}
+        {/* Status line (status colours, not result colours): kickoff muted, or
+            LIVE green + clock, or FINAL red — red on wins too. */}
+        {showStatus ? (
+          isLive ? (
+            <View style={styles.statusRow}>
+              <Animated.View style={[styles.liveDot, {backgroundColor: colors.live, opacity: dotPulse}]} />
+              <Text style={[bodyType.bold, styles.statusText, {color: colors.gameWon}]}>LIVE</Text>
+              {periodLabel ? (
+                <Text style={[bodyType.regular, styles.statusMeta, {color: colors.textSecondary}]}>
+                  {periodLabel}
+                </Text>
+              ) : null}
+            </View>
+          ) : isFinal ? (
+            <View style={styles.statusRow}>
+              <Text style={[bodyType.bold, styles.statusText, {color: colors.gameLost}]}>FINAL</Text>
+            </View>
+          ) : (
+            <Text style={[bodyType.regular, styles.kickoff, {color: colors.textSecondary}]}>
+              {formatKickoff(game.kickoff_at)}
             </Text>
+          )
+        ) : null}
+
+        {/* Matchup — names (tappable when editable) with records inline, no "@". */}
+        <View style={styles.matchupRow}>
+          <View style={styles.namesCol}>
+            {renderTeam(away, game.away_team, awayRecord, awayNm)}
+            {renderTeam(home, game.home_team, homeRecord, homeNm)}
+          </View>
+
+          {showScores ? (
+            <View style={styles.scoresCol}>
+              <Text style={[bodyType.bold, styles.score, {color: awayScoreColor}]}>
+                {game.away_score ?? '—'}
+              </Text>
+              <Text style={[bodyType.bold, styles.score, {color: homeScoreColor}]}>
+                {game.home_score ?? '—'}
+              </Text>
+            </View>
           ) : null}
         </View>
-      ) : null}
-
-      {showStatus && isFinal ? (
-        <View style={styles.statusRow}>
-          <Text style={[bodyType.bold, styles.statusText, {color: colors.textSecondary}]}>
-            FINAL
-          </Text>
-        </View>
-      ) : null}
-
-      {/* Matchup. The names column does NOT flex, so the scores sit a fixed
-          gap to the right of the longest name rather than flushed to the edge.
-          Each name carries its record inline as small muted text; the home team
-          drops the old "@" prefix (spec §6.2). */}
-      {/* PRE kickoff renders ABOVE the matchup (no scores in this state). */}
-      {!showScores ? (
-        <Text style={[bodyType.regular, styles.kickoff, {color: colors.textSecondary}]}>
-          {formatKickoff(game.kickoff_at)}
-        </Text>
-      ) : null}
-
-      <View style={styles.matchupRow}>
-        <View style={styles.namesCol}>
-          <View style={styles.nameRow}>
-            <Text
-              style={[awayEmphasis.font, styles.teamName, {color: awayEmphasis.color, fontSize: awayEmphasis.size}]}
-              numberOfLines={1}>
-              {away.toUpperCase()}
-            </Text>
-            {awayRecord ? (
-              <Text style={[bodyType.regular, styles.record, {color: colors.textSecondary}]}>
-                {awayRecord}
-              </Text>
-            ) : null}
-          </View>
-          <View style={styles.nameRow}>
-            <Text
-              style={[homeEmphasis.font, styles.teamName, {color: homeEmphasis.color, fontSize: homeEmphasis.size}]}
-              numberOfLines={1}>
-              {home.toUpperCase()}
-            </Text>
-            {homeRecord ? (
-              <Text style={[bodyType.regular, styles.record, {color: colors.textSecondary}]}>
-                {homeRecord}
-              </Text>
-            ) : null}
-          </View>
-        </View>
-
-        {showScores ? (
-          <View style={styles.scoresCol}>
-            <Text style={[bodyType.bold, styles.score, {color: awayScoreColor}]}>
-              {game.away_score ?? '—'}
-            </Text>
-            <Text style={[bodyType.bold, styles.score, {color: homeScoreColor}]}>
-              {game.home_score ?? '—'}
-            </Text>
-          </View>
-        ) : null}
       </View>
-      </View>
+
+      {flameSlot}
     </View>
   );
 }
 
-// Every colour is applied inline from useTheme() at the call site, so these
-// are layout-only and need no theme parameter.
 const styles = StyleSheet.create({
-  // The whole card — one outlined pill. Starting proportions; per-screen
-  // polish deferred.
   pill: {
     flexDirection: 'row',
     alignItems: 'stretch',
-    borderWidth: StyleSheet.hairlineWidth,
     borderRadius: borderRadius.lg,
     overflow: 'hidden',
   },
@@ -398,6 +413,15 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginTop: 1,
     textAlign: 'center',
+  },
+  panelDivider: {
+    width: 22,
+    height: StyleSheet.hairlineWidth,
+    marginVertical: 3,
+  },
+  stackedRank: {
+    fontSize: 13,
+    fontVariant: ['tabular-nums'],
   },
   divider: {
     width: StyleSheet.hairlineWidth,
@@ -427,14 +451,20 @@ const styles = StyleSheet.create({
   statusMeta: {
     fontSize: 11,
   },
+  kickoff: {
+    fontSize: 12,
+    marginBottom: 2,
+  },
   matchupRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   namesCol: {
-    // Deliberately no flex — so the scores sit a fixed gap to the right of the
-    // longest team name instead of being pushed to the far edge.
+    // No flex — scores sit a fixed gap right of the longest name.
     gap: 2,
+  },
+  nameTap: {
+    paddingVertical: 2,
   },
   nameRow: {
     flexDirection: 'row',
@@ -458,8 +488,18 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontVariant: ['tabular-nums'],
   },
-  kickoff: {
-    fontSize: 12,
-    marginTop: 2,
+  flameSlot: {
+    width: 56,
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dimFlame: {
+    opacity: 0.5,
+  },
+  lockOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

@@ -51,7 +51,7 @@ export function CompleteHero() {
           style={[
             monoType.regular,
             styles.delta,
-            {color: weekResult.rankDelta > 0 ? colors.win : colors.loss},
+            {color: weekResult.rankDelta > 0 ? colors.gameWon : colors.gameLost},
           ]}>
           {weekResult.rankDelta > 0 ? '↑' : '↓'} {Math.abs(weekResult.rankDelta)} from last week
         </Text>

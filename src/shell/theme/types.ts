@@ -85,8 +85,6 @@ export interface ThemeColors {
   ink: string;              // Deep ink for high-contrast type
   textTertiary: string;     // Captions, muted labels, placeholders
   live: string;             // Live-green dot for in-progress states
-  loss: string;             // Negative delta numerals (mono)
-  win: string;              // Positive delta numerals (mono)
   // GameChip FINAL result — the picked team's score. Split per mode: the
   // light values are dark enough to read on #EBEBEB, the dark values light
   // enough to read on #1A1A1A. Both directions measured — see defaults.ts.

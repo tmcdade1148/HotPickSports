@@ -70,8 +70,6 @@ export function useTheme(): {colors: ThemeColors; isDark: boolean} {
       ink: extended.ink,
       textTertiary: extended.text_tertiary,
       live: extended.live,
-      loss: extended.loss,
-      win: extended.win,
       gameWon: extended.game_won,
       gameLost: extended.game_lost,
       hotpickMiss: extended.hotpick_miss,

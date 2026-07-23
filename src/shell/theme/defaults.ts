@@ -72,14 +72,12 @@ export const HOTPICK_EXTENDED_TOKENS = {
   ink: '#303030',
   text_tertiary: '#8A8A8A',
   live: '#22C55E',
-  loss: '#DC2626',
-  win: '#22C55E',
   // GameChip FINAL result colours — the picked team's score. Deliberately NOT
-  // reusing win/loss: those are tuned for dark-surface delta numerals and fail
-  // AA as text on the LIGHT card (#22C55E is 2.1:1 on #EBEBEB). These carry a
+  // reusing the now-removed win/loss delta tokens: they weren't theme-split and
+  // failed AA as text on the LIGHT card (#22C55E is 2.1:1 on #EBEBEB). These carry a
   // real value in BOTH objects so neither mode inherits the other's.
-  // LIGHT (on surface #EBEBEB): won 5.98:1 · lost 5.43:1. Measured 2026-07-18.
-  game_won: '#166534',
+  // LIGHT (on surface #EBEBEB): won ~5:1 (game_won brightened to #15803D 2026-07-23) · lost 5.43:1. Measured 2026-07-18.
+  game_won: '#15803D',
   game_lost: '#B91C1C',
   // HISTORY chart — the "flame missed" bar (map rule 5: height = week, colour
   // = did the flame hit). Its OWN token, deliberately not an accentTeal alias:
@@ -95,8 +93,6 @@ export const HOTPICK_EXTENDED_TOKENS_DARK = {
   ink: '#303030',
   text_tertiary: '#7A7A7A',
   live: '#22C55E',
-  loss: '#DC2626',
-  win: '#22C55E',
   // DARK twins. The light greens/reds fail on dark surfaces (#166534 is 1.8:1
   // on #1A1A1A), so each gets a lighter value — the same fix shape as error →
   // #F1655A. DARK (on surface #1A1A1A): won 9.99:1 · lost 5.59:1. Also clears
