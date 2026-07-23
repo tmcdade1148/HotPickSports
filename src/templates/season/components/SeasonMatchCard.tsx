@@ -1,8 +1,9 @@
 import React from 'react';
 import {Text} from '@shared/components/AppText';
 import {View, TouchableOpacity, Alert, StyleSheet} from 'react-native';
-import {Lock} from 'lucide-react-native';
-import {HotPickFlame} from '@shared/components/HotPickFlame';
+import {ChipFlameColor} from '@shared/components/ChipFlameColor';
+import {ChipFlameDeselected} from '@shared/components/ChipFlameDeselected';
+import {ChipLock} from '@shared/components/ChipLock';
 import {GameChip} from '@shared/components/GameChip';
 import type {SeasonConfig} from '@shared/types/templates';
 import type {DbSeasonGame} from '@shared/types/database';
@@ -211,44 +212,20 @@ export function SeasonMatchCard({
       isLocked && !isLive && !isFinal && styles.containerLocked,
       isHotPick && styles.containerHotPick,
     ]}>
-      {/* ── Header: day/time | lock | points ──
-          When the card is read-only the GameChip below owns the day/time and
-          the LIVE / FINAL status, so the header drops them and keeps only the
-          lock affordance and the points. Two status lines would be a
-          duplicate, and the chip's is the canonical one. */}
-      <View style={styles.header}>
-        {!isLocked ? (
-          <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
-            <Text style={styles.kickoffText}>{formatKickoff(kickoffDate)}</Text>
-          </View>
-        ) : (
-          <Lock size={12} color={colors.textPrimary} />
-        )}
-
-        {isFinal ? (
-          <View style={styles.finalRow}>
-            {existingPick?.points != null && (
-              <Text style={[
-                styles.pointsEarnedInline,
-                existingPick.points > 0 && styles.pointsEarnedPositive,
-                existingPick.points < 0 && styles.pointsEarnedNegative,
-              ]}>
-                {existingPick.points > 0
-                  ? `+${existingPick.points} pt${existingPick.points === 1 ? '' : 's'}`
-                  : existingPick.points < 0
-                    ? `\u2212${Math.abs(existingPick.points)} pt${Math.abs(existingPick.points) === 1 ? '' : 's'}`
-                    : '0 pts'}
-              </Text>
-            )}
-          </View>
-        ) : null}
-
-        <View style={styles.headerSpacer} />
-
-        {pointsLabel ? (
-          <Text style={styles.hotPickPointsHeader}>{pointsLabel}</Text>
-        ) : null}
-      </View>
+      {/* ── Header (editable only) ──
+          Once the card is read-only the GameChip owns the day/time and the
+          LIVE / FINAL status, the chip's box owns the points, and the lock
+          moves to the flame column (spec section 8: only one lock per card),
+          so the header has nothing left to show and is dropped entirely. */}
+      {!isLocked ? (
+        <View style={styles.header}>
+          <Text style={styles.kickoffText}>{formatKickoff(kickoffDate)}</Text>
+          <View style={styles.headerSpacer} />
+          {pointsLabel ? (
+            <Text style={styles.hotPickPointsHeader}>{pointsLabel}</Text>
+          ) : null}
+        </View>
+      ) : null}
 
       {/* ── Main row: rank circle (editable only) | teams | flame ── */}
       <View style={styles.mainRow}>
@@ -282,7 +259,7 @@ export function SeasonMatchCard({
         {/* Teams — the display half.
             READ-ONLY (locked / live / final): the GameChip renders it. It owns
             the three states, the scores, the clock, and the FINAL result colour
-            (from the server's is_correct — never a score comparison).
+            (from the server's winner_team + earned points, never a score comparison).
             EDITABLE: the tappable TeamRows stay exactly as they were, because
             here the team name IS the pick target. Scores never appeared in this
             branch anyway — a game with a score is live or final, which is
@@ -291,8 +268,11 @@ export function SeasonMatchCard({
           {isLocked ? (
             <GameChip
               game={game}
-              points={rank}
-              isCorrect={existingPick?.is_correct ?? null}
+              points={isHotPick ? rank : 1}
+              earnedPoints={existingPick?.points ?? null}
+              winnerTeam={game.winner_team}
+              pointsLabel={isHotPick ? 'HotPick Points' : 'PT'}
+              boxTint={isHotPick ? {background: colors.primary, text: colors.onPrimary} : undefined}
               pickedSide={
                 pickedTeam === game.home_team
                   ? 'home'
@@ -302,6 +282,8 @@ export function SeasonMatchCard({
               }
               awayName={awayTeamName}
               homeName={homeTeamName}
+              awayRecord={game.away_record}
+              homeRecord={game.home_record}
             />
           ) : (
             <View style={styles.teamNamesCol}>
@@ -329,18 +311,43 @@ export function SeasonMatchCard({
           )}
         </View>
 
-        {/* Flame icon — outline when inactive, filled orange when HotPick */}
-        <View style={styles.flameColumn}>
-          <TouchableOpacity
-            onPress={handleFlamePress}
-            disabled={isLocked || isSaving || !canSetHotPick}
-            activeOpacity={0.6}>
-            <HotPickFlame
-              size={48}
-              active={isHotPick}
-            />
-          </TouchableOpacity>
-        </View>
+        {/* Flame / lock column — spec §6.3 state machine:
+              not locked          -> flame selector (deselected until chosen), tappable
+              locked + HotPick     -> colored flame + strong lock
+              locked + not HotPick -> muted lock only, no flame
+            Tap-to-designate is unchanged; only the artwork branches. */}
+        {!isLocked ? (
+          <View style={styles.flameColumn}>
+            <TouchableOpacity
+              onPress={handleFlamePress}
+              disabled={isSaving || !canSetHotPick}
+              activeOpacity={0.6}>
+              {isHotPick ? (
+                <ChipFlameColor size={46} />
+              ) : (
+                <ChipFlameDeselected size={46} color={colors.textTertiary} />
+              )}
+            </TouchableOpacity>
+          </View>
+        ) : (
+          // Locked: the pill runs full-width; the flame/lock sits ON its right
+          // surface as an absolute overlay (no column reserving a gap). The lock
+          // layers on top of the dimmed flame for the HotPick.
+          <View style={styles.lockOverlay} pointerEvents="none">
+            {isHotPick ? (
+              <View style={styles.flameLockStack}>
+                <View style={styles.dimFlame}>
+                  <ChipFlameColor size={46} />
+                </View>
+                <View style={styles.lockOnFlame}>
+                  <ChipLock size={46} color={colors.textPrimary} />
+                </View>
+              </View>
+            ) : (
+              <ChipLock size={46} color={colors.textTertiary} />
+            )}
+          </View>
+        )}
       </View>
 
       {/* ── Pick Split Bar — revealed at kickoff ── */}
@@ -427,18 +434,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: '600',
     color: colors.textSecondary,
   },
-  finalRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 6,
-  },
-  pointsEarnedInline: {
-    // Match FINAL exactly: same size, weight, and italic styling.
-    fontSize: 14,
-    fontWeight: '900',
-    fontStyle: 'italic',
-    color: colors.textSecondary,
-  },
   headerSpacer: {
     flex: 1,
   },
@@ -447,18 +442,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: '700',
     color: colors.warning,
   },
-  pointsEarned: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: colors.textSecondary,
-  },
-  pointsEarnedPositive: {
-    color: colors.success,
-  },
-  pointsEarnedNegative: {
-    color: colors.error,
-  },
-
   // Main row
   mainRow: {
     flexDirection: 'row',
@@ -575,6 +558,33 @@ const createStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center',
     marginRight: 12,
     flexDirection: 'column',
+  },
+  // Locked HotPick: strong lock layered ON TOP of the (dimmed) colored flame.
+  flameLockStack: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Recede the flame so the lock reads as the active layer on top.
+  dimFlame: {
+    opacity: 0.5,
+  },
+  // The lock, centred over the flame.
+  lockOnFlame: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Locked: flame/lock sits ON the full-width pill's right surface, occupying the
+  // SAME footprint the flame selector uses when editable (width 48, 12 right
+  // inset — matching flameColumn), so the lock lands exactly where the flame was.
+  lockOverlay: {
+    position: 'absolute',
+    right: 12,
+    width: 48,
+    top: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   // Pick split bar
   pickSplitContainer: {

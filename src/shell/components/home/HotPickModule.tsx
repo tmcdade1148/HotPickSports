@@ -12,9 +12,10 @@
 //
 // Compliance the module inherits from the chip, by construction:
 //   Rule 1  — the flame lives in the TITLE, never inside the chip.
-//   Rule 2  — the PTS box is unsigned and neutral until FINAL.
+//   Rule 2  — the box is unsigned and neutral until the server scores the pick.
 //   Rule 3  — no green/red during live; the LIVE dot is the only motion.
-//   Rule 9  — FINAL result colour comes from the server's is_correct.
+//   Rule 9  — the result comes from the server (earned points + winner_team),
+//             never a client score comparison.
 //   Rule 10 — status is read through gameStatus.ts, case-insensitively.
 
 import React, {useEffect, useRef} from 'react';
@@ -118,21 +119,24 @@ export function HotPickModule() {
           </>
         )}
         {isFinal && (
-          <Text style={[bodyType.bold, styles.statusWord, {color: colors.gameLost}]}>
+          <Text style={[bodyType.bold, styles.statusWord, {color: colors.textSecondary}]}>
             • FINAL
           </Text>
         )}
       </View>
 
       {/* One contract: the season_games row overlaid with the fresher live
-          payload. is_correct comes straight from the SERVER (season_picks),
-          never from a score comparison (rule 9). */}
+          payload. The result comes straight from the SERVER — earned points
+          (season_picks.points) and winner_team — never a score comparison
+          (rule 9). */}
       <GameChip
         game={{...userHotPickGame, ...fromGameScore(hotPickScore)}}
         points={rank}
-        signedAtFinal
+        earnedPoints={userHotPick.points}
+        winnerTeam={userHotPickGame.winner_team}
+        pointsLabel="HotPick Points"
+        boxTint={{background: colors.primary, text: colors.onPrimary}}
         showStatus={false}
-        isCorrect={userHotPick.is_correct ?? null}
         pickedSide={
           userHotPick.picked_team === userHotPickGame.home_team
             ? 'home'
@@ -142,6 +146,8 @@ export function HotPickModule() {
         }
         awayName={awayName}
         homeName={homeName}
+        awayRecord={userHotPickGame.away_record}
+        homeRecord={userHotPickGame.home_record}
       />
     </Pressable>
   );
