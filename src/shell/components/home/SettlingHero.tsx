@@ -12,6 +12,7 @@ import {useNavigation} from '@react-navigation/native';
 import {useTheme} from '@shell/theme/hooks';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {displayType, bodyType, monoType, spacing, borderRadius} from '@shared/theme';
+import {fmtPoints} from '@shared/utils/format';
 
 // The greeting line that used to sit here is gone — the contextual line is now a
 // single producer (ContextualLine) rendered once above the hero by HomeScreen.
@@ -48,7 +49,7 @@ export function SettlingHero() {
                 lineHeight: displayType.size.display2,
               },
             ]}>
-            {isPositive ? '+' : ''}{points}
+            {fmtPoints(points)}
           </Text>
           <Text style={[displayType.display, styles.ptsLabel, {color: colors.textSecondary}]}>
             pts

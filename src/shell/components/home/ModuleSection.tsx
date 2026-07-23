@@ -33,9 +33,15 @@ import {useFocusEffect} from '@react-navigation/native';
 import {ChevronDown, ChevronUp} from 'lucide-react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {bodyType, displayType, monoType, sectionHeaderType, spacing} from '@shared/theme';
-import {fmtPoints} from './weekRecap';
+import {fmtPoints} from '@shared/utils/format';
 
-const CHEVRON = 18;
+// Eyebrow scale (Tom, 2026-07-23). Both multiply their own previous size, so
+// the number stays clearly larger than the label rather than matching it.
+const LABEL_SIZE = sectionHeaderType.fontSize * 2;   // 11 → 22, bold
+const VALUE_SIZE = Math.round(13 * 2.25);            // 13 → 29, heavy italic
+// Sized off the label so the affordance doesn't read as an afterthought beside
+// a 29px number.
+const CHEVRON = LABEL_SIZE;
 
 /** Right-aligned week status. `tone` picks the token, never a literal colour. */
 export interface ModuleSectionStatus {
@@ -98,27 +104,38 @@ export function ModuleSection({
 
   const header = (
     <View style={styles.row}>
-      <Text
-        style={[
-          bodyType.bold,
-          styles.label,
-          {color: emphasis ? colors.textPrimary : colors.textTertiary},
-        ]}
-        numberOfLines={1}>
-        {label}
-      </Text>
+      {/* The type sits on a shared BASELINE. The row itself stays centred —
+          baseline-aligning the dots and the chevron (plain Views, no text)
+          hangs them off their bottom edge instead. */}
+      <View style={styles.titleGroup}>
+        <Text
+          style={[
+            bodyType.bold,
+            styles.label,
+            {color: emphasis ? colors.textPrimary : colors.textTertiary},
+          ]}
+          numberOfLines={1}>
+          {label}
+        </Text>
 
-      {showValue && (
-        <>
-          <Text style={[bodyType.bold, styles.bullet, {color: colors.textTertiary}]}>
-            {'•'}
-          </Text>
-          <Text style={[bodyType.bold, styles.value, {color: valueColor}]}>
-            {/* U+2013 en-dash: nothing has settled. Not a zero. */}
-            {value == null ? '–' : fmtPoints(value)}
-          </Text>
-        </>
-      )}
+        {showValue && (
+          <>
+            <Text style={[bodyType.bold, styles.bullet, {color: colors.textTertiary}]}>
+              {'•'}
+            </Text>
+            <Text style={[displayType.display, styles.value, {color: valueColor}]}>
+              {/* U+2013 en-dash: nothing has settled. Not a zero. */}
+              {value == null ? '–' : fmtPoints(value)}
+            </Text>
+            {/* No unit on the en-dash — "– pts" reads like a broken number. */}
+            {value != null && (
+              <Text style={[bodyType.bold, styles.valueUnit, {color: colors.textTertiary}]}>
+                pts
+              </Text>
+            )}
+          </>
+        )}
+      </View>
 
       <View style={styles.spacer} />
 
@@ -178,17 +195,34 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     gap: 6,
   },
+  // Label · value · pts, sharing one baseline so the 22px label and the 29px
+  // number read as a single line rather than two stacked things.
+  titleGroup: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    flexShrink: 1,
+    gap: 6,
+  },
   label: {
     ...sectionHeaderType,
+    fontSize: LABEL_SIZE,
+    // sectionHeaderType's 1.8 tracking was tuned for an 11px caps label; at
+    // twice the size it opens into a gap. Scaled down proportionally.
+    letterSpacing: 0.9,
     flexShrink: 1,
   },
   bullet: {
-    fontSize: 11,
+    fontSize: LABEL_SIZE,
   },
   value: {
-    ...sectionHeaderType,
     ...monoType.regular,
-    fontSize: 13,
+    fontSize: VALUE_SIZE,
+  },
+  // Rides to the right of the number, small — a unit on that number, not a
+  // second thing to read.
+  valueUnit: {
+    fontSize: 11,
+    letterSpacing: 0.8,
   },
   // Pushes status + chevron to the right edge without letting the label's
   // flexShrink fight them for space.

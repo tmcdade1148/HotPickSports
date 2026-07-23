@@ -3,8 +3,12 @@
  *
  * These used to live inside HistoryModule.tsx. That file is now TWO components
  * (RecapModule + HistoryModule) and the eyebrow is a third consumer, so the
- * helpers moved here rather than being copied into each — one spelling of "no
- * plus signs", one spelling of "WEEK 7" / "WC".
+ * helpers moved here rather than being copied into each — one spelling of
+ * "WEEK 7" / "WC".
+ *
+ * The sign rule that also lived here is now `fmtPoints` in @shared/utils/format:
+ * it stopped being a HISTORY rule and became an app-wide one, so it belongs
+ * where the GameChip and the Picks screen can reach it too.
  */
 
 /**
@@ -49,11 +53,6 @@ export function weekLabel(week: number, isPlayoffs: boolean): string {
 export function sectionWeekLabel(week: number, isPlayoffs: boolean): string {
   if (isPlayoffs) return ROUND_LABEL[week] ?? `WEEK ${week}`;
   return `WEEK ${week}`;
-}
-
-/** No plus signs, ever. A real negative keeps its minus (U+2212). */
-export function fmtPoints(n: number): string {
-  return n < 0 ? `−${Math.abs(n)}` : String(n);
 }
 
 /**

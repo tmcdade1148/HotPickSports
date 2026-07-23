@@ -21,7 +21,7 @@ import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {DEMO_COMPETITION} from '@sports/registry';
 import {LEXICON} from '@shared/lexicon';
-import {ordinal} from '@shared/utils/format';
+import {fmtPoints, ordinal} from '@shared/utils/format';
 import {hexToRgba} from '@shared/utils/color';
 import {bodyType, displayType, spacing, borderRadius} from '@shared/theme';
 import {AvatarBadge} from '@shared/components/AvatarBadge';
@@ -132,7 +132,7 @@ export function DemoResultScreen() {
       <ScrollView style={styles.scrollFlex} contentContainerStyle={styles.scroll}>
         <Text style={styles.kicker}>DEMO WEEK · FINAL</Text>
         <Text style={styles.score}>
-          {myPoints >= 0 ? '+' : ''}{myPoints}
+          {fmtPoints(myPoints)}
           <Text style={styles.scorePts}> pts</Text>
         </Text>
         <Text style={styles.subhead}>
@@ -156,7 +156,13 @@ export function DemoResultScreen() {
                   styles.statValue,
                   {color: total.is_hotpick_correct ? colors.success : colors.error},
                 ]}>
-                  {total.is_hotpick_correct ? '+' : '−'}{total.hotpick_rank ?? 0}
+                  {/* The rank is stored unsigned; the OUTCOME signs it. A hit
+                      reads bare, a miss keeps its minus. */}
+                  {fmtPoints(
+                    total.is_hotpick_correct
+                      ? total.hotpick_rank ?? 0
+                      : -(total.hotpick_rank ?? 0),
+                  )}
                 </Text>
               </View>
               <Text style={styles.statLabel}>HOTPICK</Text>
@@ -183,7 +189,7 @@ export function DemoResultScreen() {
                 </Text>
               </View>
               <Text style={[styles.points, row.isUser && styles.pointsMe]}>
-                {row.points >= 0 ? '+' : ''}{row.points} pts
+                {fmtPoints(row.points)} pts
               </Text>
             </View>
           ))}

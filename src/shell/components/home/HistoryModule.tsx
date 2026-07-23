@@ -27,14 +27,9 @@ import {useGlobalStore} from '@shell/stores/globalStore';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useTheme} from '@shell/theme/hooks';
 import {displayType, monoType, spacing, borderRadius} from '@shared/theme';
+import {fmtPoints} from '@shared/utils/format';
 import {ModuleSection} from './ModuleSection';
-import {
-  HIDDEN_PHASES,
-  PLAYOFF_PHASES,
-  fmtPoints,
-  weekLabel,
-  type WeekRow,
-} from './weekRecap';
+import {HIDDEN_PHASES, PLAYOFF_PHASES, weekLabel, type WeekRow} from './weekRecap';
 
 // Five week slots visible at rest — one more than before, because the head no
 // longer eats ~28% of the card. Older weeks live in the carousel behind them.

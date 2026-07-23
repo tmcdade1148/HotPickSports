@@ -16,7 +16,7 @@ import {PILL_HEIGHT} from '@shared/theme/pill';
 import type {DbSeasonGame} from '@shared/types/database';
 import {useTheme} from '@shell/theme';
 import {useNavReserve} from '@shared/hooks/useNavReserve';
-import {ordinalSuffix} from '@shared/utils/format';
+import {fmtPoints, ordinalSuffix} from '@shared/utils/format';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {supabase} from '@shared/config/supabase';
@@ -469,7 +469,7 @@ export function SeasonPicksScreen() {
                     styles.widgetValue,
                     {color: displayWeekScore >= 0 ? colors.success : colors.error},
                   ]}>
-                    {displayWeekScore >= 0 ? '+' : ''}{displayWeekScore}
+                    {fmtPoints(displayWeekScore)}
                   </Text>
                   <Text style={[
                     styles.widgetPts,
@@ -501,11 +501,7 @@ export function SeasonPicksScreen() {
                     displayWeekScore != null && displayWeekScore > 0 && {color: colors.success},
                     displayWeekScore != null && displayWeekScore < 0 && {color: colors.error},
                   ]}>
-                    {displayWeekScore == null
-                      ? '—'
-                      : displayWeekScore > 0
-                        ? `+${displayWeekScore}`
-                        : `${displayWeekScore}`}
+                    {displayWeekScore == null ? '—' : fmtPoints(displayWeekScore)}
                   </Text>
                   <Text style={styles.widgetPts}>pts</Text>
                 </View>

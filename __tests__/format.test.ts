@@ -10,6 +10,7 @@ import {
   formatRosterPass,
   normalizeRosterPass,
   formatRelativeTime,
+  fmtPoints,
 } from '../src/shared/utils/format';
 
 describe('ordinalSuffix', () => {
@@ -81,6 +82,36 @@ describe('normalizeRosterPass', () => {
   it('preserves digit-only and letter-only inputs', () => {
     expect(normalizeRosterPass('12345678')).toBe('12345678');
     expect(normalizeRosterPass('abcdefgh')).toBe('ABCDEFGH');
+  });
+});
+
+describe('fmtPoints', () => {
+  // The app-wide sign rule (2026-07-23). Every point value on every surface —
+  // the GameChip's FINAL box, the Picks week score, Home's eyebrows, the Recap
+  // card — formats through here. A "+" creeping back in is the regression this
+  // guards: it makes a settled result read as a swing that could still move.
+  it('renders positives BARE — never a leading plus', () => {
+    expect(fmtPoints(16)).toBe('16');
+    expect(fmtPoints(1)).toBe('1');
+    expect(fmtPoints(31)).toBe('31');
+  });
+
+  it('renders zero as a plain 0', () => {
+    expect(fmtPoints(0)).toBe('0');
+  });
+
+  it('keeps the minus on genuine negatives', () => {
+    expect(fmtPoints(-16)).toBe('−16');
+    expect(fmtPoints(-1)).toBe('−1');
+  });
+
+  it('uses U+2212 MINUS SIGN, not a hyphen', () => {
+    // A hyphen-minus renders short and high next to full-height digits; the
+    // real minus sign is what the design calls for and what every surface must
+    // agree on. `-16` (hyphen) is the wrong glyph even though it "looks right".
+    expect(fmtPoints(-16)).toBe('−16');
+    expect(fmtPoints(-16)).not.toBe('-16');
+    expect(fmtPoints(-16).charCodeAt(0)).toBe(0x2212);
   });
 });
 

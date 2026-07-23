@@ -70,3 +70,22 @@ export function formatRelativeTime(iso: string): string {
 export function ordinal(n: number): string {
   return `${n}${ordinalSuffix(n)}`;
 }
+
+/**
+ * THE sign rule for every point value in the app.
+ *
+ * A positive number is BARE (16, 22, 1). Only a genuine negative carries its
+ * minus (−16), and it's U+2212 MINUS SIGN, not a hyphen. Zero is "0".
+ *
+ * Why: a leading "+" makes a settled result read as a potential swing — as if
+ * the number could still move. Nothing that has already happened should look
+ * like an offer. Colour carries the state (green gain / neutral / red miss);
+ * the sign is only there when the number is genuinely below zero.
+ *
+ * This was a HISTORY-local rule and is now global (2026-07-23): the GameChip's
+ * FINAL box, the Picks screen's week score, Home's eyebrows and the Recap card
+ * all format through here. Do not re-implement it at a call site.
+ */
+export function fmtPoints(n: number): string {
+  return n < 0 ? `−${Math.abs(n)}` : String(n);
+}

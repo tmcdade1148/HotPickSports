@@ -33,6 +33,7 @@ import {Animated, StyleSheet, TouchableOpacity, View} from 'react-native';
 import type {TextStyle} from 'react-native';
 import {useTheme} from '@shell/theme';
 import {bodyType, borderRadius, displayType, spacing} from '@shared/theme';
+import {fmtPoints} from '@shared/utils/format';
 import {isFinalStatus, isLiveStatus} from '@sports/nfl/utils/gameStatus';
 import {ChipFlameColor} from '@shared/components/ChipFlameColor';
 import {ChipFlameDeselected} from '@shared/components/ChipFlameDeselected';
@@ -190,13 +191,14 @@ export function GameChip({
   // Box (rule 9 + LIVE gate). Resolves ONLY at FINAL with a scored value; until
   // then it shows the neutral stake, so a signed/coloured number is impossible
   // during PRE/LIVE and in the FINAL-but-not-yet-scored window.
+  // Sign rule is app-wide (fmtPoints): positives BARE, only genuine negatives
+  // carry a minus. A hit reads "16", a standard win "1", a HotPick miss "−16".
+  // The COLOUR still carries the state — green gain / neutral / red miss — so
+  // dropping the "+" costs no information and stops a settled result from
+  // reading like a swing that could still move.
   const boxValue =
     isFinal && earnedPoints !== null
-      ? earnedPoints > 0
-        ? `+${earnedPoints}`
-        : earnedPoints < 0
-          ? `−${Math.abs(earnedPoints)}`
-          : '0'
+      ? fmtPoints(earnedPoints)
       : noPickLocked
         ? '0'
         : String(points);

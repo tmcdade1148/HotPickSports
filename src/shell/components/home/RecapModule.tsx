@@ -17,7 +17,7 @@
 // The rules it holds:
 //   Rule 2  — no "+" anywhere. A positive number is bare (16, 22); only a
 //             genuine negative carries its minus (−16). Nothing reads as a
-//             potential swing.
+//             potential swing. Now app-wide via fmtPoints, not local to Home.
 //   Rule 1  — the flame is allowed here: at week complete it stops being your
 //             call and becomes your story.
 //   Hard Rule #9 — every colour is a token. No hex in this file.
@@ -35,13 +35,13 @@ import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useTheme} from '@shell/theme/hooks';
 import {PICKED_NAME_SIZE} from '@shared/components/GameChip';
 import {bodyType, borderRadius, displayType, monoType, spacing} from '@shared/theme';
+import {fmtPoints} from '@shared/utils/format';
 import {ModuleSection} from './ModuleSection';
 import {fullTeamName} from './teamColors';
 import {
   HIDDEN_PHASES,
   PLAYOFF_PHASES,
   derivePickDisplay,
-  fmtPoints,
   sectionWeekLabel,
   type WeekRow,
 } from './weekRecap';

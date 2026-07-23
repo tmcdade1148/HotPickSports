@@ -12,6 +12,7 @@ import {BarChart3, Flame} from 'lucide-react-native';
 import {useTheme} from '@shell/theme';
 import {bodyType, displayType, spacing, borderRadius} from '@shared/theme';
 import {LEXICON, scoringNeverNegative} from '@shared/lexicon';
+import {fmtPoints} from '@shared/utils/format';
 
 // ── HotPick points badge — mirrors the rank circle on SeasonMatchCard ──
 function HotPickBadge({rank}: {rank: number}) {
@@ -155,20 +156,20 @@ export function DemoScoreModal({
             styles.bigScore,
             {color: weekPoints >= 0 ? colors.success : colors.error},
           ]}>
-          {weekPoints >= 0 ? '+' : ''}{weekPoints}
+          {fmtPoints(weekPoints)}
           <Text style={{fontSize: 20, color: colors.textSecondary}}> pts</Text>
         </Text>
 
         <Text style={[bodyType.regular, styles.scoreLine, {color: colors.textPrimary}]}>
           You won <Text style={{fontWeight: '800'}}>{regularWins}</Text> of your {regularPicks}{' '}
-          regular picks (+{regularWins}).
+          regular picks ({regularWins}).
         </Text>
 
         {hotpickRank != null && hotpickCorrect !== null && (
           <Text style={[bodyType.regular, styles.scoreLine, {color: colors.textPrimary}]}>
             {hotpickCorrect ? (
               <>
-                Your rank-{hotpickRank} HotPick <Text style={{fontWeight: '800', color: colors.success}}>hit (+{hotpickRank})</Text>.
+                Your rank-{hotpickRank} HotPick <Text style={{fontWeight: '800', color: colors.success}}>hit ({hotpickRank})</Text>.
               </>
             ) : (
               <>
@@ -179,7 +180,7 @@ export function DemoScoreModal({
         )}
 
         <Text style={[bodyType.bold, styles.netLine, {color: colors.textPrimary}]}>
-          Net: {weekPoints >= 0 ? '+' : ''}{weekPoints} for the week.
+          Net: {fmtPoints(weekPoints)} for the week.
         </Text>
 
         <Pressable
