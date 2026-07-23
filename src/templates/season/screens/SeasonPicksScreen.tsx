@@ -16,8 +16,7 @@ import type {DbSeasonGame} from '@shared/types/database';
 import {useTheme} from '@shell/theme';
 import {useNavReserve} from '@shared/hooks/useNavReserve';
 import {ordinalSuffix} from '@shared/utils/format';
-import {useNFLStore, type GameScore} from '@sports/nfl/stores/nflStore';
-import {computeLiveWeekEarned} from '@sports/nfl/utils/liveWeekScore';
+import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {supabase} from '@shared/config/supabase';
 import {DemoIntroModal, DemoScoreModal} from '@shell/components/home/DemoModals';
@@ -225,37 +224,26 @@ export function SeasonPicksScreen() {
     return total;
   })();
 
-  // Week Score display value. The server-settled total (weekEarned) is
-  // authoritative, but the sim only writes it at settle — so for the IN-PROGRESS
-  // week we show a live running estimate computed from the week's own game rows
-  // (same logic as the Home weekly pills), which populates and updates as games
-  // finalize. Past weeks (browsed) always use the settled server value. Built
-  // from `games` (kept fresh by subscribeToGameScores), so it doesn't depend on
-  // the Home screen having populated nflStore.liveScores.
-  const liveScoresFromGames = useMemo(() => {
-    const m: Record<string, GameScore> = {};
-    for (const g of games) {
-      m[g.game_id] = {
-        homeScore: g.home_score ?? 0,
-        awayScore: g.away_score ?? 0,
-        status: (g.status ?? '').toLowerCase(),
-        currentPeriod: null,
-        gameClock: null,
-      };
-    }
-    return m;
-  }, [games]);
-  const liveWeekEarned = useMemo(
-    () => computeLiveWeekEarned(weekPicks, games, liveScoresFromGames, null).earned,
-    [weekPicks, games, liveScoresFromGames],
-  );
+  // Week Score = the sum of the SERVER's SETTLED per-pick points. season_picks.points
+  // is null until a game is scored, then 0 / 1 / ±rank, so summing the non-null
+  // points is the settled week score — games still live (points null) contribute
+  // nothing, and it grows as they finalise (correct and expected). Deliberately
+  // NOT a client-side projection: no score comparison, no signing an in-progress
+  // value — same rule as the chip (settled results may sign + colour, live ones
+  // may not).
+  const settledWeekScore = useMemo(() => {
+    const scored = weekPicks.filter(p => p.points != null);
+    return scored.length
+      ? scored.reduce((sum, p) => sum + (p.points ?? 0), 0)
+      : null;
+  }, [weekPicks]);
   const isLiveWeek = currentWeek === dbCurrentWeek;
   const anyGameStarted = useMemo(() => games.some(hasStarted), [games]);
-  // In-progress week with ≥1 game started → live running estimate; otherwise the
+  // In-progress week with ≥1 game started → settled per-pick points once games finalise; otherwise the
   // settled server value (so it reads "—" before kickoff and for past weeks until
   // a real score exists).
   const displayWeekScore =
-    isLiveWeek && anyGameStarted ? liveWeekEarned ?? weekEarned : weekEarned;
+    isLiveWeek && anyGameStarted ? settledWeekScore : weekEarned;
 
   // Keep the viewing week in sync with the league's current week, but DON'T
   // yank the user off a week they've navigated back to. On first mount we land
