@@ -24,9 +24,9 @@ import {DemoIntroModal, DemoScoreModal} from '@shell/components/home/DemoModals'
 // ---------------------------------------------------------------------------
 // Game ordering — once a game actually kicks off it rises to the top, grouped
 // into broad kickoff WAVES (THURSDAY NIGHT / SUNDAY 1PM / SUNDAY 4PM / SUNDAY
-// NIGHT / MONDAY NIGHT). One section per wave, newest wave first, rank-ordered
+// NIGHT / MONDAY NIGHT). One section per wave, in chronological order (earliest kickoff on top), the HotPick first in its wave then rank-ordered
 // within the wave. So the list tracks the week's progress — Thursday on top
-// first, then the Sunday 1pm block above it, then 4pm, SNF, MNF. Games not yet
+// first, then the Sunday 1pm block below it, then 4pm, SNF, MNF. Games not yet
 // started stay in a single "OPEN" group below, ranked by HotPick value (1 → 16)
 // since those are the picks you can still make. A game lifts up only when it
 // kicks off — each game locks at its own kickoff, never before.
@@ -341,6 +341,11 @@ export function SeasonPicksScreen() {
       (!picksAreOpen || weekLocked || hasStarted(g) ? started : open).push(g);
     }
     const byRank = (a: DbSeasonGame, b: DbSeasonGame) => effectiveRank(a) - effectiveRank(b);
+    // The user's HotPick sorts to the top of its wave — a wrapper-level sort, so
+    // the chip never learns HotPick status. byRank orders the rest of the wave.
+    const hotPickGameId = weekPicks.find(p => p.is_hotpick)?.game_id ?? null;
+    const byWave = (a: DbSeasonGame, b: DbSeasonGame) =>
+      a.game_id === hotPickGameId ? -1 : b.game_id === hotPickGameId ? 1 : byRank(a, b);
 
     const out: {title: string; data: DbSeasonGame[]}[] = [];
 
@@ -359,9 +364,9 @@ export function SeasonPicksScreen() {
         waves.set(key, {label, start, games: [g]});
       }
     }
-    // Newest wave on top; rank-order within each wave (reads 1→16).
-    for (const w of [...waves.values()].sort((a, b) => b.start - a.start)) {
-      out.push({title: w.label, data: w.games.sort(byRank)});
+    // Chronological (earliest wave on top); the HotPick first in its wave, then rank-order (reads 1→16).
+    for (const w of [...waves.values()].sort((a, b) => a.start - b.start)) {
+      out.push({title: w.label, data: w.games.sort(byWave)});
     }
 
     if (open.length) {
@@ -369,7 +374,7 @@ export function SeasonPicksScreen() {
       out.push({title: 'OPEN', data: open});
     }
     return out;
-  }, [games, picksAreOpen, weekLocked]);
+  }, [games, picksAreOpen, weekLocked, weekPicks]);
 
   if (!config) {
     return (
