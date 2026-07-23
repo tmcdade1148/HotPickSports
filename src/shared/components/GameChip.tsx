@@ -105,6 +105,15 @@ export interface GameChipProps {
 }
 
 /**
+ * Type size of the PICKED team's name — the emphasised one. Exported because
+ * Home's Recap card sizes its team name to match the chip's, and two equal
+ * literals in two files drift.
+ */
+export const PICKED_NAME_SIZE = 16;
+/** The un-picked opponent: smaller and lighter, so a picked game reads first. */
+const OPPONENT_NAME_SIZE = 13;
+
+/**
  * Adapter: nflStore's camelCase live-score payload → the chip's snake_case
  * fields. Spread over a base game: `{...dbGame, ...fromGameScore(liveScores[id])}`.
  */
@@ -231,12 +240,12 @@ export function GameChip({
       // Nothing picked: full-weight neutral while editable (both equal); muted
       // once locked, so an unpicked game recedes behind games you're in.
       return editable
-        ? {font: displayType.display, color: colors.textPrimary, size: 16}
-        : {font: {...displayType.display, fontWeight: '400' as const}, color: colors.textSecondary, size: 13};
+        ? {font: displayType.display, color: colors.textPrimary, size: PICKED_NAME_SIZE}
+        : {font: {...displayType.display, fontWeight: '400' as const}, color: colors.textSecondary, size: OPPONENT_NAME_SIZE};
     }
     return isPicked
-      ? {font: displayType.display, color: pickedNameColor ?? colors.textPrimary, size: 16}
-      : {font: {...displayType.display, fontWeight: '400' as const}, color: colors.textSecondary, size: 13};
+      ? {font: displayType.display, color: pickedNameColor ?? colors.textPrimary, size: PICKED_NAME_SIZE}
+      : {font: {...displayType.display, fontWeight: '400' as const}, color: colors.textSecondary, size: OPPONENT_NAME_SIZE};
   };
   const awayNm = nameStyle(pickedSide === 'away');
   const homeNm = nameStyle(pickedSide === 'home');

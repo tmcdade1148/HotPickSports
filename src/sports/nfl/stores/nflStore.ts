@@ -103,7 +103,10 @@ interface NFLState {
   activePoolMemberCount: number;
 
   // ScoreModule data
-  currentWeekPoints: number;
+  // null = no season_user_totals row for the current week yet (nothing has
+  // settled). Deliberately not 0: Home's WEEK eyebrow renders null as a grey
+  // en-dash, and a 0 there would read as a scored week that went nowhere.
+  currentWeekPoints: number | null;
   lastWeekNet: number | null; // null in Week 1
   weekPointsMap: Record<number, number>; // week → week_points for rolling display
   weekRecordMap: Record<number, {correct: number; total: number}>; // week → correct/total picks
@@ -172,7 +175,7 @@ export const useNFLStore = create<NFLState>((set, get) => ({
   activePoolMemberCount: 0,
 
   // ScoreModule data
-  currentWeekPoints: 0,
+  currentWeekPoints: null,
   lastWeekNet: null,
   weekPointsMap: {},
   weekRecordMap: {},
@@ -207,7 +210,7 @@ export const useNFLStore = create<NFLState>((set, get) => ({
         userSeasonTotal: 0,
         userPoolRank: null,
         activePoolMemberCount: 0,
-        currentWeekPoints: 0,
+        currentWeekPoints: null,
         lastWeekNet: null,
         weekPointsMap: {},
         weekRecordMap: {},
@@ -583,7 +586,7 @@ export const useNFLStore = create<NFLState>((set, get) => ({
     const {competition, currentWeek, currentPhase, weekState} = get();
     const isPlayoffs = currentPhase !== 'REGULAR';
     // Exclude the current week from the season total while games are in progress.
-    // currentWeekPoints is shown separately by WeekScoreModule.
+    // currentWeekPoints is shown separately by Home's WEEK eyebrow.
     const weekInProgress =
       weekState === 'picks_open' || weekState === 'locked' || weekState === 'live';
 
@@ -605,7 +608,9 @@ export const useNFLStore = create<NFLState>((set, get) => ({
 
     let total = 0;
     let lastWeekPoints: number | null = null;
-    let currentWeekPts = 0;
+    // Stays null when the current week has no row yet — "nothing settled",
+    // which the WEEK eyebrow renders as a grey en-dash rather than a 0.
+    let currentWeekPts: number | null = null;
 
     for (const row of data ?? []) {
       if (row.week === currentWeek) {

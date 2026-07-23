@@ -7,6 +7,7 @@ import {useSeasonStore} from '../stores/seasonStore';
 import {WeekSelector} from '../components/WeekSelector';
 import {SeasonMatchCard} from '../components/SeasonMatchCard';
 import {isWeekLocked} from '../utils/weekLock';
+import {hasStarted, resolveWeekScore} from '../utils/weekScore';
 import {PicksProgressHeader} from '../components/PicksProgressHeader';
 import {SubmitPicksFooter} from '../components/SubmitPicksFooter';
 import {useAuth} from '@shared/hooks/useAuth';
@@ -60,19 +61,6 @@ function waveBucket(g: DbSeasonGame): {key: string; label: string} {
   if (day === 1 && hour >= 17) return {key: 'mnf', label: 'MONDAY NIGHT'};
   if (day === 2 && hour < 4) return {key: 'mnf', label: 'MONDAY NIGHT'};
   return {key: 'other', label: 'OTHER'};
-}
-
-/**
- * Has this game actually STARTED? Based purely on game STATUS (live or final),
- * which is the reliable cross-environment signal — ESPN sets it at kickoff in
- * production, and the simulator sets it when a wave kicks off. Deliberately NOT
- * based on kickoff_at (the simulator runs on real 2025 schedule timestamps that
- * are already in the past) nor lock_at (a game can be locked without having
- * started). Not-yet-started games stay in the lower group until they play.
- */
-function hasStarted(g: DbSeasonGame): boolean {
-  const s = (g.status ?? '').toUpperCase();
-  return s === 'FINAL' || s === 'STATUS_FINAL' || s === 'COMPLETED' || s === 'IN_PROGRESS' || s === 'LIVE';
 }
 
 /**
@@ -224,26 +212,19 @@ export function SeasonPicksScreen() {
     return total;
   })();
 
-  // Week Score = the sum of the SERVER's SETTLED per-pick points. season_picks.points
-  // is null until a game is scored, then 0 / 1 / ±rank, so summing the non-null
-  // points is the settled week score — games still live (points null) contribute
-  // nothing, and it grows as they finalise (correct and expected). Deliberately
-  // NOT a client-side projection: no score comparison, no signing an in-progress
-  // value — same rule as the chip (settled results may sign + colour, live ones
-  // may not).
-  const settledWeekScore = useMemo(() => {
-    const scored = weekPicks.filter(p => p.points != null);
-    return scored.length
-      ? scored.reduce((sum, p) => sum + (p.points ?? 0), 0)
-      : null;
-  }, [weekPicks]);
+  // Week Score — derived by the SHARED helper so Home's WEEK eyebrow shows this
+  // exact number at every point of the weekend. Never derive it a second way here.
   const isLiveWeek = currentWeek === dbCurrentWeek;
-  const anyGameStarted = useMemo(() => games.some(hasStarted), [games]);
-  // In-progress week with ≥1 game started → settled per-pick points once games finalise; otherwise the
-  // settled server value (so it reads "—" before kickoff and for past weeks until
-  // a real score exists).
-  const displayWeekScore =
-    isLiveWeek && anyGameStarted ? settledWeekScore : weekEarned;
+  const displayWeekScore = useMemo(
+    () =>
+      resolveWeekScore({
+        picks: weekPicks,
+        games,
+        isLiveWeek,
+        serverWeekPoints: weekEarned,
+      }),
+    [weekPicks, games, isLiveWeek, weekEarned],
+  );
 
   // Keep the viewing week in sync with the league's current week, but DON'T
   // yank the user off a week they've navigated back to. On first mount we land

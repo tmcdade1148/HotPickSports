@@ -12,7 +12,7 @@ import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {isScheduledStatus} from '@sports/nfl/utils/gameStatus';
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {useTheme} from '@shell/theme/hooks';
-import {spacing, bodyType, sectionHeaderType} from '@shared/theme';
+import {spacing, bodyType} from '@shared/theme';
 import {ordinalSuffix} from '@shared/utils/format';
 
 import {SystemMessageSlot} from '@shell/components/home/SystemMessageSlot';
@@ -26,7 +26,9 @@ import {CrossContestStrip} from '@shell/components/home/CrossContestStrip';
 import {DemoButton} from '@shell/components/home/DemoButton';
 import {Insight} from '@shell/components/home/Insight';
 import {HomeInbox} from '@shell/components/home/HomeInbox';
+import {RecapModule} from '@shell/components/home/RecapModule';
 import {HistoryModule} from '@shell/components/home/HistoryModule';
+import {ModuleSection} from '@shell/components/home/ModuleSection';
 import {ContestCarousel} from '@shell/components/home/ContestCarousel';
 import {ContestActions} from '@shell/components/ContestActions';
 import {PartnerModule} from '@shell/components/home/PartnerModule';
@@ -57,6 +59,7 @@ export function HomeScreen() {
   const competition  = useNFLStore(s => s.competition);
   const configLoaded = useNFLStore(s => s.configLoaded);
   const picksOpenAt  = useNFLStore(s => s.picksOpenAt);
+  const currentWeekPoints = useNFLStore(s => s.currentWeekPoints);
 
   const loadLastWeekHotPick   = useGlobalStore(s => s.loadLastWeekHotPick);
   const loadRecentWeeks       = useGlobalStore(s => s.loadRecentWeeks);
@@ -382,17 +385,28 @@ export function HomeScreen() {
     return unsub;
   }, [competition, currentWeek, fetchLiveScores, fetchHighestRankedGame, subscribeToLiveScores]);
 
-  // The HISTORY head's live value (nflStore.currentWeekPoints). The fetch
-  // existed with ZERO call sites — this is where it gets wired — and the
-  // realtime channel makes the head tick as the scoring cron writes, with no
-  // reload. Keyed on competition + userId so the channel tears down on sign-out
-  // (Home unmounts) and on a competition switch (effect re-runs).
+  // The WEEK eyebrow's live value (nflStore.currentWeekPoints). The realtime
+  // channel makes it tick as the scoring cron writes, with no reload. Keyed on
+  // competition + userId so the channel tears down on sign-out (Home unmounts)
+  // and on a competition switch (effect re-runs).
   useEffect(() => {
     if (!userId || !competition) return;
     fetchUserSeasonScore(userId).catch(() => {});
     const unsub = subscribeToUserSeasonScore(userId);
     return unsub;
   }, [userId, competition, fetchUserSeasonScore, subscribeToUserSeasonScore]);
+
+  // Keep Home's copy of the week's picks in step with scoring. The WEEK eyebrow
+  // sums the SETTLED per-pick points (the same shared helper the Picks screen
+  // calls), so stale pick rows would show a lower number here than there —
+  // exactly the divergence the shared helper exists to prevent. currentWeekPoints
+  // is written by the SAME scoring run that settles those picks and is already
+  // realtime-subscribed above, so a change to it is the signal to re-read them.
+  // Cheaper than opening a second Realtime channel on season_picks.
+  useEffect(() => {
+    if (!userId || currentWeek <= 0) return;
+    fetchSeasonUserPicks(userId, currentWeek).catch(() => {});
+  }, [currentWeekPoints, userId, currentWeek, fetchSeasonUserPicks]);
 
   // Bootstrap seasonStore.config from Home too — MainTabNavigator runs
   // initialize as well, but only after activeSport + activePoolId resolve.
@@ -469,18 +483,15 @@ export function HomeScreen() {
     <ContestCarousel pools={sortedVisiblePools} />
   ) : null;
 
-  // Off-cycle Clubs: if the user's upcoming-season Contests carry valid Club
+  // Off-cycle Leagues: if the user's upcoming-season Contests carry valid League
   // affiliations (partnerIds, derived from visiblePools above), show the real
-  // YOUR CLUBS stack instead of the generic one-line teaser.
+  // LEAGUES stack instead of the generic one-line teaser.
   const offCycleClubs = partnerIds.length > 0 ? (
-    <View style={styles.section}>
-      <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textTertiary}]}>
-        YOUR {LEXICON.league.plural.toUpperCase()}
-      </Text>
+    <ModuleSection label={LEXICON.league.plural.toUpperCase()}>
       {partnerIds.map(pid => (
         <PartnerModule key={pid} partnerId={pid} />
       ))}
-    </View>
+    </ModuleSection>
   ) : null;
 
   return (
@@ -566,36 +577,26 @@ export function HomeScreen() {
 
         {showInsight && <Insight />}
 
-        {/* HISTORY (module 6) — sits after ACTION + HOTPICK and before
-            CONTESTS, per the map's module order. Renders NOTHING until the
-            first week settles (map row 1: "hide if none"), so it is simply
-            absent for every new tester rather than showing an empty chart. */}
+        {/* RECAP + HISTORY — after ACTION + HOTPICK and before CONTESTS, per
+            the map's module order. Two independent modules (each with its own
+            collapsing eyebrow) since the design pass; both render NOTHING until
+            they have a week to describe, so a new tester sees neither rather
+            than an empty card. */}
+        <RecapModule />
         <HistoryModule />
 
         {/* Board Discovery Tile — routes partner board members (Chairman /
             Director) into League Tools. Self-hides when not on a board. */}
         <ManagedLeagueModule />
 
-        {/* In-cycle YOUR CONTESTS section — replaced on off-cycle
-            states (off_season_idle / pre_season_games) by the action
-            stack + cross-Contest strip above. */}
+        {/* In-cycle CONTESTS section — replaced on off-cycle states
+            (off_season_idle / pre_season_games) by the action stack +
+            cross-Contest strip above. The carousel carries the eyebrow (it owns
+            the page dots), so a Player with no Contests gets the explainer with
+            no empty header over it. */}
         {showPoolStack && isInCycle && (
-          <View style={styles.section}>
-            {/* Swipe carousel: one contest card per swipe, dots track the
-                active/visible one (orange). Swiping sets the global active
-                contest (Hard Rule #20). When the user has no visible pools we
-                still show the title; the Join/Create affordance now lives in
-                the locked footer below. */}
-            {visiblePools.length > 0 ? (
-              // Inside styles.section (which already provides the top gap) —
-              // drop the carousel's own margin so the space above YOUR CONTESTS
-              // matches the space above YOUR LEAGUES (no double margin).
-              <ContestCarousel pools={sortedVisiblePools} topMargin={false} />
-            ) : (
-              <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textTertiary}]}>
-                YOUR {LEXICON.contest.plural.toUpperCase()}
-              </Text>
-            )}
+          <>
+            {visiblePools.length > 0 && <ContestCarousel pools={sortedVisiblePools} />}
             {/* Onboarding explainer — only useful until the player is in more
                 than one Contest; drop it once they've got several. */}
             {visiblePools.length <= 1 && (
@@ -603,7 +604,7 @@ export function HomeScreen() {
                 Be in as many Contests as you want. They'll all live right here. You can also make picks on your own and join a Contest later. It's just more fun with someone keeping score.
               </Text>
             )}
-          </View>
+          </>
         )}
 
         {configLoaded
@@ -611,25 +612,23 @@ export function HomeScreen() {
           && homeRow !== 'off_far'
           && homeRow !== 'off_near'
           && homeRow !== 'pre_bridge' && (
-          // In-cycle YOUR CLUBS section with the full Gaffer / Perks
-          // explainer. Off-cycle states use the shrunken one-line
-          // ClubsTeaser per spec.
-          <View style={styles.section}>
-            <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textTertiary}]}>
-              YOUR {LEXICON.league.plural.toUpperCase()}
-            </Text>
-            {/* "What is a Club" explainer — onboarding only. Once the player is
-                in a Club-affiliated Contest (partnerIds populated) they know
-                what Clubs are, so drop it and just show their Clubs. */}
+          // In-cycle LEAGUES section with the full Gaffer / Perks explainer.
+          // Off-cycle states use the shrunken one-line ClubsTeaser per spec.
+          <>
+            <ModuleSection label={LEXICON.league.plural.toUpperCase()}>
+              {partnerIds.map(pid => (
+                <PartnerModule key={pid} partnerId={pid} />
+              ))}
+            </ModuleSection>
+            {/* "What is a League" explainer — onboarding only. Once the player
+                is in a League-affiliated Contest (partnerIds populated) they
+                know what Leagues are, so drop it and just show their Leagues. */}
             {partnerIds.length === 0 && (
               <Text style={[bodyType.regular, styles.sectionNote, {color: colors.textSecondary}]}>
                 These are bars, shops, and brands that back Contests with perks for everyone.
               </Text>
             )}
-            {partnerIds.map(pid => (
-              <PartnerModule key={pid} partnerId={pid} />
-            ))}
-          </View>
+          </>
         )}
       </ScrollView>
       <View
@@ -684,16 +683,15 @@ function PreseasonPicksOpenLine() {
   );
 }
 
-/** One-line Clubs teaser for off-cycle states per spec §6 + Appendix.
- *  Replaces the longer Gaffer/Perks explainer that lives in the
- *  in-cycle YOUR CLUBS section. */
+/** One-line Leagues teaser for off-cycle states per spec §6 + Appendix.
+ *  Replaces the longer Gaffer/Perks explainer that lives in the in-cycle
+ *  LEAGUES section. No eyebrow: it renders only when the Player has no
+ *  Leagues, and an eyebrow over an empty stack is a promise it can't keep —
+ *  same zero-state rule as the in-cycle section. */
 function ClubsTeaser() {
   const {colors} = useTheme();
   return (
     <View style={offCycleStyles.clubsBlock}>
-      <Text style={[bodyType.bold, offCycleStyles.clubsLabel, {color: colors.textTertiary}]}>
-        YOUR {LEXICON.league.plural.toUpperCase()}
-      </Text>
       <Text style={[bodyType.regular, offCycleStyles.clubsTeaser, {color: colors.textSecondary}]}>
         These are bars, shops, and brands that back Contests with perks for everyone.
       </Text>
@@ -725,7 +723,6 @@ const offCycleStyles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     gap: 6,
   },
-  clubsLabel:  {fontSize: 11, letterSpacing: 1.8, marginBottom: 4},
   clubsTeaser: {fontSize: 14, lineHeight: 20},
 });
 
@@ -755,17 +752,10 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     paddingHorizontal: spacing.lg,
   },
-  section: {marginTop: spacing.md},
-  sectionTitle: {
-    // Type from the shared token so every module header matches.
-    ...sectionHeaderType,
-    paddingHorizontal: spacing.lg,
-    marginBottom: 10,
-  },
   // Explanatory line that sits under a section header or below a CTA
   // row. Mirrors the welcomeSub style on OffSeasonHero (14px / 20
-  // lineHeight / textSecondary, non-italic) so the HotPick description
-  // and the YOUR CONTESTS / YOUR CLUBS notes read as the same voice.
+  // lineHeight / textSecondary, non-italic) so the CONTESTS and LEAGUES
+  // notes read as the same voice.
   sectionNote: {
     fontSize: 14,
     lineHeight: 20,

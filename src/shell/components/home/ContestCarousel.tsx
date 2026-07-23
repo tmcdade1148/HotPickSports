@@ -1,17 +1,19 @@
 // ContestCarousel — horizontal swipe through the user's contests on Home
-// (per Tom, 2026-06-15). Replaces the vertical PoolModule stack in the in-cycle
-// YOUR CONTESTS section:
+// (per Tom, 2026-06-15). Replaces the vertical PoolModule stack in the CONTESTS
+// section:
 //   • one full-width contest card per swipe (paging snap)
-//   • a dot per contest to the right of the section title; the active/visible
+//   • a dot per contest, in the eyebrow's accessory slot; the active/visible
 //     contest's dot is orange
 //   • swiping to a card makes it the GLOBALLY active contest (Board + Chirps
 //     follow it too) per Hard Rule #20 — the visible card IS the active one
+//
+// It owns the CONTESTS eyebrow because it owns the dots. It renders only when
+// the user HAS contests, which is how the eyebrow disappears in the zero state.
 //
 // HotPick-themed (Hard Rule #9); the Join/Create affordance stays below the
 // carousel in HomeScreen, not here.
 
 import React, {useEffect, useMemo, useRef} from 'react';
-import {Text} from '@shared/components/AppText';
 import {
   FlatList,
   StyleSheet,
@@ -22,19 +24,16 @@ import {
 } from 'react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useGlobalStore} from '@shell/stores/globalStore';
-import {bodyType, spacing, sectionHeaderType} from '@shared/theme';
 import {LEXICON} from '@shared/lexicon';
 import type {DbPool} from '@shared/types/database';
 import {PoolModule} from './PoolModule';
+import {ModuleSection} from './ModuleSection';
 
 interface ContestCarouselProps {
   pools: DbPool[];
-  /** Apply the carousel's own top margin. False when it's already inside a
-   *  section that provides the gap (avoids doubling the space). */
-  topMargin?: boolean;
 }
 
-export function ContestCarousel({pools, topMargin = true}: ContestCarouselProps) {
+export function ContestCarousel({pools}: ContestCarouselProps) {
   const {colors} = useTheme();
   const {width} = useWindowDimensions();
   const activePoolId = useGlobalStore(s => s.activePoolId);
@@ -67,34 +66,29 @@ export function ContestCarousel({pools, topMargin = true}: ContestCarouselProps)
     }
   };
 
-  return (
-    <View style={[styles.wrap, topMargin && {marginTop: spacing.lg}]}>
-      <View style={styles.titleRow}>
-        <Text style={[bodyType.bold, styles.title, {color: colors.textTertiary}]}>
-          YOUR {LEXICON.contest.plural.toUpperCase()}
-        </Text>
-        {pools.length > 1 && (
+  const dots =
+    pools.length > 1 ? (
+      <View
+        style={styles.dots}
+        accessibilityLabel={`Contest ${activeIndex + 1} of ${pools.length}`}>
+        {pools.map((p, i) => (
           <View
-            style={styles.dots}
-            accessibilityLabel={`Contest ${activeIndex + 1} of ${pools.length}`}>
-            {pools.map((p, i) => (
-              <View
-                key={p.id}
-                style={[
-                  styles.dot,
-                  {
-                    backgroundColor:
-                      i === activeIndex ? colors.primary : colors.border,
-                    width: i === activeIndex ? 8 : 6,
-                    height: i === activeIndex ? 8 : 6,
-                  },
-                ]}
-              />
-            ))}
-          </View>
-        )}
+            key={p.id}
+            style={[
+              styles.dot,
+              {
+                backgroundColor: i === activeIndex ? colors.primary : colors.border,
+                width: i === activeIndex ? 8 : 6,
+                height: i === activeIndex ? 8 : 6,
+              },
+            ]}
+          />
+        ))}
       </View>
+    ) : null;
 
+  return (
+    <ModuleSection label={LEXICON.contest.plural.toUpperCase()} accessory={dots}>
       <FlatList
         ref={listRef}
         data={pools}
@@ -115,22 +109,11 @@ export function ContestCarousel({pools, topMargin = true}: ContestCarouselProps)
         getItemLayout={(_d, index) => ({length: width, offset: width * index, index})}
         onMomentumScrollEnd={onMomentumEnd}
       />
-    </View>
+    </ModuleSection>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: {},
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    marginBottom: 10,
-  },
-  title: {
-    ...sectionHeaderType,
-  },
   dots: {
     flexDirection: 'row',
     alignItems: 'center',

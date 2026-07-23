@@ -29,6 +29,7 @@ import {RegularCompleteHero} from './RegularCompleteHero';
 import {SuperBowlIntroHero} from './SuperBowlIntroHero';
 import {SeasonCompleteHero} from './SeasonCompleteHero';
 import {PlayoffBanner} from './PlayoffBanner';
+import {WeekSection} from './WeekSection';
 import {HOME_ROWS, type HomeRow} from './homeRows';
 
 export interface StateHeroProps {
@@ -39,7 +40,11 @@ export interface StateHeroProps {
 export function StateHero({row}: StateHeroProps) {
   const currentPhase = useNFLStore(s => s.currentPhase);
 
-  const hero = heroFor(row);
+  // The WEEK eyebrow labels the ACTION module. It self-hides on the rows with
+  // no week in play (off-season, pre-season, the bridges), so every row can be
+  // wrapped from one place. Inside the playoff branch below it lands UNDER the
+  // banner — round identity first, then the week.
+  const hero = <WeekSection row={row}>{heroFor(row)}</WeekSection>;
 
   // During the playoffs / Super Bowl, the in-cycle heroes render unchanged
   // beneath a playoff banner (round identity, bracket progress, accent, rules
