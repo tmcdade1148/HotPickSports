@@ -1,32 +1,33 @@
 // HotPickModule — Home's HOTPICK module (Home Module Map v4, module 5).
 //
-// "The module is a GameChip wearing a flame." That is literally the structure:
-// a title row carrying the flame + status, and the same GameChip the Picks
-// screen renders. Nothing here is bespoke game markup.
+// "The module is a GameChip wearing a flame." A title row carrying the flame +
+// "Your HotPick", and the same GameChip the Picks screen renders — now showing
+// its OWN status line (LIVE/FINAL + clock) inside the chip, and carrying the
+// orange HotPick border. Nothing here is bespoke game markup.
 //
 // It is a SIBLING of the ACTION module (PicksOpenHero), rendered directly
 // beneath it by StateHero — not nested inside it. ACTION owns the countdown,
-// the CTA and the week progress; this module owns the HotPick and nothing
-// else. There is deliberately no countdown here: the map's "One countdown,
-// ever" is ACTION's, and the chip's PRE state already shows kickoff.
+// the CTA and the week progress; this module owns the HotPick and nothing else.
+// There is deliberately no countdown here: the map's "One countdown, ever" is
+// ACTION's, and the chip's PRE state already shows kickoff.
 //
 // Compliance the module inherits from the chip, by construction:
 //   Rule 1  — the flame lives in the TITLE, never inside the chip.
 //   Rule 2  — the box is unsigned and neutral until the server scores the pick.
-//   Rule 3  — no green/red during live; the LIVE dot is the only motion.
+//   Rule 3  — no green/red during live; the chip's LIVE dot is the only motion.
 //   Rule 9  — the result comes from the server (earned points + winner_team),
 //             never a client score comparison.
 //   Rule 10 — status is read through gameStatus.ts, case-insensitively.
 
-import React, {useEffect, useRef} from 'react';
+import React from 'react';
 import {Text} from '@shared/components/AppText';
-import {Animated, Pressable, StyleSheet, View} from 'react-native';
+import {Pressable, StyleSheet, View} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {Flame} from 'lucide-react-native';
 import {GameChip, fromGameScore} from '@shared/components/GameChip';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
-import {isFinalStatus, isLiveStatus} from '@sports/nfl/utils/gameStatus';
+import {isFinalStatus} from '@sports/nfl/utils/gameStatus';
 import {useTheme} from '@shell/theme';
 import {bodyType, spacing} from '@shared/theme';
 
@@ -39,54 +40,26 @@ export function HotPickModule() {
   const liveScores = useNFLStore(s => s.liveScores);
   const seasonTeams = useSeasonStore(s => s.config?.teams);
 
-  // Live payload preferred over the season_games row — it's the fresher of the
-  // two during play.
+  // Live payload preferred over the season_games row — fresher during play. The
+  // chip reads its LIVE/FINAL status and clock straight from this merged game.
   const hotPickScore = userHotPickGame
     ? liveScores[userHotPickGame.game_id]
     : undefined;
 
-  // STATUS ONLY, via gameStatus.ts (lowercases before comparing, so ESPN's
-  // 'FINAL' and the simulator's 'final' resolve the same — rule 10).
+  // FINAL drives the panel tint (neutral at FINAL so the resolve reads). The
+  // chip owns the status line + dot now, so that's all we need here (rule 10).
   const hotPickStatus = hotPickScore?.status ?? userHotPickGame?.status;
-  const isLive = isLiveStatus(hotPickStatus);
   const isFinal = isFinalStatus(hotPickStatus);
-
-  // The LIVE dot is the only animated value on this card.
-  const dotPulse = useRef(new Animated.Value(1)).current;
-  useEffect(() => {
-    if (!isLive) {
-      dotPulse.setValue(1);
-      return;
-    }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(dotPulse, {toValue: 0.3, duration: 550, useNativeDriver: true}),
-        Animated.timing(dotPulse, {toValue: 1, duration: 550, useNativeDriver: true}),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [isLive, dotPulse]);
 
   // Nicknames from SeasonConfig.teams[].shortName — the same source the Picks
   // screen uses, so the two screens can't drift.
   const teamNickname = (code: string | null | undefined): string =>
     (code ? seasonTeams?.find(t => t.code === code)?.shortName : null) ?? code ?? '';
 
-  const periodLabel = (() => {
-    if (!isLive) return null;
-    const period = hotPickScore?.currentPeriod ?? userHotPickGame?.current_period;
-    const clock = hotPickScore?.gameClock ?? userHotPickGame?.game_clock;
-    const parts: string[] = [];
-    if (period != null) parts.push(`Q${period}`);
-    if (clock) parts.push(clock);
-    return parts.length > 0 ? parts.join(' · ') : null;
-  })();
-
   const rank = userHotPickGame?.frozen_rank ?? userHotPickGame?.rank ?? null;
 
-  // No HotPick, no game, or no real rank → no module. The chip's PTS box is
-  // mandatory and a "0 PTS" box would be a lie.
+  // No HotPick, no game, or no real rank → no module. The chip's box is
+  // mandatory and a "0 pts" box would be a lie.
   if (!userHotPick || !userHotPickGame || rank == null) return null;
 
   const awayName = teamNickname(userHotPickGame.away_team);
@@ -103,41 +76,22 @@ export function HotPickModule() {
         <Text style={[bodyType.bold, styles.title, {color: colors.primary}]}>
           Your HotPick
         </Text>
-        {isLive && (
-          <>
-            <Animated.View
-              style={[styles.liveDot, {backgroundColor: colors.live, opacity: dotPulse}]}
-            />
-            <Text style={[bodyType.bold, styles.statusWord, {color: colors.gameWon}]}>
-              LIVE
-            </Text>
-            {periodLabel && (
-              <Text style={[bodyType.regular, styles.statusMeta, {color: colors.textSecondary}]}>
-                {periodLabel}
-              </Text>
-            )}
-          </>
-        )}
-        {isFinal && (
-          <Text style={[bodyType.bold, styles.statusWord, {color: colors.gameLost}]}>
-            • FINAL
-          </Text>
-        )}
       </View>
 
-      {/* One contract: the season_games row overlaid with the fresher live
-          payload. The result comes straight from the SERVER — earned points
-          (season_picks.points) and winner_team — never a score comparison
-          (rule 9). */}
+      {/* The season_games row overlaid with the fresher live payload. The chip
+          renders its own LIVE/FINAL status + clock inside itself, and the orange
+          HotPick border. Result comes from the SERVER — earned points +
+          winner_team, never a score comparison (rule 9). */}
       <GameChip
         game={{...userHotPickGame, ...fromGameScore(hotPickScore)}}
         points={rank}
         earnedPoints={userHotPick.points}
         winnerTeam={userHotPickGame.winner_team}
-        pointsLabel="HotPick Points"
+        pointsLabel="HotPick Point"
+        scoresRightInset={spacing.md}
         pickedNameColor={colors.primary}
+        outlineColor={colors.primary}
         boxTint={isFinal ? undefined : {background: colors.primary, text: colors.onPrimary}}
-        showStatus={false}
         pickedSide={
           userHotPick.picked_team === userHotPickGame.home_team
             ? 'home'
@@ -167,18 +121,5 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 13,
-  },
-  liveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginLeft: 2,
-  },
-  statusWord: {
-    fontSize: 13,
-    letterSpacing: 0.8,
-  },
-  statusMeta: {
-    fontSize: 12,
   },
 });

@@ -5,17 +5,23 @@ import Svg, {Path} from 'react-native-svg';
 interface ChipFlameColorProps {
   /** Height in points — width auto-scales to preserve aspect ratio. */
   size?: number;
+  /** Fill for the rounded base bar — pass a theme token (e.g. textPrimary),
+   *  never a baked hex, or the bar vanishes on the dark chip surface. */
+  barColor: string;
 }
 
 // ChipFlameColor — the lit HotPick flame (locked/selected chip).
 // Brand mark: the six orange tones are baked in like a logo and read on both
 // light and dark surfaces, so this component does NOT theme its fills.
-// Source: GamesTagFlame.svg. Two empty export paths and the black base bar were
-// dropped per Game Chip Spec §6.4. viewBox 0 0 44.98 64.53 (aspect ~0.697:1).
+// Source: GamesTagFlame.svg. Two empty export paths were dropped; the base bar
+// (the one source path with no fill — SVG-default black) was ALSO dropped in the
+// original conversion, which is now restored as the final Path and THEMED via
+// `barColor` — never baked, or it vanishes on the dark chip surface.
+// viewBox 0 0 44.98 64.53 (aspect ~0.697:1).
 const VBW = 44.98;
 const VBH = 64.53;
 
-export function ChipFlameColor({size = 40}: ChipFlameColorProps) {
+export function ChipFlameColor({size = 40, barColor}: ChipFlameColorProps) {
   const width = size * (VBW / VBH);
   return (
     <View accessible={false} focusable={false} collapsable={false}>
@@ -27,6 +33,11 @@ export function ChipFlameColor({size = 40}: ChipFlameColorProps) {
         <Path fill="#b94526" d="M3.92,37.51l-.13.51c-1.97,3.29-3.05,7.16-3.29,10.92h-.19c.05-.62-.11-1.23-.14-1.83-.15-2.41-.29-4.83-.03-7.23.25-2.3,1.06-5.84,2.16-7.82.24,1.85.63,3.57,1.38,5.2.06.14.12.25.24.27v-.02Z" />
         <Path fill="#f68f23" d="M34.54,60.61H12.8c-1.89-3.36-2.57-7.2-1.48-10.99.91-3.14,3.54-5.66,6.24-7.31,1.97-1.21,4.06-2.04,5.95-3.47,1.83-1.4,3.33-2.86,3.73-5.29,1.45,3,2.21,6.11,2.42,9.34.12,2.08-.26,4.06-1.17,5.92-.84,1.87-2.05,3.39-3.54,4.96,3.89.12,9.03-2.16,10.05-6.31,2.36,3.72,2.93,8.32.37,11.97,0,0-.83,1.18-.83,1.18Z" />
         <Path fill="#483119" d="M.17,47.1c-.07.05-.09.05-.08.04s.04-.04.08-.04Z" />
+        {/* Rounded base bar — themed, never baked. Geometry reused from
+            ChipFlameDeselected's bar (the same bar; the exact ChipFlameColor
+            coords weren't in the committed source, and SVG path data isn't
+            fabricated — the <0.2% viewBox difference is sub-pixel). */}
+        <Path fill={barColor} d="M2.59,60.5h40.28c1.07,0,1.94.87,1.94,1.94h0c0,1.07-.87,1.95-1.94,1.95H2.58c-1.07,0-1.94-.87-1.94-1.94h0c0-1.08.87-1.95,1.95-1.95Z" />
       </Svg>
     </View>
   );

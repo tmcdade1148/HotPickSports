@@ -96,6 +96,9 @@ export interface GameChipProps {
   homeName?: string;
   awayRecord?: string | null;
   homeRecord?: string | null;
+  /** Extra right inset (px) on the score column, so a specific surface can pull
+   *  its scores left. Home's HotPick card passes it; the Picks screen omits it. */
+  scoresRightInset?: number;
   /** Whether the chip renders its own status row. Default true. Home's HotPick
    *  card passes false (its title carries the status). */
   showStatus?: boolean;
@@ -156,6 +159,7 @@ export function GameChip({
   homeName,
   awayRecord,
   homeRecord,
+  scoresRightInset = 0,
   showStatus = true,
 }: GameChipProps) {
   const {colors} = useTheme();
@@ -168,6 +172,12 @@ export function GameChip({
   const away = awayName ?? game.away_team;
   const home = homeName ?? game.home_team;
 
+  // A locked game with no pick: no point was or can be earned (earnedPoints
+  // stays null, so the box never resolves). Show an em-dash for the value and
+  // mute both names so unpicked games recede behind games in play. Display only —
+  // the resolve gate below is untouched.
+  const noPickLocked = !editable && pickedSide === null;
+
   // Box (rule 9 + LIVE gate). Resolves ONLY at FINAL with a scored value; until
   // then it shows the neutral stake, so a signed/coloured number is impossible
   // during PRE/LIVE and in the FINAL-but-not-yet-scored window.
@@ -178,7 +188,9 @@ export function GameChip({
         : earnedPoints < 0
           ? `−${Math.abs(earnedPoints)}`
           : '0'
-      : String(points);
+      : noPickLocked
+        ? '0'
+        : String(points);
   const boxColor =
     isFinal && earnedPoints !== null
       ? earnedPoints > 0
@@ -194,6 +206,14 @@ export function GameChip({
     boxTint?.text ??
     (isFinal && earnedPoints !== null ? boxColor : colors.textSecondary);
 
+  // Written-out unit, pluralised off the DISPLAYED number's magnitude — singular
+  // ONLY when |value| === 1, so 0 and −1 pluralise correctly (0 → "points",
+  // −1 → "point"). `pointsLabel` is the singular base ("point" / "HotPick
+  // Point"); the chip appends the s.
+  const displayedValue =
+    isFinal && earnedPoints !== null ? earnedPoints : noPickLocked ? 0 : points;
+  const labelText = pointsLabel + (Math.abs(displayedValue) === 1 ? '' : 's');
+
   // Score colour (rule 9). Only the WINNER's score greens, and only at FINAL.
   const awayScoreColor =
     isFinal && winnerTeam !== null && game.away_team === winnerTeam
@@ -208,7 +228,11 @@ export function GameChip({
   // picked name takes `pickedNameColor` heavy and the opponent goes muted+lighter.
   const nameStyle = (isPicked: boolean) => {
     if (pickedSide === null) {
-      return {font: displayType.display, color: colors.textPrimary, size: 16};
+      // Nothing picked: full-weight neutral while editable (both equal); muted
+      // once locked, so an unpicked game recedes behind games you're in.
+      return editable
+        ? {font: displayType.display, color: colors.textPrimary, size: 16}
+        : {font: {...displayType.display, fontWeight: '400' as const}, color: colors.textSecondary, size: 13};
     }
     return isPicked
       ? {font: displayType.display, color: pickedNameColor ?? colors.textPrimary, size: 16}
@@ -279,24 +303,12 @@ export function GameChip({
   // Flame slot — rendered only when there's a flame or a lock to show (Home's
   // HotPick card passes neither, so the slot collapses). Flame 50 in every
   // state so the chip doesn't jump at lock. Tap target only when editable.
-  const flameContent = (
-    <>
-      {flame === 'lit' ? (
-        <View style={lock ? styles.dimFlame : null}>
-          <ChipFlameColor size={50} />
-        </View>
-      ) : flame === 'deselected' ? (
-        <ChipFlameDeselected size={50} color={colors.textTertiary} />
-      ) : lock ? (
-        <ChipLock size={46} color={colors.textPrimary} />
-      ) : null}
-      {lock && flame === 'lit' ? (
-        <View style={styles.lockOverlay}>
-          <ChipLock size={46} color={colors.textPrimary} />
-        </View>
-      ) : null}
-    </>
-  );
+  const flameContent =
+    flame === 'lit' ? (
+      <ChipFlameColor size={50} barColor={colors.textPrimary} />
+    ) : flame === 'deselected' ? (
+      <ChipFlameDeselected size={50} color={colors.textTertiary} />
+    ) : null;
   const flameSlot =
     flame === 'none' && !lock ? null : editable ? (
       <TouchableOpacity style={styles.flameSlot} activeOpacity={0.6} onPress={onPressFlame}>
@@ -322,21 +334,20 @@ export function GameChip({
           FINAL + scored, then signed + coloured. Stacks the frozen rank beneath
           when `stackedRank` is set. White-on-orange when tinted. */}
       <View style={[styles.ptsBox, {backgroundColor: boxTint?.background ?? colors.surfaceElevated}]}>
-        <Text style={[bodyType.bold, styles.ptsValue, {color: boxColor}]}>
+        <Text style={[displayType.display, styles.ptsValue, {color: boxColor}]}>
           {boxValue}
+        </Text>
+        <Text style={[bodyType.bold, styles.ptsLabel, {color: labelColor}]}>
+          {labelText}
         </Text>
         {stackedRank != null ? (
           <>
             <View style={[styles.panelDivider, {backgroundColor: boxTint?.text ?? colors.border}]} />
-            <Text style={[bodyType.bold, styles.stackedRank, {color: boxTint?.text ?? colors.textSecondary}]}>
+            <Text style={[displayType.display, styles.stackedRank, {color: boxTint?.text ?? colors.textSecondary}]}>
               {stackedRank}
             </Text>
           </>
-        ) : (
-          <Text style={[bodyType.bold, styles.ptsLabel, {color: labelColor}]}>
-            {pointsLabel}
-          </Text>
-        )}
+        ) : null}
       </View>
 
       <View style={[styles.divider, {backgroundColor: colors.border}]} />
@@ -348,7 +359,7 @@ export function GameChip({
           isLive ? (
             <View style={styles.statusRow}>
               <Animated.View style={[styles.liveDot, {backgroundColor: colors.live, opacity: dotPulse}]} />
-              <Text style={[bodyType.bold, styles.statusText, {color: colors.gameWon}]}>LIVE</Text>
+              <Text style={[styles.statusText, {color: colors.gameWon}]}>LIVE</Text>
               {periodLabel ? (
                 <Text style={[bodyType.regular, styles.statusMeta, {color: colors.textSecondary}]}>
                   {periodLabel}
@@ -357,7 +368,7 @@ export function GameChip({
             </View>
           ) : isFinal ? (
             <View style={styles.statusRow}>
-              <Text style={[bodyType.bold, styles.statusText, {color: colors.gameLost}]}>FINAL</Text>
+              <Text style={[styles.statusText, {color: colors.gameLost}]}>FINAL</Text>
             </View>
           ) : (
             <Text style={[bodyType.regular, styles.kickoff, {color: colors.textSecondary}]}>
@@ -374,7 +385,7 @@ export function GameChip({
           </View>
 
           {showScores ? (
-            <View style={styles.scoresCol}>
+            <View style={[styles.scoresCol, {marginRight: scoresRightInset}]}>
               <Text style={[bodyType.bold, styles.score, {color: awayScoreColor}]}>
                 {game.away_score ?? '—'}
               </Text>
@@ -387,6 +398,13 @@ export function GameChip({
       </View>
 
       {flameSlot}
+
+      {/* Lock — a small badge in the top-right corner on locked chips. */}
+      {lock ? (
+        <View style={styles.cornerLock} pointerEvents="none">
+          <ChipLock size={23} color={colors.textPrimary} />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -405,22 +423,23 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   ptsValue: {
-    fontSize: 22,
+    fontSize: 32,
     fontVariant: ['tabular-nums'],
   },
   ptsLabel: {
     fontSize: 10,
     letterSpacing: 1,
-    marginTop: 1,
+    marginTop: -4,
     textAlign: 'center',
   },
   panelDivider: {
-    width: 22,
-    height: StyleSheet.hairlineWidth,
+    width: 44,
+    height: 2,
+    borderRadius: 1,
     marginVertical: 3,
   },
   stackedRank: {
-    fontSize: 13,
+    fontSize: 18,
     fontVariant: ['tabular-nums'],
   },
   divider: {
@@ -445,14 +464,15 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   statusText: {
-    fontSize: 11,
+    fontSize: 17,
+    fontWeight: '900',
     letterSpacing: 1,
   },
   statusMeta: {
-    fontSize: 11,
+    fontSize: 13,
   },
   kickoff: {
-    fontSize: 12,
+    fontSize: 14,
     marginBottom: 2,
   },
   matchupRow: {
@@ -460,7 +480,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   namesCol: {
-    // No flex — scores sit a fixed gap right of the longest name.
+    // Flex so the scores are pushed to the game block's right edge — every
+    // chip's scores right-align to the same spot, not floated off the name.
+    flex: 1,
     gap: 2,
   },
   nameTap: {
@@ -480,8 +502,10 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   scoresCol: {
-    marginLeft: spacing.lg,
-    alignItems: 'flex-start',
+    // Right-justified: a 1-digit score sits over the ones place of a 2-digit
+    // one (tabular-nums keeps the columns equal).
+    marginLeft: spacing.md,
+    alignItems: 'flex-end',
     gap: 2,
   },
   score: {
@@ -494,12 +518,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dimFlame: {
-    opacity: 0.5,
-  },
-  lockOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
+  cornerLock: {
+    position: 'absolute',
+    top: 5,
+    right: 7,
   },
 });

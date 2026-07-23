@@ -113,8 +113,9 @@ export function SeasonMatchCard({
   const boxTint = panelOrange
     ? {background: colors.primary, text: colors.onPrimary}
     : undefined;
-  // Picked name: teal normally, orange when it's also the HotPick.
-  const pickedNameColor = isHotPick ? colors.primary : colors.accentTeal;
+  // Picked name: ORANGE in every state, HotPick or not — "orange = mine". The
+  // HotPick is set apart by its panel, lit flame and border, not the name colour.
+  const pickedNameColor = colors.primary;
   // Flame: grey selector while editable-and-not-HotPick; lit whenever HotPick;
   // gone once locked-and-not-HotPick (a lock shows instead).
   const flame: 'none' | 'deselected' | 'lit' = isHotPick
@@ -123,13 +124,18 @@ export function SeasonMatchCard({
       ? 'deselected'
       : 'none';
   const lock = !editable;
-  // Orange chip outline whenever this is the HotPick, in every state.
-  const outlineColor = isHotPick ? colors.primary : undefined;
+  // Chip border: orange = your HotPick (every state, incl LIVE); green = a
+  // non-HotPick game in play. Never both — HotPick wins.
+  const outlineColor = isHotPick
+    ? colors.primary
+    : isLive
+      ? colors.live
+      : undefined;
   // Number: rank while editable; once locked, HotPick shows its rank and a
   // standard pick shows the stake "1" stacked over the rank.
   const points = editable ? rank : isHotPick ? rank : 1;
   const stackedRank = !editable && !isHotPick ? rank : undefined;
-  const pointsLabel = isHotPick ? 'HotPick Points' : 'PT';
+  const pointsLabel = isHotPick ? 'HotPick Point' : 'point';
   const pickedSide: 'home' | 'away' | null =
     pickedTeam === game.home_team
       ? 'home'
