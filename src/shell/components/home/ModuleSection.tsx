@@ -16,7 +16,9 @@
 //   pts     a tight unit on the number, in the number's OWN colour — the two
 //           read as one thing, not a value and a grey afterthought.
 //   Trailing a small node right after the label word (the HOTPICK flame).
-//   Status  right-aligned, heavy italic. WEEK only.
+//   Status  right-aligned, heavy italic, 2× the label. WEEK only. Yields to the
+//           label group on a narrow row — caps at the leftover width and
+//           truncates, never pushes the label.
 //   Chevron toggles the children. Collapsed by default; the value stays visible
 //           while collapsed, because the value is the reason to look.
 //
@@ -210,10 +212,16 @@ const styles = StyleSheet.create({
   // read as a single line rather than two stacked things. No uniform `gap` —
   // the spaces are deliberately unequal (a word-space before the value, a tight
   // hair before pts), so each rides on its own marginLeft.
+  //
+  // flexShrink: 0 — the LABEL GROUP WINS THE ROW. When a wide status (PICKS
+  // LOCKED at 2×) can't fit beside it on a narrow screen, the status caps and
+  // truncates (see `status`); the label never gives up space. Real labels
+  // (WEEK n, WEEK n RECAP) fit within the row on the smallest device, so this
+  // group never needs to shrink for its own sake.
   titleGroup: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    flexShrink: 1,
+    flexShrink: 0,
   },
   label: {
     ...sectionHeaderType,
@@ -240,14 +248,22 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     marginLeft: 2,
   },
-  // Pushes status + chevron to the right edge without letting the label's
-  // flexShrink fight them for space.
+  // Pushes status + chevron to the right edge. flex:1 (basis 0) so it only
+  // eats FREE space; when the row is tight it collapses to minWidth and the
+  // status absorbs the shrink, never the label group.
   spacer: {
     flex: 1,
     minWidth: spacing.sm,
   },
+  // 2× the old 11px. Heavy italic. flexShrink lets it give way on a narrow row
+  // — it caps at the width the label group leaves and truncates (numberOfLines
+  // 1), rather than pushing into the label or off the screen. Deliberately NOT
+  // adjustsFontSizeToFit: this codebase has a documented iOS bug where it
+  // mis-measures inside a flex row and shrinks to the minimum even when the text
+  // fits, which would render the status tiny on roomy screens.
   status: {
-    fontSize: 11,
+    fontSize: 22,
     letterSpacing: 0.3,
+    flexShrink: 1,
   },
 });
