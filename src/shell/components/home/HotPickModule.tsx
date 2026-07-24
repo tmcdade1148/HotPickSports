@@ -2,9 +2,16 @@
 //
 // "The module is a GameChip wearing a flame." A HOTPICK eyebrow — rendered
 // through ModuleSection so it matches CONTESTS / LEAGUES exactly (same casing,
-// weight, type) with the small flame TRAILING the word — over the same GameChip
-// the Picks screen renders. The chip shows its OWN status line (LIVE/FINAL +
-// clock) and the orange HotPick border. Nothing here is bespoke game markup.
+// weight, type) with the BRANDED flame TRAILING the word — over the same
+// GameChip the Picks screen renders. The chip shows its OWN status line
+// (LIVE/FINAL + clock) and the orange HotPick border. Nothing here is bespoke
+// game markup.
+//
+// The trailing mark is ChipFlameColor, NOT GamesTagFlame: same branded artwork,
+// but ChipFlameColor themes its base bar via barColor (we pass textPrimary) so
+// it survives dark mode. GamesTagFlame bakes a #000000 base bar that vanishes on
+// the near-black Home background in the dark theme — right on the orange Picks
+// CTA, wrong here.
 //
 // It is a SIBLING of the ACTION module (PicksOpenHero), rendered directly
 // beneath it by StateHero — not nested inside it. ACTION owns the countdown,
@@ -23,7 +30,7 @@
 import React from 'react';
 import {Pressable, StyleSheet} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
-import {Flame} from 'lucide-react-native';
+import {ChipFlameColor} from '@shared/components/ChipFlameColor';
 import {GameChip, fromGameScore} from '@shared/components/GameChip';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
@@ -69,7 +76,10 @@ export function HotPickModule() {
   return (
     <ModuleSection
       label="HOTPICK"
-      labelTrailing={<Flame size={14} color={colors.primary} strokeWidth={2.5} />}>
+      // Branded flame, base bar themed via barColor so it reads on both light
+      // and dark Home backgrounds (textPrimary: dark on light, white on dark).
+      // Size dialled to the eyebrow; tune on device.
+      labelTrailing={<ChipFlameColor size={18} barColor={colors.textPrimary} />}>
       {/* The tap target is the chip (the eyebrow row isn't interactive here —
           nothing to collapse). The season_games row overlaid with the fresher
           live payload; the chip renders its own LIVE/FINAL status + clock and
