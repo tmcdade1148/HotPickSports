@@ -18,6 +18,7 @@ import {useTheme} from '@shell/theme/hooks';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {isFinalStatus} from '@sports/nfl/utils/gameStatus';
+import {isWeekInProgress} from '@shared/utils/weekState';
 import {displayType, bodyType, spacing} from '@shared/theme';
 
 const POINTS_FONT = 36;
@@ -42,6 +43,27 @@ export function IdentityBar({style}: {style?: StyleProp<ViewStyle>}) {
   // HomeScreen via loadSeasonTotal. null = not loaded yet → render nothing
   // rather than a misleading 0.
   const seasonTotal = useGlobalStore(s => s.seasonTotal);
+
+  // Range label inputs. `seasonTotal` already excludes the in-progress week, so
+  // mid-season a bare "SEASON PTS" reads as if it counted the live week. Naming
+  // the range ("PTS THRU WK n") says what the number actually is and makes the
+  // roll-forward visible when the week settles.
+  const currentWeek  = useNFLStore(s => s.currentWeek);
+  const currentPhase = useNFLStore(s => s.currentPhase);
+  const weekState    = useNFLStore(s => s.weekState);
+
+  // n = the last week FOLDED INTO the total, derived from the SAME predicate
+  // loadSeasonTotal uses to decide what to sum — so the label can't claim a
+  // week the number doesn't include. In progress → the total stops at the week
+  // before; settled/idle → it includes the current week.
+  const lastCompletedWeek = isWeekInProgress(weekState) ? currentWeek - 1 : currentWeek;
+  // Only the regular season names a range. Before week 1 completes there's no
+  // range yet; the playoffs, REGULAR_COMPLETE and SEASON_COMPLETE are their own
+  // leaderboards where "thru week n" would mislead — those stay "SEASON PTS".
+  const rangeLabel =
+    currentPhase === 'REGULAR' && lastCompletedWeek >= 1
+      ? `PTS THRU WK ${lastCompletedWeek}`
+      : 'SEASON PTS';
 
   // When every game in the current week is final, the week total has
   // just been rolled into the season total — pulse the SEASON PTS
@@ -148,7 +170,7 @@ export function IdentityBar({style}: {style?: StyleProp<ViewStyle>}) {
         <Text
           style={[bodyType.bold, styles.pointsLabel, {color: colors.textTertiary}]}
           numberOfLines={1}>
-          SEASON PTS
+          {rangeLabel}
         </Text>
       </View>
     </View>
