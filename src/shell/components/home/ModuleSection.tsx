@@ -7,12 +7,15 @@
 // each module still rendered its own <Text>. Adding a value and a chevron to that
 // arrangement would drift the same way, so the whole row lives here.
 //
-// The row is: LABEL · VALUE ................................ STATUS  chevron
+// The row is: LABEL VALUE pts ............................. STATUS  chevron
 //
 //   Label   uppercase, sectionHeaderType, textTertiary (textPrimary for WEEK).
-//   Value   after a bullet. Positive → gameWon · negative → gameLost WITH its
-//           minus · nothing settled → grey en-dash. Never a green zero.
-//           Tabular figures so the ones column holds still as it changes.
+//   Value   a space after the label (no separator). Positive → gameWon ·
+//           negative → gameLost WITH its minus · nothing settled → grey en-dash.
+//           Never a green zero. Tabular figures so the ones column holds still.
+//   pts     a tight unit on the number, in the number's OWN colour — the two
+//           read as one thing, not a value and a grey afterthought.
+//   Trailing a small node right after the label word (the HOTPICK flame).
 //   Status  right-aligned, heavy italic. WEEK only.
 //   Chevron toggles the children. Collapsed by default; the value stays visible
 //           while collapsed, because the value is the reason to look.
@@ -53,14 +56,17 @@ export interface ModuleSectionProps {
   /** Uppercased by the caller-facing contract; rendered as given. */
   label: string;
   /**
-   * Points shown after the bullet. `null` = nothing settled → grey en-dash.
-   * OMIT the prop entirely for a module that has no number (Contests, Leagues).
+   * Points shown a space after the label. `null` = nothing settled → grey
+   * en-dash. OMIT the prop entirely for a module with no number (Contests,
+   * Leagues, HotPick).
    */
   value?: number | null;
   /** Right-aligned heavy-italic status. WEEK eyebrow only. */
   status?: ModuleSectionStatus | null;
   /** Right-aligned node — the Contest carousel's page dots. */
   accessory?: React.ReactNode;
+  /** Small node rendered immediately AFTER the label word (the HOTPICK flame). */
+  labelTrailing?: React.ReactNode;
   /** Adds the chevron and makes the whole row a toggle. Collapsed by default. */
   collapsible?: boolean;
   /** The WEEK eyebrow's label renders in textPrimary; every other one tertiary. */
@@ -73,6 +79,7 @@ export function ModuleSection({
   value,
   status,
   accessory,
+  labelTrailing,
   collapsible = false,
   emphasis = false,
   children,
@@ -118,18 +125,22 @@ export function ModuleSection({
           {label}
         </Text>
 
+        {/* Trailing node — the HOTPICK flame, right after the word. */}
+        {labelTrailing != null && (
+          <View style={styles.labelTrailing}>{labelTrailing}</View>
+        )}
+
         {showValue && (
           <>
-            <Text style={[bodyType.bold, styles.bullet, {color: colors.textTertiary}]}>
-              {'•'}
-            </Text>
             <Text style={[displayType.display, styles.value, {color: valueColor}]}>
               {/* U+2013 en-dash: nothing has settled. Not a zero. */}
               {value == null ? '–' : fmtPoints(value)}
             </Text>
-            {/* No unit on the en-dash — "– pts" reads like a broken number. */}
+            {/* No unit on the en-dash — "– pts" reads like a broken number.
+                Otherwise it takes the NUMBER's colour so the two read as one
+                unit (green with a gain, red with a miss). */}
             {value != null && (
-              <Text style={[bodyType.bold, styles.valueUnit, {color: colors.textTertiary}]}>
+              <Text style={[bodyType.bold, styles.valueUnit, {color: valueColor}]}>
                 pts
               </Text>
             )}
@@ -195,13 +206,14 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     gap: 6,
   },
-  // Label · value · pts, sharing one baseline so the 22px label and the 29px
-  // number read as a single line rather than two stacked things.
+  // Label value pts, sharing one baseline so the 22px label and the 29px number
+  // read as a single line rather than two stacked things. No uniform `gap` —
+  // the spaces are deliberately unequal (a word-space before the value, a tight
+  // hair before pts), so each rides on its own marginLeft.
   titleGroup: {
     flexDirection: 'row',
     alignItems: 'baseline',
     flexShrink: 1,
-    gap: 6,
   },
   label: {
     ...sectionHeaderType,
@@ -211,18 +223,22 @@ const styles = StyleSheet.create({
     letterSpacing: 0.9,
     flexShrink: 1,
   },
-  bullet: {
-    fontSize: LABEL_SIZE,
+  // The flame sits just past the last glyph of the word.
+  labelTrailing: {
+    marginLeft: 6,
   },
   value: {
     ...monoType.regular,
     fontSize: VALUE_SIZE,
+    // A word-space after the label — the separator, now that the bullet is gone.
+    marginLeft: 8,
   },
-  // Rides to the right of the number, small — a unit on that number, not a
-  // second thing to read.
+  // Rides tight to the number, small, in the number's colour — a unit ON that
+  // number, not a second thing to read.
   valueUnit: {
     fontSize: 11,
     letterSpacing: 0.8,
+    marginLeft: 2,
   },
   // Pushes status + chevron to the right edge without letting the label's
   // flexShrink fight them for space.
