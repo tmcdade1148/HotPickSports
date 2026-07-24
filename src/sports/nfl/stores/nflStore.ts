@@ -969,12 +969,12 @@ export const useNFLStore = create<NFLState>((set, get) => ({
 
         if (myStanding && myStanding.rank === 1) {
           set({
-            pathBackNarrative: `Your HotPick hit. +${rank} pts.${gamesStillLive > 0 ? ` ${gamesStillLive} game${gamesStillLive !== 1 ? 's' : ''} still live.` : ''}`,
+            pathBackNarrative: `Your HotPick hit. ${rank} pts.${gamesStillLive > 0 ? ` ${gamesStillLive} game${gamesStillLive !== 1 ? 's' : ''} still live.` : ''}`,
             hotPickGameStatus: 'complete',
           });
         } else {
           set({
-            pathBackNarrative: `Your HotPick hit! +${rank} pts.`,
+            pathBackNarrative: `Your HotPick hit! ${rank} pts.`,
             hotPickGameStatus: 'complete',
           });
         }
@@ -1009,8 +1009,8 @@ export const useNFLStore = create<NFLState>((set, get) => ({
       set({
         pathBackNarrative:
           spotsGained > 0
-            ? `Your HotPick on ${team} is live. Win: +${rank} pts, you jump ${spotsGained} spot${spotsGained !== 1 ? 's' : ''}.`
-            : `Your HotPick on ${team} is live. Win: +${rank} pts.`,
+            ? `Your HotPick on ${team} is live. Win: ${rank} pts, you jump ${spotsGained} spot${spotsGained !== 1 ? 's' : ''}.`
+            : `Your HotPick on ${team} is live. Win: ${rank} pts.`,
         hotPickGameStatus: 'live',
       });
     } else if (isPending) {

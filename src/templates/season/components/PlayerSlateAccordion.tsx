@@ -19,6 +19,7 @@ import {View, ActivityIndicator, StyleSheet} from 'react-native';
 import {Text} from '@shared/components/AppText';
 import {useTheme} from '@shell/theme';
 import {bodyType, spacing, borderRadius} from '@shared/theme';
+import {fmtPoints} from '@shared/utils/format';
 import type {DbSeasonGame} from '@shared/types/database';
 
 export interface PlayerSlatePick {
@@ -141,14 +142,15 @@ export function PlayerSlateAccordion({games, slate, isNonPrivate, teams}: Props)
         const isHotRow = pick?.is_hotpick === true;
         const rank = g.frozen_rank ?? g.rank ?? null;
 
-        // HotPick points: unsigned rank while pending (rule 2), signed +
-        // coloured once the server decides it.
+        // HotPick points: unsigned rank while pending, signed + coloured once
+        // the server decides it. Signs go through fmtPoints — positives BARE,
+        // only a miss carries its minus (app-wide rule).
         let ptsEl: React.ReactNode = null;
         if (isHotRow && rank != null) {
           if (pick?.is_correct === true) {
-            ptsEl = <Text style={[bodyType.bold, styles.pts, {color: colors.gameWon}]}>{`+${rank}`}</Text>;
+            ptsEl = <Text style={[bodyType.bold, styles.pts, {color: colors.gameWon}]}>{fmtPoints(rank)}</Text>;
           } else if (pick?.is_correct === false) {
-            ptsEl = <Text style={[bodyType.bold, styles.pts, {color: colors.gameLost}]}>{`−${rank}`}</Text>;
+            ptsEl = <Text style={[bodyType.bold, styles.pts, {color: colors.gameLost}]}>{fmtPoints(-rank)}</Text>;
           } else {
             ptsEl = <Text style={[bodyType.bold, styles.pts, {color: colors.textSecondary}]}>{`${rank}`}</Text>;
           }

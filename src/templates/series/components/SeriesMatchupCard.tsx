@@ -224,7 +224,7 @@ export function SeriesMatchupCard({
           <Text style={styles.gamesLabel}>
             Predicted: {pickedSeriesLength} games
             {pickedSeriesLength === actualLength
-              ? ` (+${config.seriesLengthBonusPoints} bonus!)`
+              ? ` (${config.seriesLengthBonusPoints} bonus!)`
               : ` (Actual: ${actualLength})`}
           </Text>
         </View>
@@ -254,7 +254,7 @@ export function SeriesMatchupCard({
               styles.pointsText,
               pointsEarned > 0 ? styles.pointsPositive : styles.pointsZero,
             ]}>
-            {pointsEarned > 0 ? `+${pointsEarned} pts` : '0 pts'}
+            {`${pointsEarned} pts`}
           </Text>
         </View>
       )}

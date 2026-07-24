@@ -52,7 +52,7 @@ export function PlayoffRulesModal({visible, onClose}: Props) {
             <Rule
               colors={colors}
               heading="Scoring"
-              text="Each correct pick is worth +1. Your HotPick is worth its rank: + the rank if it wins, − the rank if it loses. Higher-ranked games are bigger swings."
+              text="Each correct pick is worth 1. Your HotPick is worth its rank: you gain the rank if it wins, − the rank if it loses. Higher-ranked games are bigger swings."
             />
             {/* Tie-breaker ladder — applied in order until the tie is broken. */}
             <View

@@ -119,13 +119,13 @@ export function InstructionsScreen() {
             rank (1-10) based on how competitive it is.
           </Text>
           <Text style={[styles.bulletItem, {color: colors.textSecondary}]}>
-            {'\u2022'} Correct HotPick: earn +rank points (e.g., rank 8 = +8 pts)
+            {'\u2022'} Correct HotPick: earn rank points (e.g., rank 8 = 8 pts)
           </Text>
           <Text style={[styles.bulletItem, {color: colors.textSecondary}]}>
-            {'\u2022'} Wrong HotPick: subtract rank points (e.g., rank 8 = -8 pts)
+            {'\u2022'} Wrong HotPick: subtract rank points (e.g., rank 8 = {'\u2212'}8 pts)
           </Text>
           <Text style={[styles.bulletItem, {color: colors.textSecondary}]}>
-            {'\u2022'} All other picks: +1 for correct, 0 for incorrect
+            {'\u2022'} All other picks: 1 for correct, 0 for incorrect
           </Text>
           <Text style={[styles.body, {color: colors.textSecondary, marginTop: spacing.sm}]}>
             Picking higher-ranked games as your HotPick compounds your weekly

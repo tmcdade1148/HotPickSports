@@ -75,7 +75,7 @@ export function DemoIntroModal({visible, onClose, onExitHome}: {visible: boolean
           <View style={[styles.bullet, {backgroundColor: colors.secondary}]} />
           <Text style={[bodyType.regular, styles.ruleText, {color: colors.textPrimary}]}>
             Pick the winner of each game. Every correct pick is{' '}
-            <Text style={{fontWeight: '800'}}>+1 point</Text>. {scoringNeverNegative}
+            <Text style={{fontWeight: '800'}}>1 point</Text>. {scoringNeverNegative}
           </Text>
         </View>
 
@@ -93,7 +93,7 @@ export function DemoIntroModal({visible, onClose, onExitHome}: {visible: boolean
           <View style={{flex: 1}}>
             <Text style={[bodyType.regular, {color: colors.textPrimary, fontSize: 14, lineHeight: 19}]}>
               Get your HotPick right and you win{' '}
-              <Text style={{fontWeight: '800', color: colors.success}}>+12</Text>. Get it wrong
+              <Text style={{fontWeight: '800', color: colors.success}}>12</Text>. Get it wrong
               and you lose{' '}
               <Text style={{fontWeight: '800', color: colors.error}}>−12</Text>. Higher badge =
               bigger swing.

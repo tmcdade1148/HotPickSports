@@ -383,7 +383,7 @@ function formatNarrative(hw: UserHardwareItem): string {
     case 'sharpshooter_week':
       return `Week ${ctx.week}: ${ctx.correct}/${ctx.total} regular picks correct (${Math.round((ctx.pick_rate as number ?? 0) * 100)}%). Pool size: ${ctx.pool_size}.`;
     case 'gunslinger_week':
-      return `Week ${ctx.week}: Won a Rank ${ctx.hotpick_rank} HotPick on ${ctx.hotpick_team}. +${ctx.points_earned} pts.`;
+      return `Week ${ctx.week}: Won a Rank ${ctx.hotpick_rank} HotPick on ${ctx.hotpick_team}. ${ctx.points_earned} pts.`;
     case 'contrarian_week':
       return `Week ${ctx.week}: Went against the Contest on ${ctx.against_majority_count} games, won ${ctx.against_majority_wins}. Finished #${ctx.week_rank}.`;
     case 'perfect_week':
