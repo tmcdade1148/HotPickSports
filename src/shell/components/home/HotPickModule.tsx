@@ -97,6 +97,10 @@ export function HotPickModule() {
           winnerTeam={userHotPickGame.winner_team}
           pointsLabel="HotPick Point"
           scoresRightInset={spacing.md}
+          // On Home the team names ARE the headline — 1.5× — and the day/time
+          // line steps back a touch so they carry the chip.
+          teamNameScale={1.5}
+          kickoffFontSize={12}
           pickedNameColor={colors.primary}
           outlineColor={colors.primary}
           boxTint={isFinal ? undefined : {background: colors.primary, text: colors.onPrimary}}

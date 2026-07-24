@@ -129,7 +129,7 @@ export function RecapModule() {
           {/* No HotPick designated that week → the row and the team name drop
               out entirely. A "—" here would imply a pick that didn't resolve. */}
           {hpResolved && (
-            <View style={styles.row}>
+            <View style={[styles.row, styles.hotpickRow]}>
               <View style={styles.labelCol}>
                 <View style={styles.resultLine}>
                   <Text style={[displayType.display, styles.result, {color: colors.textPrimary}]}>
@@ -215,6 +215,14 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  // The HotPick row's label column is TWO lines (result + team name), so
+  // centring drops the points value to the middle — level with the gap between
+  // the lines. Top-align it instead: the value and the result line are the same
+  // size (RESULT_SIZE) and font, so their baselines coincide and the number
+  // sits on the "HotPick … : WIN" line it belongs to.
+  hotpickRow: {
+    alignItems: 'flex-start',
   },
   labelCol: {
     flex: 1,

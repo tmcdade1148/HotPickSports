@@ -20,7 +20,9 @@ import {HomeHeader} from '@shell/components/home/HomeHeader';
 import {IdentityBar} from '@shell/components/home/IdentityBar';
 import {ManagedLeagueModule} from '@shell/components/home/ManagedLeagueModule';
 import {StateHero} from '@shell/components/home/StateHero';
-import {ContextualLine} from '@shell/components/home/ContextualLine';
+// ContextualLine is hidden for now (see the commented render below); the import
+// stays commented so restoring is a two-line uncomment, not a re-import hunt.
+// import {ContextualLine} from '@shell/components/home/ContextualLine';
 import {HeroSkeleton} from '@shell/components/home/HeroSkeleton';
 import {CrossContestStrip} from '@shell/components/home/CrossContestStrip';
 import {DemoButton} from '@shell/components/home/DemoButton';
@@ -532,8 +534,14 @@ export function HomeScreen() {
         {/* CONTEXTUAL LINE (map module 3) — one line, above the hero. Single
             producer, reading the state table; renders nothing for rows whose
             contextual pool is empty. Gated on configLoaded so it doesn't flash
-            the default-state line before the real phase resolves. */}
-        {configLoaded && <ContextualLine row={homeRow} />}
+            the default-state line before the real phase resolves.
+
+            HIDDEN FOR NOW (Tom, 2026-07-24): the whole headline system is off
+            across every state — rewritten post-launch. Commented, not deleted,
+            so the switch is intact to restore: uncomment the line below (and its
+            import) and the per-phase headlines come back with no other change.
+            The layout closes up with it gone — no reserved gap. */}
+        {/* {configLoaded && <ContextualLine row={homeRow} />} */}
 
         {showHero &&
           (configLoaded ? (

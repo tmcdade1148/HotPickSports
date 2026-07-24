@@ -113,9 +113,11 @@ export function ModuleSection({
 
   const header = (
     <View style={styles.row}>
-      {/* The type sits on a shared BASELINE. The row itself stays centred —
-          baseline-aligning the dots and the chevron (plain Views, no text)
-          hangs them off their bottom edge instead. */}
+      {/* The row is BASELINE-aligned so the status (PICKS LOCKED …) sits on the
+          same baseline as the label — the tall 29px value would otherwise pull
+          the label's baseline low while the status floated at the row's centre.
+          The non-text items (dots, chevron) can't baseline-align — they'd hang
+          off their bottom edge — so each is wrapped in a self-centred View. */}
       <View style={styles.titleGroup}>
         <Text
           style={[
@@ -152,7 +154,7 @@ export function ModuleSection({
 
       <View style={styles.spacer} />
 
-      {accessory}
+      {accessory != null && <View style={styles.rightItem}>{accessory}</View>}
 
       {status ? (
         <Text
@@ -166,12 +168,15 @@ export function ModuleSection({
         </Text>
       ) : null}
 
-      {collapsible &&
-        (open ? (
-          <ChevronUp size={CHEVRON} color={colors.textTertiary} strokeWidth={2.5} />
-        ) : (
-          <ChevronDown size={CHEVRON} color={colors.textTertiary} strokeWidth={2.5} />
-        ))}
+      {collapsible && (
+        <View style={styles.rightItem}>
+          {open ? (
+            <ChevronUp size={CHEVRON} color={colors.textTertiary} strokeWidth={2.5} />
+          ) : (
+            <ChevronDown size={CHEVRON} color={colors.textTertiary} strokeWidth={2.5} />
+          )}
+        </View>
+      )}
     </View>
   );
 
@@ -203,10 +208,14 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'baseline',
     paddingHorizontal: spacing.lg,
     marginBottom: 10,
     gap: 6,
+  },
+  // Dots / chevron opt OUT of the row's baseline and centre on it instead.
+  rightItem: {
+    alignSelf: 'center',
   },
   // Label value pts, sharing one baseline so the 22px label and the 29px number
   // read as a single line rather than two stacked things. No uniform `gap` —

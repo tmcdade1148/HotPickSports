@@ -103,6 +103,12 @@ export interface GameChipProps {
   /** Whether the chip renders its own status row. Default true. Home's HotPick
    *  card passes false (its title carries the status). */
   showStatus?: boolean;
+  /** Multiplies BOTH team-name sizes. Default 1. Home's HotPick card passes 1.5
+   *  so the names become the chip's headline; the Picks screen leaves it 1. */
+  teamNameScale?: number;
+  /** Font size of the kickoff day/time line. Default 14. Home's HotPick card
+   *  passes a slightly smaller value so the names dominate. */
+  kickoffFontSize?: number;
 }
 
 /**
@@ -171,6 +177,8 @@ export function GameChip({
   homeRecord,
   scoresRightInset = 0,
   showStatus = true,
+  teamNameScale = 1,
+  kickoffFontSize = 14,
 }: GameChipProps) {
   const {colors} = useTheme();
 
@@ -288,7 +296,7 @@ export function GameChip({
     const inner = (
       <View style={styles.nameRow}>
         <Text
-          style={[nm.font, styles.teamName, {color: nm.color, fontSize: nm.size}]}
+          style={[nm.font, styles.teamName, {color: nm.color, fontSize: nm.size * teamNameScale}]}
           numberOfLines={1}>
           {label.toUpperCase()}
         </Text>
@@ -384,7 +392,7 @@ export function GameChip({
               <Text style={[styles.statusText, {color: colors.gameLost}]}>FINAL</Text>
             </View>
           ) : (
-            <Text style={[bodyType.regular, styles.kickoff, {color: colors.textSecondary}]}>
+            <Text style={[bodyType.regular, styles.kickoff, {color: colors.textSecondary, fontSize: kickoffFontSize}]}>
               {formatKickoff(game.kickoff_at)}
             </Text>
           )
