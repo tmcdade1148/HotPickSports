@@ -72,10 +72,11 @@ export function StateHero({row}: StateHeroProps) {
 
 function heroFor(row: HomeRow): React.ReactElement {
   switch (row) {
-    // ACTION (PicksOpenHero) then HOTPICK (HotPickModule) as siblings — the
-    // HotPick card sits directly BENEATH the action module, never inside it.
-    // HotPickModule renders null when there's no HotPick or no rank.
-    case 'picks_open':  return <><PicksOpenHero /><HotPickModule /></>;
+    // picks_open pulls the HotPick UP INSIDE the ACTION surface (spec §6.4), so
+    // PicksOpenHero renders HotPickModule itself — no sibling here.
+    case 'picks_open':  return <PicksOpenHero />;
+    // locked / live keep the HOTPICK card as a sibling BENEATH the action module
+    // (unchanged). HotPickModule renders null when there's no HotPick or no rank.
     case 'locked':      return <><PicksOpenHero /><HotPickModule /></>;
     case 'live':        return <><PicksOpenHero /><HotPickModule /></>;
     case 'settling':    return <SettlingHero />;

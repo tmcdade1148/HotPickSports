@@ -2,6 +2,7 @@ import React from 'react';
 import {Text} from '@shared/components/AppText';
 import {View, StyleSheet} from 'react-native';
 import {HotPickFlame} from '@shared/components/HotPickFlame';
+import {PickProgressBar} from '@shared/components/PickProgressBar';
 import {spacing} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 
@@ -19,9 +20,10 @@ interface PicksProgressHeaderProps {
  *
  * Shows:
  * 1. Week title + pick count with flame when picking starts
- * 2. Progress bar (grey → yellow → green)
+ * 2. Progress bar — orange while filling, green when all picked (PickProgressBar)
  *
- * Count turns yellow on first pick, green + bold when all picked.
+ * Count turns orange on first pick, green + bold when all picked (matching the
+ * bar — no more yellow mid-state).
  * A small flame appears left of the count once picks start.
  */
 export function PicksProgressHeader({
@@ -34,20 +36,15 @@ export function PicksProgressHeader({
 }: PicksProgressHeaderProps) {
   const {colors} = useTheme();
   const styles = createStyles(colors);
-  const progress = totalGames > 0 ? pickCount / totalGames : 0;
   const allPicked = pickCount >= totalGames && totalGames > 0;
   const hasPicks = pickCount > 0;
 
-  const barColor = allPicked
-    ? colors.success
-    : hasPicks
-      ? colors.warning
-      : colors.border;
-
+  // Count colour tracks the shared bar: orange while filling, green when
+  // complete. Yellow is dropped from both (spec §3.2).
   const countColor = allPicked
-    ? colors.success
+    ? colors.gameWon
     : hasPicks
-      ? colors.warning
+      ? colors.primary
       : colors.textSecondary;
 
   const hasHotPick = hotPickCount >= hotPicksRequired;
@@ -74,18 +71,8 @@ export function PicksProgressHeader({
         </View>
       </View>
 
-      {/* Progress bar */}
-      <View style={styles.progressBar}>
-        <View
-          style={[
-            styles.progressFill,
-            {
-              width: `${Math.min(progress * 100, 100)}%`,
-              backgroundColor: barColor,
-            },
-          ]}
-        />
-      </View>
+      {/* Progress bar — the shared element (also on Home's picks_open surface). */}
+      <PickProgressBar picksSet={pickCount} totalGames={totalGames} />
     </View>
   );
 }
@@ -127,15 +114,5 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   pickCountComplete: {
     fontWeight: '800',
-  },
-  progressBar: {
-    height: 6,
-    backgroundColor: colors.border,
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 3,
   },
 });

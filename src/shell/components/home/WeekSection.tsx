@@ -89,7 +89,9 @@ function weekStatus(
     return {text: liveCount === 1 ? 'GAME IN PROGRESS' : 'GAMES IN PROGRESS', tone: 'go'};
   }
   switch (weekState) {
-    case 'picks_open': return {text: 'PICKS OPEN', tone: 'go'};
+    // picks_open shows NO status word — the surface's deadline line ("PICKS LOCK
+    // THU 8:20 PM") carries "open" now (spec §6.6).
+    case 'picks_open': return null;
     case 'locked':
     case 'live':       return {text: 'PICKS LOCKED', tone: 'stop'};
     default:           return null;

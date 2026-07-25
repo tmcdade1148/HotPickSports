@@ -141,8 +141,11 @@ export function fromGameScore(score?: {
   };
 }
 
-/** "Thu, 8:20 PM" */
-function formatKickoff(iso: string): string {
+/** "Thu, 8:20 PM". Exported so the Home deadline line renders the lock moment
+ *  through the SAME formatter (spec §6.1: reuse the pattern, don't write a new
+ *  one). Callers that want an uppercase, comma-less variant transform the
+ *  output ("THU 8:20 PM"). */
+export function formatKickoff(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
