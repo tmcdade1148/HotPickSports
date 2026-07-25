@@ -16,7 +16,7 @@
 // above the hero (currently hidden). The HotPick card is its own module
 // (HotPickModule): a sibling below in locked/live, pulled INSIDE here.
 
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useMemo} from 'react';
 import {Text} from '@shared/components/AppText';
 import {Pressable, StyleSheet, View} from 'react-native';
 import {ArrowRight} from 'lucide-react-native';
@@ -28,8 +28,6 @@ import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
 // isFinalStatus survives for weekComplete (every game FINAL) — a completion
 // question, not a lock question. The week lock reads isWeekLocked() (rule 11).
 import {isFinalStatus} from '@sports/nfl/utils/gameStatus';
-import {isSandboxCompetition} from '@shared/utils/competition';
-import {singleUnit} from './useCountdown';
 // Rule 11: the ONE answer to "are picks locked" (MIN kickoff). weekLockAtFromGames
 // is the same MIN(kickoff_at) as an epoch — the deadline anchor's source.
 import {isWeekLocked, weekLockAtFromGames} from '@templates/season/utils/weekLock';
@@ -58,13 +56,13 @@ export function PicksOpenHero() {
   // every game's kickoff to compute MIN(kickoff_at) — and weekComplete, which
   // denominates against the whole week, not just liveScores.
   const seasonGames        = useSeasonStore(s => s.games);
-  const competition        = useSeasonStore(s => s.config?.competition);
 
   const isPicksOpenState = weekState === 'picks_open';
 
   // THE week lock — rule 11. isWeekLocked() is MIN(kickoff_at) across the week,
   // mirroring the server's enforce_pick_lock, and the ONLY answer to "are picks
-  // locked." No ticker: useCountdownParts re-renders every 30s.
+  // locked." Re-evaluated on each store-driven render; the server enforces the
+  // exact lock, so the client flip near MIN(kickoff) is cosmetic.
   const weekLocked = isWeekLocked(seasonGames);
 
   // COMPLETION, not lock. "Every game is FINAL" ≠ "the week is locked." Kept for
@@ -89,19 +87,10 @@ export function PicksOpenHero() {
   const allPicks = picksSet >= picksTotal;
 
   // THE lock moment — MIN(kickoff_at) across the week (weekLock.ts), the value
-  // the server enforces. The deadline line AND the ambient countdown both target
-  // THIS, never the HotPick game's own kickoff (spec §6.1, trap #1). null in
-  // preseason / while loading — handled below, never rendered as blank/NaN.
+  // the server enforces. The deadline anchor targets THIS, never the HotPick
+  // game's own kickoff (trap #1). null in preseason / while loading — handled
+  // below, never rendered as blank/NaN.
   const lockAtMs = weekLockAtFromGames(seasonGames);
-  const lockTarget = useMemo(
-    () => (lockAtMs != null ? new Date(lockAtMs) : null),
-    [lockAtMs],
-  );
-  const timer = useCountdownParts(lockTarget);
-
-  // Reviewer sandboxes (nfl_2025_sim*) show a fixed "3 DAYS" — the sim is a
-  // frozen Week-8 demo, so the ambient countdown should always read 3 days.
-  const sandboxCountdown = isSandboxCompetition(competition);
 
   // ── picks_open surface ────────────────────────────────────────────────────
   // Every hook above runs unconditionally; safe to branch now.
@@ -114,16 +103,8 @@ export function PicksOpenHero() {
         ? formatKickoff(new Date(lockAtMs).toISOString()).replace(', ', ' ').toUpperCase()
         : null;
 
-    // Ambient "n DAYS LEFT" — the demoted countdown, pointed at the lock time.
-    let daysLeftLabel: string | null = null;
-    if (sandboxCountdown) {
-      daysLeftLabel = '3 DAYS LEFT';
-    } else if (timer) {
-      const su = singleUnit(timer.days, timer.hours, timer.minutes);
-      daysLeftLabel = `${su.value} ${su.unit.toUpperCase()}${su.value === 1 ? '' : 'S'} LEFT`;
-    }
-
-    // Progress label (left).
+    // Progress label (left). The right side is intentionally empty for now — the
+    // ambient "n DAYS LEFT" is dropped; a smarter urgency line is a follow-up.
     let progressLabel: string;
     let progressLabelColor: string;
     if (allPicks && hotPickDesignated) {
@@ -144,14 +125,14 @@ export function PicksOpenHero() {
     let openCtaA11y: string;
     let openCtaDimmed = false;
     if (picksSet === 0) {
-      openCtaLabel = 'MAKE YOUR PICKS';
-      openCtaA11y = 'Make your picks';
+      openCtaLabel = 'GO MAKE YOUR PICKS';
+      openCtaA11y = 'Go make your picks';
     } else if (!allPicks) {
       openCtaLabel = 'FINISH YOUR PICKS';
       openCtaA11y = 'Finish your picks';
     } else if (!hotPickDesignated) {
-      openCtaLabel = 'TAG YOUR HOTPICK TO LOCK IN';
-      openCtaA11y = 'Tag your HotPick to lock in — you are not in until you do';
+      openCtaLabel = 'TAG YOUR HOTPICK';
+      openCtaA11y = 'Tag your HotPick — you are not in until you do';
     } else {
       // Done — the action is no longer urgent, so it dims.
       openCtaLabel = 'VIEW OR REVISE';
@@ -173,9 +154,12 @@ export function PicksOpenHero() {
           {backgroundColor: colors.surfaceElevated, borderColor: colors.border},
         ]}>
         {/* Deadline anchor — the LOCK moment (MIN kickoff), replacing the old
-            countdown headline. */}
+            countdown headline. "PICKS LOCK" + the time read as one line: equal
+            size, the label lighter and the time heavier. */}
         <View style={styles.deadlineRow}>
-          <Text style={[bodyType.bold, styles.deadlineLabel, {color: colors.textSecondary}]}>
+          {/* Same italic display face as the time, a lighter weight — so the two
+              read as one italic line and the time stays the emphasis. */}
+          <Text style={[displayType.display, styles.deadlineLabel, {color: colors.textSecondary}]}>
             PICKS LOCK
           </Text>
           <Text
@@ -187,25 +171,8 @@ export function PicksOpenHero() {
           </Text>
         </View>
 
-        {/* Progress — promoted from footnote. Left: count / HotPick-needed /
-            all-in. Right (ambient, grey): the demoted countdown. */}
-        <View style={styles.progressLabelRow}>
-          <Text
-            style={[bodyType.bold, styles.progressLabelLeft, {color: progressLabelColor}]}
-            numberOfLines={1}>
-            {progressLabel}
-          </Text>
-          {daysLeftLabel != null && (
-            <Text
-              style={[bodyType.regular, styles.progressLabelRight, {color: colors.textTertiary}]}
-              numberOfLines={1}>
-              {daysLeftLabel}
-            </Text>
-          )}
-        </View>
-        <PickProgressBar picksSet={picksSet} totalGames={picksTotal} />
-
-        {/* CTA — no flame on the button, ever (spec §6.3). Label + arrow only. */}
+        {/* CTA — no flame on the button, ever (spec §6.3). Label + arrow only.
+            Sits ABOVE the progress so the bar reads as the result of acting. */}
         <Pressable
           onPress={() => navigation.navigate('PicksTab')}
           style={({pressed}) => [
@@ -227,6 +194,17 @@ export function PicksOpenHero() {
           </Text>
           <ArrowRight size={22} color={colors.onPrimary} strokeWidth={3} />
         </Pressable>
+
+        {/* Progress — below the CTA. Left: count / HotPick-needed / all-in. The
+            right side is intentionally empty for now (ambient countdown dropped). */}
+        <View style={styles.progressLabelRow}>
+          <Text
+            style={[bodyType.bold, styles.progressLabelLeft, {color: progressLabelColor}]}
+            numberOfLines={1}>
+            {progressLabel}
+          </Text>
+        </View>
+        <PickProgressBar picksSet={picksSet} totalGames={picksTotal} />
 
         {/* HotPick — pulled UP into the surface. Filled = the existing chip;
             empty = a dashed beckon sized to the chip (no reflow). */}
@@ -361,25 +339,6 @@ function resolveStakesLine(): string | null {
   return null;
 }
 
-function useCountdownParts(
-  target: Date | null,
-): {days: number; hours: number; minutes: number} | null {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!target) return;
-    const id = setInterval(() => setNow(Date.now()), 30_000);
-    return () => clearInterval(id);
-  }, [target]);
-
-  if (!target) return null;
-  const diff = Math.max(0, target.getTime() - now);
-  const totalMinutes = Math.floor(diff / 60_000);
-  const days = Math.floor(totalMinutes / (60 * 24));
-  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
-  const minutes = totalMinutes % 60;
-  return {days, hours, minutes};
-}
-
 const styles = StyleSheet.create({
   card: {
     marginHorizontal: spacing.lg,
@@ -390,47 +349,47 @@ const styles = StyleSheet.create({
   },
 
   // ── picks_open surface ──────────────────────────────────────────────────
-  // Deadline anchor: "PICKS LOCK" small-caps beside the day/time, baseline-aligned.
+  // Deadline anchor: "PICKS LOCK" and the day/time read as one line — equal
+  // size, baseline-aligned; the weight difference (label bold, time display-
+  // heavy italic) is what separates them, not size.
   deadlineRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
     justifyContent: 'center',
     gap: 8,
-    marginBottom: 14,
+    marginBottom: 16,
   },
+  // Same italic display face as the time; lighter weight (600 vs the time's
+  // 800) so the label recedes and the time reads as the emphasis.
   deadlineLabel: {
-    fontSize: 13,
-    letterSpacing: 1,
-  },
-  deadlineTime: {
-    fontSize: 22,
+    fontSize: 18,
+    fontWeight: '600',
     letterSpacing: 0.3,
   },
-  // Progress label row sits just above the bar. Left count, right ambient countdown.
+  deadlineTime: {
+    fontSize: 18,
+    letterSpacing: 0.3,
+  },
+  // Progress label row sits just above the bar, below the CTA. Left count only;
+  // the right side is intentionally empty for now (ambient countdown dropped).
   progressLabelRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    justifyContent: 'space-between',
+    marginTop: 16,
     marginBottom: 8,
-    gap: 8,
   },
   progressLabelLeft: {
     fontSize: 13,
     letterSpacing: 0.8,
     flexShrink: 1,
   },
-  progressLabelRight: {
-    fontSize: 12,
-    letterSpacing: 0.5,
-    flexShrink: 0,
-  },
   // picks_open CTA — no GAMES tag, so padding lives on the Pressable itself.
+  // Sits directly under the deadline (which carries the gap above it).
   ctaOpen: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginTop: 16,
     paddingVertical: 15,
     paddingHorizontal: 20,
     borderRadius: borderRadius.md + 2,
