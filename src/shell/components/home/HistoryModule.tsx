@@ -170,7 +170,7 @@ export function HistoryModule() {
   const slotW = cardW > 0 ? cardW / VISIBLE_SLOTS : 0;
 
   return (
-    <ModuleSection label="HISTORY" value={seasonTotal} collapsible>
+    <ModuleSection label="HISTORY" value={seasonTotal} valueNeutral collapsible>
       <View
         style={[styles.card, {backgroundColor: colors.surface}]}
         onLayout={e => setCardW(e.nativeEvent.layout.width)}>

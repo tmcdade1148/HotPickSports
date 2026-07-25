@@ -63,6 +63,12 @@ export interface ModuleSectionProps {
    * Leagues, HotPick).
    */
   value?: number | null;
+  /** Render the value in neutral textPrimary regardless of sign, instead of the
+   *  default green/red-by-sign. The HISTORY eyebrow's SEASON total sets this so
+   *  it reads like IdentityBar's neutral "PTS THRU WK n" header — a running
+   *  season total is not a win/loss, so it should never green. Week-level values
+   *  (WEEK, RECAP) leave it off and keep the sign colour. */
+  valueNeutral?: boolean;
   /** Right-aligned heavy-italic status. WEEK eyebrow only. */
   status?: ModuleSectionStatus | null;
   /** Right-aligned node — the Contest carousel's page dots. */
@@ -79,6 +85,7 @@ export interface ModuleSectionProps {
 export function ModuleSection({
   label,
   value,
+  valueNeutral = false,
   status,
   accessory,
   labelTrailing,
@@ -102,14 +109,18 @@ export function ModuleSection({
 
   const showValue = value !== undefined;
   // A settled 0 is a real result and stays neutral — "never a green zero".
+  // valueNeutral forces textPrimary for any non-null value (the HISTORY season
+  // total, which reads like a header figure, not a win/loss).
   const valueColor =
     value == null
       ? colors.textTertiary
-      : value > 0
-        ? colors.gameWon
-        : value < 0
-          ? colors.gameLost
-          : colors.textPrimary;
+      : valueNeutral
+        ? colors.textPrimary
+        : value > 0
+          ? colors.gameWon
+          : value < 0
+            ? colors.gameLost
+            : colors.textPrimary;
 
   const header = (
     <View style={styles.row}>
