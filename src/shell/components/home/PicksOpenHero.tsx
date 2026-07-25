@@ -9,9 +9,10 @@
 // rebuild.
 //
 // locked / live (ACTION module spec 2): picks are locked, so there's no action —
-// the big CTA is GONE. The fall-through renders the quiet surface: a lock marker
-// (ChipLock) + the single HotPick, INSIDE the surface. "Big Games to Watch"
-// rides below (StateHero). settling/complete are their own heroes (out of scope).
+// the big CTA is GONE. The fall-through renders the quiet surface: a header line
+// (pulsing "GAMES IN PROGRESS" when live + the ChipLock padlock, far right) → the
+// HotPick card → the hit-rate. "Big Games to Watch" rides below (StateHero).
+// settling/complete are their own heroes (out of scope).
 //
 // The contextual line is NOT here — it's a single producer (ContextualLine)
 // above the hero (currently hidden). The HotPick (HotPickModule) renders INSIDE
@@ -35,6 +36,7 @@ import {PickProgressBar} from '@shared/components/PickProgressBar';
 import {HotPickModule} from './HotPickModule';
 import {Insight} from './Insight';
 import {ChipLock} from '@shared/components/ChipLock';
+import {PulsingText} from '@shared/components/LiveLabel';
 
 // Fallback denominator only — preferred source is nflStore.totalGamesThisWeek
 // (picksMade + scheduledUnpicked). Games that kicked off without a pick are
@@ -214,37 +216,44 @@ export function PicksOpenHero() {
 
   // ── LOCKED / LIVE — the quiet surface (spec 2, §6.4) ──────────────────────
   // Picks are locked: there is no action, so the big "GO TO THE GAMES" CTA is
-  // GONE. What remains is a lock-marked header + the single HotPick, INSIDE the
-  // surface. "Big Games to Watch" rides below as a sibling (StateHero) and fills
-  // the reason to stay open. Settling/complete are their own heroes (out of
-  // scope). Reached only when weekLocked is true.
+  // GONE. What remains: a header line (status + padlock) → the single HotPick
+  // card → the hit-rate. "Big Games to Watch" rides below as a sibling
+  // (StateHero). Settling/complete are their own heroes (out of scope). Reached
+  // only when weekLocked is true.
   return (
     <>
+      {/* Dedicated header line FOR the card below — ALWAYS rendered so it
+          reserves its height and a game going live never reflows anything below.
+          Left: the pulsing "GAMES IN PROGRESS", only when games are live. Right:
+          the padlock (ChipLock), always present on locked/live. */}
+      <View style={styles.actionHeader}>
+        <View style={styles.actionHeaderLeft}>
+          {liveCount > 0 && (
+            <PulsingText
+              style={[displayType.display, styles.gamesInProgress, {color: colors.gameWon}]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.5}>
+              {liveCount === 1 ? 'GAME IN PROGRESS' : 'GAMES IN PROGRESS'}
+            </PulsingText>
+          )}
+        </View>
+        <ChipLock size={26} color={colors.textSecondary} />
+      </View>
+
       <View
         style={[
           styles.card,
           {backgroundColor: colors.surfaceElevated, borderColor: colors.border},
         ]}>
-        {/* Lock marker — the Picks-screen padlock (ChipLock, reused), icon-only
-            in the top-right corner like a locked game chip (spec §5). No words:
-            the WEEK eyebrow already reads "PICKS LOCKED". */}
-        <View style={styles.cornerLock} pointerEvents="none">
-          <ChipLock size={26} color={colors.textSecondary} />
-        </View>
-
         {/* The single HotPick, INSIDE the surface (Part A). No beckon — it's too
-            late to designate one now; HotPickModule renders null if none was set. */}
-        <HotPickModule embedded />
+            late to designate one now; HotPickModule renders null if none was set.
+            flush: no top margin (it's the card's only content). */}
+        <HotPickModule embedded flush />
       </View>
 
-      {/* Under the HotPick (spec §6/§7): the season HotPick hit-rate, then the
-          live "games in progress" pulse — moved off the WEEK eyebrow. */}
+      {/* Season HotPick hit-rate, directly under the HotPick (spec §6). */}
       <Insight />
-      {liveCount > 0 && (
-        <Text style={[bodyType.bold, styles.gamesInProgress, {color: colors.gameWon}]}>
-          {liveCount === 1 ? 'GAME IN PROGRESS' : 'GAMES IN PROGRESS'}
-        </Text>
-      )}
     </>
   );
 }
@@ -274,7 +283,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'baseline',
     justifyContent: 'center',
-    gap: 8,
+    // One word-space between "PICKS LOCK" and the time; gap 8 read as a double
+    // space (round-2 polish).
+    gap: 5,
     marginBottom: 16,
   },
   // Same italic display face as the time; lighter weight (600 vs the time's
@@ -331,18 +342,27 @@ const styles = StyleSheet.create({
   },
 
   // ── locked / live surface (spec 2) ──────────────────────────────────────
-  // Padlock in the card's top-right corner, like a locked game chip (spec §5).
-  cornerLock: {
-    position: 'absolute',
-    top: 12,
-    right: 14,
-    zIndex: 1,
+  // Dedicated header line above the card: pulsing status on the left, padlock on
+  // the right. Fixed minHeight so it reserves space whether or not games are live
+  // — a game going live never pushes the card (and everything below) down. Even
+  // top/bottom breathing room so it crowds neither the eyebrow nor the card.
+  actionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+    minHeight: 34,
   },
-  // "GAMES IN PROGRESS" line, under the HotPick (moved off the eyebrow, §7).
+  // flex:1 pushes the padlock to the far right and bounds the status text, so it
+  // shrinks (adjustsFontSizeToFit) to the leftover width instead of wrapping.
+  actionHeaderLeft: {
+    flex: 1,
+  },
+  // "GAMES IN PROGRESS" — 2× and heavy (displayType) so it shouts when the
+  // Player's games are live. Left-aligned on the header line.
   gamesInProgress: {
-    fontSize: 12,
-    letterSpacing: 1,
-    textAlign: 'center',
-    marginTop: 10,
+    fontSize: 24,
+    lineHeight: 28,
+    letterSpacing: 0.5,
   },
 });

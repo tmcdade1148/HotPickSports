@@ -27,10 +27,11 @@
 //   - STATUS colour = the LIVE/FINAL label. gameWon = in progress, gameLost =
 //     ended (red on wins too — it describes game state, not outcome).
 
-import React, {useEffect, useRef} from 'react';
+import React from 'react';
 import {Text} from '@shared/components/AppText';
-import {Animated, StyleSheet, TouchableOpacity, View} from 'react-native';
+import {StyleSheet, TouchableOpacity, View} from 'react-native';
 import type {TextStyle} from 'react-native';
+import {LiveLabel} from '@shared/components/LiveLabel';
 import {useTheme} from '@shell/theme';
 import {bodyType, borderRadius, displayType, spacing} from '@shared/theme';
 import {fmtPoints} from '@shared/utils/format';
@@ -263,23 +264,6 @@ export function GameChip({
   const awayNm = nameStyle(pickedSide === 'away');
   const homeNm = nameStyle(pickedSide === 'home');
 
-  // LIVE dot pulse — the only animated value; drives this dot's opacity alone.
-  const dotPulse = useRef(new Animated.Value(1)).current;
-  useEffect(() => {
-    if (!isLive) {
-      dotPulse.setValue(1);
-      return;
-    }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(dotPulse, {toValue: 0.3, duration: 550, useNativeDriver: true}),
-        Animated.timing(dotPulse, {toValue: 1, duration: 550, useNativeDriver: true}),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [isLive, dotPulse]);
-
   const periodLabel = (() => {
     if (!isLive) return null;
     const parts: string[] = [];
@@ -380,8 +364,8 @@ export function GameChip({
         {showStatus ? (
           isLive ? (
             <View style={styles.statusRow}>
-              <Animated.View style={[styles.liveDot, {backgroundColor: colors.live, opacity: dotPulse}]} />
-              <Text style={[styles.statusText, {color: colors.gameWon}]}>LIVE</Text>
+              {/* The WORD "LIVE" pulses now — no separate dot (round-2 polish). */}
+              <LiveLabel style={[styles.statusText, {color: colors.gameWon}]} />
               {periodLabel ? (
                 <Text style={[bodyType.regular, styles.statusMeta, {color: colors.textSecondary}]}>
                   {periodLabel}

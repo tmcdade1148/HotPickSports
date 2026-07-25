@@ -61,12 +61,17 @@ export interface HotPickModuleProps {
   beckon?: boolean;
   /** Beckon copy escalation — true when the HotPick is the only thing left. */
   beckonUrgent?: boolean;
+  /** Drop the embedded top margin — for a card where the HotPick is the ONLY
+   *  content (locked/live), so it doesn't stack on the card's own top padding.
+   *  picks_open leaves it off (the margin separates it from the progress above). */
+  flush?: boolean;
 }
 
 export function HotPickModule({
   embedded = false,
   beckon = false,
   beckonUrgent = false,
+  flush = false,
 }: HotPickModuleProps) {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
@@ -104,6 +109,7 @@ export function HotPickModule({
     if (embedded && beckon && !userHotPick) {
       return embeddedFrame(
         colors,
+        flush,
         <Pressable
           onPress={() => navigation.navigate('PicksTab')}
           style={({pressed}) => [
@@ -169,7 +175,7 @@ export function HotPickModule({
   );
 
   if (embedded) {
-    return embeddedFrame(colors, chip);
+    return embeddedFrame(colors, flush, chip);
   }
 
   return (
@@ -187,9 +193,9 @@ export function HotPickModule({
 // above the chip/beckon, aligned to the ACTION card padding (no outer margin, no
 // ModuleSection eyebrow). One helper so the caption is identical over the chip
 // and the beckon — only the box swaps, so the caption never shifts.
-function embeddedFrame(colors: any, child: React.ReactNode) {
+function embeddedFrame(colors: any, flush: boolean, child: React.ReactNode) {
   return (
-    <View style={styles.embeddedWrap}>
+    <View style={[styles.embeddedWrap, flush && styles.embeddedWrapFlush]}>
       <View style={styles.embeddedCaption}>
         <Text style={[styles.embeddedCaptionText, {color: colors.textTertiary}]}>
           HOTPICK
@@ -213,6 +219,11 @@ const styles = StyleSheet.create({
   chipWrapEmbedded: {},
   embeddedWrap: {
     marginTop: spacing.md,
+  },
+  // Locked/live: the HotPick is the card's only content, so no top margin on top
+  // of the card padding (was reading as too much space above the chip).
+  embeddedWrapFlush: {
+    marginTop: 0,
   },
   embeddedCaption: {
     flexDirection: 'row',

@@ -17,7 +17,7 @@ import React from 'react';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {resolveWeekScore} from '@templates/season/utils/weekScore';
-import {ModuleSection, type ModuleSectionStatus} from './ModuleSection';
+import {ModuleSection} from './ModuleSection';
 import {PLAYOFF_PHASES, sectionWeekLabel} from './weekRecap';
 import type {HomeRow} from './homeRows';
 
@@ -39,7 +39,6 @@ export interface WeekSectionProps {
 export function WeekSection({row, children}: WeekSectionProps) {
   const currentWeek = useNFLStore(s => s.currentWeek);
   const currentPhase = useNFLStore(s => s.currentPhase);
-  const weekState = useNFLStore(s => s.weekState);
   const currentWeekPoints = useNFLStore(s => s.currentWeekPoints);
 
   // The viewed week's picks + games. Home pins seasonStore to the live week, so
@@ -58,34 +57,16 @@ export function WeekSection({row, children}: WeekSectionProps) {
     serverWeekPoints: currentWeekPoints,
   });
 
-  const status = weekStatus(weekState);
-
+  // The eyebrow carries no status word any more: picks_open's deadline line says
+  // "open", and locked/live are marked by the corner padlock on the surface — so
+  // "PICKS LOCKED" here was redundant (round-2 polish). "GAMES IN PROGRESS" lives
+  // under the HotPick.
   return (
     <ModuleSection
       label={sectionWeekLabel(currentWeek, PLAYOFF_PHASES.includes(String(currentPhase)))}
       value={score}
-      status={status}
       emphasis>
       {children}
     </ModuleSection>
   );
-}
-
-/**
- * What the week is doing, right-aligned. Settling and complete carry no status:
- * the value has become the whole story.
- */
-function weekStatus(
-  weekState: string | null | undefined,
-): ModuleSectionStatus | null {
-  switch (weekState) {
-    // picks_open shows NO status word — the surface's deadline line carries
-    // "open". locked/live read "PICKS LOCKED" (picks ARE locked); the live
-    // "GAMES IN PROGRESS" pulse moved UNDER the HotPick (spec §7), off the
-    // eyebrow.
-    case 'picks_open': return null;
-    case 'locked':
-    case 'live':       return {text: 'PICKS LOCKED', tone: 'stop'};
-    default:           return null;
-  }
 }

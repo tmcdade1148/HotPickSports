@@ -22,13 +22,14 @@
 //   Rule 10 — status via gameStatus.ts (case-insensitive).
 //   Rule 9 colours, Hard Rule #9 — every colour is a token.
 
-import React, {useEffect, useRef} from 'react';
+import React from 'react';
 import {Text} from '@shared/components/AppText';
-import {Animated, StyleSheet, View} from 'react-native';
+import {StyleSheet, View} from 'react-native';
 import {useTheme} from '@shell/theme';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {fromGameScore, formatKickoff} from '@shared/components/GameChip';
+import {LiveLabel} from '@shared/components/LiveLabel';
 import {isLiveStatus, isFinalStatus} from '@sports/nfl/utils/gameStatus';
 import {bodyType, displayType, monoType, spacing, borderRadius} from '@shared/theme';
 import type {DbSeasonGame} from '@shared/types/database';
@@ -92,15 +93,6 @@ function BigGameTile({game, variant}: {game: DbSeasonGame; variant: BigGamesVari
           .filter(Boolean)
           .join(' · ')
       : null;
-  // Status + clock live in the header, the clock right of LIVE (spec §4) — no
-  // sub-line. Nudge/scheduled show the kickoff instead.
-  const statusText = isLive
-    ? periodLabel
-      ? `LIVE  ${periodLabel}`
-      : 'LIVE'
-    : isFinal
-      ? 'FINAL'
-      : kickoff;
 
   // FINAL border greens (Rule 9 winner from the server); otherwise a hairline.
   const borderColor = isFinal ? colors.gameWon : colors.border;
@@ -116,7 +108,10 @@ function BigGameTile({game, variant}: {game: DbSeasonGame; variant: BigGamesVari
           : colors.textTertiary
         : colors.textPrimary;
     return (
-      <View style={styles.teamRow}>
+      // space-between only when a SCORE is shown, so scores hold the fixed right
+      // column and align across both rows. A RECORD sits immediately right of the
+      // code (left-aligned pair), not flung to the edge.
+      <View style={[styles.teamRow, {justifyContent: showScores ? 'space-between' : 'flex-start'}]}>
         <Text style={[displayType.display, styles.code, {color: colors.textPrimary}]} numberOfLines={1}>
           {teamCode}
         </Text>
@@ -146,14 +141,30 @@ function BigGameTile({game, variant}: {game: DbSeasonGame; variant: BigGamesVari
           </Text>
         )}
         <View style={styles.statusWrap}>
-          {isLive && <LiveDot color={colors.onPrimary} />}
-          <Text
-            style={[bodyType.bold, styles.status, {color: colors.onPrimary}]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.6}>
-            {statusText}
-          </Text>
+          {isLive ? (
+            <>
+              {/* The WORD "LIVE" pulses at fixed size; the clock rides beside it
+                  and is the ONLY part that shrinks to fit the leftover width. */}
+              <LiveLabel style={[bodyType.bold, styles.status, {color: colors.onPrimary}]} />
+              {periodLabel ? (
+                <Text
+                  style={[bodyType.bold, styles.status, {color: colors.onPrimary}]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.5}>
+                  {periodLabel}
+                </Text>
+              ) : null}
+            </>
+          ) : (
+            <Text
+              style={[bodyType.bold, styles.status, {color: colors.onPrimary}]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.6}>
+              {isFinal ? 'FINAL' : kickoff}
+            </Text>
+          )}
         </View>
       </View>
 
@@ -163,22 +174,6 @@ function BigGameTile({game, variant}: {game: DbSeasonGame; variant: BigGamesVari
       </View>
     </View>
   );
-}
-
-// The pulsing LIVE dot — the only motion, mirroring the GameChip live dot.
-function LiveDot({color}: {color: string}) {
-  const pulse = useRef(new Animated.Value(1)).current;
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, {toValue: 0.3, duration: 550, useNativeDriver: true}),
-        Animated.timing(pulse, {toValue: 1, duration: 550, useNativeDriver: true}),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [pulse]);
-  return <Animated.View style={[styles.liveDot, {backgroundColor: color, opacity: pulse}]} />;
 }
 
 const styles = StyleSheet.create({
@@ -207,21 +202,17 @@ const styles = StyleSheet.create({
     fontSize: 15,
     letterSpacing: 0,
   },
+  // gap is the single space between "LIVE" and the clock (was reading double).
   statusWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
     flexShrink: 1,
   },
   status: {
     fontSize: 10,
     letterSpacing: 0.5,
     flexShrink: 1,
-  },
-  liveDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
   },
   body: {
     paddingHorizontal: 8,
@@ -231,7 +222,6 @@ const styles = StyleSheet.create({
   teamRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    justifyContent: 'space-between',
     gap: 6,
   },
   code: {
@@ -246,10 +236,10 @@ const styles = StyleSheet.create({
     minWidth: 22,
     textAlign: 'right',
   },
+  // Record sits right after the code (left-aligned pair) — no right-column
+  // sizing; that's only for scores (styles.value).
   record: {
     fontSize: 11,
     fontVariant: ['tabular-nums'],
-    minWidth: 22,
-    textAlign: 'right',
   },
 });
