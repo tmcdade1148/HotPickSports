@@ -9,8 +9,10 @@
 //   off_far / off_near      → OffSeasonHero (off_near switches the countdown to
 //                             picks-open and shows the row-2 headline/sub)
 //   pre_bridge              → PreSeasonGamesHero
-//   picks_open/locked/live  → PicksOpenHero + HotPickModule (differentiated
-//                             inside PicksOpenHero via isWeekLocked())
+//   picks_open/locked/live  → PicksOpenHero + BigGames (differentiated inside
+//                             PicksOpenHero via isWeekLocked()). The HotPick
+//                             lives INSIDE the surface in all three states now —
+//                             no sibling HotPickModule here (spec 2, Part A).
 //   settling                → SettlingHero
 //   complete                → CompleteHero
 //   reg_done                → RegularCompleteHero
@@ -20,7 +22,7 @@
 import React from 'react';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {PicksOpenHero} from './PicksOpenHero';
-import {HotPickModule} from './HotPickModule';
+import {BigGames} from './BigGames';
 import {SettlingHero} from './SettlingHero';
 import {CompleteHero} from './CompleteHero';
 import {OffSeasonHero} from './OffSeasonHero';
@@ -72,13 +74,13 @@ export function StateHero({row}: StateHeroProps) {
 
 function heroFor(row: HomeRow): React.ReactElement {
   switch (row) {
-    // picks_open pulls the HotPick UP INSIDE the ACTION surface (spec §6.4), so
-    // PicksOpenHero renders HotPickModule itself — no sibling here.
-    case 'picks_open':  return <PicksOpenHero />;
-    // locked / live keep the HOTPICK card as a sibling BENEATH the action module
-    // (unchanged). HotPickModule renders null when there's no HotPick or no rank.
-    case 'locked':      return <><PicksOpenHero /><HotPickModule /></>;
-    case 'live':        return <><PicksOpenHero /><HotPickModule /></>;
+    // The HotPick lives INSIDE the ACTION surface in ALL three states now
+    // (PicksOpenHero renders it) — no sibling HotPickModule anywhere (spec 2,
+    // Part A: kills the locked/live double-render). Big Games rides below:
+    // a nudge (records, no scores) pre-lock, a live/final scoreboard after.
+    case 'picks_open':  return <><PicksOpenHero /><BigGames variant="nudge" /></>;
+    case 'locked':      return <><PicksOpenHero /><BigGames variant="scoreboard" /></>;
+    case 'live':        return <><PicksOpenHero /><BigGames variant="scoreboard" /></>;
     case 'settling':    return <SettlingHero />;
     case 'complete':    return <CompleteHero />;
     // off_far keeps the kickoff countdown; off_near switches it to picks-open

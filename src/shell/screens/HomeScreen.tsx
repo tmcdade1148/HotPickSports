@@ -1,6 +1,6 @@
 // Home composes the redesigned hero suite (HomeHeader → IdentityBar →
-// StateHero → Insight → Pool/Partner stacks). All Supabase reads live
-// in store loaders fired here so child modules can stay presentational.
+// StateHero → Pool/Partner stacks). All Supabase reads live in store loaders
+// fired here so child modules can stay presentational.
 
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {Text} from '@shared/components/AppText';
@@ -26,7 +26,6 @@ import {StateHero} from '@shell/components/home/StateHero';
 import {HeroSkeleton} from '@shell/components/home/HeroSkeleton';
 import {CrossContestStrip} from '@shell/components/home/CrossContestStrip';
 import {DemoButton} from '@shell/components/home/DemoButton';
-import {Insight} from '@shell/components/home/Insight';
 import {HomeInbox} from '@shell/components/home/HomeInbox';
 import {RecapModule} from '@shell/components/home/RecapModule';
 import {HistoryModule} from '@shell/components/home/HistoryModule';
@@ -109,12 +108,8 @@ export function HomeScreen() {
   // holds its defaults (REGULAR / picks_open / week 1), which would briefly
   // flash the Week 1 picks-open hero + CTA before the true phase (e.g.
   // PRE_SEASON) resolves on a cold launch / reviewer reload.
-  const isPicksFlow =
-    configLoaded &&
-    (homeRow === 'picks_open' ||
-     homeRow === 'locked'     ||
-     homeRow === 'live');
-  const showInsight      = isPicksFlow;
+  // The HotPick hit-rate (Insight) now renders UNDER the HotPick inside the hero
+  // (PicksOpenHero), not as a standalone line here (spec §6).
   // Everyone sees the hero + YOUR CONTESTS + YOUR CLUBS — the
   // off-cycle hero (OffSeasonHero etc.) plus the section headers and
   // their orientation copy carry the new-user onboarding directly on
@@ -582,8 +577,6 @@ export function HomeScreen() {
             {offCycleClubs ?? <ClubsTeaser />}
           </>
         )}
-
-        {showInsight && <Insight />}
 
         {/* RECAP + HISTORY — after ACTION + HOTPICK and before CONTESTS, per
             the map's module order. Two independent modules (each with its own

@@ -8,15 +8,16 @@
 // an optional stakes slot. Composed from a few reused elements — no screen
 // rebuild.
 //
-// locked / live / complete (GO TO THE GAMES / WEEK N COMPLETE) are UNCHANGED —
-// they are the separate Big Games spec. This file early-returns the picks_open
-// surface and leaves that branch exactly as it shipped.
+// locked / live (ACTION module spec 2): picks are locked, so there's no action —
+// the big CTA is GONE. The fall-through renders the quiet surface: a lock marker
+// (ChipLock) + the single HotPick, INSIDE the surface. "Big Games to Watch"
+// rides below (StateHero). settling/complete are their own heroes (out of scope).
 //
 // The contextual line is NOT here — it's a single producer (ContextualLine)
-// above the hero (currently hidden). The HotPick card is its own module
-// (HotPickModule): a sibling below in locked/live, pulled INSIDE here.
+// above the hero (currently hidden). The HotPick (HotPickModule) renders INSIDE
+// this surface in all three states now — embedded, never a sibling.
 
-import React, {useMemo} from 'react';
+import React from 'react';
 import {Text} from '@shared/components/AppText';
 import {Pressable, StyleSheet, View} from 'react-native';
 import {ArrowRight} from 'lucide-react-native';
@@ -25,16 +26,15 @@ import {useTheme} from '@shell/theme/hooks';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
-// isFinalStatus survives for weekComplete (every game FINAL) — a completion
-// question, not a lock question. The week lock reads isWeekLocked() (rule 11).
-import {isFinalStatus} from '@sports/nfl/utils/gameStatus';
 // Rule 11: the ONE answer to "are picks locked" (MIN kickoff). weekLockAtFromGames
 // is the same MIN(kickoff_at) as an epoch — the deadline anchor's source.
 import {isWeekLocked, weekLockAtFromGames} from '@templates/season/utils/weekLock';
+import {isLiveStatus} from '@sports/nfl/utils/gameStatus';
 import {formatKickoff} from '@shared/components/GameChip';
 import {PickProgressBar} from '@shared/components/PickProgressBar';
 import {HotPickModule} from './HotPickModule';
-import {GamesTagFlame} from '@shared/components/GamesTagFlame';
+import {Insight} from './Insight';
+import {ChipLock} from '@shared/components/ChipLock';
 
 // Fallback denominator only — preferred source is nflStore.totalGamesThisWeek
 // (picksMade + scheduledUnpicked). Games that kicked off without a pick are
@@ -49,15 +49,10 @@ export function PicksOpenHero() {
   const userPickCount      = useNFLStore(s => s.userPickCount);
   const totalGamesThisWeek = useNFLStore(s => s.totalGamesThisWeek);
   const userHotPick        = useNFLStore(s => s.userHotPick);
-  const weekState          = useNFLStore(s => s.weekState);
-  const currentWeek        = useNFLStore(s => s.currentWeek);
   const liveScores         = useNFLStore(s => s.liveScores);
-  // Full week game list. Feeds isWeekLocked()/weekLockAtFromGames — which need
-  // every game's kickoff to compute MIN(kickoff_at) — and weekComplete, which
-  // denominates against the whole week, not just liveScores.
+  // Full week game list. Feeds isWeekLocked()/weekLockAtFromGames — every game's
+  // kickoff, to compute MIN(kickoff_at).
   const seasonGames        = useSeasonStore(s => s.games);
-
-  const isPicksOpenState = weekState === 'picks_open';
 
   // THE week lock — rule 11. isWeekLocked() is MIN(kickoff_at) across the week,
   // mirroring the server's enforce_pick_lock, and the ONLY answer to "are picks
@@ -65,19 +60,9 @@ export function PicksOpenHero() {
   // exact lock, so the client flip near MIN(kickoff) is cosmetic.
   const weekLocked = isWeekLocked(seasonGames);
 
-  // COMPLETION, not lock. "Every game is FINAL" ≠ "the week is locked." Kept for
-  // the CTA's "WEEK N COMPLETE" state. Denominator is the FULL week (seasonGames)
-  // or an early Thursday-Night-only final false-fires it.
-  const weekComplete = useMemo(() => {
-    // In picks_open the week hasn't started; last week's still-cached finals
-    // (seasonGames lags rollover) would otherwise read "COMPLETE" on a fresh week.
-    if (isPicksOpenState || seasonGames.length === 0) return false;
-    for (const g of seasonGames) {
-      const status = liveScores[g.game_id]?.status ?? g.status ?? '';
-      if (!isFinalStatus(status)) return false;
-    }
-    return true;
-  }, [isPicksOpenState, seasonGames, liveScores]);
+  // Games actually in play — drives the "GAMES IN PROGRESS" line under the
+  // HotPick (moved off the WEEK eyebrow, spec §7).
+  const liveCount = Object.values(liveScores).filter(g => isLiveStatus(g.status)).length;
 
   const picksSet = userPickCount ?? 0;
   // Effective denominator — picks made plus games still scheduled (pickable).
@@ -148,6 +133,7 @@ export function PicksOpenHero() {
     const stakesLine = resolveStakesLine();
 
     return (
+      <>
       <View
         style={[
           styles.card,
@@ -217,117 +203,49 @@ export function PicksOpenHero() {
           </Text>
         )}
       </View>
+
+      {/* HotPick hit-rate — directly under the HotPick, above Big Games (spec
+          §6). It's about the HotPick, so it belongs to it, not floating below
+          the games. */}
+      <Insight />
+      </>
     );
   }
 
-  // ── LOCKED / LIVE / COMPLETE — UNCHANGED (separate Big Games spec) ─────────
-  // Reached only once the week has locked, so weekLocked is always true here;
-  // the picks_open label branches below are unreachable and kept so this block
-  // stays byte-identical to what shipped.
-  let ctaLabel = 'MAKE YOUR PICKS';
-  let ctaAccessibilityLabel = 'Make your picks';
-  if (weekComplete) {
-    ctaLabel = `WEEK ${currentWeek} COMPLETE`;
-    ctaAccessibilityLabel = `Week ${currentWeek} complete — see how it played out`;
-  } else if (weekLocked && picksSet > 0 && !allPicks) {
-    ctaLabel = "YOU'RE MISSING A FEW PICKS";
-    ctaAccessibilityLabel = "You're missing a few picks";
-  } else if (weekLocked) {
-    ctaLabel = 'GO TO THE GAMES';
-    ctaAccessibilityLabel = 'Go to the games';
-  } else if (allPicks && hotPickDesignated) {
-    ctaLabel = 'VIEW OR REVISE YOUR PICKS';
-    ctaAccessibilityLabel = 'View or revise your picks';
-  } else if (picksSet > 0) {
-    ctaLabel = 'FINISH YOUR PICKS';
-    ctaAccessibilityLabel = 'Finish your picks';
-  }
-  const missedGames = Math.max(0, picksTotal - picksSet);
-  const isPartial = picksSet > 0 && !allPicks;
-
-  const picksConfirm = allPicks
-    ? 'All picks set'
-    : `${picksSet} of ${picksTotal} picks set`;
-  const hotPickConfirm = hotPickDesignated
-    ? 'HotPick designated'
-    : 'HotPick still needed';
-  const confirmLine = isPartial
-    ? `You still have ${missedGames} pick${missedGames === 1 ? '' : 's'} to make`
-    : allPicks && hotPickDesignated
-    ? weekLocked
-      ? 'All your picks are in and locked.'
-      : 'All your picks are in — revise anytime before kickoff.'
-    : `${picksConfirm} · ${hotPickConfirm}`;
-
+  // ── LOCKED / LIVE — the quiet surface (spec 2, §6.4) ──────────────────────
+  // Picks are locked: there is no action, so the big "GO TO THE GAMES" CTA is
+  // GONE. What remains is a lock-marked header + the single HotPick, INSIDE the
+  // surface. "Big Games to Watch" rides below as a sibling (StateHero) and fills
+  // the reason to stay open. Settling/complete are their own heroes (out of
+  // scope). Reached only when weekLocked is true.
   return (
-    <View
-      style={[
-        styles.card,
-        {backgroundColor: colors.surfaceElevated, borderColor: colors.border},
-      ]}>
-      {/* CTA — label + emphasis flip once everything is locked in. Left 1/6 is a
-          HotPick-blue "GAMES" strip so the destination is obvious. */}
-      <Pressable
-        onPress={() => navigation.navigate('PicksTab')}
-        style={({pressed}) => {
-          const isReviewMode = allPicks && hotPickDesignated && !weekLocked;
-          const dimmed = isReviewMode || weekLocked || weekComplete;
-          const baseOpacity = dimmed ? 0.7 : 1;
-          return [
-            styles.cta,
-            {
-              backgroundColor: colors.primary,
-              shadowColor: colors.primary,
-              opacity: pressed ? baseOpacity * 0.85 : baseOpacity,
-            },
-          ];
-        }}
-        accessibilityRole="button"
-        accessibilityLabel={`Go to games — ${ctaAccessibilityLabel}`}>
-        {/* HotPick light-blue destination tag with the full-color flame brand
-            mark — the universal "go to the picks/games surface" signal. */}
-        <View style={[styles.gamesTag, {backgroundColor: colors.highlight}]}>
-          <GamesTagFlame size={44} />
-        </View>
-
-        <View style={[
-          styles.ctaBody,
-          weekComplete ? styles.ctaBodyTight : null,
-          weekComplete ? styles.ctaBodyTopAligned : styles.ctaBodyCentered,
+    <>
+      <View
+        style={[
+          styles.card,
+          {backgroundColor: colors.surfaceElevated, borderColor: colors.border},
         ]}>
-          <View style={styles.ctaLabel}>
-            <Text
-              style={[displayType.display, styles.ctaText, {color: colors.onPrimary}]}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.55}>
-              {ctaLabel}
-            </Text>
-            {weekComplete && (
-              <Text style={[bodyType.regular, styles.ctaFollowOn, {color: colors.onPrimary}]}>
-                see how it played out
-              </Text>
-            )}
-          </View>
-          <ArrowRight size={22} color={colors.onPrimary} strokeWidth={3} />
+        {/* Lock marker — the Picks-screen padlock (ChipLock, reused), icon-only
+            in the top-right corner like a locked game chip (spec §5). No words:
+            the WEEK eyebrow already reads "PICKS LOCKED". */}
+        <View style={styles.cornerLock} pointerEvents="none">
+          <ChipLock size={26} color={colors.textSecondary} />
         </View>
-      </Pressable>
 
-      {/* Confirmation line — factual when complete, bold red warning when picks
-          are partial so missed games are obvious. */}
-      {!weekComplete && (
-        <Text
-          style={[
-            isPartial ? bodyType.bold : bodyType.regular,
-            styles.confirmLine,
-            isPartial
-              ? {color: colors.error, fontStyle: 'normal'}
-              : {color: colors.textTertiary},
-          ]}>
-          {confirmLine}
+        {/* The single HotPick, INSIDE the surface (Part A). No beckon — it's too
+            late to designate one now; HotPickModule renders null if none was set. */}
+        <HotPickModule embedded />
+      </View>
+
+      {/* Under the HotPick (spec §6/§7): the season HotPick hit-rate, then the
+          live "games in progress" pulse — moved off the WEEK eyebrow. */}
+      <Insight />
+      {liveCount > 0 && (
+        <Text style={[bodyType.bold, styles.gamesInProgress, {color: colors.gameWon}]}>
+          {liveCount === 1 ? 'GAME IN PROGRESS' : 'GAMES IN PROGRESS'}
         </Text>
       )}
-    </View>
+    </>
   );
 }
 
@@ -406,60 +324,24 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 14,
   },
-
-  // ── locked / live / complete CTA (unchanged) ────────────────────────────
-  cta: {
-    flexDirection: 'row',
-    borderRadius: borderRadius.md + 2,
-    overflow: 'hidden',
-    shadowOpacity: 0.55,
-    shadowRadius: 24,
-    shadowOffset: {width: 0, height: 8},
-    elevation: 6,
-  },
-  gamesTag: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ctaBody: {
-    flex: 5,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-  },
-  ctaBodyTight: {
-    paddingVertical: 7,
-  },
-  ctaBodyTopAligned: {
-    alignItems: 'flex-start',
-  },
-  ctaBodyCentered: {
-    alignItems: 'center',
-  },
-  ctaLabel: {
-    flexShrink: 1,
-    minWidth: 0,
-    alignItems: 'center',
-  },
-  ctaFollowOn: {
-    fontSize: 10,
-    lineHeight: 11,
-    fontStyle: 'italic',
-    opacity: 0.78,
-    marginTop: 1,
-  },
-  // Shared by both CTAs — same size/tracking.
+  // picks_open CTA label — kept here (the locked/live CTA is gone).
   ctaText: {
     fontSize: 18,
     letterSpacing: 0.5,
   },
-  confirmLine: {
+
+  // ── locked / live surface (spec 2) ──────────────────────────────────────
+  // Padlock in the card's top-right corner, like a locked game chip (spec §5).
+  cornerLock: {
+    position: 'absolute',
+    top: 12,
+    right: 14,
+    zIndex: 1,
+  },
+  // "GAMES IN PROGRESS" line, under the HotPick (moved off the eyebrow, §7).
+  gamesInProgress: {
     fontSize: 12,
-    fontStyle: 'italic',
+    letterSpacing: 1,
     textAlign: 'center',
     marginTop: 10,
   },

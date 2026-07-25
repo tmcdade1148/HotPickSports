@@ -16,7 +16,6 @@
 import React from 'react';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
-import {isLiveStatus} from '@sports/nfl/utils/gameStatus';
 import {resolveWeekScore} from '@templates/season/utils/weekScore';
 import {ModuleSection, type ModuleSectionStatus} from './ModuleSection';
 import {PLAYOFF_PHASES, sectionWeekLabel} from './weekRecap';
@@ -42,7 +41,6 @@ export function WeekSection({row, children}: WeekSectionProps) {
   const currentPhase = useNFLStore(s => s.currentPhase);
   const weekState = useNFLStore(s => s.weekState);
   const currentWeekPoints = useNFLStore(s => s.currentWeekPoints);
-  const liveScores = useNFLStore(s => s.liveScores);
 
   // The viewed week's picks + games. Home pins seasonStore to the live week, so
   // these normally describe it; `isLiveWeek` catches the frame after the Player
@@ -60,8 +58,7 @@ export function WeekSection({row, children}: WeekSectionProps) {
     serverWeekPoints: currentWeekPoints,
   });
 
-  const liveCount = Object.values(liveScores).filter(g => isLiveStatus(g.status)).length;
-  const status = weekStatus(weekState, liveCount);
+  const status = weekStatus(weekState);
 
   return (
     <ModuleSection
@@ -75,22 +72,17 @@ export function WeekSection({row, children}: WeekSectionProps) {
 }
 
 /**
- * What the week is doing, right-aligned.
- *
- * Games actually underway outrank the week_state label — once the ball is in
- * the air that IS the state, and it's what the Player is checking for. Settling
- * and complete carry no status: the value has become the whole story.
+ * What the week is doing, right-aligned. Settling and complete carry no status:
+ * the value has become the whole story.
  */
 function weekStatus(
   weekState: string | null | undefined,
-  liveCount: number,
 ): ModuleSectionStatus | null {
-  if (liveCount > 0) {
-    return {text: liveCount === 1 ? 'GAME IN PROGRESS' : 'GAMES IN PROGRESS', tone: 'go'};
-  }
   switch (weekState) {
-    // picks_open shows NO status word — the surface's deadline line ("PICKS LOCK
-    // THU 8:20 PM") carries "open" now (spec §6.6).
+    // picks_open shows NO status word — the surface's deadline line carries
+    // "open". locked/live read "PICKS LOCKED" (picks ARE locked); the live
+    // "GAMES IN PROGRESS" pulse moved UNDER the HotPick (spec §7), off the
+    // eyebrow.
     case 'picks_open': return null;
     case 'locked':
     case 'live':       return {text: 'PICKS LOCKED', tone: 'stop'};
