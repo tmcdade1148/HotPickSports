@@ -1,103 +1,66 @@
-// src/shell/components/home/SettlingHero.tsx
-// Spec §6.4.3 — settling row.
+// Settling — a SLIM STRIP, not a card (ACTION between-weeks spec §7.1). Scores
+// are calculating and this lasts minutes, so the row barely needs presence: a
+// spinner + "Settling week N…" and a muted "final points shortly".
 //
-// Eyebrow: "SETTLING."
-// Hero: this week's HotPick result — won/lost, net points, brief narrative.
-// CTA: "View week recap."
+// NO net-points number (scores aren't final), NO sign colour, NO recap CTA — the
+// result must appear NOWHERE during settling (the old card shouted it in red
+// before it was even final). The WEEK eyebrow above reads "WEEK N" (label only,
+// no value); the running season total lives in HISTORY below.
 
 import React from 'react';
 import {Text} from '@shared/components/AppText';
-import {Pressable, StyleSheet, View} from 'react-native';
-import {useNavigation} from '@react-navigation/native';
+import {ActivityIndicator, StyleSheet, View} from 'react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
-import {displayType, bodyType, monoType, spacing, borderRadius} from '@shared/theme';
-import {fmtPoints} from '@shared/utils/format';
+import {bodyType, spacing} from '@shared/theme';
 
-// The greeting line that used to sit here is gone — the contextual line is now a
-// single producer (ContextualLine) rendered once above the hero by HomeScreen.
 export function SettlingHero() {
   const {colors} = useTheme();
-  const navigation = useNavigation<any>();
-
-  const weekResult         = useNFLStore(s => s.weekResult);
-  const currentWeek        = useNFLStore(s => s.currentWeek);
-  const pathBackNarrative  = useNFLStore(s => s.pathBackNarrative);
-
-  const points = weekResult?.weekPoints ?? 0;
-  const isPositive = points >= 0;
+  const currentWeek = useNFLStore(s => s.currentWeek);
 
   return (
-    <View style={styles.wrap}>
-      <Text style={[bodyType.bold, styles.eyebrow, {color: colors.textTertiary}]}>
-        YOUR WEEK {currentWeek} RESULT
-      </Text>
-
-      <View style={[styles.resultCard, {backgroundColor: colors.surfaceElevated, borderColor: colors.border}]}>
-        <View style={styles.resultRow}>
-          <Text
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.6}
-            style={[
-              displayType.display,
-              monoType.regular,
-              {
-                flexShrink: 1,
-                fontSize: displayType.size.display2,
-                color: isPositive ? colors.success : colors.error,
-                lineHeight: displayType.size.display2,
-              },
-            ]}>
-            {fmtPoints(points)}
-          </Text>
-          <Text style={[displayType.display, styles.ptsLabel, {color: colors.textSecondary}]}>
-            pts
-          </Text>
-        </View>
-
-        {pathBackNarrative ? (
-          <Text style={[bodyType.regular, styles.narrative, {color: colors.textPrimary}]}>
-            {pathBackNarrative}
-          </Text>
-        ) : null}
-      </View>
-
-      <Pressable
-        onPress={() => navigation.navigate('PicksTab')}
-        style={({pressed}) => [
-          styles.cta,
-          {borderColor: colors.border, opacity: pressed ? 0.7 : 1},
-        ]}
-        accessibilityRole="button"
-        accessibilityLabel="View this week's completed picks">
-        <Text style={[bodyType.bold, styles.ctaText, {color: colors.textPrimary}]}>
-          View week recap
+    <View style={styles.strip}>
+      <View style={styles.left}>
+        <ActivityIndicator size="small" color={colors.textSecondary} />
+        <Text
+          style={[bodyType.bold, styles.settling, {color: colors.textPrimary}]}
+          numberOfLines={1}>
+          Settling week {currentWeek}…
         </Text>
-      </Pressable>
+      </View>
+      <Text
+        style={[bodyType.regular, styles.sub, {color: colors.textTertiary}]}
+        numberOfLines={1}>
+        final points shortly
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap:        {paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.lg, gap: spacing.md},
-  // Matches the "YOUR CONTESTS" section title (fontSize 11 / letterSpacing 1.8
-  // / textTertiary) so the result title reads as a section header.
-  eyebrow:     {fontSize: 11, letterSpacing: 1.8},
-  resultCard: {
-    padding: spacing.lg,
-    borderRadius: borderRadius.lg + 4,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  resultRow:   {flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm},
-  ptsLabel:    {fontSize: 24},
-  narrative:   {fontSize: 14, marginTop: spacing.sm, lineHeight: 20},
-  cta: {
-    paddingVertical: spacing.md - 2,
-    paddingHorizontal: spacing.lg,
-    borderRadius: borderRadius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
+  strip: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
   },
-  ctaText: {fontSize: 14, letterSpacing: 0.5},
+  left: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flexShrink: 1,
+  },
+  settling: {
+    fontSize: 15,
+    letterSpacing: 0.2,
+    flexShrink: 1,
+  },
+  sub: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    flexShrink: 0,
+  },
 });

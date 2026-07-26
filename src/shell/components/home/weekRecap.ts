@@ -88,3 +88,67 @@ export function derivePickDisplay(raw: {
     total: Math.max(0, totalPicks - 1),
   };
 }
+
+/**
+ * The derived recap for a settled week — SHARED by RecapModule (the prior-week
+ * card) and the complete-state recap-hero (the just-finished week), so the two
+ * can never disagree about the HotPick outcome or the week total.
+ */
+export interface RecapData {
+  recap: WeekRow;
+  hotPickRank: number | null;
+  isHotPickCorrect: boolean | null;
+  /** A HotPick was made AND resolved (both rank and outcome known). */
+  hpResolved: boolean;
+  /** The HotPick's signed contribution: +rank on a hit, −rank on a miss, 0 if none. */
+  hpPoints: number;
+  /** The week's net total (season_user_totals.week_points). */
+  total: number;
+  /** The base (non-HotPick) picks — the HotPick removed from both sides. */
+  picks: {correct: number; total: number};
+}
+
+/**
+ * Pick the recap week and derive its numbers ONCE.
+ *   weekSettled → the CURRENT week (its games are final and scored)
+ *   otherwise   → the most recent FINISHED week (currentWeek − 1)
+ * Returns null when there's no scored week at/under the cutoff.
+ *
+ * A missed week is ABSENT from `recentWeeks` (loadRecentWeeks reads only the
+ * season_user_totals rows that exist, and no 0 row is written for a week with no
+ * picks), so this silently falls back to the prior week. Representing a missed
+ * week as a scored 0 is a backend change, out of scope here.
+ */
+export function selectRecap(
+  recentWeeks: WeekRow[],
+  currentWeek: number,
+  weekSettled: boolean,
+): RecapData | null {
+  const cutoff = weekSettled ? currentWeek : currentWeek - 1;
+  const eligible = recentWeeks
+    .filter(w => w.week <= cutoff)
+    .sort((a, b) => a.week - b.week);
+  const recap = eligible.length > 0 ? eligible[eligible.length - 1] : null;
+  if (recap == null) return null;
+
+  const hotPickRank = recap.hotPickRank;
+  const isHotPickCorrect = recap.isHotPickCorrect;
+  const hpResolved = hotPickRank != null && isHotPickCorrect != null;
+  const hpPoints =
+    hotPickRank == null || isHotPickCorrect == null
+      ? 0
+      : isHotPickCorrect
+        ? hotPickRank
+        : -hotPickRank;
+  const picks = derivePickDisplay(recap);
+
+  return {
+    recap,
+    hotPickRank,
+    isHotPickCorrect,
+    hpResolved,
+    hpPoints,
+    total: recap.total,
+    picks,
+  };
+}

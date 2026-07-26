@@ -57,14 +57,24 @@ export function WeekSection({row, children}: WeekSectionProps) {
     serverWeekPoints: currentWeekPoints,
   });
 
-  // The eyebrow carries no status word any more: picks_open's deadline line says
-  // "open", and locked/live are marked by the corner padlock on the surface — so
-  // "PICKS LOCKED" here was redundant (round-2 polish). "GAMES IN PROGRESS" lives
-  // under the HotPick.
+  // The eyebrow carries no status word: picks_open's deadline line says "open",
+  // and locked/live are marked by the corner padlock on the surface.
+  //
+  // Between-weeks (settling / complete) show the WEEK label ONLY — no value. The
+  // result is not shouted in the eyebrow: during settling it isn't final, and at
+  // complete the recap-hero carries it, so the week appears exactly ONCE down the
+  // screen. complete appends "COMPLETE" to the label (ACTION between-weeks §7).
+  const isPlayoffs = PLAYOFF_PHASES.includes(String(currentPhase));
+  const betweenWeeks = row === 'settling' || row === 'complete';
+  const label =
+    row === 'complete'
+      ? `${sectionWeekLabel(currentWeek, isPlayoffs)} COMPLETE`
+      : sectionWeekLabel(currentWeek, isPlayoffs);
+
   return (
     <ModuleSection
-      label={sectionWeekLabel(currentWeek, PLAYOFF_PHASES.includes(String(currentPhase)))}
-      value={score}
+      label={label}
+      value={betweenWeeks ? undefined : score}
       emphasis>
       {children}
     </ModuleSection>

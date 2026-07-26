@@ -1,161 +1,71 @@
-// Complete-state hero: standing context, dimmed CTA. HISTORY owns the
-// finished-week HotPick, recap, and weekly trend (v4.1 handoff at settling).
+// Complete — the finished week's recap folded INTO the action slot (ACTION
+// between-weeks spec §7.2). It renders the REAL recap card (the shared RecapCard,
+// expanded and always visible) — NOT a thinner parallel one — with a quiet
+// "Week N+1 picks open …" line below. NO big button (next week isn't open — when
+// it opens the state flips to picks_open where the CTA lives) and NO flame.
+//
+// The WEEK eyebrow above reads "WEEK N COMPLETE" (label only, no value) and the
+// WEEK-N RECAP eyebrow is suppressed for this week (RecapModule returns null in
+// complete) — so the expanded RecapCard IS the recap and the week appears ONCE.
+//
+// Numbers come from the SHARED selectRecap() helper — the same derivation
+// RecapModule uses. A missed week is ABSENT, so selectRecap falls back to the
+// prior week; that must NOT read as this week's under the "WEEK N COMPLETE"
+// eyebrow, so an unscored current week passes null → RecapCard shows a neutral
+// "—" (never the stale prior week). Representing a missed week as a scored 0 is
+// the banked [BACKEND] work.
 
 import React from 'react';
 import {Text} from '@shared/components/AppText';
-import {Pressable, StyleSheet, View} from 'react-native';
-import {ArrowRight} from 'lucide-react-native';
-import {useNavigation} from '@react-navigation/native';
+import {StyleSheet, View} from 'react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useGlobalStore} from '@shell/stores/globalStore';
-import {displayType, bodyType, monoType, spacing, borderRadius} from '@shared/theme';
-import {ordinal} from '@shared/utils/format';
-import {GamesTagFlame} from '@shared/components/GamesTagFlame';
-
-// LAUNCH FLAG — the "You sit Nth in <Contest>" standing line is HIDDEN for launch.
-// weekResult.newRank intermittently renders a null "0th" (render-timing), which
-// reads as broken on the first screen, and the line duplicates the Ladder (one tap
-// away). Removed for launch, NOT deleted — flip to true to restore the status line
-// once newRank loading is reliable. See also userRankByPool/get_user_ranks_in_pools.
-const SHOW_STANDING_LINE = false;
+import {bodyType, spacing} from '@shared/theme';
+import {RecapCard} from './RecapCard';
+import {fullTeamName} from './teamColors';
+import {selectRecap, type WeekRow} from './weekRecap';
 
 export function CompleteHero() {
   const {colors} = useTheme();
-  const navigation = useNavigation<any>();
+  const currentWeek = useNFLStore(s => s.currentWeek);
+  const userHotPick = useNFLStore(s => s.userHotPick);
+  const recentWeeks = useGlobalStore(s => s.recentWeeks) as WeekRow[];
 
-  const weekResult      = useNFLStore(s => s.weekResult);
-  const currentWeek     = useNFLStore(s => s.currentWeek);
-  const activePoolId    = useGlobalStore(s => s.activePoolId);
-  const visiblePools    = useGlobalStore(s => s.visiblePools);
-  const activePool      = visiblePools.find(p => p.id === activePoolId);
+  // The just-finished week — complete ⇒ weekSettled true. Shared derivation.
+  const data = selectRecap(recentWeeks, currentWeek, true);
+  // Only THIS week's own result; a missed (absent) week falls back to the prior
+  // one, which must not render as this week's. Unscored → null → RecapCard "—".
+  const scored = data != null && data.recap.week === currentWeek;
+  const cardData = scored ? data : null;
 
-  const newRank  = weekResult?.newRank;
-  const poolName = activePool?.name ?? 'your Contest';
+  const teamCode = scored ? userHotPick?.picked_team ?? null : null;
+  const team = teamCode ? (fullTeamName(teamCode) ?? teamCode).toUpperCase() : null;
 
   return (
-    <View
-      style={[
-        styles.card,
-        {backgroundColor: colors.surfaceElevated, borderColor: colors.border},
-      ]}>
-      {/* Standing context — sits between CTA and trend strip, same spot
-          PicksOpenHero uses for its confirmation line. */}
-      {SHOW_STANDING_LINE && typeof newRank === 'number' && (
-        <Text style={[bodyType.regular, styles.standingText, {color: colors.textPrimary}]}>
-          You sit <Text style={{fontFamily: 'Manrope-Bold'}}>{ordinal(newRank)}</Text> in {poolName}.
-        </Text>
-      )}
-      {weekResult?.rankDelta != null && weekResult.rankDelta !== 0 && (
-        <Text
-          style={[
-            monoType.regular,
-            styles.delta,
-            {color: weekResult.rankDelta > 0 ? colors.gameWon : colors.gameLost},
-          ]}>
-          {weekResult.rankDelta > 0 ? '↑' : '↓'} {Math.abs(weekResult.rankDelta)} from last week
-        </Text>
-      )}
+    <View style={styles.wrap}>
+      <RecapCard data={cardData} team={team} />
 
-      {/* CTA — dimmed flame, two-line label, arrow aligned to top. Left
-          1/6 is a HotPick-blue flame strip matching the PicksOpenHero
-          CTA so the navigation destination (Games) is visually
-          consistent across home states. */}
-      <Pressable
-        onPress={() => navigation.navigate('PicksTab')}
-        style={({pressed}) => [
-          styles.cta,
-          {backgroundColor: colors.primary, shadowColor: colors.primary, opacity: pressed ? 0.6 : 0.7},
-        ]}
-        accessibilityRole="button"
-        accessibilityLabel={`Go to games — Week ${currentWeek} complete, review your picks`}>
-        <View style={[styles.gamesTag, {backgroundColor: colors.highlight}]}>
-          <GamesTagFlame size={44} />
-        </View>
-        <View style={styles.ctaBody}>
-          <View style={styles.ctaLabel}>
-            <Text style={[displayType.display, styles.ctaText, {color: colors.onPrimary}]} numberOfLines={1}>
-              WEEK {currentWeek} COMPLETE
-            </Text>
-            <Text style={[bodyType.regular, styles.ctaFollowOn, {color: colors.onPrimary}]}>
-              review your picks
-            </Text>
-          </View>
-          <ArrowRight size={22} color={colors.onPrimary} strokeWidth={3} />
-        </View>
-      </Pressable>
-
-      {/* The week-recap prose is deleted. It called buildWeekRecap with RAW
-          server counts, so it printed "of 16" — while HISTORY's recap card,
-          showing the same week, derives "of 15" per the map. In the complete
-          state both were on screen at once, disagreeing. HISTORY owns the
-          recap; this hero keeps the standing and the rank delta. */}
-
-      {/* WeeklyTrend (the 3 week-pills) is retired — HISTORY owns per-week
-          scores now. The recap line above is the card's last element; the
-          card's own 18px padding closes the bottom, so no spacing was lost
-          (the strip carried its own marginTop, not a bottom gap). */}
+      {/* Next week — no button; picks aren't open yet. picksOpenAt holds the
+          SEASON opener (not the next week's open) and the weekly open is
+          admin-initiated with no stored time, so this degrades to a dayless
+          "in the morning" rather than a wrong/past date. */}
+      <Text style={[bodyType.regular, styles.nextWeek, {color: colors.textTertiary}]}>
+        Week {currentWeek + 1} picks open in the morning.
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    marginHorizontal: spacing.lg,
+  wrap: {
     marginTop: spacing.sm,
-    padding: 18,
-    borderRadius: borderRadius.lg + 2,
-    borderWidth: 1,
   },
-  standingText: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  delta: {
-    fontSize: 12,
-    letterSpacing: 0.5,
-    marginTop: 2,
-    marginBottom: 12,
-  },
-  cta: {
-    flexDirection: 'row',
-    borderRadius: borderRadius.md + 2,
-    overflow: 'hidden',
-    shadowOpacity: 0.4,
-    shadowRadius: 18,
-    shadowOffset: {width: 0, height: 6},
-    elevation: 4,
-  },
-  // Left 1/6 — solid HotPick light-blue strip backing the full-color flame
-  // brand mark. Fill is colors.highlight (#A5CCD9, applied inline).
-  gamesTag: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // Right 5/6 — wraps the original label + arrow. Padding lives here
-  // so the GAMES tag bleeds to the rounded edge.
-  ctaBody: {
-    flex: 5,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 7,
-    paddingHorizontal: 20,
-  },
-  ctaLabel: {
-    alignItems: 'center',
-  },
-  ctaText: {
-    fontSize: 18,
-    letterSpacing: 0.5,
-  },
-  ctaFollowOn: {
-    fontSize: 10,
-    lineHeight: 11,
+  nextWeek: {
+    fontSize: 13,
     fontStyle: 'italic',
-    opacity: 0.78,
-    marginTop: 1,
+    textAlign: 'center',
+    marginTop: 12,
+    marginHorizontal: spacing.lg,
   },
 });
