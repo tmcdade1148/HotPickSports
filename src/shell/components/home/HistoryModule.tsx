@@ -124,13 +124,19 @@ export function HistoryModule() {
     return out;
   }, [recentWeeks, currentWeek, isRegularComplete]);
 
-  // Each zone is sized to the biggest week IN VIEW on its own side of the axis —
-  // so an all-positive season collapses the lower zone to nothing instead of
-  // holding ~58px open for a negative that never arrives. A zone holding a bar
-  // too short for its own number also has to reserve the row that number moves
-  // out into, or a +1 week would print its digit on top of the axis.
+  // Each zone is sized to the biggest week the chart can SCROLL TO on its side of
+  // the axis — across ALL cells, not just the at-rest window. Bars are ABSOLUTE
+  // height (fixed px/point) and this is a horizontal ScrollView through every
+  // week, so sizing from only the rightmost VISIBLE_SLOTS is the bug: when the
+  // recent weeks are all one sign (e.g. a late losing streak) the opposite zone
+  // collapses, and scrolling back to a taller earlier bar of that sign draws it
+  // into a zone too short to hold it — it clips against the card top (the
+  // "identical stub" bug). A genuinely one-sided SEASON still collapses the empty
+  // zone (barHeight(0) === 0), floored to MIN_ZONE so the axis keeps a little
+  // breathing room. A zone holding a bar too short for its own number also
+  // reserves the row that number moves out into.
   const {posH, negH} = useMemo(() => {
-    const vis = cells.slice(-VISIBLE_SLOTS);
+    const vis = cells;
     let maxPos = 0;
     let maxNeg = 0;
     let outsidePos = false;
