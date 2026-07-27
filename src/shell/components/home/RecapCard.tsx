@@ -49,6 +49,11 @@ const RESULT_SIZE = Math.round(PICKED_NAME_SIZE * 1.25);
 // bottom line reads as the headline figure of the card.
 const VALUE_SIZE = 20;
 const TOTAL_SIZE = Math.round(VALUE_SIZE * 1.5);
+// The bar's small caps. PTS stays put; the week label opposite it is half again
+// as large and carries the display weight, so the bar reads as a titled figure
+// rather than two footnotes around a number.
+const PTS_SIZE = 11;
+const FOOTER_LABEL_SIZE = Math.round(PTS_SIZE * 1.5);
 // One right-aligned column for all three numbers, and one hanging slot to its
 // right — the rows leave it empty; the footer puts PTS in it, keeping the ones
 // column put between the rows and the bar.
@@ -186,7 +191,7 @@ export function RecapCard({
             number stays pinned right, on its column. */}
         {weekLabel ? (
           <Text
-            style={[bodyType.bold, styles.footerLabel, {color: colors.ink}]}
+            style={[displayType.display, styles.footerLabel, {color: colors.ink}]}
             numberOfLines={1}>
             {`${weekLabel} TOTAL:`}
           </Text>
@@ -283,12 +288,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   // Takes the bar's free space (flex) so the total + PTS stay right-aligned on
-  // their column whatever the label's length. Sized with PTS — the two are the
-  // bar's small caps, one at each end.
+  // their column whatever the label's length. No extra tracking: at this size
+  // it's a label like "1pt PICKS", not a small cap, so it takes the display
+  // face's own letterSpacing.
   footerLabel: {
     flex: 1,
-    fontSize: 11,
-    letterSpacing: 1.4,
+    fontSize: FOOTER_LABEL_SIZE,
   },
   // minWidth, not width: at 1.5× a three-glyph total ("−10") fills the column,
   // so a fixed width would clip it. The right EDGE is what has to line up with
@@ -301,7 +306,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   pts: {
-    fontSize: 11,
+    fontSize: PTS_SIZE,
     letterSpacing: 1.4,
     width: SUFFIX_COL,
     textAlign: 'right',
