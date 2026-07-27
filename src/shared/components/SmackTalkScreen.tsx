@@ -18,7 +18,7 @@ import {useAuth} from '@shared/hooks/useAuth';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {getDisplayName} from '@shared/utils/displayName';
 import {SMACK_REACTIONS} from '@shared/config/smackTalk';
-import {LEXICON, welcomeOpenerDefault} from '@shared/lexicon';
+import {LEXICON} from '@shared/lexicon';
 import {spacing, borderRadius} from '@shared/theme';
 
 import type {DbSmackMessage, DbSmackReaction} from '@shared/types/database';
@@ -140,26 +140,16 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
   const flatListRef = useRef<FlatList<DbSmackMessage>>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Gaffer (organizer) identity for this pool — drives the Gaffer badge and the
-  // one-time welcome-opener pre-fill. Select the primitives, not the pool
-  // object, so this doesn't churn renders.
+  // Gaffer (organizer) identity for this pool — drives the Gaffer badge on a
+  // message. Select the primitive, not the pool object, so this doesn't churn
+  // renders. (It also fed the welcome-opener pre-fill, which is gone; the
+  // contestName and isGaffer that existed only for that went with it.)
   const organizerId = useGlobalStore(
     s =>
       (s.userPools.find(p => p.id === poolId) ??
         s.visiblePools.find(p => p.id === poolId))?.organizer_id ?? null,
   );
-  const contestName = useGlobalStore(
-    s =>
-      (s.userPools.find(p => p.id === poolId) ??
-        s.visiblePools.find(p => p.id === poolId))?.name ?? '',
-  );
-  const isGaffer = !!user?.id && organizerId === user.id;
 
-  // True while the composer holds the pre-filled welcome opener (so sending it
-  // is tagged message_type='welcome', the one-time marker). Cleared once the
-  // Gaffer clears the field or sends.
-  const [isWelcomeDraft, setIsWelcomeDraft] = useState(false);
-  const welcomePrefillDone = useRef(false);
   // Bumped on every optimistic reaction change. fetchReactions captures it and
   // discards its result if it changed mid-flight — so a stale full-replace
   // refetch can't briefly drop a reaction the user just added/removed before
@@ -181,30 +171,13 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
     loadBlocked();
   }, [user?.id]);
 
-  // ── Gaffer welcome-opener pre-fill ──────────────────────────────────
-  // Once per Contest: if the current user is the Gaffer and no 'welcome' row
-  // exists yet, pre-fill the composer with the default opener. The Gaffer sends
-  // as-is, edits, or clears. Lightweight exists-check; runs at most once.
-  useEffect(() => {
-    if (!isGaffer || !contestName || welcomePrefillDone.current) return;
-    welcomePrefillDone.current = true; // run the check at most once
-    let cancelled = false;
-    (async () => {
-      const {data} = await supabase
-        .from('smack_messages')
-        .select('id')
-        .eq('pool_id', poolId)
-        .eq('message_type', 'welcome')
-        .limit(1);
-      // Only pre-fill an empty composer (never clobber a message in progress).
-      if (cancelled || (data && data.length > 0) || newMessage.length > 0) return;
-      setNewMessage(welcomeOpenerDefault(contestName));
-      setIsWelcomeDraft(true);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [isGaffer, contestName, poolId, newMessage]);
+  // The Gaffer welcome-opener PRE-FILL WAS REMOVED. It put words in the
+  // Gaffer's mouth, and every Contest sending the same "personal" welcome read
+  // as fake. The composer now starts empty for everyone, Gaffer included.
+  //
+  // The 'welcome' message_type is NOT retired: rows already carry it and
+  // rendering treats them as ordinary chirps. We simply stop producing it — new
+  // messages are always 'user'.
 
   // ── Fetch messages + reactions ──────────────────────────────────────
   useEffect(() => {
@@ -673,9 +646,10 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
       p_text: text,
       p_reply_to: replyTo?.id ?? null,
       p_mentions: mentions.map(m => m.userId),
-      // The pre-filled Gaffer opener is tagged 'welcome' (one-time marker);
-      // everything else is a normal 'user' chirp.
-      p_message_type: isWelcomeDraft ? 'welcome' : 'user',
+      // Always 'user' now. The only thing that ever sent 'welcome' was the
+      // Gaffer pre-fill, which is gone; the type itself still exists for the
+      // rows that already carry it.
+      p_message_type: 'user',
     });
 
     if (sendError) {
@@ -685,7 +659,6 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
 
     setReplyTo(null);
     setMentions([]);
-    setIsWelcomeDraft(false);
     setSending(false);
   };
 
@@ -934,12 +907,7 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
           placeholder="Speak your mind…"
           placeholderTextColor={colors.textSecondary}
           value={newMessage}
-          onChangeText={t => {
-            setNewMessage(t);
-            // Clearing the field abandons the welcome opener; a fresh message
-            // is then a normal chirp, not the one-time 'welcome'.
-            if (t.trim().length === 0) setIsWelcomeDraft(false);
-          }}
+          onChangeText={setNewMessage}
           multiline
           maxLength={500}
           editable={!sending}
