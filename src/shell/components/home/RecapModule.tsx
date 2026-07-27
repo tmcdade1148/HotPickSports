@@ -90,12 +90,13 @@ export function RecapModule() {
   if (weekState === 'settling' || weekState === 'complete') return null;
   if (data == null) return null;
 
+  // ONE spelling of the week for this card: the eyebrow's "WEEK 7 RECAP" and
+  // the footer's "WEEK 7 TOTAL:" can't drift apart.
+  const weekLabel = sectionWeekLabel(data.recap.week, isPlayoffs);
+
   return (
-    <ModuleSection
-      label={`${sectionWeekLabel(data.recap.week, isPlayoffs)} RECAP`}
-      value={data.total}
-      collapsible>
-      <RecapCard data={data} team={team} matchup={matchup} />
+    <ModuleSection label={`${weekLabel} RECAP`} value={data.total} collapsible>
+      <RecapCard data={data} team={team} matchup={matchup} weekLabel={weekLabel} />
     </ModuleSection>
   );
 }

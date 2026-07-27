@@ -3,8 +3,8 @@
 //   HotPick: WIN                                  16
 //   BILLS vs DOLPHINS
 //   1pt PICKS                        6 of 15       6
-//   ┌───────────────── teal ─────────────────────────┐
-//   │                                        22 PTS  │
+//   ┌──────────────── amber ─────────────────────────┐
+//   │ WEEK 7 TOTAL:                          22 PTS  │
 //
 // The two rows always ADD to the footer total — the whole point of the card, and
 // why the three numbers share one right-aligned tabular column.
@@ -59,11 +59,18 @@ export function RecapCard({
   data,
   team,
   matchup,
+  weekLabel,
 }: {
   data: RecapData | null;
   /** The HotPick team alone — the fallback when the week's game isn't loaded. */
   team: string | null;
   matchup?: RecapMatchup | null;
+  /**
+   * "WEEK 7" / "WC" — resolved by the caller, which knows the phase, so the
+   * footer names the same week the eyebrow above it does. Omitted → the footer
+   * is the bare total, as before.
+   */
+  weekLabel?: string | null;
 }) {
   const {colors} = useTheme();
 
@@ -174,6 +181,16 @@ export function RecapCard({
           mode (~2.5:1 on amber, fails AA); it only worked when the bar was teal
           and flipped with it. */}
       <View style={[styles.footer, {backgroundColor: colors.secondary}]}>
+        {/* Names the figure, so the bar isn't a bare number: "WEEK 7 TOTAL:".
+            Same ink as the rest of the bar, and it takes the free space so the
+            number stays pinned right, on its column. */}
+        {weekLabel ? (
+          <Text
+            style={[bodyType.bold, styles.footerLabel, {color: colors.ink}]}
+            numberOfLines={1}>
+            {`${weekLabel} TOTAL:`}
+          </Text>
+        ) : null}
         <Text style={[displayType.display, styles.total, {color: colors.ink}]}>
           {fmtPoints(data.total)}
         </Text>
@@ -264,6 +281,14 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
+  },
+  // Takes the bar's free space (flex) so the total + PTS stay right-aligned on
+  // their column whatever the label's length. Sized with PTS — the two are the
+  // bar's small caps, one at each end.
+  footerLabel: {
+    flex: 1,
+    fontSize: 11,
+    letterSpacing: 1.4,
   },
   // minWidth, not width: at 1.5× a three-glyph total ("−10") fills the column,
   // so a fixed width would clip it. The right EDGE is what has to line up with

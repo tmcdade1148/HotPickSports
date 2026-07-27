@@ -25,7 +25,9 @@ import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {bodyType, spacing} from '@shared/theme';
 import {RecapCard} from './RecapCard';
 import {
+  PLAYOFF_PHASES,
   resolveMatchup,
+  sectionWeekLabel,
   selectRecap,
   teamDisplayName,
   type WeekRow,
@@ -35,6 +37,9 @@ export function CompleteHero() {
   const {colors} = useTheme();
   const currentWeek = useNFLStore(s => s.currentWeek);
   const userHotPick = useNFLStore(s => s.userHotPick);
+  // Phase only to label the footer's week: a playoff round reads "WC TOTAL:",
+  // not "WEEK 19 TOTAL:" — the same spelling RecapModule's eyebrow uses.
+  const currentPhase = useNFLStore(s => s.currentPhase);
   const recentWeeks = useGlobalStore(s => s.recentWeeks) as WeekRow[];
   // This week's slate, already cached by seasonStore (HomeScreen fetches the
   // current week) — read only, no fetch. See resolveMatchup for the fallback.
@@ -50,10 +55,21 @@ export function CompleteHero() {
   const teamCode = scored ? userHotPick?.picked_team ?? null : null;
   const team = teamCode ? teamDisplayName(teamCode) : null;
   const matchup = resolveMatchup(weekGames, teamCode);
+  const weekLabel = cardData
+    ? sectionWeekLabel(
+        cardData.recap.week,
+        PLAYOFF_PHASES.includes(String(currentPhase ?? '')),
+      )
+    : null;
 
   return (
     <View style={styles.wrap}>
-      <RecapCard data={cardData} team={team} matchup={matchup} />
+      <RecapCard
+        data={cardData}
+        team={team}
+        matchup={matchup}
+        weekLabel={weekLabel}
+      />
 
       {/* Next week — no button; picks aren't open yet. picksOpenAt holds the
           SEASON opener (not the next week's open) and the weekly open is
