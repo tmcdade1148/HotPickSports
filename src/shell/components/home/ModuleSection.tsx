@@ -75,6 +75,17 @@ export interface ModuleSectionProps {
   accessory?: React.ReactNode;
   /** Small node rendered immediately AFTER the label word (the HOTPICK flame). */
   labelTrailing?: React.ReactNode;
+  /**
+   * An emphasised WORD closing the label — the WEEK eyebrow's "WEEK 7: COMPLETE",
+   * where COMPLETE carries the weight and the week reads as its subject.
+   *
+   * It's the ACCENT that stays bold and the base that lightens to regular,
+   * because only two Manrope faces ship (Regular + Bold): there is no
+   * bolder-than-bold to reach for without adding a font file, which would make
+   * a copy tweak a native change. Same size, tracking and baseline either way —
+   * only the weight differs.
+   */
+  labelAccent?: string | null;
   /** Adds the chevron and makes the whole row a toggle. Collapsed by default. */
   collapsible?: boolean;
   /** The WEEK eyebrow's label renders in textPrimary; every other one tertiary. */
@@ -89,6 +100,7 @@ export function ModuleSection({
   status,
   accessory,
   labelTrailing,
+  labelAccent,
   collapsible = false,
   emphasis = false,
   children,
@@ -132,12 +144,17 @@ export function ModuleSection({
       <View style={styles.titleGroup}>
         <Text
           style={[
-            bodyType.bold,
+            // With an accent the base steps back to regular so the accent is
+            // the bold one — see labelAccent.
+            labelAccent ? bodyType.regular : bodyType.bold,
             styles.label,
             {color: emphasis ? colors.textPrimary : colors.textTertiary},
           ]}
           numberOfLines={1}>
           {label}
+          {labelAccent ? (
+            <Text style={bodyType.bold}>{` ${labelAccent}`}</Text>
+          ) : null}
         </Text>
 
         {/* Trailing node — the HOTPICK flame, right after the word. */}
@@ -201,7 +218,9 @@ export function ModuleSection({
           style={({pressed}) => [{opacity: pressed ? 0.6 : 1}]}
           accessibilityRole="button"
           accessibilityState={{expanded: open}}
-          accessibilityLabel={label}>
+          // The accent is part of the label, not decoration — a reader that
+          // announced "WEEK 7:" and dropped COMPLETE would lose the point.
+          accessibilityLabel={labelAccent ? `${label} ${labelAccent}` : label}>
           {header}
         </Pressable>
       ) : (

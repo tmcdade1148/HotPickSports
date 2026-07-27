@@ -4,13 +4,13 @@
 // "Week N+1 picks open …" line below. NO big button (next week isn't open — when
 // it opens the state flips to picks_open where the CTA lives) and NO flame.
 //
-// The WEEK eyebrow above reads "WEEK N IS COMPLETE" (label only, no value) and the
+// The WEEK eyebrow above reads "WEEK N: COMPLETE" (label only, no value) and the
 // WEEK-N RECAP eyebrow is suppressed for this week (RecapModule returns null in
 // complete) — so the expanded RecapCard IS the recap and the week appears ONCE.
 //
 // Numbers come from the SHARED selectRecap() helper — the same derivation
 // RecapModule uses. A missed week is ABSENT, so selectRecap falls back to the
-// prior week; that must NOT read as this week's under the "WEEK N IS COMPLETE"
+// prior week; that must NOT read as this week's under the "WEEK N: COMPLETE"
 // eyebrow, so an unscored current week passes null → RecapCard shows a neutral
 // "—" (never the stale prior week). Representing a missed week as a scored 0 is
 // the banked [BACKEND] work.
