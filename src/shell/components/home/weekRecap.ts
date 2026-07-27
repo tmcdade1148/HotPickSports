@@ -11,7 +11,7 @@
  * where the GameChip and the Picks screen can reach it too.
  */
 
-import {fullTeamName} from './teamColors';
+import {fullTeamName, teamNickname} from './teamColors';
 
 /**
  * Phases where Home's week modules do not exist at all — there is no season
@@ -155,7 +155,10 @@ export function selectRecap(
   };
 }
 
-/** "BAL" → "BALTIMORE RAVENS" — the recap card's team-name treatment, once. */
+/**
+ * "BAL" → "BALTIMORE RAVENS" — the full name, used when the team stands ALONE
+ * (the matchup's fallback), where there's room for the city.
+ */
 export function teamDisplayName(abbr: string): string {
   return (fullTeamName(abbr) ?? abbr).toUpperCase();
 }
@@ -165,10 +168,10 @@ export function teamDisplayName(abbr: string): string {
  * NFL scoreboard order, never "my team first".
  */
 export interface RecapMatchup {
-  /** Display-ready names, away first. */
+  /** Display-ready NICKNAMES, away first ("FALCONS" / "JETS"). */
   away: string;
   home: string;
-  /** Which side the HotPick is on, so the card bolds the right one. */
+  /** Which side the HotPick is on, so the card marks the right one (bold + orange). */
   hotPickIsHome: boolean;
 }
 
@@ -199,9 +202,11 @@ export function resolveMatchup(
       g.home_team?.toUpperCase() === code || g.away_team?.toUpperCase() === code,
   );
   if (!game) return null;
+  // Nicknames, not full names: two city+name pairs overflow the line. The
+  // team-alone fallback keeps the full name — see teamDisplayName.
   return {
-    away: teamDisplayName(game.away_team),
-    home: teamDisplayName(game.home_team),
+    away: teamNickname(game.away_team) ?? game.away_team,
+    home: teamNickname(game.home_team) ?? game.home_team,
     hotPickIsHome: game.home_team?.toUpperCase() === code,
   };
 }

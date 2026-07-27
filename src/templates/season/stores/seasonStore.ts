@@ -254,7 +254,14 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       return s === 'IN_PROGRESS' || s === 'LIVE';
     });
     if (!force && cached && !hasLiveGame) {
-      set({games: cached, isLoading: false});
+      // Only swap the VISIBLE slate when this IS the week being viewed — the
+      // same guard the network path below already applies. Home warms the prior
+      // week so the RECAP matchup line can read it, and without this guard that
+      // cached hit would push last week's games onto everything reading
+      // `games` (BigGames / WeekSection / PicksOpenHero / the Picks screen).
+      // The Board is unaffected either way: it reads allWeekGames[week].
+      const sameWeek = get().currentWeek === week;
+      set(state => ({games: sameWeek ? cached : state.games, isLoading: false}));
       return;
     }
 

@@ -79,6 +79,17 @@ export function fullTeamName(abbr: string | null | undefined): string | null {
   return `${titleCase(t.city)} ${titleCase(t.name)}`;
 }
 
+/**
+ * "BAL" → "RAVENS" — the nickname alone, for lines that carry TWO teams (the
+ * recap card's matchup) where the cities would overflow. Uppercase, as the
+ * table stores it. Unknown abbrs surface the raw code rather than the fallback
+ * palette's empty name.
+ */
+export function teamNickname(abbr: string | null | undefined): string | null {
+  if (!abbr) return null;
+  return getTeamColors(abbr).name || abbr.toUpperCase();
+}
+
 /** Two-letter initials for a partner/team name fallback ("Miller's Tavern" → "MT"). */
 export function partnerInitials(name: string | null | undefined): string {
   if (!name) return '··';

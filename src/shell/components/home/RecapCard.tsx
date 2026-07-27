@@ -1,7 +1,7 @@
 // RecapCard — the shared recap CARD body.
 //
-//   HotPick : WIN                                 16
-//   BUFFALO BILLS vs MIAMI DOLPHINS
+//   HotPick: WIN                                  16
+//   BILLS vs DOLPHINS
 //   1pt PICKS                        6 of 15       6
 //   ┌───────────────── teal ─────────────────────────┐
 //   │                                        22 PTS  │
@@ -23,11 +23,15 @@
 //   Hard Rule #9 — every colour is a token.
 //
 // The matchup line replaced a lone team name, and the flame came off the result
-// line with it: the line now carries two teams, so the ONE accent on it is the
-// WIN/LOSS. Both team names are neutral — the result colour stays on the
-// WIN/LOSS above, and doubling it onto the teams over-saturates a
-// compliance-sensitive surface. Which team is yours is carried by WEIGHT (bold),
-// never by colour.
+// line with it. Which team is YOURS is marked two ways, neither of them a result
+// signal: WEIGHT (bold) and the HotPick orange (colors.primary — the marker the
+// chip panel and the flame already use). The opponent is neutral. RESULT colour
+// (gameWon / gameLost) appears exactly twice, both on the line above: the
+// WIN/LOSS word and its points. Never on a team name — a green or red team name
+// doubles the result and over-saturates a compliance-sensitive surface.
+//
+// Matchup uses NICKNAMES ("BILLS vs DOLPHINS"): two full city+name pairs don't
+// fit the line. The team-alone fallback keeps the full name — it has the room.
 
 import React from 'react';
 import {Text} from '@shared/components/AppText';
@@ -41,6 +45,10 @@ import type {RecapData, RecapMatchup} from './weekRecap';
 // The result label above the matchup is a quarter larger so the outcome lands
 // before the teams do.
 const RESULT_SIZE = Math.round(PICKED_NAME_SIZE * 1.25);
+// The two row values; the footer's total is half again as large, so the week's
+// bottom line reads as the headline figure of the card.
+const VALUE_SIZE = 20;
+const TOTAL_SIZE = Math.round(VALUE_SIZE * 1.5);
 // One right-aligned column for all three numbers, and one hanging slot to its
 // right — the rows leave it empty; the footer puts PTS in it, keeping the ones
 // column put between the rows and the bar.
@@ -72,6 +80,9 @@ export function RecapCard({
   }
 
   const hpColor = data.isHotPickCorrect ? colors.gameWon : colors.gameLost;
+  // The HotPick team wears the HotPick MARKER (orange), not a result colour:
+  // it says "this is your pick", never "this won/lost".
+  const pickTeam = {color: colors.primary};
   // The base Picks are the remainder, so the two rows always add to the footer.
   const picksPoints = data.total - data.hpPoints;
 
@@ -89,7 +100,7 @@ export function RecapCard({
               <View style={styles.labelCol}>
                 <View style={styles.resultLine}>
                   <Text style={[displayType.display, styles.result, {color: colors.textPrimary}]}>
-                    HotPick :
+                    HotPick:
                   </Text>
                   <Text style={[displayType.display, styles.result, {color: hpColor}]}>
                     {data.isHotPickCorrect ? 'WIN' : 'LOSS'}
@@ -101,22 +112,30 @@ export function RecapCard({
               </Text>
               <View style={styles.suffix} />
             </View>
-            {/* Outside labelCol on purpose: two full team names need the card's
-                full width, not the width left over beside the points column
-                (which the row above already reserves and this line leaves
-                empty). Falls back to the lone team name when the week's slate
-                isn't loaded — never "vs undefined". */}
+            {/* Outside labelCol on purpose: the matchup gets the card's full
+                width, not the width left over beside the points column (which
+                the row above reserves and this line leaves empty) — so even the
+                longest pairing has room and never lands on an ellipsis. Falls
+                back to the lone team name (FULL name, it has the room) when the
+                week's slate isn't loaded — never "vs undefined". */}
             {matchup || team ? (
               <Text
-                style={[displayType.display, styles.matchupLine, {color: colors.textPrimary}]}
+                style={[
+                  displayType.display,
+                  styles.matchupLine,
+                  // Base colour is the OPPONENT's (neutral); the HotPick side
+                  // overrides to orange below. With no matchup the only name on
+                  // the line IS the HotPick, so the whole line takes the marker.
+                  matchup ? {color: colors.textPrimary} : pickTeam,
+                ]}
                 numberOfLines={1}>
                 {matchup ? (
                   <>
-                    <Text style={matchup.hotPickIsHome ? styles.opponent : null}>
+                    <Text style={matchup.hotPickIsHome ? styles.opponent : pickTeam}>
                       {matchup.away}
                     </Text>
                     <Text style={[styles.vs, {color: colors.textSecondary}]}> vs </Text>
-                    <Text style={matchup.hotPickIsHome ? null : styles.opponent}>
+                    <Text style={matchup.hotPickIsHome ? pickTeam : styles.opponent}>
                       {matchup.home}
                     </Text>
                   </>
@@ -218,6 +237,7 @@ const styles = StyleSheet.create({
   // parent sets — so the HotPick team reads bold wherever it correctly sits,
   // first or second. Safe to override here because displayType.display is a
   // SYSTEM font (real weights), not a fixed-weight custom family like Manrope.
+  // Colour stays the parent's neutral; only the HotPick side takes the orange.
   opponent: {
     fontWeight: '400',
   },
@@ -231,7 +251,7 @@ const styles = StyleSheet.create({
   },
   value: {
     ...monoType.regular,
-    fontSize: 20,
+    fontSize: VALUE_SIZE,
     width: VALUE_COL,
     textAlign: 'right',
   },
@@ -245,10 +265,14 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
   },
+  // minWidth, not width: at 1.5× a three-glyph total ("−10") fills the column,
+  // so a fixed width would clip it. The right EDGE is what has to line up with
+  // the rows' values, and the PTS box to its right pins that regardless of how
+  // wide this grows.
   total: {
     ...monoType.regular,
-    fontSize: 20,
-    width: VALUE_COL,
+    fontSize: TOTAL_SIZE,
+    minWidth: VALUE_COL,
     textAlign: 'right',
   },
   pts: {

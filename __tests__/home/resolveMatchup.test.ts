@@ -11,6 +11,9 @@
 //
 // Also locks the fallbacks, which exist so the line can never regress to a blank
 // or "vs undefined": week not cached, team not in the slate, no team at all.
+//
+// The matchup carries NICKNAMES ("BILLS vs DOLPHINS") — two full city+name pairs
+// overflow the line. The team-alone fallback keeps the full name (teamDisplayName).
 
 import {resolveMatchup} from '@shell/components/home/weekRecap';
 
@@ -24,26 +27,26 @@ const SLATE = [
 describe('resolveMatchup — away-first ordering', () => {
   test('HotPick on the AWAY team → it is first, and flagged as away', () => {
     expect(resolveMatchup(SLATE, 'BUF')).toEqual({
-      away: 'BUFFALO BILLS',
-      home: 'MIAMI DOLPHINS',
+      away: 'BILLS',
+      home: 'DOLPHINS',
       hotPickIsHome: false,
     });
   });
 
   test('HotPick on the HOME team → order is UNCHANGED, it is still second', () => {
-    // The bold follows hotPickIsHome, so the card bolds the second name here —
-    // the pick never gets promoted to the front.
+    // The bold + orange follow hotPickIsHome, so the card marks the second name
+    // here — the pick never gets promoted to the front.
     expect(resolveMatchup(SLATE, 'MIA')).toEqual({
-      away: 'BUFFALO BILLS',
-      home: 'MIAMI DOLPHINS',
+      away: 'BILLS',
+      home: 'DOLPHINS',
       hotPickIsHome: true,
     });
   });
 
   test('the away/home pair comes from the GAME, not the argument order', () => {
     expect(resolveMatchup(SLATE, 'DEN')).toEqual({
-      away: 'KANSAS CITY CHIEFS',
-      home: 'DENVER BRONCOS',
+      away: 'CHIEFS',
+      home: 'BRONCOS',
       hotPickIsHome: true,
     });
   });
@@ -75,10 +78,11 @@ describe('resolveMatchup — fallbacks (the card shows the team alone)', () => {
   });
 
   test('an unknown abbreviation still resolves, surfacing the raw code', () => {
-    // fullTeamName returns the code for teams it doesn't know (expansion, or a
-    // seed using a different abbreviation) — the matchup must still render.
+    // An unknown team (expansion, or a seed on a different abbreviation) has no
+    // nickname on the fallback palette — it must surface the code, never render
+    // as an empty half of the matchup.
     expect(resolveMatchup([{away_team: 'BUF', home_team: 'XXX'}], 'XXX')).toEqual({
-      away: 'BUFFALO BILLS',
+      away: 'BILLS',
       home: 'XXX',
       hotPickIsHome: true,
     });

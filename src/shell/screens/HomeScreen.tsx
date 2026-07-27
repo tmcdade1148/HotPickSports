@@ -426,7 +426,19 @@ export function HomeScreen() {
     // (showing "WEEK N COMPLETE" / "LOCKED PICKS" at the top of a fresh week).
     // force:true also bypasses the per-week cache so a stale entry can't win.
     setSeasonViewedWeek(currentWeek);
-    fetchSeasonWeekGames(currentWeek, true).catch(() => {});
+    // Then warm the PRIOR week, whose slate the RECAP eyebrow's matchup line
+    // reads out of allWeekGames — nothing else on Home populates it, so without
+    // this the eyebrow always fell back to the HotPick team name alone.
+    // Unforced: it fills the cache once and is served from it afterwards.
+    // Chained rather than fired alongside so the two can't race on the store's
+    // shared isLoading (the warm resolving first would clear the current week's
+    // spinner early). Never swaps the visible slate — seasonViewedWeek is the
+    // current week, and fetchWeekGames only assigns `games` on a week match.
+    fetchSeasonWeekGames(currentWeek, true)
+      .then(() => {
+        if (currentWeek > 1) return fetchSeasonWeekGames(currentWeek - 1);
+      })
+      .catch(() => {});
   }, [userId, currentWeek, fetchSeasonUserPicks, fetchSeasonWeekGames, setSeasonViewedWeek, seasonConfig]);
 
   useEffect(() => {
