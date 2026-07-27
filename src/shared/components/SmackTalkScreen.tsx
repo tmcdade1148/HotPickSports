@@ -86,6 +86,38 @@ function formatSmackTime(date: Date): string {
 export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
   const {colors} = useTheme();
   const navReserve = useNavReserve();
+  // The composer reserves room for the TAB BAR (navReserve = NAV_BAR_HEIGHT +
+  // insets.bottom, a constant). That reserve is only correct while the composer
+  // is sitting on the tab bar. Once the keyboard lifts it, the tab bar is gone
+  // behind the keyboard but the reserve rode up with the row and reads as a gap
+  // between the composer and the keyboard.
+  //
+  // So: track the keyboard and drop the reserve while it's up. This is the
+  // padding only — the KAV's behavior values and keyboardVerticalOffset={0} are
+  // deliberately untouched (see the notes on the KAV below); the avoidance
+  // strategy was never the bug.
+  //
+  // NOT platform-gated, unlike the same listener pattern in ProfileSetupScreen /
+  // PoolWelcomeScreen — those gate to Android because they're synthesising room
+  // that iOS's behavior="padding" already provides. Here BOTH platforms lift the
+  // composer (iOS by padding, Android by shrinking to "height"), so both carry
+  // the stale reserve up with it.
+  //
+  // Event choice is per platform, and it matters: iOS fires will* IN STEP with
+  // the keyboard animation, so the reserve is gone as the composer rises rather
+  // than snapping shut a frame after it lands. Android doesn't fire will*
+  // reliably — only did* — so it takes those and accepts the smaller jump.
+  const [keyboardUp, setKeyboardUp] = useState(false);
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const show = Keyboard.addListener(showEvent, () => setKeyboardUp(true));
+    const hide = Keyboard.addListener(hideEvent, () => setKeyboardUp(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
   const styles = createStyles(colors);
   const [messages, setMessages] = useState<DbSmackMessage[]>([]);
   const [reactions, setReactions] = useState<Record<string, DbSmackReaction[]>>({});
@@ -887,7 +919,10 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
         </View>
       )}
 
-      <View style={[styles.inputRow, {paddingBottom: navReserve}]}>
+      {/* Tab-bar reserve only while the keyboard is DOWN — see the note by the
+          keyboard listener above. With the keyboard up the row sits on the
+          keyboard, so the reserve would be a gap. */}
+      <View style={[styles.inputRow, {paddingBottom: keyboardUp ? 0 : navReserve}]}>
         <TextInput
           style={styles.input}
           placeholder="Talk trash..."
