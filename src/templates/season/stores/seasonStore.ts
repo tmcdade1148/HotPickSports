@@ -9,6 +9,17 @@ import type {
   DbSeasonUserTotal,
 } from '@shared/types/database';
 
+/**
+ * What a player sees when a pick doesn't save for a reason that isn't the lock.
+ *
+ * ONE string, because the alternative is what was here: `error.message` passed
+ * straight through, i.e. Postgres text such as "invalid input syntax for type
+ * uuid" surfacing as app copy. The raw error still goes to the console for us —
+ * this is only what `saveError` is allowed to hold. The lock branch already had
+ * its own player-facing line and keeps it; this covers everything else.
+ */
+const SAVE_FAILED = "That pick didn't save. Check your connection and try again.";
+
 /** Leaderboard display name: poolie_name → first + last initial → 'Player' */
 function formatLeaderboardName(p: {poolie_name: string | null; first_name: string | null; last_name: string | null}): string {
   return p.poolie_name
@@ -324,6 +335,16 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
     if (!config) {
       return;
     }
+    // No user yet → do NOTHING, exactly as a missing config does. Screens pass
+    // `user?.id ?? ''` while auth is still resolving on a cold start, and an
+    // empty string reached the upsert as user_id, which Postgres rejects
+    // (22P02, "invalid input syntax for type uuid"). The optimistic pick was
+    // then rolled back, so the tap visibly reverted. Guarded HERE rather than at
+    // the four call sites because every template's picks funnel through this
+    // store — a future screen repeating the `?? ''` pattern can't reopen it.
+    if (!userId) {
+      return;
+    }
 
     // Enforce hotPicksPerWeek limit
     if (isHotPick) {
@@ -389,8 +410,12 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
         set({weekPicks: prevWeekPicks, saveError: 'Picks are locked for the week.'});
         get().fetchWeekGames(currentWeek, true);
       } else {
+        // The RAW message stays in the console for us; the STORE gets copy a
+        // player could read. `error.message` here is Postgres text ("invalid
+        // input syntax for type uuid") — never something to put in front of
+        // someone. Mirrors the locked branch above, which already does this.
         console.error('[savePick] ERROR:', error.message, error.details, error.hint, JSON.stringify(error));
-        set({weekPicks: prevWeekPicks, saveError: error.message});
+        set({weekPicks: prevWeekPicks, saveError: SAVE_FAILED});
       }
     }
 
@@ -400,6 +425,11 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
   setHotPick: async ({userId, gameId}) => {
     const {config, weekPicks, currentWeek} = get();
     if (!config) return;
+    // Same auth guard as savePick — see there. setHotPick writes up to TWO rows
+    // (clearing the old HotPick, then setting the new one), so an unresolved
+    // user could otherwise fail halfway and leave the optimistic state rolled
+    // back against a half-written week.
+    if (!userId) return;
 
     const pick = weekPicks.find(p => p.game_id === gameId);
     if (!pick) return; // Must have a pick first
@@ -434,7 +464,8 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
         {onConflict: 'user_id,game_id'},
       );
       if (clearError) {
-        set({weekPicks: prevWeekPicks, saveError: clearError.message, isSaving: false});
+        console.error('[setHotPick] clear ERROR:', clearError.message);
+        set({weekPicks: prevWeekPicks, saveError: SAVE_FAILED, isSaving: false});
         return;
       }
     }
@@ -454,7 +485,8 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
     );
 
     if (error) {
-      set({weekPicks: prevWeekPicks, saveError: error.message});
+      console.error('[setHotPick] ERROR:', error.message);
+      set({weekPicks: prevWeekPicks, saveError: SAVE_FAILED});
     }
     set({isSaving: false});
   },
