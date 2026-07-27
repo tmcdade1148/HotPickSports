@@ -890,7 +890,7 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
       <View style={[styles.inputRow, {paddingBottom: navReserve}]}>
         <TextInput
           style={styles.input}
-          placeholder="Talk trash..."
+          placeholder="Speak your mind…"
           placeholderTextColor={colors.textSecondary}
           value={newMessage}
           onChangeText={t => {
