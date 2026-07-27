@@ -21,16 +21,24 @@ import {StyleSheet, View} from 'react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useGlobalStore} from '@shell/stores/globalStore';
+import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {bodyType, spacing} from '@shared/theme';
 import {RecapCard} from './RecapCard';
-import {fullTeamName} from './teamColors';
-import {selectRecap, type WeekRow} from './weekRecap';
+import {
+  resolveMatchup,
+  selectRecap,
+  teamDisplayName,
+  type WeekRow,
+} from './weekRecap';
 
 export function CompleteHero() {
   const {colors} = useTheme();
   const currentWeek = useNFLStore(s => s.currentWeek);
   const userHotPick = useNFLStore(s => s.userHotPick);
   const recentWeeks = useGlobalStore(s => s.recentWeeks) as WeekRow[];
+  // This week's slate, already cached by seasonStore (HomeScreen fetches the
+  // current week) — read only, no fetch. See resolveMatchup for the fallback.
+  const weekGames = useSeasonStore(s => s.allWeekGames[currentWeek]);
 
   // The just-finished week — complete ⇒ weekSettled true. Shared derivation.
   const data = selectRecap(recentWeeks, currentWeek, true);
@@ -40,11 +48,12 @@ export function CompleteHero() {
   const cardData = scored ? data : null;
 
   const teamCode = scored ? userHotPick?.picked_team ?? null : null;
-  const team = teamCode ? (fullTeamName(teamCode) ?? teamCode).toUpperCase() : null;
+  const team = teamCode ? teamDisplayName(teamCode) : null;
+  const matchup = resolveMatchup(weekGames, teamCode);
 
   return (
     <View style={styles.wrap}>
-      <RecapCard data={cardData} team={team} />
+      <RecapCard data={cardData} team={team} matchup={matchup} />
 
       {/* Next week — no button; picks aren't open yet. picksOpenAt holds the
           SEASON opener (not the next week's open) and the weekly open is

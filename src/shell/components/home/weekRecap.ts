@@ -11,6 +11,8 @@
  * where the GameChip and the Picks screen can reach it too.
  */
 
+import {fullTeamName} from './teamColors';
+
 /**
  * Phases where Home's week modules do not exist at all — there is no season
  * to describe. The WEEK eyebrow, the Recap and the HISTORY chart all check it.
@@ -150,5 +152,56 @@ export function selectRecap(
     hpPoints,
     total: recap.total,
     picks,
+  };
+}
+
+/** "BAL" → "BALTIMORE RAVENS" — the recap card's team-name treatment, once. */
+export function teamDisplayName(abbr: string): string {
+  return (fullTeamName(abbr) ?? abbr).toUpperCase();
+}
+
+/**
+ * The HotPick's game as the recap card renders it: away first, home second —
+ * NFL scoreboard order, never "my team first".
+ */
+export interface RecapMatchup {
+  /** Display-ready names, away first. */
+  away: string;
+  home: string;
+  /** Which side the HotPick is on, so the card bolds the right one. */
+  hotPickIsHome: boolean;
+}
+
+/**
+ * Resolve the recapped week's HotPick game into an away-first matchup.
+ *
+ * `games` is that week's slate exactly as `seasonStore.allWeekGames` already
+ * caches it — this READS what's loaded and never fetches. Ordering reuses the
+ * away-first convention seasonStore already spells for the ladder dropdown
+ * (`${away_team} @ ${home_team}`).
+ *
+ * Matched on the picked team, not `game_id`: a team plays at most once in a
+ * week, so its abbreviation identifies the game unambiguously — and the
+ * prior-week source (`globalStore.lastWeekHotPick`) carries only the team, no
+ * game_id, so a game_id match would need new plumbing to work in the eyebrow.
+ *
+ * Returns null when the week isn't cached or the team's game isn't in it; both
+ * callers then fall back to the team name alone — the card's prior behaviour.
+ */
+export function resolveMatchup(
+  games: ReadonlyArray<{home_team: string; away_team: string}> | undefined,
+  teamCode: string | null,
+): RecapMatchup | null {
+  if (!teamCode || games == null) return null;
+  const code = teamCode.toUpperCase();
+  const game = games.find(
+    g =>
+      g.home_team?.toUpperCase() === code || g.away_team?.toUpperCase() === code,
+  );
+  if (!game) return null;
+  return {
+    away: teamDisplayName(game.away_team),
+    home: teamDisplayName(game.home_team),
+    hotPickIsHome: game.home_team?.toUpperCase() === code,
   };
 }

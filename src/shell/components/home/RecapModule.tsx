@@ -13,14 +13,16 @@
 import React, {useMemo} from 'react';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
+import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {ModuleSection} from './ModuleSection';
 import {RecapCard} from './RecapCard';
-import {fullTeamName} from './teamColors';
 import {
   HIDDEN_PHASES,
   PLAYOFF_PHASES,
+  resolveMatchup,
   selectRecap,
   sectionWeekLabel,
+  teamDisplayName,
   type WeekRow,
 } from './weekRecap';
 
@@ -63,7 +65,18 @@ export function RecapModule() {
         : data.recap.week === currentWeek - 1
           ? lastWeekHotPick?.team ?? null
           : null;
-  const team = teamCode ? (fullTeamName(teamCode) ?? teamCode).toUpperCase() : null;
+  const team = teamCode ? teamDisplayName(teamCode) : null;
+
+  // The recapped week's slate, as seasonStore already caches it per week —
+  // READ ONLY, nothing is fetched here. Scoped to the ONE week so a live score
+  // landing on another week can't re-render this card. Not loaded (a cold
+  // launch straight to Home caches only the CURRENT week) → resolveMatchup
+  // returns null and the card shows the HotPick team alone, as it did before.
+  const recapWeek = data?.recap.week ?? null;
+  const weekGames = useSeasonStore(s =>
+    recapWeek == null ? undefined : s.allWeekGames[recapWeek],
+  );
+  const matchup = resolveMatchup(weekGames, teamCode);
 
   // Hold while a competition config is loading (e.g. the moment the onboarding
   // demo exits — nflStore still holds the demo's played week until the real
@@ -82,7 +95,7 @@ export function RecapModule() {
       label={`${sectionWeekLabel(data.recap.week, isPlayoffs)} RECAP`}
       value={data.total}
       collapsible>
-      <RecapCard data={data} team={team} />
+      <RecapCard data={data} team={team} matchup={matchup} />
     </ModuleSection>
   );
 }
