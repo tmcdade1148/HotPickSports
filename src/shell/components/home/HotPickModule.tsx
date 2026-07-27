@@ -1,29 +1,37 @@
 // HotPickModule — Home's HOTPICK module (Home Module Map v4, module 5).
 //
-// "The module is a GameChip wearing a flame." A HOTPICK eyebrow — rendered
-// through ModuleSection so it matches CONTESTS / LEAGUES exactly (same casing,
-// weight, type) with the BRANDED flame TRAILING the word — over the same
-// GameChip the Picks screen renders. The chip shows its OWN status line
-// (LIVE/FINAL + clock) and the orange HotPick border. Nothing here is bespoke
-// game markup.
+// A HOTPICK caption over the same GameChip the Picks screen renders. The chip
+// shows its OWN status line (LIVE/FINAL + clock) and the orange HotPick border.
+// Nothing here is bespoke game markup.
 //
-// The trailing mark is ChipFlameColor, NOT GamesTagFlame: same branded artwork,
-// but ChipFlameColor themes its base bar via barColor (we pass textPrimary) so
-// it survives dark mode. GamesTagFlame bakes a #000000 base bar that vanishes on
-// the near-black Home background in the dark theme — right on the orange Picks
-// CTA, wrong here.
+// THE FLAME WAS REMOVED DELIBERATELY. Do not "restore" it as a bug fix. There is
+// now NO flame anywhere on this module that a user can see: the caption's mark
+// is gone, and the only other one lives in the eyebrow path below, which has no
+// callers (see the placement note). The caption carries the word alone, larger
+// and bold, and the chip's orange border already marks it as the HotPick.
 //
-// TWO placements, one owner of the HotPick presentation:
-//   • Default (sibling)  — the locked / live rows. StateHero renders it directly
-//     beneath the ACTION module; it wears the ModuleSection eyebrow and returns
-//     null when there's no HotPick. UNCHANGED.
-//   • embedded (picks_open) — pulled UP INSIDE the ACTION card (spec §6.4). No
-//     ModuleSection eyebrow and no outer margin: a lean HOTPICK caption + the
-//     chip, aligned to the card padding. With `beckon`, an empty HotPick shows a
-//     dashed beckon sized to the filled chip so tagging it causes no reflow.
+// ChipFlameColor is still imported because that unreachable eyebrow path still
+// references it. Kept, not pruned, so removing the dead path stays one clean
+// deletion rather than something half-done here.
+//
+// PLACEMENTS — one owner of the HotPick presentation, but only ONE of these two
+// actually renders today:
+//   • embedded — THE LIVE PATH, and the only thing a user ever sees. Pulled UP
+//     INSIDE the ACTION card (spec §6.4): no ModuleSection eyebrow and no outer
+//     margin, a lean HOTPICK caption + the chip aligned to the card padding.
+//     With `beckon`, an empty HotPick shows a dashed beckon sized to the filled
+//     chip so tagging it causes no reflow. PicksOpenHero serves picks_open,
+//     locked AND live, so this covers all three states.
+//   • Default (sibling, ModuleSection eyebrow) — UNREACHABLE. Both call sites of
+//     this component are in PicksOpenHero (the beckon and the flush chip) and
+//     BOTH pass `embedded`, so the eyebrow branch never runs. It is left-over
+//     from spec 2, Part A, which moved the HotPick INSIDE the surface for all
+//     three states to kill the locked/live double-render — see StateHero's
+//     "no sibling HotPickModule anywhere". Left in place deliberately; deleting
+//     it is its own change, not a copy tweak.
 //
 // Compliance the module inherits from the chip, by construction:
-//   Rule 1  — the flame lives in the eyebrow/caption, never inside the chip.
+//   Rule 1  — no flame renders anywhere the user can see; never inside the chip.
 //   Rule 2  — the box is unsigned and neutral until the server scores the pick.
 //   Rule 3  — no green/red during live; the chip's LIVE dot is the only motion.
 //   Rule 9  — the result comes from the server (earned points + winner_team),
@@ -189,10 +197,14 @@ export function HotPickModule({
   );
 }
 
-// The lean in-card frame (picks_open): a small HOTPICK caption + branded flame
-// above the chip/beckon, aligned to the ACTION card padding (no outer margin, no
-// ModuleSection eyebrow). One helper so the caption is identical over the chip
-// and the beckon — only the box swaps, so the caption never shifts.
+// The lean in-card frame — THE path every state renders through. A HOTPICK
+// caption above the chip/beckon, aligned to the ACTION card padding (no outer
+// margin, no ModuleSection eyebrow). One helper so the caption is identical over
+// the chip and the beckon — only the box swaps, so the caption never shifts.
+//
+// The flame that sat beside the word is gone (see header). The caption is now a
+// single Text; the row keeps its flexDirection so the word still baselines the
+// same way and the box below is unmoved.
 function embeddedFrame(colors: any, flush: boolean, child: React.ReactNode) {
   return (
     <View style={[styles.embeddedWrap, flush && styles.embeddedWrapFlush]}>
@@ -200,9 +212,6 @@ function embeddedFrame(colors: any, flush: boolean, child: React.ReactNode) {
         <Text style={[styles.embeddedCaptionText, {color: colors.textTertiary}]}>
           HOTPICK
         </Text>
-        <View style={styles.embeddedCaptionFlame}>
-          <ChipFlameColor size={16} barColor={colors.textPrimary} />
-        </View>
       </View>
       {child}
     </View>
@@ -230,13 +239,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
+  // 1.5× the previous 13, and bold. Weight is a REAL change here, unlike the
+  // ModuleSection eyebrow: that label is Manrope-Bold (a fixed-weight family, so
+  // fontWeight does nothing), whereas this one sets no fontFamily at all and
+  // therefore renders in the platform's system face — which has real weights.
+  // sectionHeaderType supplies no family or weight either; only its tracking,
+  // which the letterSpacing below overrides.
   embeddedCaptionText: {
     ...sectionHeaderType,
-    fontSize: 13,
+    fontSize: 20,
+    fontWeight: '700',
     letterSpacing: 1,
-  },
-  embeddedCaptionFlame: {
-    marginLeft: 6,
   },
   // Dashed beckon, sized to the filled chip so tagging the HotPick doesn't
   // reflow the surface (spec §6.4). Copy is a noun — "PICK YOUR HOTPICK" —
