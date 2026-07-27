@@ -92,10 +92,10 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
   // behind the keyboard but the reserve rode up with the row and reads as a gap
   // between the composer and the keyboard.
   //
-  // So: track the keyboard and drop the reserve while it's up. This is the
-  // padding only — the KAV's behavior values and keyboardVerticalOffset={0} are
-  // deliberately untouched (see the notes on the KAV below); the avoidance
-  // strategy was never the bug.
+  // So: track the keyboard and swap the reserve for a small gap while it's up.
+  // This is the padding only — the KAV's behavior values and
+  // keyboardVerticalOffset={0} are deliberately untouched (see the notes on the
+  // KAV below); the avoidance strategy was never the bug.
   //
   // NOT platform-gated, unlike the same listener pattern in ProfileSetupScreen /
   // PoolWelcomeScreen — those gate to Android because they're synthesising room
@@ -921,8 +921,14 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
 
       {/* Tab-bar reserve only while the keyboard is DOWN — see the note by the
           keyboard listener above. With the keyboard up the row sits on the
-          keyboard, so the reserve would be a gap. */}
-      <View style={[styles.inputRow, {paddingBottom: keyboardUp ? 0 : navReserve}]}>
+          keyboard, so the full reserve would be a gap; spacing.sm is breathing
+          room, so the composer reads as deliberately placed rather than flush
+          against the keyboard by accident. */}
+      <View
+        style={[
+          styles.inputRow,
+          {paddingBottom: keyboardUp ? spacing.sm : navReserve},
+        ]}>
         <TextInput
           style={styles.input}
           placeholder="Talk trash..."
