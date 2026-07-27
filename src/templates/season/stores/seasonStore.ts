@@ -261,11 +261,30 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       // `games` (BigGames / WeekSection / PicksOpenHero / the Picks screen).
       // The Board is unaffected either way: it reads allWeekGames[week].
       const sameWeek = get().currentWeek === week;
-      set(state => ({games: sameWeek ? cached : state.games, isLoading: false}));
+      set(state => ({
+        games: sameWeek ? cached : state.games,
+        // A background warm of ANOTHER week must not clear the viewed week's
+        // spinner out from under it (Home warms the prior week for the RECAP
+        // matchup while this week may still be loading).
+        isLoading: sameWeek ? false : state.isLoading,
+      }));
       return;
     }
 
-    set({isLoading: true});
+    // Does THIS call own the screen's spinner? Only when both hold:
+    //   • it's the week being VIEWED — a background warm of another week must
+    //     never blank the list the user is looking at
+    //   • nothing is cached for that week yet — i.e. a genuine first load
+    // Otherwise we already have games on screen, so we refresh UNDERNEATH and
+    // swap the data in when it lands. This is the flash fix: the live-game
+    // bypass above (correctly) skips the cache all Sunday, so without this every
+    // return to the Picks tab replaced the whole list with a spinner.
+    // NOTE this does not weaken the live-score path — scores arrive through
+    // subscribeToGameScores and patch the store directly; they never come here.
+    const ownsSpinner =
+      get().currentWeek === week && (get().allWeekGames[week]?.length ?? 0) === 0;
+
+    if (ownsSpinner) set({isLoading: true});
     try {
       const {data} = await supabase
         .from('season_games')
@@ -291,7 +310,10 @@ export const useSeasonStore = create<SeasonState>((set, get) => ({
       // the screen will just show no games rather than spin forever.
       console.warn('[seasonStore] fetchWeekGames failed', err);
     } finally {
-      set({isLoading: false});
+      // Still unconditional for the spinner we RAISED — a failed fetch can
+      // never leave it stuck. Scoped to that case so a refresh-underneath call
+      // can't clear a genuine first-load spinner belonging to another fetch.
+      if (ownsSpinner) set({isLoading: false});
     }
   },
 
