@@ -79,11 +79,13 @@ export interface ModuleSectionProps {
    * An emphasised WORD closing the label — the WEEK eyebrow's "WEEK 7: COMPLETE",
    * where COMPLETE carries the weight and the week reads as its subject.
    *
-   * It's the ACCENT that stays bold and the base that lightens to regular,
-   * because only two Manrope faces ship (Regular + Bold): there is no
-   * bolder-than-bold to reach for without adding a font file, which would make
-   * a copy tweak a native change. Same size, tracking and baseline either way —
-   * only the weight differs.
+   * The base label keeps its Manrope bold; the accent renders in the DISPLAY
+   * face — heavy italic (800) at the label's own size. That's how it gets
+   * heavier than bold at all: Manrope ships two static faces (Regular + Bold)
+   * and a fontWeight override does nothing on a fixed-weight family, whereas
+   * displayType.display is the SYSTEM font, which has real weights. It's also
+   * the treatment `status` (PICKS LOCKED) already uses in this same row, so the
+   * emphasis is the row's existing voice rather than a new one.
    */
   labelAccent?: string | null;
   /** Adds the chevron and makes the whole row a toggle. Collapsed by default. */
@@ -144,16 +146,16 @@ export function ModuleSection({
       <View style={styles.titleGroup}>
         <Text
           style={[
-            // With an accent the base steps back to regular so the accent is
-            // the bold one — see labelAccent.
-            labelAccent ? bodyType.regular : bodyType.bold,
+            bodyType.bold,
             styles.label,
             {color: emphasis ? colors.textPrimary : colors.textTertiary},
           ]}
           numberOfLines={1}>
           {label}
           {labelAccent ? (
-            <Text style={bodyType.bold}>{` ${labelAccent}`}</Text>
+            <Text style={[displayType.display, styles.labelAccent]}>
+              {` ${labelAccent}`}
+            </Text>
           ) : null}
         </Text>
 
@@ -269,6 +271,13 @@ const styles = StyleSheet.create({
     // twice the size it opens into a gap. Scaled down proportionally.
     letterSpacing: 0.9,
     flexShrink: 1,
+  },
+  // The emphasised closing word (COMPLETE). Size is INHERITED from the label so
+  // the two halves stay one line at one scale; only the face changes. Tracking
+  // matches `status` — the row's other display-face text at this size — rather
+  // than the face's own −0.5, which is tuned for far larger figures.
+  labelAccent: {
+    letterSpacing: 0.3,
   },
   // The flame sits just past the last glyph of the word.
   labelTrailing: {

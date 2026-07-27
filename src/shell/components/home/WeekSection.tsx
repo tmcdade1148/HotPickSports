@@ -64,8 +64,9 @@ export function WeekSection({row, children}: WeekSectionProps) {
   // result is not shouted in the eyebrow: during settling it isn't final, and at
   // complete the recap-hero carries it, so the week appears exactly ONCE down the
   // screen. complete reads "WEEK 7: COMPLETE" (ACTION between-weeks §7) — the
-  // week names the subject, and COMPLETE carries the weight as the eyebrow's
-  // accent (see ModuleSection's labelAccent).
+  // week names the subject in the label's own bold, and COMPLETE carries the
+  // emphasis in the display face (heavy italic) as the eyebrow's accent (see
+  // ModuleSection's labelAccent).
   const isPlayoffs = PLAYOFF_PHASES.includes(String(currentPhase));
   const betweenWeeks = row === 'settling' || row === 'complete';
   const isComplete = row === 'complete';
