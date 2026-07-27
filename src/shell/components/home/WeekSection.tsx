@@ -63,12 +63,14 @@ export function WeekSection({row, children}: WeekSectionProps) {
   // Between-weeks (settling / complete) show the WEEK label ONLY — no value. The
   // result is not shouted in the eyebrow: during settling it isn't final, and at
   // complete the recap-hero carries it, so the week appears exactly ONCE down the
-  // screen. complete appends "COMPLETE" to the label (ACTION between-weeks §7).
+  // screen. complete appends "IS COMPLETE" to the label (ACTION between-weeks
+  // §7) — it reads as a sentence about the week ("WEEK 7 IS COMPLETE") rather
+  // than a status tag stapled to a number.
   const isPlayoffs = PLAYOFF_PHASES.includes(String(currentPhase));
   const betweenWeeks = row === 'settling' || row === 'complete';
   const label =
     row === 'complete'
-      ? `${sectionWeekLabel(currentWeek, isPlayoffs)} COMPLETE`
+      ? `${sectionWeekLabel(currentWeek, isPlayoffs)} IS COMPLETE`
       : sectionWeekLabel(currentWeek, isPlayoffs);
 
   return (
