@@ -49,6 +49,14 @@ interface InviteCodeRow {
   created_at: string;
 }
 
+/**
+ * Welcome-message prompt. A PROMPT, not a sample: the previous copy
+ * ("Welcome to the Contest! Here's how we play…") read as a draft to keep, which
+ * is the same "words in the Gaffer's mouth" problem as the Chirps pre-fill.
+ * The ellipsis is one character (U+2026).
+ */
+const WELCOME_PLACEHOLDER = 'Your welcome message here…';
+
 export function PoolSettingsScreen() {
   const {colors} = useTheme();
   const styles = createStyles(colors);
@@ -146,6 +154,11 @@ export function PoolSettingsScreen() {
     pool?.welcome_message ?? '',
   );
   const [savingWelcome, setSavingWelcome] = useState(false);
+  // Blanks the welcome placeholder while the field has focus, so tapping in
+  // leaves a genuinely empty box to type into rather than ghost text to read
+  // around. Restored on blur — and only visible then if the field is still
+  // empty, which the placeholder handles on its own.
+  const [welcomeFocused, setWelcomeFocused] = useState(false);
   const [saving, setSaving] = useState(false);
   const [broadcastVisible, setBroadcastVisible] = useState(false);
 
@@ -674,8 +687,13 @@ export function PoolSettingsScreen() {
           onChangeText={setWelcomeMessage}
           maxLength={500}
           multiline
-          placeholder="Welcome to the Contest! Here's how we play…"
+          // Empty while focused — see welcomeFocused. The old copy was a
+          // sample welcome, which read as something to keep rather than a
+          // prompt to write your own.
+          placeholder={welcomeFocused ? '' : WELCOME_PLACEHOLDER}
           placeholderTextColor={colors.textSecondary}
+          onFocus={() => setWelcomeFocused(true)}
+          onBlur={() => setWelcomeFocused(false)}
           textAlignVertical="top"
         />
         <View style={styles.welcomeFooter}>
@@ -693,6 +711,25 @@ export function PoolSettingsScreen() {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Communication — MOVED here from below Privacy so it sits directly
+            under Welcome Message: the auto-welcome and a broadcast are the two
+            ways the Gaffer talks to the Contest, so they read as one group.
+            Behaviour is unchanged — same button, same state, same composer.
+            BroadcastComposer itself stays mounted outside the ScrollView (it's a
+            modal), so only this trigger moved.
+
+            Club Pool admin tools (perk editor + partner broadcast) live in
+            ClubAdminScreen (Settings → Club Admin) — reachable from there for
+            any user organizing a Club Pool. "Add/Edit Clubs" is in the Club
+            Rosters section above. */}
+        <Text style={styles.sectionTitle}>Communication</Text>
+        <TouchableOpacity
+          style={[styles.broadcastButton, {borderColor: accentColor}]}
+          onPress={() => setBroadcastVisible(true)}>
+          <Megaphone size={18} color={accentColor} />
+          <Text style={[styles.broadcastText, {color: accentColor}]}>Send Broadcast</Text>
+        </TouchableOpacity>
 
         {/* Assistant Gaffers (Directors on a Club Pool) — the Gaffer adds
             helpers by email; they get the same Gaffer Tools minus this
@@ -912,20 +949,9 @@ export function PoolSettingsScreen() {
             label was vestigial. Privacy posture is communicated at
             Create-time + on the empty-state hero instead. */}
 
-        {/* Communication & Moderation */}
-        <Text style={styles.sectionTitle}>Communication</Text>
-        <TouchableOpacity
-          style={[styles.broadcastButton, {borderColor: accentColor}]}
-          onPress={() => setBroadcastVisible(true)}>
-          <Megaphone size={18} color={accentColor} />
-          <Text style={[styles.broadcastText, {color: accentColor}]}>Send Broadcast</Text>
-        </TouchableOpacity>
-
-        {/* Club Pool admin tools (perk editor + partner broadcast)
-            moved to ClubAdminScreen (Settings → Club Admin). Reachable
-            from there for any user organizing a Club Pool. The
-            "Add/Edit Clubs" button now lives in the Club Rosters
-            section at the top of this screen. */}
+        {/* Communication moved UP to sit directly under Welcome Message —
+            both are "what you say to your Contest", so they belong together.
+            Moderation stays here. */}
 
         <Text style={styles.sectionTitle}>Moderation</Text>
         <TouchableOpacity
