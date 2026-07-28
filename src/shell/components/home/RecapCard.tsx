@@ -101,6 +101,18 @@ export function RecapCard({
   return (
     <View style={[styles.card, {backgroundColor: colors.surface}]}>
       <View style={styles.body}>
+        {/* MISSED WEEK — no picks submitted, scored 0 by the finalizer. The
+            HotPick and PICKS rows would both be "0 of 0", which reads as a
+            played week that went badly. One honest line instead. Stated, never
+            scolded: no "you missed out", no lost-value framing. The footer is
+            unchanged and already renders the 0 in neutral ink — a missed week
+            is not a loss, so it never takes a result colour. */}
+        {data.recap.isNoShow ? (
+          <Text style={[bodyType.regular, styles.noPicks, {color: colors.textSecondary}]}>
+            No picks submitted this week
+          </Text>
+        ) : (
+          <>
         {/* No HotPick designated that week → the row and the matchup drop out
             entirely. A "—" here would imply a pick that didn't resolve.
             Result line + matchup are ONE unit with no gap between them (the
@@ -178,6 +190,8 @@ export function RecapCard({
           </Text>
           <View style={styles.suffix} />
         </View>
+          </>
+        )}
       </View>
 
       {/* The week's total, on the AMBER bar (colors.secondary — constant in both
@@ -224,6 +238,12 @@ const styles = StyleSheet.create({
   },
   emptyDash: {
     fontSize: 28,
+  },
+  // The missed-week line. Sized with the card's body copy, not the display
+  // face — it's a statement of fact, not a headline.
+  noPicks: {
+    fontSize: 14,
+    paddingVertical: 2,
   },
   row: {
     flexDirection: 'row',

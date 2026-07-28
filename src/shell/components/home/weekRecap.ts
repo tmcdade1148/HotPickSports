@@ -40,6 +40,12 @@ export type WeekRow = {
   totalPicks: number;
   isHotPickCorrect: boolean | null;
   hotPickRank: number | null;
+  /**
+   * The week was MISSED — no picks, scored 0 by the finalizer. NOT the same as
+   * a played week that netted 0; both carry `total: 0`, and only this tells
+   * them apart. HISTORY draws an X for one and a baseline pill for the other.
+   */
+  isNoShow: boolean;
 };
 
 /** Playoff rounds read as rounds, not week numbers. */
@@ -116,10 +122,13 @@ export interface RecapData {
  *   otherwise   → the most recent FINISHED week (currentWeek − 1)
  * Returns null when there's no scored week at/under the cutoff.
  *
- * A missed week is ABSENT from `recentWeeks` (loadRecentWeeks reads only the
- * season_user_totals rows that exist, and no 0 row is written for a week with no
- * picks), so this silently falls back to the prior week. Representing a missed
- * week as a scored 0 is a backend change, out of scope here.
+ * A missed week USED to be absent from `recentWeeks` — no row existed, so this
+ * fell through to the prior week and the recap showed a stale one. That was the
+ * bug behind the Missed Week Zero spec. `finalize_week_for_all_users` now writes
+ * a real 0 row with is_no_show, so the missed week IS in `recentWeeks` and is
+ * selected here like any other. The fallback is gone by construction: there is
+ * no longer a hole to fall through. Nothing here special-cases it — a no-show is
+ * simply the latest week at or under the cutoff, and it wins on `week`.
  */
 export function selectRecap(
   recentWeeks: WeekRow[],

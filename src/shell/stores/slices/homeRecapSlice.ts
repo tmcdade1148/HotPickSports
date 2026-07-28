@@ -149,8 +149,13 @@ export const createHomeRecapSlice = (set: Set): HomeRecapSlice => ({
 
     let query = supabase
       .from('season_user_totals')
+      // is_no_show is load-bearing for display, not decoration: a MISSED week and
+      // a week that was played and netted exactly zero both arrive as
+      // week_points 0. Without this flag the two are indistinguishable, and
+      // HISTORY would draw the same nothing for "I wasn't here" and "I was here
+      // and it came to nothing".
       .select(
-        'week, week_points, correct_picks, total_picks, is_hotpick_correct, hotpick_rank',
+        'week, week_points, correct_picks, total_picks, is_hotpick_correct, hotpick_rank, is_no_show',
       )
       .eq('user_id', userId)
       .eq('competition', competition);
@@ -165,6 +170,7 @@ export const createHomeRecapSlice = (set: Set): HomeRecapSlice => ({
       total_picks: number | null;
       is_hotpick_correct: boolean | null;
       hotpick_rank: number | null;
+      is_no_show: boolean | null;
     }>;
     // Per-week earned is `week_points`. `playoff_points` is NOT a separate
     // bucket — the scoring fn sets it equal to week_points for weeks ≥ 19 so
@@ -177,6 +183,9 @@ export const createHomeRecapSlice = (set: Set): HomeRecapSlice => ({
       totalPicks:       r.total_picks ?? 0,
       isHotPickCorrect: r.is_hotpick_correct,
       hotPickRank:      r.hotpick_rank,
+      // Null-safe: rows written before the flag existed, and any row the
+      // scorer (rather than the finalizer) created, read as "played".
+      isNoShow:         r.is_no_show === true,
     }));
 
     // HotPick record, derived from the SAME rows rather than its own query.

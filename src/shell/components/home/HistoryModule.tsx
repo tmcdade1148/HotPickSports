@@ -58,6 +58,16 @@ const MIN_BAR = 4;            // a ±1 week still has to be visible
 const LABEL_FITS_INSIDE = 20;
 // One line of that number, for the room a zone reserves when it moves outside.
 const OUTSIDE_LABEL_H = 14;
+// ── The two "nothing" weeks, which must never look alike ──
+// A week that was PLAYED and netted exactly zero (8 correct picks against a
+// wrong rank-8 HotPick) draws a thin pill on the baseline: "I was here and it
+// came to nothing". As a zero-height bar it would be indistinguishable from a
+// week that was skipped. Its 0 sits ABOVE the pill — 4px cannot hold a numeral,
+// so this is a deliberate exception to the label-inside rule.
+const ZERO_PILL_H = 4;
+// A week that was MISSED (is_no_show) draws an X on the axis and no bar at all:
+// "I wasn't here". This is the room its zone reserves for that mark.
+const NO_SHOW_MARK_H = 14;
 
 /** Pixel height for a points magnitude, floored so ±1 shows and capped at the zone. */
 function barHeight(points: number): number {
@@ -141,13 +151,25 @@ export function HistoryModule() {
     let maxNeg = 0;
     let outsidePos = false;
     let outsideNeg = false;
+    // Neither "nothing" week contributes a bar, but both still need room above
+    // the axis — the X for a missed week, and the pill PLUS its label for a
+    // played zero. Without reserving it they clip against the zone.
+    let hasNoShow = false;
+    let hasZero = false;
     for (const c of vis) {
       if (c.kind !== 'week' || !c.data || c.week > settledThrough) continue;
+      // Checked BEFORE the totalPicks guard: a no-show has totalPicks 0 and
+      // would otherwise be skipped entirely, taking its X's room with it.
+      if (c.data.isNoShow) {
+        hasNoShow = true;
+        continue;
+      }
       if (c.data.totalPicks <= 0) continue;
       const t = c.data.total;
       const short = barHeight(t) < LABEL_FITS_INSIDE;
       // A settled 0 has no bar at all, so its number joins the positives.
       if (t >= 0) {
+        if (t === 0) hasZero = true;
         if (t > maxPos) maxPos = t;
         if (short) outsidePos = true;
       } else {
@@ -156,7 +178,11 @@ export function HistoryModule() {
       }
     }
     return {
-      posH: barHeight(maxPos) + (outsidePos ? OUTSIDE_LABEL_H : 0),
+      posH: Math.max(
+        barHeight(maxPos) + (outsidePos ? OUTSIDE_LABEL_H : 0),
+        hasZero ? ZERO_PILL_H + OUTSIDE_LABEL_H : 0,
+        hasNoShow ? NO_SHOW_MARK_H : 0,
+      ),
       negH: barHeight(maxNeg) + (outsideNeg ? OUTSIDE_LABEL_H : 0),
     };
   }, [cells, settledThrough]);
@@ -220,12 +246,18 @@ export function HistoryModule() {
               }
 
               const w = cell.data;
+              // MISSED week — the finalizer wrote a real 0 row with is_no_show.
+              // Drawn as an X, never as a bar of any height.
+              const isNoShow = w?.isNoShow === true && cell.week <= settledThrough;
               // A slot draws a bar only once its week is SCORED. That covers
               // three cases with one rule: the current week before it settles,
               // a week the Player skipped, and a week still being scored.
               const scored =
                 w != null && w.totalPicks > 0 && cell.week <= settledThrough;
               const total = scored && w ? w.total : 0;
+              // PLAYED and netted exactly zero — the pill case. Distinct from
+              // the no-show above, and from an unscored week (scored === false).
+              const zeroPill = scored && total === 0;
               const barColor =
                 w?.isHotPickCorrect === true
                   ? colors.primary
@@ -260,13 +292,34 @@ export function HistoryModule() {
               return (
                 <View key={`${cell.week}-${i}`} style={[styles.slot, {width: slotW}]}>
                   <View style={[styles.posZone, {height: posH}]}>
-                    {/* A settled 0 has no bar, so its number goes above the
-                        axis with the positives. */}
-                    {total >= 0 && outsideLabel}
-                    {total > 0 && (
-                      <View style={[styles.bar, {height: mag, backgroundColor: barColor}]}>
-                        {insideLabel}
-                      </View>
+                    {/* MISSED: an X sitting on the axis, and nothing else — no
+                        bar, no number. "I wasn't here." */}
+                    {isNoShow ? (
+                      <Text
+                        style={[displayType.display, styles.noShowMark, {color: colors.textTertiary}]}
+                        numberOfLines={1}>
+                        ✕
+                      </Text>
+                    ) : (
+                      <>
+                        {/* A settled 0 has no bar, so its number goes above the
+                            axis with the positives. */}
+                        {total >= 0 && outsideLabel}
+                        {/* A played zero draws the thin pill instead of nothing,
+                            so it can't be mistaken for a week never played. */}
+                        {(total > 0 || zeroPill) && (
+                          <View
+                            style={[
+                              styles.bar,
+                              {
+                                height: zeroPill ? ZERO_PILL_H : mag,
+                                backgroundColor: barColor,
+                              },
+                            ]}>
+                            {!zeroPill && insideLabel}
+                          </View>
+                        )}
+                      </>
                     )}
                   </View>
                   <View style={[styles.axis, {backgroundColor: colors.border}]} />
@@ -341,6 +394,12 @@ const styles = StyleSheet.create({
     ...monoType.regular,
     fontSize: 11,
     lineHeight: 14,
+  },
+  // Sits on the axis in place of a bar. lineHeight matches NO_SHOW_MARK_H so
+  // the room the zone reserves is exactly the room this takes.
+  noShowMark: {
+    fontSize: 12,
+    lineHeight: NO_SHOW_MARK_H,
   },
   slotLabel: {
     fontSize: 12,

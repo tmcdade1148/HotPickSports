@@ -317,6 +317,13 @@ export interface GlobalState {
     totalPicks: number;
     isHotPickCorrect: boolean | null;
     hotPickRank: number | null;
+    /**
+     * The week was MISSED — no picks submitted, scored 0 by the finalizer.
+     * Distinct from a played week that netted 0 (8 correct picks against a
+     * wrong rank-8 HotPick), which this leaves false. Both arrive with
+     * `total: 0`, so nothing downstream can tell them apart without it.
+     */
+    isNoShow: boolean;
   }>;
   loadRecentWeeks: (userId: string, competition: string) => Promise<void>;
 

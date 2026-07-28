@@ -94,8 +94,15 @@ export function RecapModule() {
   // the footer's "WEEK 7 TOTAL:" can't drift apart.
   const weekLabel = sectionWeekLabel(data.recap.week, isPlayoffs);
 
+  // A missed week has to say so ON THE EYEBROW, because this module is
+  // COLLAPSIBLE: collapsed, the eyebrow is all there is, and a bare "0" reads
+  // as a week played badly rather than a week not played.
   return (
-    <ModuleSection label={`${weekLabel} RECAP`} value={data.total} collapsible>
+    <ModuleSection
+      label={`${weekLabel} RECAP`}
+      labelAccent={data.recap.isNoShow ? '· NO PICKS' : undefined}
+      value={data.total}
+      collapsible>
       <RecapCard data={data} team={team} matchup={matchup} weekLabel={weekLabel} />
     </ModuleSection>
   );
