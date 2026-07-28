@@ -14,6 +14,20 @@ import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 import type {ThemeColors} from '@shell/theme';
 
+/**
+ * Is the Pricing section shown? FALSE — Gaffers are free this season.
+ *
+ * HIDDEN, NOT DELETED. The whole AccordionSection (the tiers, the "only the
+ * Gaffer pays" note, the Founding 100 line) is intact below; flip this to true
+ * when pricing restarts mid-September and it comes back exactly as it was.
+ *
+ * The `: boolean` annotation is deliberate: without it TypeScript narrows the
+ * type to `false`, which makes the guard below a provably-constant condition
+ * that lint rules flag and readers "tidy away". Leave it. Same pattern as
+ * SHOW_WELCOME_MESSAGE in PoolSettingsScreen.
+ */
+const SHOW_PRICING: boolean = false;
+
 interface SectionProps {
   title: string;
   children: React.ReactNode;
@@ -102,21 +116,30 @@ export function InstructionsScreen() {
           <Text style={[styles.body, {color: colors.textSecondary, marginTop: spacing.sm}]}>
             Picks open a few days before the first game of the week.
           </Text>
+          {/* WHOLE-WEEK lock. The single source is
+              @templates/season/utils/weekLock.ts \u2014 read-only once
+              now >= MIN(kickoff_at), mirroring the server's enforce_pick_lock
+              and get_week_lock_time. "Never a per-game lock_at." This copy
+              previously described a per-game lock, which was the opposite of
+              what the app and the server actually do. */}
           <Text style={[styles.bulletItem, {color: colors.textSecondary}]}>
-            {'\u2022'} Every game locks at its own kickoff time.
+            {'\u2022'} The entire week locks the moment the first game kicks off {'\u2014'} usually Thursday night.
           </Text>
           <Text style={[styles.bulletItem, {color: colors.textSecondary}]}>
-            {'\u2022'} Picks for later games stay editable until those games kick off \u2014 even after earlier games have already started.
+            {'\u2022'} Sunday and Monday games lock at that same moment, not at their own kickoff.
+          </Text>
+          <Text style={[styles.bulletItem, {color: colors.textSecondary}]}>
+            {'\u2022'} Your exact deadline is always on the Home screen.
           </Text>
           <Text style={[styles.body, {color: colors.textSecondary, marginTop: spacing.sm}]}>
-            You can edit any unlocked pick as many times as you want right up until it locks.
+            Until the lock, change your picks as often as you like. After it, the week is set.
           </Text>
         </AccordionSection>
 
         <AccordionSection title="The HotPick" colors={colors}>
           <Text style={[styles.body, {color: colors.textSecondary}]}>
             Every week, designate one of your picks as your HotPick. Each game has a
-            rank (1-10) based on how competitive it is.
+            rank from 1 to 16, based on how competitive it is.
           </Text>
           <Text style={[styles.bulletItem, {color: colors.textSecondary}]}>
             {'\u2022'} Correct HotPick: earn rank points (e.g., rank 8 = 8 pts)
@@ -127,9 +150,12 @@ export function InstructionsScreen() {
           <Text style={[styles.bulletItem, {color: colors.textSecondary}]}>
             {'\u2022'} All other picks: 1 for correct, 0 for incorrect
           </Text>
+          {/* Compliance: the previous line ("compounds your weekly movement —
+              up or down") dramatised the point deduction, which the legal
+              guardrails flag. States the mechanic plainly instead. */}
           <Text style={[styles.body, {color: colors.textSecondary, marginTop: spacing.sm}]}>
-            Picking higher-ranked games as your HotPick compounds your weekly
-            movement — up or down. Choose with conviction.
+            Your HotPick is your highest-conviction call of the week. Higher-ranked
+            games are worth more.
           </Text>
         </AccordionSection>
 
@@ -208,6 +234,33 @@ export function InstructionsScreen() {
           </Text>
         </AccordionSection>
 
+        {/* Hyphens here are PLAIN ASCII, matching what the Ladder actually
+            renders: SeasonBoardScreen:322 builds its badge as `T-${rank}`. The
+            examples in this copy have to be the same character as the badge
+            they describe, so don't "typographically improve" them to U+2011. */}
+        <AccordionSection title="Ties" colors={colors}>
+          <Text style={[styles.body, {color: colors.textSecondary}]}>
+            All season long, in both weekly and season standings, players on the same
+            total share a place. The Ladder marks it with a T — T-2, T-7.
+          </Text>
+          <Text style={[styles.body, {color: colors.textSecondary, marginTop: spacing.sm}]}>
+            Ties are only broken for the top three. If two or more players finish level
+            on points and that tie decides first, second or third, it comes down to
+            HotPick points: the net total each player earned from their HotPicks across
+            the season. Same total, but one of them used their HotPick conviction to
+            greater effect. That one takes it.
+          </Text>
+          <Text style={[styles.body, {color: colors.textSecondary, marginTop: spacing.sm}]}>
+            If they're still level after that, they finish together. Co-champions,
+            co-runners-up. A tie that survives a whole season has earned it.
+          </Text>
+          <Text style={[styles.body, {color: colors.textSecondary, marginTop: spacing.sm}]}>
+            Everyone below the top three stays co-ranked, all the way down.
+          </Text>
+        </AccordionSection>
+
+        {/* Pricing — HIDDEN, not deleted. See SHOW_PRICING. */}
+        {SHOW_PRICING && (
         <AccordionSection title="Pricing" colors={colors}>
           <Text style={[styles.body, {color: colors.textSecondary}]}>
             HotPick is free to play. Gaffers pay based on Contest size:
@@ -236,6 +289,7 @@ export function InstructionsScreen() {
             Founding 100 Contests are free forever, regardless of size.
           </Text>
         </AccordionSection>
+        )}
 
         <AccordionSection title="Season Phases" colors={colors}>
           <Text style={[styles.body, {color: colors.textSecondary}]}>

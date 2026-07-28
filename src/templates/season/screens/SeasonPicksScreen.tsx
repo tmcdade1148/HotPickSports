@@ -30,7 +30,9 @@ import {DemoIntroModal, DemoScoreModal} from '@shell/components/home/DemoModals'
 // first, then the Sunday 1pm block below it, then 4pm, SNF, MNF. Games not yet
 // started stay in a single "OPEN" group below, ranked by HotPick value (1 → 16)
 // since those are the picks you can still make. A game lifts up only when it
-// kicks off — each game locks at its own kickoff, never before.
+// actually kicks off — that's the GROUPING rule, and it is not the lock rule:
+// picks lock for the WHOLE WEEK at the first kickoff (see weekLock.ts), so games
+// sitting in "OPEN" after that are unstarted, not still pickable.
 // ---------------------------------------------------------------------------
 
 /** Effective HotPick rank for ordering: frozen_rank (locked at deadline) ?? live rank. */
@@ -296,9 +298,10 @@ export function SeasonPicksScreen() {
     [pickCount, hotPickCount, setCurrentWeek],
   );
 
-  // Picks remain interactive through 'live'; individual cards lock per kickoff
-  // (each game locks at its own kickoff). 'locked' state and beyond are fully
-  // locked (all games sit in the started/wave groups).
+  // Phase gate only — does this week_state allow picking at all. It is NOT the
+  // lock: that's weekLocked just below, a WHOLE-WEEK rule (first kickoff seals
+  // the week, never per game). 'live' stays here because the phase permits
+  // interaction; weekLocked is what actually closes the cards.
   const picksAreOpen =
     (weekState === 'picks_open' || weekState === 'live') && currentWeek === dbCurrentWeek;
 
