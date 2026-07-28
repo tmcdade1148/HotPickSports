@@ -57,6 +57,27 @@ interface InviteCodeRow {
  */
 const WELCOME_PLACEHOLDER = 'Your welcome message here…';
 
+/**
+ * Is the Welcome Message section shown? FALSE — the field currently goes
+ * nowhere.
+ *
+ * `pools.welcome_message` has no consumer. The auto-post trigger was dropped on
+ * 18 June (20260618190917_drop_auto_welcome_trigger.sql) and replaced by the
+ * Chirps composer pre-fill, which was itself removed. The column is now only
+ * written and read straight back into the form that wrote it — so a Gaffer
+ * types a welcome, saves it, and nothing happens. Showing that is dishonest.
+ *
+ * HIDDEN, NOT DELETED. The section, its state, the save handler and the
+ * placeholder/focus-clear behaviour are all intact below; flipping this to true
+ * restores it exactly. That is the whole point — when it's wired up properly in
+ * September, this is a one-line change, not an archaeology exercise.
+ *
+ * The `: boolean` annotation is deliberate: without it TypeScript narrows the
+ * type to `false`, which makes the guard below a provably-constant condition
+ * that lint rules flag and readers "tidy away". Leave it.
+ */
+const SHOW_WELCOME_MESSAGE: boolean = false;
+
 export function PoolSettingsScreen() {
   const {colors} = useTheme();
   const styles = createStyles(colors);
@@ -674,43 +695,50 @@ export function PoolSettingsScreen() {
           </>
         )}
 
-        {/* Welcome Message — auto-posted to Chirps as the Gaffer
-            when a new member joins. Sets Contest culture from the
-            first message a recruit sees. */}
-        <Text style={styles.sectionTitle}>Welcome Message</Text>
-        <Text style={styles.welcomeHint}>
-          Posted in {LEXICON.chirps.plural} as you when a new player joins your Contest. Leave blank for no auto-welcome.
-        </Text>
-        <TextInput
-          style={styles.welcomeInput}
-          value={welcomeMessage}
-          onChangeText={setWelcomeMessage}
-          maxLength={500}
-          multiline
-          // Empty while focused — see welcomeFocused. The old copy was a
-          // sample welcome, which read as something to keep rather than a
-          // prompt to write your own.
-          placeholder={welcomeFocused ? '' : WELCOME_PLACEHOLDER}
-          placeholderTextColor={colors.textSecondary}
-          onFocus={() => setWelcomeFocused(true)}
-          onBlur={() => setWelcomeFocused(false)}
-          textAlignVertical="top"
-        />
-        <View style={styles.welcomeFooter}>
-          <Text style={styles.welcomeCount}>
-            {welcomeMessage.length}/500
-          </Text>
-          {hasWelcomeChanged && (
-            <TouchableOpacity
-              style={[styles.saveButton, savingWelcome && styles.saveButtonDisabled]}
-              onPress={handleSaveWelcome}
-              disabled={savingWelcome}>
-              <Text style={styles.saveButtonText}>
-                {savingWelcome ? 'Saving...' : 'Save'}
+        {/* Welcome Message — HIDDEN, not deleted. See SHOW_WELCOME_MESSAGE.
+            Everything below is intact and still wired: flip the flag to bring
+            the whole section back exactly as it was. */}
+        {SHOW_WELCOME_MESSAGE && (
+          <>
+            {/* Auto-posted to Chirps as the Gaffer when a new member joins.
+                Sets Contest culture from the first message a recruit sees.
+                (Currently nothing consumes it — see the flag.) */}
+            <Text style={styles.sectionTitle}>Welcome Message</Text>
+            <Text style={styles.welcomeHint}>
+              Posted in {LEXICON.chirps.plural} as you when a new player joins your Contest. Leave blank for no auto-welcome.
+            </Text>
+            <TextInput
+              style={styles.welcomeInput}
+              value={welcomeMessage}
+              onChangeText={setWelcomeMessage}
+              maxLength={500}
+              multiline
+              // Empty while focused — see welcomeFocused. The old copy was a
+              // sample welcome, which read as something to keep rather than a
+              // prompt to write your own.
+              placeholder={welcomeFocused ? '' : WELCOME_PLACEHOLDER}
+              placeholderTextColor={colors.textSecondary}
+              onFocus={() => setWelcomeFocused(true)}
+              onBlur={() => setWelcomeFocused(false)}
+              textAlignVertical="top"
+            />
+            <View style={styles.welcomeFooter}>
+              <Text style={styles.welcomeCount}>
+                {welcomeMessage.length}/500
               </Text>
-            </TouchableOpacity>
-          )}
-        </View>
+              {hasWelcomeChanged && (
+                <TouchableOpacity
+                  style={[styles.saveButton, savingWelcome && styles.saveButtonDisabled]}
+                  onPress={handleSaveWelcome}
+                  disabled={savingWelcome}>
+                  <Text style={styles.saveButtonText}>
+                    {savingWelcome ? 'Saving...' : 'Save'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </>
+        )}
 
         {/* Communication — MOVED here from below Privacy so it sits directly
             under Welcome Message: the auto-welcome and a broadcast are the two
