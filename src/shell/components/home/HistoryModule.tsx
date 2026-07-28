@@ -65,9 +65,13 @@ const OUTSIDE_LABEL_H = 14;
 // week that was skipped. Its 0 sits ABOVE the pill — 4px cannot hold a numeral,
 // so this is a deliberate exception to the label-inside rule.
 const ZERO_PILL_H = 4;
-// A week that was MISSED (is_no_show) draws an X on the axis and no bar at all:
-// "I wasn't here". This is the room its zone reserves for that mark.
+// A week that was MISSED (is_no_show) draws an X CENTRED ON the axis and no bar
+// at all: "I wasn't here". Straddling the line is the whole point — every bar
+// sits above or below it, so a mark ACROSS it reads as structurally different,
+// no result rather than a small one. Half of it falls in each zone, so both
+// reserve NO_SHOW_HALF rather than either reserving the whole mark.
 const NO_SHOW_MARK_H = 14;
+const NO_SHOW_HALF = NO_SHOW_MARK_H / 2;
 
 /** Pixel height for a points magnitude, floored so ±1 shows and capped at the zone. */
 function barHeight(points: number): number {
@@ -151,9 +155,12 @@ export function HistoryModule() {
     let maxNeg = 0;
     let outsidePos = false;
     let outsideNeg = false;
-    // Neither "nothing" week contributes a bar, but both still need room above
-    // the axis — the X for a missed week, and the pill PLUS its label for a
-    // played zero. Without reserving it they clip against the zone.
+    // Neither "nothing" week contributes a bar, but both still need room. The
+    // played zero needs the pill PLUS its label above the axis; the missed
+    // week's X straddles the axis, so it needs HALF its height on EACH side —
+    // including below, where nothing previously reserved anything. Without the
+    // negative half, an all-positive season collapses negH to 0 and the bottom
+    // of the X lands on the week label beneath it.
     let hasNoShow = false;
     let hasZero = false;
     for (const c of vis) {
@@ -181,9 +188,12 @@ export function HistoryModule() {
       posH: Math.max(
         barHeight(maxPos) + (outsidePos ? OUTSIDE_LABEL_H : 0),
         hasZero ? ZERO_PILL_H + OUTSIDE_LABEL_H : 0,
-        hasNoShow ? NO_SHOW_MARK_H : 0,
+        hasNoShow ? NO_SHOW_HALF : 0,
       ),
-      negH: barHeight(maxNeg) + (outsideNeg ? OUTSIDE_LABEL_H : 0),
+      negH: Math.max(
+        barHeight(maxNeg) + (outsideNeg ? OUTSIDE_LABEL_H : 0),
+        hasNoShow ? NO_SHOW_HALF : 0,
+      ),
     };
   }, [cells, settledThrough]);
 
@@ -291,35 +301,45 @@ export function HistoryModule() {
 
               return (
                 <View key={`${cell.week}-${i}`} style={[styles.slot, {width: slotW}]}>
+                  {/* MISSED WEEK — an X CENTRED ON the axis: half above, half
+                      below, so the line cuts through it. Bars always sit on one
+                      side of the line; a mark across it reads as "no result"
+                      rather than a small one.
+
+                      Anchored to the SLOT, not to the 1px axis View, and
+                      offset by posH. Absolutely-positioned children that spill
+                      outside a parent's bounds are clipped on Android; the slot
+                      is tall enough to contain it, the axis never is. A no-show
+                      draws nothing in either zone below — `scored` is false, so
+                      there is no number and no bar to suppress. */}
+                  {isNoShow && (
+                    <Text
+                      style={[
+                        displayType.display,
+                        styles.noShowMark,
+                        {color: colors.textPrimary, top: posH + 0.5 - NO_SHOW_HALF},
+                      ]}
+                      numberOfLines={1}>
+                      ✕
+                    </Text>
+                  )}
                   <View style={[styles.posZone, {height: posH}]}>
-                    {/* MISSED: an X sitting on the axis, and nothing else — no
-                        bar, no number. "I wasn't here." */}
-                    {isNoShow ? (
-                      <Text
-                        style={[displayType.display, styles.noShowMark, {color: colors.textTertiary}]}
-                        numberOfLines={1}>
-                        ✕
-                      </Text>
-                    ) : (
-                      <>
-                        {/* A settled 0 has no bar, so its number goes above the
-                            axis with the positives. */}
-                        {total >= 0 && outsideLabel}
-                        {/* A played zero draws the thin pill instead of nothing,
-                            so it can't be mistaken for a week never played. */}
-                        {(total > 0 || zeroPill) && (
-                          <View
-                            style={[
-                              styles.bar,
-                              {
-                                height: zeroPill ? ZERO_PILL_H : mag,
-                                backgroundColor: barColor,
-                              },
-                            ]}>
-                            {!zeroPill && insideLabel}
-                          </View>
-                        )}
-                      </>
+                    {/* A settled 0 has no bar, so its number goes above the
+                        axis with the positives. */}
+                    {total >= 0 && outsideLabel}
+                    {/* A played zero draws the thin pill instead of nothing, so
+                        it can't be mistaken for a week never played. */}
+                    {(total > 0 || zeroPill) && (
+                      <View
+                        style={[
+                          styles.bar,
+                          {
+                            height: zeroPill ? ZERO_PILL_H : mag,
+                            backgroundColor: barColor,
+                          },
+                        ]}>
+                        {!zeroPill && insideLabel}
+                      </View>
                     )}
                   </View>
                   <View style={[styles.axis, {backgroundColor: colors.border}]} />
@@ -395,9 +415,17 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 14,
   },
-  // Sits on the axis in place of a bar. lineHeight matches NO_SHOW_MARK_H so
-  // the room the zone reserves is exactly the room this takes.
+  // Straddles the axis in place of a bar. `top` is applied inline because it
+  // depends on posH. left/right + textAlign centre it across the slot, which
+  // alignItems can't do for an absolutely-positioned child. lineHeight matches
+  // NO_SHOW_MARK_H so the space each zone reserves is exactly what this takes.
+  // Colour is textPrimary, not textTertiary: a deliberate mark on the timeline,
+  // not a faint absence — and it flips with the theme.
   noShowMark: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    textAlign: 'center',
     fontSize: 12,
     lineHeight: NO_SHOW_MARK_H,
   },
