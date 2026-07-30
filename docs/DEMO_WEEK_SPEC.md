@@ -1,6 +1,6 @@
 # Demo Week — Interactive Onboarding Spec
 
-**Status:** Draft for review (2026-06-01)
+**Status:** BUILT — shipped in Home Slices 7b–7f. §10 (preseason dogfooding on nfl_2026 / the Sept 1 purge) is SUPERSEDED by docs/PRESEASON_ISOLATION_SPEC.md — do not implement §10.
 **Build target:** Before NFL Season 2 launch (Sept 2026)
 **Author:** Claude session `claude/sweet-wright-cCUZa`
 

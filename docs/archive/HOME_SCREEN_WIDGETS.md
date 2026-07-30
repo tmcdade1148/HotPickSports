@@ -1,5 +1,7 @@
 # HotPick Sports — Home Screen Smart Widgets Overview
 
+> **⚠️ SUPERSEDED by [docs/HOME_MODULE_MAP.md](../HOME_MODULE_MAP.md)** — describes the pre-rebuild Home architecture (max-2 event cards, pool switcher in card header). Kept for history; do not implement.
+
 **Last updated:** March 9, 2026
 **Purpose:** Reference doc for developing Home Screen widgets without breaking existing work.
 

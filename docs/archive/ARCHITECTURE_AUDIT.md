@@ -1,5 +1,7 @@
 # HotPick Sports — Architecture Audit & Drift Report
 
+> **⚠️ SUPERSEDED by [docs/LAUNCH_READINESS.md](../LAUNCH_READINESS.md) (2026-06-25)** — fully absorbed into the launch register. Point-in-time report, kept for history.
+
 **Generated:** 2026-06-08 · **Branch:** `claude/hotpick-architecture-audit-cAlbr`
 **Supabase project:** `mzqtrpdiqhopjmxjccwy` (PostgreSQL 17, read-only inspection)
 **Method:** Live schema (`list_tables` verbose, `list_migrations`, `list_edge_functions`,
