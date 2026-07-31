@@ -54,12 +54,8 @@ Deno.serve(async (req) => {
 
     const seasonYear = Number(cfg.season_year ?? 2026);
 
-    // Preseason isolation: espn_season_type is a preseason-only config key ('1' =>
-    // preseason). Unlike the two ESPN-driven functions, this one reads from the
-    // Odds API, whose single `americanfootball_nfl` sport key already covers
-    // preseason games — there is no seasontype parameter to pin. So the branch
-    // reads the key for parity/observability and the fetch URL is UNCHANGED. Absent
-    // (every regular competition, incl. nfl_2026) => isPreseason=false, same result.
+    // The Odds API publishes NFL preseason under a separate sport key
+    // (`americanfootball_nfl_preseason`); the regular key matches no preseason game.
     const espnSeasonType = String(cfg.espn_season_type ?? "").replace(/^"|"$/g, "");
     const isPreseason = espnSeasonType === "1";
 
@@ -79,8 +75,12 @@ Deno.serve(async (req) => {
       return json({ error: "Missing ODDS_API_KEY" }, 500);
     }
 
+    const sportKey = isPreseason
+      ? "americanfootball_nfl_preseason"
+      : "americanfootball_nfl";
+
     const oddsRes = await fetch(
-      `https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?apiKey=${oddsApiKey}&regions=us&markets=spreads,h2h&oddsFormat=american`
+      `https://api.the-odds-api.com/v4/sports/${sportKey}/odds/?apiKey=${oddsApiKey}&regions=us&markets=spreads,h2h&oddsFormat=american`
     );
     if (!oddsRes.ok) throw new Error(`Odds API error ${oddsRes.status}`);
     const oddsData = await oddsRes.json();
@@ -104,7 +104,12 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      const bookmaker = oddsGame.bookmakers?.[0];
+      // Preseason books post late and unevenly: take the first bookmaker that
+      // actually carries a usable market, not just the first in the list. Falls
+      // back to [0] so regular-season behaviour is byte-identical.
+      const bookmaker = oddsGame.bookmakers?.find((b: any) =>
+        b.markets?.some((m: any) => m.key === "spreads" || m.key === "h2h")
+      ) ?? oddsGame.bookmakers?.[0];
       if (!bookmaker) { skipped++; continue; }
 
       const spreadsMarket = bookmaker.markets?.find((m: any) => m.key === "spreads");
@@ -128,15 +133,23 @@ Deno.serve(async (req) => {
     // §5b — odds present = games updated this run plus those whose existing odds
     // were preserved. The gate (§5c) compares odds_count against odds_expected.
     const oddsPresent = updated + preserved;
+    // A run that priced nothing is a failure, not a success with a zero count —
+    // silence here is what lets a bad slate reach the (immutable) rank freeze.
+    const allMissing = oddsPresent === 0 && games.length > 0;
+
     await markReadiness(competition, week, {
-      odds_status: "ok",
+      odds_status: allMissing ? "failed" : "ok",
       odds_count: oddsPresent,
       odds_expected: games.length,
-      odds_error: oddsPresent < games.length ? `${games.length - oddsPresent} game(s) missing odds` : null,
+      odds_error: allMissing
+        ? `No odds matched for ${games.length} game(s) — check sport key ${sportKey}`
+        : (oddsPresent < games.length
+            ? `${games.length - oddsPresent} game(s) missing odds`
+            : null),
       odds_at: new Date().toISOString(),
     });
 
-    return json({ success: true, competition, season_year: seasonYear, week, preseason: isPreseason, updated, skipped, preserved, total: games.length, errors,
+    return json({ success: true, competition, season_year: seasonYear, week, preseason: isPreseason, sportKey, updated, skipped, preserved, total: games.length, errors,
       apiUsage: { used: oddsRes.headers.get("x-requests-used"), remaining: oddsRes.headers.get("x-requests-remaining") } }, 200);
   } catch (err) {
     if (week) await markReadiness(competition, week, { odds_status: "failed", odds_error: String(err), odds_at: new Date().toISOString() });
