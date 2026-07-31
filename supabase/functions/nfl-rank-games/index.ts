@@ -70,6 +70,11 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     competition = body.competition ?? "nfl_2026";
     const force = Boolean(body.force);
+    // silent: skip the "picks locked" SmackTalk broadcast. Used when re-ranking
+    // PAST weeks during an odds backfill so we don't spam pools with backdated
+    // lock messages. Live weekly cron passes no `silent`, so its behavior is
+    // unchanged.
+    const silent = Boolean(body.silent);
 
     const { data: configRows } = await supabase
       .from("competition_config").select("key, value").eq("competition", competition);
@@ -106,6 +111,29 @@ Deno.serve(async (req) => {
 
     const baseRanked = rankGames(games);
     const ranked = applyPlayoffEscalation(baseRanked, week);
+
+    // A slate where every game has the same win probability carries no
+    // information: competitiveness ties, both sort keys tie, and the
+    // comparator falls through to kickoff time, producing a reverse-
+    // chronological ranking that looks valid. frozen_rank is immutable
+    // (Hard Rule #6), so refuse to write rather than freeze nonsense.
+    const probs = games.map((g) => homeWinProb(g));
+    const distinctProbs = new Set(probs.map((p) => p.toFixed(6))).size;
+
+    if (games.length >= 4 && distinctProbs === 1) {
+      await markReadiness(competition, week, {
+        ranks_status: "failed",
+        ranks_error: `Degenerate odds: all ${games.length} games share one`
+          + ` win probability. Ranking would be kickoff order. Refusing`
+          + ` to freeze. Run nfl-fetch-odds, then re-run.`,
+        ranks_at: new Date().toISOString(),
+      });
+      return json({
+        error: "degenerate_odds", competition, week,
+        games: games.length, distinct_win_probabilities: 1,
+      }, 409);
+    }
+
     const errors: string[] = [];
 
     for (const r of ranked) {
@@ -116,8 +144,10 @@ Deno.serve(async (req) => {
     }
 
     // ── SmackTalk: post "picks locked" to all pools with per-pool counts ──
-    const { data: pools } = await supabase
-      .from("pools").select("id").eq("competition", competition).eq("is_archived", false);
+    const { data: pools } = silent
+      ? { data: [] as { id: string }[] }
+      : await supabase
+          .from("pools").select("id").eq("competition", competition).eq("is_archived", false);
 
     if (pools && pools.length > 0) {
       // Count distinct users who submitted picks this week
