@@ -87,8 +87,11 @@ export function getEventsByPriority(
   });
 }
 
-export function getDefaultEvent(visibleCompetitions?: readonly string[]): AnyEventConfig {
-  return getEventsByPriority(visibleCompetitions)[0] ?? worldCup2026;
+export function getDefaultEvent(
+  visibleCompetitions?: readonly string[],
+  now: number = Date.now(),
+): AnyEventConfig {
+  return getEventsByPriority(visibleCompetitions, now)[0] ?? worldCup2026;
 }
 
 // Resolve a registered event by its competition string, ignoring visibility

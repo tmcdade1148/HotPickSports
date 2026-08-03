@@ -111,17 +111,19 @@ export const nflSeason: SeasonConfig = {
  * isolation comes from the competition string, never current_phase).
  * Runs REGULAR phase over 3 weeks with espn_season_type=1.
  *
- * status "active" + an August startDate makes this the boot default
- * for the launch window (getEventsByPriority sorts active first, then
- * startDate ascending). availableUntil retires it automatically at
- * nfl_2026 picks-open, so no second OTA is needed in launch week.
+ * status "upcoming" keeps it OUT of the default sort, so nfl_2026 is the
+ * boot default at all times and an uninvited user never sees this
+ * (REGISTRY-03). The preseason is invite-led: getEventByCompetition
+ * ignores status, so an invite code still switches a player into it, and
+ * that choice now persists across launches. availableUntil still retires
+ * it at nfl_2026 picks-open with no client release.
  */
 export const nflPreseason2026: SeasonConfig = {
   ...nflSeason,
   competition: 'nfl_2026_pre',
   name: 'NFL 2026 Preseason',
   shortName: 'NFL26-PRE',
-  status: 'active',
+  status: 'upcoming',
   startDate: '2026-08-13',
   endDate: '2026-08-29',
   picksOpenDate: '2026-08-11',
