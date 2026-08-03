@@ -6,11 +6,13 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   StyleSheet,
 } from 'react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {supabase} from '@shared/config/supabase';
+import {getEventByCompetition} from '@sports/registry';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 import {FoundingWall} from '@shell/paywall';
@@ -37,6 +39,8 @@ export function CreatePoolScreen({navigation}: any) {
   const user = useGlobalStore(s => s.user);
   const activeSport = useGlobalStore(s => s.activeSport);
   const createPool = useGlobalStore(s => s.createPool);
+  const setActiveSport = useGlobalStore(s => s.setActiveSport);
+  const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
 
   const [poolName, setPoolName] = useState('');
   const [creating, setCreating] = useState(false);
@@ -45,6 +49,12 @@ export function CreatePoolScreen({navigation}: any) {
   // founding season, the server allows it and flags the wall. The Contest
   // already exists; the wall is informational, and dismissing it returns Home.
   const [showFoundingWall, setShowFoundingWall] = useState(false);
+  // Post-create confirmation for a redirected create (REGISTRY-03 Part C).
+  // A redirected create changes nothing on screen — the new Contest lives in
+  // a competition the Player is not viewing — so without this they would
+  // reasonably assume it failed and tap again.
+  const [showSeasonConfirm, setShowSeasonConfirm] = useState(false);
+  const [createdPoolId, setCreatedPoolId] = useState<string | null>(null);
 
   // A time-boxed event can redirect Contest creation to the season it leads
   // into, so a Contest started during the preseason is a regular-season
@@ -80,6 +90,11 @@ export function CreatePoolScreen({navigation}: any) {
         setShowFoundingWall(true);
         return;
       }
+      if (isRedirected) {
+        setCreatedPoolId(result.pool.id);
+        setShowSeasonConfirm(true);
+        return;
+      }
       // Delay navigation to let the store update + HomeScreen re-render settle.
       // Without this, the JoinPoolModule unmount collides with the navigation
       // transition in Fabric's ShadowView diffing, causing a SIGSEGV.
@@ -91,6 +106,31 @@ export function CreatePoolScreen({navigation}: any) {
     } else {
       setError(result.error ?? 'Failed to create Contest. Please try again.');
     }
+  };
+
+  // "Take me to it" — a real switch into the season the Contest was created
+  // in. Part B makes it persist, so the Player is still there tomorrow. This
+  // is a direct setActiveSport, the same silent switch joinPool performs; it
+  // deliberately does NOT fire the Settings switcher's restart alert.
+  const goToNewContest = () => {
+    const target = targetCompetition
+      ? getEventByCompetition(targetCompetition)
+      : undefined;
+    if (target) {
+      setActiveSport(target);
+      // setActiveSport clears activePoolId and reloads the persisted pool for
+      // the target competition asynchronously. createPool already wrote this
+      // id under that competition's key, so set it directly rather than
+      // racing the reload.
+      if (createdPoolId) setActivePoolId(createdPoolId);
+    }
+    setShowSeasonConfirm(false);
+    setTimeout(() => navigation.goBack(), 100);
+  };
+
+  const stayInCurrentCompetition = () => {
+    setShowSeasonConfirm(false);
+    setTimeout(() => navigation.goBack(), 100);
   };
 
   const handleCreate = () => {
@@ -177,6 +217,39 @@ export function CreatePoolScreen({navigation}: any) {
         trigger="pool_cap"
         onClose={() => navigation.goBack()}
       />
+
+      {/* Copy is spec-locked (REGISTRY-03 §5 Part C) — do not reword.
+          Report layout problems instead of shortening it. */}
+      <Modal
+        visible={showSeasonConfirm}
+        transparent
+        animationType="fade"
+        onRequestClose={stayInCurrentCompetition}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalHeading}>YOUR CONTEST IS SET.</Text>
+            <Text style={styles.modalBody}>
+              It’s ready for the regular season. Picks open September 2nd,
+              first games September 9th. Round up your crew between now and
+              then.
+            </Text>
+
+            <TouchableOpacity
+              style={styles.modalPrimary}
+              onPress={goToNewContest}>
+              <Text style={styles.modalPrimaryText}>Take me to it</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.modalSecondary}
+              onPress={stayInCurrentCompetition}>
+              <Text style={styles.modalSecondaryText}>
+                Stay in the preseason
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -262,6 +335,54 @@ const createStyles = (colors: any) => StyleSheet.create({
   createButtonText: {
     color: colors.onPrimary,
     fontSize: 16,
+    fontWeight: '600',
+  },
+  modalBackdrop: {
+    flex: 1,
+    // Matches the FoundingWall scrim exactly (shell/paywall/FoundingWall.tsx).
+    // A modal scrim is not a brand colour and the theme has no token for it;
+    // diverging here would just make two modals look different.
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  modalCard: {
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+  },
+  modalHeading: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
+  },
+  modalBody: {
+    fontSize: 15,
+    color: colors.textSecondary,
+    lineHeight: 22,
+    marginBottom: spacing.lg,
+  },
+  modalPrimary: {
+    backgroundColor: colors.primary,
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  modalPrimaryText: {
+    color: colors.onPrimary,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalSecondary: {
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    alignItems: 'center',
+  },
+  modalSecondaryText: {
+    color: colors.textSecondary,
+    fontSize: 15,
     fontWeight: '600',
   },
 });
