@@ -16,8 +16,11 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {useGlobalStore} from '@shell/stores/globalStore';
-import {getDefaultEvent} from '@sports/registry';
+import {
+  useGlobalStore,
+  ACTIVE_COMPETITION_KEY,
+} from '@shell/stores/globalStore';
+import {getDefaultEvent, getEventByCompetition} from '@sports/registry';
 import {registerForPushNotifications} from '@shell/services/pushNotifications';
 import type {User} from '@supabase/supabase-js';
 
@@ -48,9 +51,26 @@ export async function runPostAuthFlow({
   // will see the gated comp(s) re-appear after the RPC resolves.
   const defaultEvent = getDefaultEvent(store.visibleCompetitions);
 
+  // Restore the persisted competition (REGISTRY-03 Part B), same validated
+  // contract as LoadingScreen: getEventByCompetition answers "registered?"
+  // and applies the availableUntil window, so a retired competition fails
+  // restore with no extra check. signOut clears this key, so a fresh login
+  // after a deliberate signout always gets the default. Any failure falls
+  // back to defaultEvent — no new failure modes on the auth path.
+  let initialEvent = defaultEvent;
+  try {
+    const saved = await AsyncStorage.getItem(ACTIVE_COMPETITION_KEY);
+    if (saved) {
+      const match = getEventByCompetition(saved);
+      if (match) initialEvent = match;
+    }
+  } catch {
+    // keep defaultEvent
+  }
+
   // Step 1: Set auth state
   store.setUser(user);
-  store.setActiveSport(defaultEvent);
+  store.setActiveSport(initialEvent);
 
   // Step 2: Ensure user is in global pool
   await store.ensureGlobalPoolMembership();
@@ -85,7 +105,7 @@ export async function runPostAuthFlow({
   // getState() fresh; the captured `store.activeSport` is stale. Mirrors
   // LoadingScreen.tsx:137.
   const resolvedCompetition =
-    useGlobalStore.getState().activeSport?.competition ?? defaultEvent.competition;
+    useGlobalStore.getState().activeSport?.competition ?? initialEvent.competition;
   await store.fetchUserPools(user.id, resolvedCompetition);
   const pools = useGlobalStore.getState().userPools;
 

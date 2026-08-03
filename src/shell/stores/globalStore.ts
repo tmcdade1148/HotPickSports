@@ -31,11 +31,15 @@ const POOL_STORAGE_PREFIX = 'hotpick_active_pool_';
 const DEFAULT_POOL_PREFIX = 'hotpick_default_pool_';
 
 /**
- * DEV-only: AsyncStorage key for the active competition so Metro hot reloads
- * don't reset the developer back to the default event. Production builds must
- * never read this value — LoadingScreen handles the gating.
+ * AsyncStorage key for the active competition. Persisted in DEV and
+ * production alike (REGISTRY-03 Part B): a competition entered by invite
+ * code has to survive relaunch, otherwise every join and every create is
+ * undone at next boot. Restore is always validated through
+ * getEventByCompetition — a saved value is a preference, not a right —
+ * and cleared on signout so a shared device carries nothing across
+ * accounts. One key, one code path, so DEV and production cannot drift.
  */
-export const DEV_ACTIVE_COMPETITION_KEY = 'hotpick_dev_active_competition';
+export const ACTIVE_COMPETITION_KEY = 'hotpick_active_competition';
 
 /** AsyncStorage key for a competition's active pool */
 function poolStorageKey(competition: string): string {
@@ -78,17 +82,17 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     }
 
     // Clear all per-competition pool + default pool keys plus the
-    // DEV-only persisted active competition. The latter is critical
-    // for the multi-account dev flow: without it, a previous user's
-    // sim choice persists into the next user's session and bypasses
-    // their visibility allowlist (LoadingScreen's DEV restore uses
-    // getAllEventsUnfiltered).
+    // persisted active competition. The latter is critical on a shared
+    // device: without it, a previous user's competition choice persists
+    // into the next user's session. The profileSlice visibility guard
+    // would eventually correct a competition they cannot see, but one
+    // visible to both accounts would silently leak.
     const keys = await AsyncStorage.getAllKeys();
     const toRemove = keys.filter(
       k =>
         k.startsWith(POOL_STORAGE_PREFIX) ||
         k.startsWith(DEFAULT_POOL_PREFIX) ||
-        k === DEV_ACTIVE_COMPETITION_KEY,
+        k === ACTIVE_COMPETITION_KEY,
     );
     if (toRemove.length > 0) {
       await AsyncStorage.multiRemove(toRemove);
@@ -173,13 +177,12 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     } else {
       set({activeSport: sport});
     }
-    // DEV only: persist competition so Metro hot reloads preserve selection.
-    // Production ignores this value — see LoadingScreen for the read path.
-    if (__DEV__) {
-      AsyncStorage.setItem(DEV_ACTIVE_COMPETITION_KEY, sport.competition).catch(
-        () => {},
-      );
-    }
+    // Persist the selection in DEV and production alike. Fire-and-forget:
+    // a failed write costs the player their competition on next launch,
+    // which is the pre-REGISTRY-03 behaviour, never a boot failure.
+    AsyncStorage.setItem(ACTIVE_COMPETITION_KEY, sport.competition).catch(
+      () => {},
+    );
   },
 
   // ---------------------------------------------------------------------------

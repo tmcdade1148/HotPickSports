@@ -96,7 +96,7 @@ export const createProfileSlice = (set: Set, get: Get): ProfileSlice => ({
     // Settings → Competition and stay there for the rest of the session.
     //
     // Note: this fires in DEV too. Earlier versions skipped DEV to
-    // preserve the LoadingScreen DEV_ACTIVE_COMPETITION_KEY
+    // preserve the LoadingScreen ACTIVE_COMPETITION_KEY
     // hot-reload sanity, but per Tom that was sticking beta testers
     // on the wrong competition. If a dev wants to test 2026 in DEV,
     // they switch via Settings → Competition after boot.
@@ -105,7 +105,7 @@ export const createProfileSlice = (set: Set, get: Get): ProfileSlice => ({
     const current = get().activeSport;
 
     // Defense in depth — if LoadingScreen restored a persisted
-    // activeSport (e.g. AsyncStorage DEV_ACTIVE_COMPETITION_KEY
+    // activeSport (e.g. AsyncStorage ACTIVE_COMPETITION_KEY
     // carrying nfl_2025_sim from a previous super-admin session)
     // that this user can't actually see, kick them to a visible
     // one. Without this, a logout-then-login-as-different-user

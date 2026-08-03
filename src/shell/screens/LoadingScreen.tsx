@@ -8,9 +8,9 @@ import BootSplash from 'react-native-bootsplash';
 import {supabase} from '@shared/config/supabase';
 import {
   useGlobalStore,
-  DEV_ACTIVE_COMPETITION_KEY,
+  ACTIVE_COMPETITION_KEY,
 } from '@shell/stores/globalStore';
-import {getDefaultEvent, getAllEventsUnfiltered} from '@sports/registry';
+import {getDefaultEvent, getEventByCompetition} from '@sports/registry';
 import {resolvePendingInviteCodeOnLaunch} from '@shell/services/pendingInvite';
 import {registerForPushNotifications} from '@shell/services/pushNotifications';
 
@@ -81,28 +81,30 @@ export function LoadingScreen({navigation}: any) {
 
         setUser(session.user);
 
-        // DEV only: restore last-selected competition across Metro hot reloads
-        // so flipping between competitions during development doesn't reset on
-        // every save. Production always uses defaultEvent.
+        // Restore the last-selected competition (REGISTRY-03 Part B). This is
+        // what makes an invite code a durable door: switched once, it stays
+        // until the player switches again or the competition retires.
+        //
+        // Validation chain — restore wins over default derivation, and loses
+        // to validation. getEventByCompetition answers "registered?" and
+        // applies the availableUntil window, so a saved nfl_2026_pre stops
+        // restoring at 2026-09-02T11:00:00Z with no extra check. It looks
+        // across gated events too, so a beta tester's sim selection still
+        // survives; visibility is enforced separately by the profileSlice
+        // defense-in-depth once the RPC resolves. Any failure — missing key,
+        // unknown competition, retired competition, storage error — falls
+        // back to defaultEvent, i.e. exactly today's behaviour.
         let eventToActivate = defaultEvent;
-        if (__DEV__) {
-          try {
-            const persistedCompetition = await AsyncStorage.getItem(
-              DEV_ACTIVE_COMPETITION_KEY,
-            );
-            if (persistedCompetition) {
-              // DEV-only: look across ALL events (including gated ones
-              // like nfl_2025_sim) so a beta tester's persisted dev
-              // selection survives hot reload. Production restricts via
-              // visibleCompetitions at every other call site.
-              const match = getAllEventsUnfiltered().find(
-                e => e.competition === persistedCompetition,
-              );
-              if (match) eventToActivate = match;
-            }
-          } catch (err) {
-            console.warn('[LoadingScreen] DEV competition restore failed:', err);
+        try {
+          const persistedCompetition = await AsyncStorage.getItem(
+            ACTIVE_COMPETITION_KEY,
+          );
+          if (persistedCompetition) {
+            const match = getEventByCompetition(persistedCompetition);
+            if (match) eventToActivate = match;
           }
+        } catch (err) {
+          console.warn('[LoadingScreen] competition restore failed:', err);
         }
         setActiveSport(eventToActivate);
 
