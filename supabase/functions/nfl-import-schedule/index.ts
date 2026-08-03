@@ -13,6 +13,24 @@ const WEEK_TO_ESPN: Record<number, { seasonType: number; espnWeek: number; phase
   22: { seasonType: 3, espnWeek: 5, phase: "SUPERBOWL" },
 };
 
+// ESPN moneylines are strings ("-198", "+164") nested under
+// odds.moneyline.<side>.close.odds, with .open.odds as a fallback
+// before a line closes. NOT under homeTeamOdds, which has no such key.
+function espnML(odds: any, side: "home" | "away"): number | null {
+  const raw = odds?.moneyline?.[side]?.close?.odds
+           ?? odds?.moneyline?.[side]?.open?.odds;
+  if (raw === null || raw === undefined) return null;
+  const n = Number(String(raw).replace(/^\+/, ""));
+  return Number.isFinite(n) ? n : null;
+}
+
+function espnSpread(odds: any): number | null {
+  // odds.spread is numeric and home-relative (negative = home favored),
+  // matching probFromSpread. odds.details is a display label, not data.
+  return typeof odds?.spread === "number" && Number.isFinite(odds.spread)
+    ? odds.spread : null;
+}
+
 Deno.serve(async (req) => {
   // Cron auth gate (verify_jwt=false): require the dedicated cron shared secret.
   // CRON_SHARED_SECRET (Edge Secret) is compared to the x-cron-secret header that
@@ -64,12 +82,17 @@ Deno.serve(async (req) => {
     const isPreseason = espnSeasonType === "1";
 
     let seasonType: number, espnWeek: number, phase: string;
-    if (isPreseason) { seasonType = 1; espnWeek = week; phase = "PRESEASON"; }
+    // ESPN indexes seasontype=1 week 1 as the Hall of Fame Game, so our
+    // preseason weeks 1-3 are ESPN weeks 2-4. The offset also excludes
+    // the HOF game automatically.
+    if (isPreseason) { seasonType = 1; espnWeek = week + 1; phase = "PRESEASON"; }
     else if (week <= 18) { seasonType = 2; espnWeek = week; phase = "REGULAR"; }
     else if (WEEK_TO_ESPN[week]) { ({ seasonType, espnWeek, phase } = WEEK_TO_ESPN[week]); }
     else return json({ error: `Invalid week: ${week}` }, 400);
 
-    const espnUrl = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=${seasonType}&week=${espnWeek}`;
+    // `dates` pins the season. Without it ESPN returns whatever season it
+    // considers current, which in July 2026 was still 2025.
+    const espnUrl = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=${seasonType}&week=${espnWeek}&dates=${seasonYear}`;
     const espnRes = await fetch(espnUrl);
     if (!espnRes.ok) throw new Error(`ESPN API error ${espnRes.status}`);
     const espnData = await espnRes.json();
@@ -79,6 +102,17 @@ Deno.serve(async (req) => {
       await markReadiness(competition, week, { games_status: "ok", games_count: 0, games_at: new Date().toISOString() });
       return json({ success: true, competition, season_year: seasonYear, week, imported: 0, warning: "No games found" }, 200);
     }
+
+    // Read existing odds BEFORE the mapping so the coalesce below can preserve
+    // them. nfl-fetch-odds is the primary odds source; a re-import must never
+    // blank a value it wrote (same discipline as frozen_rank, Hard Rule #6).
+    // Cron ordering (import 05:00, odds 10:00) hides this — it is not a guarantee.
+    const { data: existing } = await supabase
+      .from("season_games").select("game_id, spread, home_moneyline, away_moneyline")
+      .eq("competition", competition).eq("season_year", seasonYear).eq("week", week);
+    const prior = new Map(
+      (existing ?? []).map((g: any) => [g.game_id, g])
+    );
 
     const cleanRecord = (r: string | null) => {
       if (!r) return null;
@@ -91,6 +125,7 @@ Deno.serve(async (req) => {
       const homeTeam = comp.competitors.find((c: any) => c.homeAway === "home");
       const awayTeam = comp.competitors.find((c: any) => c.homeAway === "away");
       const odds = comp.odds?.[0];
+      const was = prior.get(event.id);
       const espnStatus = comp.status?.type?.name ?? "";
       let status = "SCHEDULED";
       if (espnStatus.includes("FINAL")) status = "FINAL";
@@ -104,16 +139,13 @@ Deno.serve(async (req) => {
         away_score: awayTeam.score ? parseInt(awayTeam.score, 10) : null,
         home_record: cleanRecord(homeTeam.records?.[0]?.summary ?? null),
         away_record: cleanRecord(awayTeam.records?.[0]?.summary ?? null),
-        spread: odds?.details ? parseFloat(odds.details) : null,
-        home_moneyline: odds?.homeTeamOdds?.moneyLine ? parseInt(odds.homeTeamOdds.moneyLine, 10) : null,
-        away_moneyline: odds?.awayTeamOdds?.moneyLine ? parseInt(odds.awayTeamOdds.moneyLine, 10) : null,
+        spread: espnSpread(odds) ?? was?.spread ?? null,
+        home_moneyline: espnML(odds, "home") ?? was?.home_moneyline ?? null,
+        away_moneyline: espnML(odds, "away") ?? was?.away_moneyline ?? null,
         is_finalized: false,
       };
     });
 
-    const { data: existing } = await supabase
-      .from("season_games").select("game_id")
-      .eq("competition", competition).eq("season_year", seasonYear).eq("week", week);
     if (existing && existing.length > 0) {
       const newIds = rows.map((r: any) => r.game_id);
       const toDelete = existing.filter((g) => !newIds.includes(g.game_id)).map((g) => g.game_id);
@@ -157,7 +189,7 @@ Deno.serve(async (req) => {
     // (null) until nfl-rank-games freezes them. The Tuesday cron (odds 10:00,
     // rank 10:15) and nfl-weekly-transition both run rank after odds.
 
-    return json({ success: true, competition, season_year: seasonYear, week, phase, imported: rows.length }, 200);
+    return json({ success: true, competition, season_year: seasonYear, week, phase, imported: rows.length, espnUrl }, 200);
   } catch (err) {
     if (week) await markReadiness(competition, week, { games_status: "failed", games_at: new Date().toISOString() });
     return json({ success: false, error: String(err) }, 500);
