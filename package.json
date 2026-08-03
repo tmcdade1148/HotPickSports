@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "start": "react-native start",
     "test": "jest",
-    "eas-build-pre-install": "if [ -n \"$GOOGLE_SERVICES_JSON\" ]; then echo \"[eas-build-pre-install] Copying GOOGLE_SERVICES_JSON to android/app/google-services.json\"; cp \"$GOOGLE_SERVICES_JSON\" android/app/google-services.json; fi"
+    "eas-build-pre-install": "if [ -n \"$GOOGLE_SERVICES_JSON\" ]; then echo \"[eas-build-pre-install] Copying GOOGLE_SERVICES_JSON to android/app/google-services.json\"; cp \"$GOOGLE_SERVICES_JSON\" android/app/google-services.json; fi; if [ -n \"$GOOGLE_SERVICE_INFO_PLIST\" ]; then echo \"[eas-build-pre-install] Copying GOOGLE_SERVICE_INFO_PLIST to ios/GoogleService-Info.plist\"; cp \"$GOOGLE_SERVICE_INFO_PLIST\" ios/GoogleService-Info.plist; fi"
   },
   "dependencies": {
     "@expo-google-fonts/manrope": "^0.4.2",
