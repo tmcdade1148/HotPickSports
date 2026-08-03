@@ -1,11 +1,18 @@
 import type {AnyEventConfig} from '@shared/types/templates';
 import {worldCup2026} from './worldcup/config';
-import {nflSeason, nflSeasonSim, nflSeasonSimA, nflSeasonSimG} from './nfl/config';
+import {
+  nflSeason,
+  nflPreseason2026,
+  nflSeasonSim,
+  nflSeasonSimA,
+  nflSeasonSimG,
+} from './nfl/config';
 import {nhlPlayoffs2027} from './nhl/config';
 import {nflDemo, DEMO_COMPETITION, DEMO_POOL_ID} from './nfl/demoConfig';
 
 const ALL_EVENTS: AnyEventConfig[] = [
   nflSeason,
+  nflPreseason2026,
   nflSeasonSim,
   nflSeasonSimA,
   nflSeasonSimG,
@@ -52,8 +59,23 @@ function filterByVisibility(
   return events.filter(e => visible.has(e.competition) || !GATED_COMPETITIONS.has(e.competition));
 }
 
-export function getEventsByPriority(visibleCompetitions?: readonly string[]): AnyEventConfig[] {
-  return filterByVisibility([...ALL_EVENTS], visibleCompetitions).sort((a, b) => {
+// Time-boxed events (availableUntil) drop out of the registry once the
+// date passes: they stop being selectable and stop being the boot
+// default. Retirement therefore needs no client release.
+function isWithinWindow(e: AnyEventConfig, now: number): boolean {
+  if (!e.availableUntil) return true;
+  const until = new Date(e.availableUntil).getTime();
+  // An unparseable availableUntil keeps the event visible — a typo must
+  // never silently delete a live competition mid-window.
+  return Number.isFinite(until) ? now < until : true;
+}
+
+export function getEventsByPriority(
+  visibleCompetitions?: readonly string[],
+  now: number = Date.now(),
+): AnyEventConfig[] {
+  const live = ALL_EVENTS.filter(e => isWithinWindow(e, now));
+  return filterByVisibility(live, visibleCompetitions).sort((a, b) => {
     const statusOrder = {active: 0, upcoming: 1, completed: 2};
     const aOrder = statusOrder[a.status];
     const bOrder = statusOrder[b.status];
@@ -73,10 +95,14 @@ export function getDefaultEvent(visibleCompetitions?: readonly string[]): AnyEve
 // gating. Used when an action targets a specific competition the user already
 // has access to (e.g. joining a Contest by invite) and we need to switch the
 // active sport to it — RLS still governs what data they can read.
+// Retired competitions resolve to undefined so a stale invite link can no
+// longer switch the app into one.
 export function getEventByCompetition(
   competition: string,
+  now: number = Date.now(),
 ): AnyEventConfig | undefined {
-  return ALL_EVENTS.find(e => e.competition === competition);
+  const e = ALL_EVENTS.find(x => x.competition === competition);
+  return e && isWithinWindow(e, now) ? e : undefined;
 }
 
 // Unfiltered registry — DEV-only escape hatch used by LoadingScreen to

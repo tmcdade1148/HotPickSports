@@ -58,6 +58,12 @@ export interface BaseEventConfig {
   startDate: string; // ISO 8601
   endDate: string;
   picksOpenDate?: string;
+  /** ISO 8601. When set, this event drops out of the registry once the
+   *  date passes — it stops being selectable and stops being the boot
+   *  default, with no client release required. Used for time-boxed
+   *  competitions such as a preseason that must hand off to the real
+   *  season. Omit for permanent events. */
+  availableUntil?: string;
   color: string; // Accent color for UI
   tabs: TabConfig[];
   sportIdentity: SportIdentity;
