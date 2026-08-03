@@ -112,8 +112,11 @@ Deno.serve(async (req) => {
     const baseRanked = rankGames(games);
     const ranked = applyPlayoffEscalation(baseRanked, week);
 
-    // Fewer than half as many distinct win probabilities as games means most
+    // Fewer than a third as many distinct win probabilities as games means most
     // ranks are decided by the kickoff tiebreak, not by odds. Refuse to freeze.
+    // Threshold set from 21 real full weeks (nfl_2025 + nfl_2025_sim, >=14 games):
+    // min 9 distinct spreads, avg 11.5. A *2 multiplier fires at 8 on a 16-game
+    // week — one game of margin. *3 fires at 5, well clear of any real slate.
     // Ties in competitiveness fall through the comparator to kickoff time, so a
     // low-information slate yields a reverse-chronological 1..N that looks
     // entirely valid. frozen_rank is immutable (Hard Rule #6): a false refusal
@@ -121,7 +124,7 @@ Deno.serve(async (req) => {
     const probs = games.map((g) => homeWinProb(g));
     const distinctProbs = new Set(probs.map((p) => p.toFixed(6))).size;
 
-    if (games.length >= 4 && distinctProbs * 2 <= games.length) {
+    if (games.length >= 4 && distinctProbs * 3 <= games.length) {
       await markReadiness(competition, week, {
         ranks_status: "failed",
         ranks_error: `Degenerate odds: ${games.length} games yield only`
