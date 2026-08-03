@@ -16,10 +16,11 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {useGlobalStore} from '@shell/stores/globalStore';
 import {
-  useGlobalStore,
   ACTIVE_COMPETITION_KEY,
-} from '@shell/stores/globalStore';
+  parseActiveCompetition,
+} from '@shell/stores/persistedCompetition';
 import {getDefaultEvent, getEventByCompetition} from '@sports/registry';
 import {registerForPushNotifications} from '@shell/services/pushNotifications';
 import type {User} from '@supabase/supabase-js';
@@ -52,14 +53,16 @@ export async function runPostAuthFlow({
   const defaultEvent = getDefaultEvent(store.visibleCompetitions);
 
   // Restore the persisted competition (REGISTRY-03 Part B), same validated
-  // contract as LoadingScreen: getEventByCompetition answers "registered?"
-  // and applies the availableUntil window, so a retired competition fails
-  // restore with no extra check. signOut clears this key, so a fresh login
-  // after a deliberate signout always gets the default. Any failure falls
-  // back to defaultEvent — no new failure modes on the auth path.
+  // contract as LoadingScreen and through the same codec so the two cannot
+  // drift: the record must belong to THIS user, then getEventByCompetition
+  // applies the availableUntil window. signOut also clears the key, so a
+  // deliberate signout always yields the default; the uid check is what
+  // covers an app killed without signing out. Any failure falls back to
+  // defaultEvent — no new failure modes on the auth path.
   let initialEvent = defaultEvent;
   try {
-    const saved = await AsyncStorage.getItem(ACTIVE_COMPETITION_KEY);
+    const raw = await AsyncStorage.getItem(ACTIVE_COMPETITION_KEY);
+    const saved = parseActiveCompetition(raw, user.id);
     if (saved) {
       const match = getEventByCompetition(saved);
       if (match) initialEvent = match;

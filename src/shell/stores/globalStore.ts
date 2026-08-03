@@ -17,6 +17,10 @@ import {createPartnerModuleSlice} from './slices/partnerModuleSlice';
 import {createPoolAdminSlice} from './slices/poolAdminSlice';
 import {createDemoSlice} from './slices/demoSlice';
 import {createProfileSlice} from './slices/profileSlice';
+import {
+  ACTIVE_COMPETITION_KEY,
+  serializeActiveCompetition,
+} from './persistedCompetition';
 import {FOUNDING_GAFFER_KEY} from '@shell/paywall/foundingGaffer';
 import type {GlobalState} from './globalStore.types';
 // Re-exported so existing consumers keep importing these from globalStore.
@@ -31,15 +35,15 @@ const POOL_STORAGE_PREFIX = 'hotpick_active_pool_';
 const DEFAULT_POOL_PREFIX = 'hotpick_default_pool_';
 
 /**
- * AsyncStorage key for the active competition. Persisted in DEV and
- * production alike (REGISTRY-03 Part B): a competition entered by invite
- * code has to survive relaunch, otherwise every join and every create is
- * undone at next boot. Restore is always validated through
- * getEventByCompetition — a saved value is a preference, not a right —
- * and cleared on signout so a shared device carries nothing across
- * accounts. One key, one code path, so DEV and production cannot drift.
+ * The active competition is persisted in DEV and production alike
+ * (REGISTRY-03 Part B): a competition entered by invite code has to survive
+ * relaunch, otherwise every join and every create is undone at next boot.
+ * The record is keyed to the user who chose it and restore is validated
+ * through getEventByCompetition — a saved value is a preference, not a
+ * right. Key and codec live in ./persistedCompetition so both restore
+ * seams share one implementation.
  */
-export const ACTIVE_COMPETITION_KEY = 'hotpick_active_competition';
+export {ACTIVE_COMPETITION_KEY};
 
 /** AsyncStorage key for a competition's active pool */
 function poolStorageKey(competition: string): string {
@@ -177,12 +181,19 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     } else {
       set({activeSport: sport});
     }
-    // Persist the selection in DEV and production alike. Fire-and-forget:
-    // a failed write costs the player their competition on next launch,
-    // which is the pre-REGISTRY-03 behaviour, never a boot failure.
-    AsyncStorage.setItem(ACTIVE_COMPETITION_KEY, sport.competition).catch(
-      () => {},
-    );
+    // Persist the selection in DEV and production alike, keyed to the user
+    // who made it so it cannot carry across an account switch. No user means
+    // nothing to key it to, so nothing is written — a pre-auth selection has
+    // no one to be restored for. Fire-and-forget: a failed write costs the
+    // player their competition on next launch, which is the pre-REGISTRY-03
+    // behaviour, never a boot failure.
+    const persistUid = get().user?.id;
+    if (persistUid) {
+      AsyncStorage.setItem(
+        ACTIVE_COMPETITION_KEY,
+        serializeActiveCompetition(persistUid, sport.competition),
+      ).catch(() => {});
+    }
   },
 
   // ---------------------------------------------------------------------------

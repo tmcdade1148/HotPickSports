@@ -6,10 +6,11 @@ LogBox.ignoreLogs(['AuthRetryableFetchError', 'Network request failed']);
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BootSplash from 'react-native-bootsplash';
 import {supabase} from '@shared/config/supabase';
+import {useGlobalStore} from '@shell/stores/globalStore';
 import {
-  useGlobalStore,
   ACTIVE_COMPETITION_KEY,
-} from '@shell/stores/globalStore';
+  parseActiveCompetition,
+} from '@shell/stores/persistedCompetition';
 import {getDefaultEvent, getEventByCompetition} from '@sports/registry';
 import {resolvePendingInviteCodeOnLaunch} from '@shell/services/pendingInvite';
 import {registerForPushNotifications} from '@shell/services/pushNotifications';
@@ -86,21 +87,23 @@ export function LoadingScreen({navigation}: any) {
         // until the player switches again or the competition retires.
         //
         // Validation chain — restore wins over default derivation, and loses
-        // to validation. getEventByCompetition answers "registered?" and
-        // applies the availableUntil window, so a saved nfl_2026_pre stops
-        // restoring at 2026-09-02T11:00:00Z with no extra check. It looks
-        // across gated events too, so a beta tester's sim selection still
-        // survives; visibility is enforced separately by the profileSlice
-        // defense-in-depth once the RPC resolves. Any failure — missing key,
-        // unknown competition, retired competition, storage error — falls
-        // back to defaultEvent, i.e. exactly today's behaviour.
+        // to validation. parseActiveCompetition answers "did THIS user save
+        // it?", so a value left behind by another account on a shared device
+        // never restores. getEventByCompetition then answers "registered?"
+        // and applies the availableUntil window, so a saved nfl_2026_pre
+        // stops restoring at 2026-09-02T11:00:00Z with no extra check. It
+        // looks across gated events too, so a beta tester's sim selection
+        // still survives; visibility is enforced separately by the
+        // profileSlice defense-in-depth once the RPC resolves. Any failure —
+        // missing key, wrong uid, malformed record, unknown competition,
+        // retired competition, storage error — falls back to defaultEvent,
+        // i.e. exactly today's behaviour.
         let eventToActivate = defaultEvent;
         try {
-          const persistedCompetition = await AsyncStorage.getItem(
-            ACTIVE_COMPETITION_KEY,
-          );
-          if (persistedCompetition) {
-            const match = getEventByCompetition(persistedCompetition);
+          const raw = await AsyncStorage.getItem(ACTIVE_COMPETITION_KEY);
+          const savedCompetition = parseActiveCompetition(raw, session.user.id);
+          if (savedCompetition) {
+            const match = getEventByCompetition(savedCompetition);
             if (match) eventToActivate = match;
           }
         } catch (err) {
