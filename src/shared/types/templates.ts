@@ -64,6 +64,12 @@ export interface BaseEventConfig {
    *  competitions such as a preseason that must hand off to the real
    *  season. Omit for permanent events. */
   availableUntil?: string;
+  /** When set, Contests started while this event is active are created
+   *  in the named competition instead of this one. Used by time-boxed
+   *  events (a preseason) so a Player starting a Contest gets one for
+   *  the real season rather than one that expires with the window.
+   *  Omit for normal events. */
+  contestsCreateIn?: string;
   color: string; // Accent color for UI
   tabs: TabConfig[];
   sportIdentity: SportIdentity;

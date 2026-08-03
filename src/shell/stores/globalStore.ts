@@ -361,18 +361,30 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     // global (organizers create non-global pools; globals are platform-
     // provisioned), so no filter check is needed. Without this update the
     // pool only appears after an app restart triggers `fetchUserPools`.
+    // A redirected create (event config `contestsCreateIn`, e.g. starting a
+    // Contest during the preseason) lands it in a competition the Player is
+    // NOT currently viewing. Persist the selection so it is already chosen
+    // when they switch to that competition, but leave activePoolId,
+    // visiblePools and poolsByCompetition alone — those describe the
+    // competition on screen, and repointing them strands the Player in the
+    // preseason holding a Contest from another season.
+    const isRedirected = get().activeSport?.competition !== competition;
+
     set(state => {
       const updatedPools = [...state.userPools, typedPool];
-      const updatedVisible = [...state.visiblePools, typedPool];
+      const poolRoles = {...state.poolRoles, [typedPool.id]: 'organizer'};
+      if (isRedirected) {
+        return {userPools: updatedPools, poolRoles};
+      }
       return {
         userPools: updatedPools,
-        visiblePools: updatedVisible,
+        visiblePools: [...state.visiblePools, typedPool],
         poolsByCompetition: {
           ...state.poolsByCompetition,
           [competition]: updatedPools,
         },
         activePoolId: typedPool.id,
-        poolRoles: {...state.poolRoles, [typedPool.id]: 'organizer'},
+        poolRoles,
       };
     });
     AsyncStorage.setItem(poolStorageKey(competition), typedPool.id);

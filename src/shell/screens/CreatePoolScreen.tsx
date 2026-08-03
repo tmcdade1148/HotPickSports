@@ -46,8 +46,15 @@ export function CreatePoolScreen({navigation}: any) {
   // already exists; the wall is informational, and dismissing it returns Home.
   const [showFoundingWall, setShowFoundingWall] = useState(false);
 
+  // A time-boxed event can redirect Contest creation to the season it leads
+  // into, so a Contest started during the preseason is a regular-season
+  // Contest. Falls back to the active competition.
+  const targetCompetition =
+    activeSport?.contestsCreateIn ?? activeSport?.competition;
+  const isRedirected = Boolean(activeSport?.contestsCreateIn);
+
   const doCreate = async () => {
-    if (!user?.id || !activeSport?.competition) return;
+    if (!user?.id || !activeSport?.competition || !targetCompetition) return;
 
     setCreating(true);
     setError(null);
@@ -60,7 +67,7 @@ export function CreatePoolScreen({navigation}: any) {
 
     const result = await createPool({
       userId: user.id,
-      competition: activeSport.competition,
+      competition: targetCompetition,
       name: poolName.trim(),
       isPublic: false,
     });
@@ -137,6 +144,19 @@ export function CreatePoolScreen({navigation}: any) {
             invite code with can join.
           </Text>
 
+          {/* Shown only when the event redirects creation (contestsCreateIn),
+              so the Player knows which season their Contest belongs to before
+              they commit. Copy is spec-locked (REGISTRY-02 §6b) — do not
+              reword; report layout problems instead. */}
+          {isRedirected && (
+            <View style={styles.seasonNotice}>
+              <Text style={styles.seasonNoticeText}>
+                Your Contest runs the regular season. Picks open September 2nd,
+                first games September 9th.
+              </Text>
+            </View>
+          )}
+
           {error && <Text style={styles.error}>{error}</Text>}
 
           <TouchableOpacity
@@ -210,6 +230,19 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: spacing.lg,
     lineHeight: 17,
+  },
+  seasonNotice: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  seasonNoticeText: {
+    fontSize: 14,
+    color: colors.textPrimary,
+    lineHeight: 20,
   },
   error: {
     color: colors.error,

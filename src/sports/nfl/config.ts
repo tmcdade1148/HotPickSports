@@ -127,6 +127,7 @@ export const nflPreseason2026: SeasonConfig = {
   picksOpenDate: '2026-08-11',
   totalWeeks: 3,
   availableUntil: '2026-09-02T11:00:00Z',
+  contestsCreateIn: 'nfl_2026',
 };
 
 /**
