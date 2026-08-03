@@ -112,25 +112,27 @@ Deno.serve(async (req) => {
     const baseRanked = rankGames(games);
     const ranked = applyPlayoffEscalation(baseRanked, week);
 
-    // A slate where every game has the same win probability carries no
-    // information: competitiveness ties, both sort keys tie, and the
-    // comparator falls through to kickoff time, producing a reverse-
-    // chronological ranking that looks valid. frozen_rank is immutable
-    // (Hard Rule #6), so refuse to write rather than freeze nonsense.
+    // Fewer than half as many distinct win probabilities as games means most
+    // ranks are decided by the kickoff tiebreak, not by odds. Refuse to freeze.
+    // Ties in competitiveness fall through the comparator to kickoff time, so a
+    // low-information slate yields a reverse-chronological 1..N that looks
+    // entirely valid. frozen_rank is immutable (Hard Rule #6): a false refusal
+    // costs a forced re-rank, a false pass costs a permanently wrong week.
     const probs = games.map((g) => homeWinProb(g));
     const distinctProbs = new Set(probs.map((p) => p.toFixed(6))).size;
 
-    if (games.length >= 4 && distinctProbs === 1) {
+    if (games.length >= 4 && distinctProbs * 2 <= games.length) {
       await markReadiness(competition, week, {
         ranks_status: "failed",
-        ranks_error: `Degenerate odds: all ${games.length} games share one`
-          + ` win probability. Ranking would be kickoff order. Refusing`
-          + ` to freeze. Run nfl-fetch-odds, then re-run.`,
+        ranks_error: `Degenerate odds: ${games.length} games yield only`
+          + ` ${distinctProbs} distinct win probabilities. Most ranks would be`
+          + ` decided by the kickoff tiebreak. Refusing to freeze. Run`
+          + ` nfl-fetch-odds, then re-run.`,
         ranks_at: new Date().toISOString(),
       });
       return json({
         error: "degenerate_odds", competition, week,
-        games: games.length, distinct_win_probabilities: 1,
+        games: games.length, distinct_win_probabilities: distinctProbs,
       }, 409);
     }
 
