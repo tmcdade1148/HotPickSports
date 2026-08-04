@@ -19,6 +19,7 @@
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		78BE216C575A4B439790B864 /* BootSplash.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = F14169EF94C44DF0B8CEB803 /* BootSplash.storyboard */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
+		B2E5BB96C31FB6A22977AD31 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 6F6B3EF9077EE1C815094A3E /* Expo.plist */; };
 		B6C2A10C604343BD8CEBA2B1 /* Manrope-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 5D47B2C89C1A4AC094C274EB /* Manrope-Regular.ttf */; };
 /* End PBXBuildFile section */
 
@@ -35,6 +36,7 @@
 		5709B34CF0A7D63546082F79 /* Pods-HotPickSports.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-HotPickSports.release.xcconfig"; path = "Target Support Files/Pods-HotPickSports/Pods-HotPickSports.release.xcconfig"; sourceTree = "<group>"; };
 		5D47B2C89C1A4AC094C274EB /* Manrope-Regular.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Manrope-Regular.ttf"; path = "../assets/fonts/Manrope-Regular.ttf"; sourceTree = "<group>"; };
 		5DCACB8F33CDC322A6C60F78 /* libPods-HotPickSports.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-HotPickSports.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		6F6B3EF9077EE1C815094A3E /* Expo.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; name = Expo.plist; path = HotPickSports/Supporting/Expo.plist; sourceTree = "<group>"; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = HotPickSports/AppDelegate.swift; sourceTree = "<group>"; };
 		7DAFD1BC79E345998E27CEFF /* Colors.xcassets */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = folder.assetcatalog; name = Colors.xcassets; path = HotPickSports/Colors.xcassets; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = HotPickSports/LaunchScreen.storyboard; sourceTree = "<group>"; };
@@ -76,6 +78,7 @@
 				F14169EF94C44DF0B8CEB803 /* BootSplash.storyboard */,
 				7DAFD1BC79E345998E27CEFF /* Colors.xcassets */,
 				1C6431F22F9003AF004AEB6D /* apple.icon */,
+				6F6B3EF9077EE1C815094A3E /* Expo.plist */,
 			);
 			name = HotPickSports;
 			sourceTree = "<group>";
@@ -220,6 +223,7 @@
 				B6C2A10C604343BD8CEBA2B1 /* Manrope-Regular.ttf in Resources */,
 				072B3B8B300A472CA4445EEB /* SairaCondensed-Black.ttf in Resources */,
 				248459EFBFCF4837B88D10D4 /* Manrope-Bold.ttf in Resources */,
+				B2E5BB96C31FB6A22977AD31 /* Expo.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
