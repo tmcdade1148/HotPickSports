@@ -19,6 +19,25 @@ import {confirmEmailMessage} from '@shared/lexicon';
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
 
+/**
+ * Kill switch for the password-reset entry point (2026-08-04).
+ *
+ * Flip to `true` to restore the link — that one boolean is the whole reversal.
+ *
+ * Hidden because reset could not be verified end to end before the production
+ * rebuild: a reset link lands back on ForgotPassword, and the OTA meant to
+ * carry the token_hash fix (084e2a2) also dropped bundled assets, so that
+ * build was not a trustworthy surface to tell a verifyOtp failure apart from a
+ * bundle failure. Better no visible door than one that leads nowhere.
+ *
+ * Deliberately hides ONLY the door. The flow behind it is intact and still
+ * routed: ForgotPasswordScreen, ResetPasswordScreen, and the deep-link handler
+ * in RootNavigator are untouched, so an existing recovery email still opens
+ * the app and still works if verifyOtp succeeds. That is what makes this
+ * testable again without a rebuild.
+ */
+const SHOW_FORGOT_PASSWORD = false;
+
 // Tester accounts bypass email confirmation via bypass-tester-signup. This client
 // check only routes the call; the Edge Function is the authoritative gate.
 const isTesterEmail = (e: string) =>
@@ -272,7 +291,7 @@ export function EmailEntryScreen({navigation, route}: any) {
             )}
           </TouchableOpacity>
 
-          {mode === 'sign_in' && (
+          {SHOW_FORGOT_PASSWORD && mode === 'sign_in' && (
             <TouchableOpacity
               style={styles.forgotButton}
               onPress={handleForgotPassword}>
