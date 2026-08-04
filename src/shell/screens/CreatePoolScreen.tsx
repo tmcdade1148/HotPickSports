@@ -186,13 +186,18 @@ export function CreatePoolScreen({navigation}: any) {
 
           {/* Shown only when the event redirects creation (contestsCreateIn),
               so the Player knows which season their Contest belongs to before
-              they commit. Copy is spec-locked (REGISTRY-02 §6b) — do not
-              reword; report layout problems instead. */}
+              they commit. REGISTRY-02 §6b specifies THAT this notice exists
+              and when it shows — it does NOT specify the wording below.
+              The wording is Tom's, given directly on 2026-08-04, and names
+              the season outright: the earlier "runs the regular season" left
+              WHICH regular season implicit, which is the one thing this
+              notice exists to answer. Treat it as locked to Tom, not to the
+              spec — do not reword. Report layout problems instead. */}
           {isRedirected && (
             <View style={styles.seasonNotice}>
               <Text style={styles.seasonNoticeText}>
-                Your Contest runs the regular season. Picks open September 2nd,
-                first games September 9th.
+                Your Contest will run through the 2026/27 NFL regular season.
+                Picks open September 2nd, first games September 9th.
               </Text>
             </View>
           )}
@@ -218,8 +223,14 @@ export function CreatePoolScreen({navigation}: any) {
         onClose={() => navigation.goBack()}
       />
 
-      {/* Copy is spec-locked (REGISTRY-03 §5 Part C) — do not reword.
-          Report layout problems instead of shortening it. */}
+      {/* REGISTRY-03 §5 Part C specifies THAT this confirmation exists and
+          what it must do (offer the new Contest, or stay put) — it does NOT
+          specify the wording below. The season name here echoes the notice on
+          the create screen above, so a Gaffer isn't told which season they're
+          in and then told something vaguer one screen later. That echo is a
+          consistency fix from 2026-08-04; the exact phrasing is Tom's call and
+          is the only part open to revision. Do not reword otherwise, and
+          report layout problems instead of shortening it. */}
       <Modal
         visible={showSeasonConfirm}
         transparent
@@ -229,9 +240,9 @@ export function CreatePoolScreen({navigation}: any) {
           <View style={styles.modalCard}>
             <Text style={styles.modalHeading}>YOUR CONTEST IS SET.</Text>
             <Text style={styles.modalBody}>
-              It’s ready for the regular season. Picks open September 2nd,
-              first games September 9th. Round up your crew between now and
-              then.
+              It’s ready for the 2026/27 NFL regular season. Picks open
+              September 2nd, first games September 9th. Round up your crew
+              between now and then.
             </Text>
 
             <TouchableOpacity
