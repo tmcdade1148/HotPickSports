@@ -73,6 +73,23 @@ export interface GlobalState {
   visibleCompetitionsLoaded: boolean;
   loadVisibleCompetitions: () => Promise<void>;
 
+  // Every competition this Player is CONNECTED to — has at least one live
+  // Contest in (not hidden, not archived, not deleted; organizer counts).
+  // Source: the get_user_competitions RPC, which applies that rule
+  // server-side. Backs the Home header Event Switcher via
+  // getConnectedEvents() (SWITCHER-01 §5a).
+  //
+  // NOT the same thing as `visibleCompetitions`: that one answers "what is
+  // this user ALLOWED to see" (beta gating); this one answers "where is this
+  // user actually playing". The switcher needs both.
+  //
+  // Empty means "nothing connected yet, or the fetch hasn't landed" — the
+  // switcher then shows the default event alone, i.e. no chevron. A failed
+  // fetch leaves the previous value: it degrades to a smaller switcher, never
+  // a broken header.
+  connectedCompetitions: string[];
+  fetchConnectedCompetitions: () => Promise<void>;
+
   // Per-sport "has the user played any earlier season of this sport"
   // flag, keyed by sport identifier ('football', 'soccer', 'hockey').
   // Powers the 'WELCOME BACK' vs 'WELCOME TO' branch on OffSeasonHero

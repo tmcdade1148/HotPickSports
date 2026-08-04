@@ -94,6 +94,35 @@ export function getDefaultEvent(
   return getEventsByPriority(visibleCompetitions, now)[0] ?? worldCup2026;
 }
 
+// The Event Switcher's list (SWITCHER-01 §5b): the events this Player is
+// CONNECTED to — i.e. has at least one live Contest in — plus the default
+// landing event, which is always included so a brand-new Player never faces
+// an empty switcher (and the list is never empty).
+//
+// `connected` comes from the get_user_competitions RPC, which applies the
+// not-hidden / not-archived / not-deleted rule server-side. Auto-enrolled
+// global pools are hidden, so they never create a connection — without that,
+// every signup would see the preseason (spec §2e).
+//
+// Filtering getEventsByPriority rather than ALL_EVENTS inherits three
+// behaviours for free: the availableUntil window (retired events drop out),
+// the GATED_COMPETITIONS visibility filter (sims stay hidden from ordinary
+// Players, visible to allowlisted testers), and the status-then-startDate
+// ordering. `now` is a parameter for the same reason the other accessors take
+// one — the window is testable without touching the clock.
+export function getConnectedEvents(
+  connected: readonly string[],
+  visibleCompetitions?: readonly string[],
+  now: number = Date.now(),
+): AnyEventConfig[] {
+  const all = getEventsByPriority(visibleCompetitions, now);
+  const set = new Set(connected);
+  const dflt = getDefaultEvent(visibleCompetitions, now);
+  return all.filter(
+    e => set.has(e.competition) || e.competition === dflt.competition,
+  );
+}
+
 // Resolve a registered event by its competition string, ignoring visibility
 // gating. Used when an action targets a specific competition the user already
 // has access to (e.g. joining a Contest by invite) and we need to switch the

@@ -109,6 +109,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       priorSportHistory: {},
       visibleCompetitions: [],
       visibleCompetitionsLoaded: false,
+      connectedCompetitions: [],
       activePoolId: null,
       defaultPoolId: null,
       userPools: [],
@@ -341,6 +342,35 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     return get().poolsByCompetition[competition] ?? [];
   },
 
+  // Which competitions this Player is CONNECTED to (SWITCHER-01 §5a) — the
+  // Home header Event Switcher's list. Cross-competition by design, which is
+  // exactly why it can't come from fetchUserPools: that one is scoped to the
+  // single active competition, so the client never otherwise holds a
+  // cross-event view of membership (spec §2d).
+  //
+  // Fetched after auth resolves (inside fetchProfile, alongside the other
+  // session-init reads) and after anything that can CREATE a connection —
+  // joinPool, createPool, joinPublicContest. Deliberately NOT on every
+  // switch: switching cannot change which events you're connected to.
+  //
+  // On failure, keep the previous value and swallow the error. The header
+  // renders off this list, so a transient RPC failure must cost at most a
+  // switcher entry, never the header. That also makes this client safe to
+  // ship AHEAD of the migration: an absent function errors, the list stays
+  // empty, and the pill renders exactly as it does today.
+  connectedCompetitions: [],
+  fetchConnectedCompetitions: async () => {
+    const {data, error} = await supabase.rpc('get_user_competitions');
+    if (error) {
+      logError(error, {
+        screen: 'globalStore',
+        action: 'fetchConnectedCompetitions',
+      });
+      return;
+    }
+    set({connectedCompetitions: (data as string[] | null) ?? []});
+  },
+
   createPool: async ({userId, competition, name, isPublic}) => {
     const inviteCode = generateInviteCode();
 
@@ -402,6 +432,13 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       };
     });
     AsyncStorage.setItem(poolStorageKey(competition), typedPool.id);
+
+    // A created Contest is a new connection — and on a REDIRECTED create
+    // (contestsCreateIn, e.g. starting a Contest during the preseason) it is a
+    // connection to a competition the Player isn't even viewing. That is the
+    // exact case the switcher exists to unblock, so refresh the list.
+    // Fire-and-forget: the pool is already created and returned.
+    get().fetchConnectedCompetitions().catch(() => {});
 
     return {pool: typedPool, showWall};
   },
@@ -507,6 +544,12 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     // Re-fetch pools from DB — picks up invite_code_used, manualGlobalJoins, etc.
     await get().fetchUserPools(userId, competition);
 
+    // A completed join is the other way a connection appears — this is how the
+    // switcher's second entry shows up after entering the preseason by code.
+    // Only on this branch: a PENDING applicant has no active membership yet, so
+    // get_user_competitions wouldn't return the Contest anyway.
+    get().fetchConnectedCompetitions().catch(() => {});
+
     return {pool: typedPool};
   },
 
@@ -540,6 +583,8 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     AsyncStorage.setItem(poolStorageKey(competition), typedPool.id);
     set({activePoolId: typedPool.id});
     await get().fetchUserPools(userId, competition);
+    // Same reason as joinPool — a join by any route creates a connection.
+    get().fetchConnectedCompetitions().catch(() => {});
     return {pool: typedPool};
   },
 
