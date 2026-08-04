@@ -45,6 +45,14 @@ import {LEXICON} from '@shared/lexicon';
 // floating over the content. 'CC' ≈ 80%; lower it for more transparency.
 const PILL_FILL_ALPHA = 'CC';
 
+// LEAGUES zero-state copy. ONE definition because two paths render it — the
+// in-cycle section and the off-cycle ClubsTeaser — and they must say the same
+// thing. It explains the empty space rather than describing Leagues the Player
+// can't see: sentence one is what a League is, sentence two is why the section
+// is empty and what would fill it.
+const LEAGUES_EMPTY_NOTE =
+  "Bars, organizations, and brands support Contests with perks for everyone. You'll see them here when your Contest aligns with one.";
+
 export function HomeScreen() {
   const {colors} = useTheme();
   // Bottom-inset handling now lives entirely in useNavReserve() (nav height +
@@ -625,23 +633,28 @@ export function HomeScreen() {
           && homeRow !== 'off_far'
           && homeRow !== 'off_near'
           && homeRow !== 'pre_bridge' && (
-          // In-cycle LEAGUES section with the full Gaffer / Perks explainer.
-          // Off-cycle states use the shrunken one-line ClubsTeaser per spec.
-          <>
-            <ModuleSection label={LEXICON.league.plural.toUpperCase()}>
-              {partnerIds.map(pid => (
-                <PartnerModule key={pid} partnerId={pid} />
-              ))}
-            </ModuleSection>
-            {/* "What is a League" explainer — onboarding only. Once the player
-                is in a League-affiliated Contest (partnerIds populated) they
-                know what Leagues are, so drop it and just show their Leagues. */}
+          // In-cycle LEAGUES section. With no Leagues yet, the explainer IS the
+          // section's content — it sits INSIDE ModuleSection, not after it.
+          // Two reasons: outside, it was an orphaned sentence under no header,
+          // pointing at content the Player can't see; and ModuleSection renders
+          // nothing when it has no children, so an empty partnerIds meant the
+          // LEAGUES eyebrow didn't render either. Giving the section the
+          // explainer as its child fixes both — the header returns, and the
+          // copy now explains the empty space instead of gesturing at absent
+          // content. Off-cycle states use ClubsTeaser, which does the same.
+          <ModuleSection label={LEXICON.league.plural.toUpperCase()}>
+            {partnerIds.map(pid => (
+              <PartnerModule key={pid} partnerId={pid} />
+            ))}
+            {/* Onboarding only. Once the Player is in a League-affiliated
+                Contest (partnerIds populated) they know what Leagues are, so
+                drop it and just show their Leagues. */}
             {partnerIds.length === 0 && (
               <Text style={[bodyType.regular, styles.sectionNote, {color: colors.textSecondary}]}>
-                These are bars, shops, and brands that back Contests with perks for everyone.
+                {LEAGUES_EMPTY_NOTE}
               </Text>
             )}
-          </>
+          </ModuleSection>
         )}
       </ScrollView>
       <View
@@ -696,19 +709,23 @@ function PreseasonPicksOpenLine() {
   );
 }
 
-/** One-line Leagues teaser for off-cycle states per spec §6 + Appendix.
- *  Replaces the longer Gaffer/Perks explainer that lives in the in-cycle
- *  LEAGUES section. No eyebrow: it renders only when the Player has no
- *  Leagues, and an eyebrow over an empty stack is a promise it can't keep —
- *  same zero-state rule as the in-cycle section. */
+/** Leagues zero-state for off-cycle states. Renders only when the Player has
+ *  no Leagues (see `offCycleClubs ?? <ClubsTeaser />`).
+ *
+ *  It DOES carry the eyebrow. The old no-eyebrow rule read the zero-state as an
+ *  empty stack, but a section whose content explains why it's empty isn't empty
+ *  — the copy is the content, and without a header it was a sentence about
+ *  Leagues sitting under nothing, describing something not on screen. Same
+ *  treatment as the in-cycle path, and the same copy, so the two zero-states
+ *  can't drift. */
 function ClubsTeaser() {
   const {colors} = useTheme();
   return (
-    <View style={offCycleStyles.clubsBlock}>
-      <Text style={[bodyType.regular, offCycleStyles.clubsTeaser, {color: colors.textSecondary}]}>
-        These are bars, shops, and brands that back Contests with perks for everyone.
+    <ModuleSection label={LEXICON.league.plural.toUpperCase()}>
+      <Text style={[bodyType.regular, styles.sectionNote, {color: colors.textSecondary}]}>
+        {LEAGUES_EMPTY_NOTE}
       </Text>
-    </View>
+    </ModuleSection>
   );
 }
 
@@ -731,12 +748,6 @@ const offCycleStyles = StyleSheet.create({
     marginHorizontal: spacing.lg,
     marginTop: spacing.sm,
   },
-  clubsBlock: {
-    marginTop: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    gap: 6,
-  },
-  clubsTeaser: {fontSize: 14, lineHeight: 20},
 });
 
 const styles = StyleSheet.create({
