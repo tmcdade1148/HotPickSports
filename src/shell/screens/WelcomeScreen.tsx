@@ -2,7 +2,6 @@ import React, {useState} from 'react';
 import {Text} from '@shared/components/AppText';
 import {
   View,
-  Image,
   TouchableOpacity,
   ActivityIndicator,
   StyleSheet,
@@ -15,6 +14,7 @@ import {useTheme} from '@shell/theme';
 import {signInWithApple, signInWithGoogle} from '@shell/services/socialAuth';
 import {runPostAuthFlow} from '@shell/services/postAuthFlow';
 import {VersionStamp} from '@shell/components/VersionStamp';
+import {HotPickLogo} from '@shell/components/HotPickLogo';
 
 export function WelcomeScreen({navigation}: any) {
   const {colors} = useTheme();
@@ -70,13 +70,13 @@ export function WelcomeScreen({navigation}: any) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        {/* Logo */}
+        {/* Logo — vector, NOT a bundled asset. An OTA dropped the PNG on
+            2026-08-04 and it never came back; inline geometry ships with the
+            JS bundle so it cannot go missing that way. Container and spacing
+            below are unchanged. HotPickLogo sizes itself off the artwork's
+            own aspect ratio, so it needs no style prop. */}
         <View style={styles.logoContainer}>
-          <Image
-            source={require('../../../assets/hotpick-logo.png')}
-            style={styles.logo}
-            resizeMode="contain"
-          />
+          <HotPickLogo />
         </View>
 
         <Text style={styles.tagline}>
@@ -168,10 +168,6 @@ const createStyles = (colors: any) => StyleSheet.create({
   logoContainer: {
     alignItems: 'center',
     marginBottom: spacing.sm,
-  },
-  logo: {
-    width: 320,
-    height: 320,
   },
   tagline: {
     fontSize: 16,
