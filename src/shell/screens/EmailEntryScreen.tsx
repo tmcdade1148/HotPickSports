@@ -20,30 +20,31 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
 
 /**
- * Kill switch for the password-reset entry point.
+ * Kill switch for the password-reset entry point. Hidden, and it must STAY
+ * hidden until deep links reach JavaScript.
  *
- * Hidden 2026-08-04, restored 2026-08-05. Set to `false` to hide the link
- * again — that one boolean is the whole reversal, in either direction.
+ * ROOT CAUSE (found 2026-08-05): `expo-linking` is not installed — absent from
+ * both package.json and Podfile.lock. It supplies the native subscriber that
+ * forwards URLs from ExpoAppDelegate to React Native's `Linking`, which is
+ * what RootNavigator imports. Without it iOS opens the app correctly and then
+ * drops the URL before JS ever sees it, so `handleDeepLink` never runs. Proved
+ * on device: five Alert probes on every branch of that path, and not one
+ * fired, for either `hotpick://` or `https://hotpick.app` links.
  *
- * It was hidden because reset could not be verified end to end: a reset link
- * landed back on ForgotPassword, and the OTA carrying the token_hash fix
- * (084e2a2) had also dropped bundled assets, so that build could not tell a
- * verifyOtp failure apart from a bundle failure. Rather than ship a visible
- * door that might lead nowhere, the door was hidden and the flow behind it
- * left intact.
+ * So the reset FLOW is not broken and never was. The server redeems a fresh
+ * token_hash cleanly, the email template is right, and every file in the path
+ * reads correctly — none of it is reachable. Turning this link on would give
+ * a Player a door that opens onto nothing.
  *
- * Restored because the server side is confirmed healthy: a fresh token_hash
- * redeemed cleanly against /auth/v1/verify and returned a valid session for
- * the correct user, so the email template, the link format and the token are
- * all sound. The earlier failure is best explained by a SUPERSEDED token —
- * several resets were requested during testing, and each one invalidates the
- * previous. That is expected behaviour, not a defect.
+ * Do NOT flip this to `true` as a standalone change. Installing expo-linking
+ * is a native dependency change, so it is [RESUBMIT], not [OTA] — this flag
+ * and that fix ship together or not at all. Tom's call (2026-08-05): 1.1 (18)
+ * ships as-is with this hidden, invite codes go out as text rather than links
+ * for the preseason, and deep links are fixed properly for the regular season.
  *
- * No diagnostics are wired into the token_hash branch; if a real-world reset
- * fails, add them then rather than shipping logging on the auth path
- * speculatively.
+ * See the deep-link constraint in CLAUDE.md.
  */
-const SHOW_FORGOT_PASSWORD = true;
+const SHOW_FORGOT_PASSWORD = false;
 
 // Tester accounts bypass email confirmation via bypass-tester-signup. This client
 // check only routes the call; the Edge Function is the authoritative gate.

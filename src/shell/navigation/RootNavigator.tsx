@@ -44,22 +44,7 @@ import {HistoryStackScreen} from '@shell/screens/HistoryScreen';
 import {TosVersionGateScreen} from '@shell/screens/TosVersionGateScreen';
 import {persistPendingInviteCode} from '@shell/services/pendingInvite';
 import {supabase} from '@shared/config/supabase';
-import {Alert, Linking} from 'react-native';
-
-// ===========================================================================
-// TEMPORARY DIAGNOSTICS — REMOVE BEFORE MERGING TO MAIN.
-//
-// Every static read of the reset path says it should work: the token redeems
-// (a fresh token_hash POSTed to /auth/v1/verify returns a valid session for
-// the correct user), the link opens the app, and the right bundle is on
-// device. Tapping the link still produces no navigation and no visible
-// change, so the remaining questions are runtime ones — which of these four
-// points is actually reached, and with what.
-//
-// Alert, deliberately NOT console: a preview build has no visible console.
-// Every call below is marked with this banner so `git grep TEMP-DIAG` finds
-// all of them in one pass when this comes back out.
-// ===========================================================================
+import {Linking} from 'react-native';
 
 const Stack = createNativeStackNavigator();
 
@@ -98,10 +83,6 @@ const linking = {
  * Password reset (implicit): hotpick://auth/reset#access_token=...&type=recovery
  */
 function handleDeepLink(url: string) {
-  // TEMP-DIAG — does this handler fire at all, and with what URL? A cold start
-  // routes through getInitialURL and a warm one through the `url` listener, so
-  // seeing this at all (and seeing it ONCE vs twice) is itself a finding.
-  Alert.alert('DL', url.slice(0, 120));
   try {
     // Password reset — check before invite code parsing to avoid
     // confusing the PKCE `code` param with an invite code
@@ -162,29 +143,12 @@ async function handlePasswordResetLink(url: string) {
     const tokenHash = parsed.searchParams.get('token_hash');
     const linkType = parsed.searchParams.get('type');
 
-    // TEMP-DIAG — was the branch entered? If this never shows but 'DL' did,
-    // the params are not what we think (missing token_hash, or a `type` that
-    // is not exactly 'recovery') and the code falls silently through to PKCE.
-    Alert.alert(
-      'token_hash branch',
-      `entered=${!!(tokenHash && linkType === 'recovery')} len=${tokenHash?.length ?? 0} type=${linkType}`,
-    );
-
     if (tokenHash && linkType === 'recovery') {
       const {error} = await supabase.auth.verifyOtp({
         token_hash: tokenHash,
         type: 'recovery',
       });
-      if (error) {
-        // TEMP-DIAG — the full error object, not just its message: `status`
-        // and `code` separate an expired/consumed token from a request-shape
-        // problem, and they read very differently.
-        Alert.alert('verifyOtp failed', JSON.stringify(error));
-        return;
-      }
-      // TEMP-DIAG — redeemed successfully, so anything that goes wrong from
-      // here is navigation, not auth.
-      Alert.alert('verifyOtp OK', 'navigating');
+      if (error) return;
       navigateToReset();
       return;
     }
@@ -227,23 +191,11 @@ async function handlePasswordResetLink(url: string) {
 function navigateToReset() {
   setTimeout(() => {
     const nav = navigationRef.current;
-    // TEMP-DIAG — a null ref is the silent failure this whole path is most
-    // likely to be hitting: the original code returns here with no trace, so
-    // a successful redeem still ends in nothing happening on screen.
-    Alert.alert('navigateToReset', `navRefNull=${!nav}`);
     if (!nav) return;
-    try {
-      nav.reset({
-        index: 0,
-        routes: [{name: 'ResetPassword'}],
-      });
-    } catch (e) {
-      // TEMP-DIAG — nav.reset throwing (e.g. 'ResetPassword' not reachable in
-      // the current navigator state) would otherwise be swallowed entirely:
-      // this runs inside a setTimeout, so the throw escapes every try/catch
-      // upstream in handlePasswordResetLink.
-      Alert.alert('nav.reset threw', String(e));
-    }
+    nav.reset({
+      index: 0,
+      routes: [{name: 'ResetPassword'}],
+    });
   }, 500);
 }
 
