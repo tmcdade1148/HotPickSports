@@ -6,11 +6,13 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   StyleSheet,
 } from 'react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {supabase} from '@shared/config/supabase';
+import {getEventByCompetition} from '@sports/registry';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 import {FoundingWall} from '@shell/paywall';
@@ -37,6 +39,8 @@ export function CreatePoolScreen({navigation}: any) {
   const user = useGlobalStore(s => s.user);
   const activeSport = useGlobalStore(s => s.activeSport);
   const createPool = useGlobalStore(s => s.createPool);
+  const setActiveSport = useGlobalStore(s => s.setActiveSport);
+  const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
 
   const [poolName, setPoolName] = useState('');
   const [creating, setCreating] = useState(false);
@@ -45,9 +49,22 @@ export function CreatePoolScreen({navigation}: any) {
   // founding season, the server allows it and flags the wall. The Contest
   // already exists; the wall is informational, and dismissing it returns Home.
   const [showFoundingWall, setShowFoundingWall] = useState(false);
+  // Post-create confirmation for a redirected create (REGISTRY-03 Part C).
+  // A redirected create changes nothing on screen — the new Contest lives in
+  // a competition the Player is not viewing — so without this they would
+  // reasonably assume it failed and tap again.
+  const [showSeasonConfirm, setShowSeasonConfirm] = useState(false);
+  const [createdPoolId, setCreatedPoolId] = useState<string | null>(null);
+
+  // A time-boxed event can redirect Contest creation to the season it leads
+  // into, so a Contest started during the preseason is a regular-season
+  // Contest. Falls back to the active competition.
+  const targetCompetition =
+    activeSport?.contestsCreateIn ?? activeSport?.competition;
+  const isRedirected = Boolean(activeSport?.contestsCreateIn);
 
   const doCreate = async () => {
-    if (!user?.id || !activeSport?.competition) return;
+    if (!user?.id || !activeSport?.competition || !targetCompetition) return;
 
     setCreating(true);
     setError(null);
@@ -60,7 +77,7 @@ export function CreatePoolScreen({navigation}: any) {
 
     const result = await createPool({
       userId: user.id,
-      competition: activeSport.competition,
+      competition: targetCompetition,
       name: poolName.trim(),
       isPublic: false,
     });
@@ -71,6 +88,11 @@ export function CreatePoolScreen({navigation}: any) {
       if (result.showWall === 'pool_cap') {
         // Contest is created; prime with the founding wall, then return on close.
         setShowFoundingWall(true);
+        return;
+      }
+      if (isRedirected) {
+        setCreatedPoolId(result.pool.id);
+        setShowSeasonConfirm(true);
         return;
       }
       // Delay navigation to let the store update + HomeScreen re-render settle.
@@ -84,6 +106,31 @@ export function CreatePoolScreen({navigation}: any) {
     } else {
       setError(result.error ?? 'Failed to create Contest. Please try again.');
     }
+  };
+
+  // "Take me to it" — a real switch into the season the Contest was created
+  // in. Part B makes it persist, so the Player is still there tomorrow. This
+  // is a direct setActiveSport, the same silent switch joinPool performs; it
+  // deliberately does NOT fire the Settings switcher's restart alert.
+  const goToNewContest = () => {
+    const target = targetCompetition
+      ? getEventByCompetition(targetCompetition)
+      : undefined;
+    if (target) {
+      setActiveSport(target);
+      // setActiveSport clears activePoolId and reloads the persisted pool for
+      // the target competition asynchronously. createPool already wrote this
+      // id under that competition's key, so set it directly rather than
+      // racing the reload.
+      if (createdPoolId) setActivePoolId(createdPoolId);
+    }
+    setShowSeasonConfirm(false);
+    setTimeout(() => navigation.goBack(), 100);
+  };
+
+  const stayInCurrentCompetition = () => {
+    setShowSeasonConfirm(false);
+    setTimeout(() => navigation.goBack(), 100);
   };
 
   const handleCreate = () => {
@@ -137,6 +184,24 @@ export function CreatePoolScreen({navigation}: any) {
             invite code with can join.
           </Text>
 
+          {/* Shown only when the event redirects creation (contestsCreateIn),
+              so the Player knows which season their Contest belongs to before
+              they commit. REGISTRY-02 §6b specifies THAT this notice exists
+              and when it shows — it does NOT specify the wording below.
+              The wording is Tom's, given directly on 2026-08-04, and names
+              the season outright: the earlier "runs the regular season" left
+              WHICH regular season implicit, which is the one thing this
+              notice exists to answer. Treat it as locked to Tom, not to the
+              spec — do not reword. Report layout problems instead. */}
+          {isRedirected && (
+            <View style={styles.seasonNotice}>
+              <Text style={styles.seasonNoticeText}>
+                Your Contest will run through the 2026/27 NFL regular season.
+                Picks open September 2nd, first games September 9th.
+              </Text>
+            </View>
+          )}
+
           {error && <Text style={styles.error}>{error}</Text>}
 
           <TouchableOpacity
@@ -157,6 +222,45 @@ export function CreatePoolScreen({navigation}: any) {
         trigger="pool_cap"
         onClose={() => navigation.goBack()}
       />
+
+      {/* REGISTRY-03 §5 Part C specifies THAT this confirmation exists and
+          what it must do (offer the new Contest, or stay put) — it does NOT
+          specify the wording below. The season name here echoes the notice on
+          the create screen above, so a Gaffer isn't told which season they're
+          in and then told something vaguer one screen later. That echo is a
+          consistency fix from 2026-08-04; the exact phrasing is Tom's call and
+          is the only part open to revision. Do not reword otherwise, and
+          report layout problems instead of shortening it. */}
+      <Modal
+        visible={showSeasonConfirm}
+        transparent
+        animationType="fade"
+        onRequestClose={stayInCurrentCompetition}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalHeading}>YOUR CONTEST IS SET.</Text>
+            <Text style={styles.modalBody}>
+              It’s ready for the 2026/27 NFL regular season. Picks open
+              September 2nd, first games September 9th. Round up your crew
+              between now and then.
+            </Text>
+
+            <TouchableOpacity
+              style={styles.modalPrimary}
+              onPress={goToNewContest}>
+              <Text style={styles.modalPrimaryText}>Take me to it</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.modalSecondary}
+              onPress={stayInCurrentCompetition}>
+              <Text style={styles.modalSecondaryText}>
+                Stay in the preseason
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -211,6 +315,19 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginBottom: spacing.lg,
     lineHeight: 17,
   },
+  seasonNotice: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  seasonNoticeText: {
+    fontSize: 14,
+    color: colors.textPrimary,
+    lineHeight: 20,
+  },
   error: {
     color: colors.error,
     fontSize: 14,
@@ -229,6 +346,54 @@ const createStyles = (colors: any) => StyleSheet.create({
   createButtonText: {
     color: colors.onPrimary,
     fontSize: 16,
+    fontWeight: '600',
+  },
+  modalBackdrop: {
+    flex: 1,
+    // Matches the FoundingWall scrim exactly (shell/paywall/FoundingWall.tsx).
+    // A modal scrim is not a brand colour and the theme has no token for it;
+    // diverging here would just make two modals look different.
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  modalCard: {
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+  },
+  modalHeading: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
+  },
+  modalBody: {
+    fontSize: 15,
+    color: colors.textSecondary,
+    lineHeight: 22,
+    marginBottom: spacing.lg,
+  },
+  modalPrimary: {
+    backgroundColor: colors.primary,
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  modalPrimaryText: {
+    color: colors.onPrimary,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalSecondary: {
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    alignItems: 'center',
+  },
+  modalSecondaryText: {
+    color: colors.textSecondary,
+    fontSize: 15,
     fontWeight: '600',
   },
 });

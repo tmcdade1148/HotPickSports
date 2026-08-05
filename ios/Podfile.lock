@@ -20,7 +20,7 @@ PODS:
   - EXConstants (55.0.16):
     - ExpoModulesCore
   - EXJSONUtils (55.0.2)
-  - EXManifests (55.0.17):
+  - EXManifests (55.0.19):
     - ExpoModulesCore
   - Expo (55.0.26):
     - boost
@@ -3501,7 +3501,7 @@ SPEC CHECKSUMS:
   EXApplication: 82a44fa8236bb644a805ee21e64054eeb01d22ea
   EXConstants: dadbeba983acc30f855a919658a2b34fbd86615d
   EXJSONUtils: 04bc3807d351331a5fe154ce1da596ec15d99169
-  EXManifests: 35b26ca30c8a6bd427d1cba20348cd3c43684bb2
+  EXManifests: 005bd5690cd2859db6da3b9f33983577add13155
   Expo: fb8cded217862a2c6fc046a6cc68aa83a2ed15f0
   ExpoAdapterGoogleSignIn: ab4d9fc38cb91077a4138d178395525ec65d0c2e
   ExpoAsset: 7721c5c4ae2a7c3c8147a046727ac6c020b05648
@@ -3515,7 +3515,7 @@ SPEC CHECKSUMS:
   ExpoModulesJSI: 964334271fc77832736f66ee1785761cdc778dbe
   ExpoNotifications: 61c46aa5df088ff0ad41de0504a86a92333aec55
   EXStructuredHeaders: 93ad4f31a2eec124428675e28aca11de243ee1e4
-  EXUpdates: b1c2fe01d506dd7d349aeac8580bf2423424cbb1
+  EXUpdates: c836cf96a9575268eb4499d290d930b9152465fe
   EXUpdatesInterface: 4c11f4d1594526258f14d09817dc407acbf24e3b
   fast_float: b32c788ed9c6a8c584d114d0047beda9664e7cc6
   FBLazyVector: 06b1c8278e6e1b31ef68e9e14c296b7872e79e48

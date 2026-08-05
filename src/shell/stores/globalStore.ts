@@ -17,6 +17,10 @@ import {createPartnerModuleSlice} from './slices/partnerModuleSlice';
 import {createPoolAdminSlice} from './slices/poolAdminSlice';
 import {createDemoSlice} from './slices/demoSlice';
 import {createProfileSlice} from './slices/profileSlice';
+import {
+  ACTIVE_COMPETITION_KEY,
+  serializeActiveCompetition,
+} from './persistedCompetition';
 import {FOUNDING_GAFFER_KEY} from '@shell/paywall/foundingGaffer';
 import type {GlobalState} from './globalStore.types';
 // Re-exported so existing consumers keep importing these from globalStore.
@@ -31,11 +35,15 @@ const POOL_STORAGE_PREFIX = 'hotpick_active_pool_';
 const DEFAULT_POOL_PREFIX = 'hotpick_default_pool_';
 
 /**
- * DEV-only: AsyncStorage key for the active competition so Metro hot reloads
- * don't reset the developer back to the default event. Production builds must
- * never read this value — LoadingScreen handles the gating.
+ * The active competition is persisted in DEV and production alike
+ * (REGISTRY-03 Part B): a competition entered by invite code has to survive
+ * relaunch, otherwise every join and every create is undone at next boot.
+ * The record is keyed to the user who chose it and restore is validated
+ * through getEventByCompetition — a saved value is a preference, not a
+ * right. Key and codec live in ./persistedCompetition so both restore
+ * seams share one implementation.
  */
-export const DEV_ACTIVE_COMPETITION_KEY = 'hotpick_dev_active_competition';
+export {ACTIVE_COMPETITION_KEY};
 
 /** AsyncStorage key for a competition's active pool */
 function poolStorageKey(competition: string): string {
@@ -78,17 +86,17 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     }
 
     // Clear all per-competition pool + default pool keys plus the
-    // DEV-only persisted active competition. The latter is critical
-    // for the multi-account dev flow: without it, a previous user's
-    // sim choice persists into the next user's session and bypasses
-    // their visibility allowlist (LoadingScreen's DEV restore uses
-    // getAllEventsUnfiltered).
+    // persisted active competition. The latter is critical on a shared
+    // device: without it, a previous user's competition choice persists
+    // into the next user's session. The profileSlice visibility guard
+    // would eventually correct a competition they cannot see, but one
+    // visible to both accounts would silently leak.
     const keys = await AsyncStorage.getAllKeys();
     const toRemove = keys.filter(
       k =>
         k.startsWith(POOL_STORAGE_PREFIX) ||
         k.startsWith(DEFAULT_POOL_PREFIX) ||
-        k === DEV_ACTIVE_COMPETITION_KEY,
+        k === ACTIVE_COMPETITION_KEY,
     );
     if (toRemove.length > 0) {
       await AsyncStorage.multiRemove(toRemove);
@@ -101,6 +109,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
       priorSportHistory: {},
       visibleCompetitions: [],
       visibleCompetitionsLoaded: false,
+      connectedCompetitions: [],
       activePoolId: null,
       defaultPoolId: null,
       userPools: [],
@@ -173,12 +182,18 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     } else {
       set({activeSport: sport});
     }
-    // DEV only: persist competition so Metro hot reloads preserve selection.
-    // Production ignores this value — see LoadingScreen for the read path.
-    if (__DEV__) {
-      AsyncStorage.setItem(DEV_ACTIVE_COMPETITION_KEY, sport.competition).catch(
-        () => {},
-      );
+    // Persist the selection in DEV and production alike, keyed to the user
+    // who made it so it cannot carry across an account switch. No user means
+    // nothing to key it to, so nothing is written — a pre-auth selection has
+    // no one to be restored for. Fire-and-forget: a failed write costs the
+    // player their competition on next launch, which is the pre-REGISTRY-03
+    // behaviour, never a boot failure.
+    const persistUid = get().user?.id;
+    if (persistUid) {
+      AsyncStorage.setItem(
+        ACTIVE_COMPETITION_KEY,
+        serializeActiveCompetition(persistUid, sport.competition),
+      ).catch(() => {});
     }
   },
 
@@ -327,6 +342,35 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     return get().poolsByCompetition[competition] ?? [];
   },
 
+  // Which competitions this Player is CONNECTED to (SWITCHER-01 §5a) — the
+  // Home header Event Switcher's list. Cross-competition by design, which is
+  // exactly why it can't come from fetchUserPools: that one is scoped to the
+  // single active competition, so the client never otherwise holds a
+  // cross-event view of membership (spec §2d).
+  //
+  // Fetched after auth resolves (inside fetchProfile, alongside the other
+  // session-init reads) and after anything that can CREATE a connection —
+  // joinPool, createPool, joinPublicContest. Deliberately NOT on every
+  // switch: switching cannot change which events you're connected to.
+  //
+  // On failure, keep the previous value and swallow the error. The header
+  // renders off this list, so a transient RPC failure must cost at most a
+  // switcher entry, never the header. That also makes this client safe to
+  // ship AHEAD of the migration: an absent function errors, the list stays
+  // empty, and the pill renders exactly as it does today.
+  connectedCompetitions: [],
+  fetchConnectedCompetitions: async () => {
+    const {data, error} = await supabase.rpc('get_user_competitions');
+    if (error) {
+      logError(error, {
+        screen: 'globalStore',
+        action: 'fetchConnectedCompetitions',
+      });
+      return;
+    }
+    set({connectedCompetitions: (data as string[] | null) ?? []});
+  },
+
   createPool: async ({userId, competition, name, isPublic}) => {
     const inviteCode = generateInviteCode();
 
@@ -361,21 +405,40 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     // global (organizers create non-global pools; globals are platform-
     // provisioned), so no filter check is needed. Without this update the
     // pool only appears after an app restart triggers `fetchUserPools`.
+    // A redirected create (event config `contestsCreateIn`, e.g. starting a
+    // Contest during the preseason) lands it in a competition the Player is
+    // NOT currently viewing. Persist the selection so it is already chosen
+    // when they switch to that competition, but leave activePoolId,
+    // visiblePools and poolsByCompetition alone — those describe the
+    // competition on screen, and repointing them strands the Player in the
+    // preseason holding a Contest from another season.
+    const isRedirected = get().activeSport?.competition !== competition;
+
     set(state => {
       const updatedPools = [...state.userPools, typedPool];
-      const updatedVisible = [...state.visiblePools, typedPool];
+      const poolRoles = {...state.poolRoles, [typedPool.id]: 'organizer'};
+      if (isRedirected) {
+        return {userPools: updatedPools, poolRoles};
+      }
       return {
         userPools: updatedPools,
-        visiblePools: updatedVisible,
+        visiblePools: [...state.visiblePools, typedPool],
         poolsByCompetition: {
           ...state.poolsByCompetition,
           [competition]: updatedPools,
         },
         activePoolId: typedPool.id,
-        poolRoles: {...state.poolRoles, [typedPool.id]: 'organizer'},
+        poolRoles,
       };
     });
     AsyncStorage.setItem(poolStorageKey(competition), typedPool.id);
+
+    // A created Contest is a new connection — and on a REDIRECTED create
+    // (contestsCreateIn, e.g. starting a Contest during the preseason) it is a
+    // connection to a competition the Player isn't even viewing. That is the
+    // exact case the switcher exists to unblock, so refresh the list.
+    // Fire-and-forget: the pool is already created and returned.
+    get().fetchConnectedCompetitions().catch(() => {});
 
     return {pool: typedPool, showWall};
   },
@@ -481,6 +544,12 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     // Re-fetch pools from DB — picks up invite_code_used, manualGlobalJoins, etc.
     await get().fetchUserPools(userId, competition);
 
+    // A completed join is the other way a connection appears — this is how the
+    // switcher's second entry shows up after entering the preseason by code.
+    // Only on this branch: a PENDING applicant has no active membership yet, so
+    // get_user_competitions wouldn't return the Contest anyway.
+    get().fetchConnectedCompetitions().catch(() => {});
+
     return {pool: typedPool};
   },
 
@@ -514,6 +583,8 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     AsyncStorage.setItem(poolStorageKey(competition), typedPool.id);
     set({activePoolId: typedPool.id});
     await get().fetchUserPools(userId, competition);
+    // Same reason as joinPool — a join by any route creates a connection.
+    get().fetchConnectedCompetitions().catch(() => {});
     return {pool: typedPool};
   },
 

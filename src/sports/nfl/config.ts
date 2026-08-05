@@ -105,6 +105,34 @@ export const nflSeason: SeasonConfig = {
 };
 
 /**
+ * NFL 2026 Preseason — nfl_2026_pre.
+ *
+ * A separate competition, not a phase of nfl_2026 (Hard Rule #22:
+ * isolation comes from the competition string, never current_phase).
+ * Runs REGULAR phase over 3 weeks with espn_season_type=1.
+ *
+ * status "upcoming" keeps it OUT of the default sort, so nfl_2026 is the
+ * boot default at all times and an uninvited user never sees this
+ * (REGISTRY-03). The preseason is invite-led: getEventByCompetition
+ * ignores status, so an invite code still switches a player into it, and
+ * that choice now persists across launches. availableUntil still retires
+ * it at nfl_2026 picks-open with no client release.
+ */
+export const nflPreseason2026: SeasonConfig = {
+  ...nflSeason,
+  competition: 'nfl_2026_pre',
+  name: 'NFL 2026 Preseason',
+  shortName: 'NFL26-PRE',
+  status: 'upcoming',
+  startDate: '2026-08-13',
+  endDate: '2026-08-29',
+  picksOpenDate: '2026-08-11',
+  totalWeeks: 3,
+  availableUntil: '2026-09-02T11:00:00Z',
+  contestsCreateIn: 'nfl_2026',
+};
+
+/**
  * NFL config for the App Store reviewer pool ("The Proving Grounds") and
  * active beta testing ("Testing NFL2"). Runs on pre-seeded 2025 NFL data.
  *

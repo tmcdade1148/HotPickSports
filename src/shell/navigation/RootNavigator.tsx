@@ -78,6 +78,7 @@ const linking = {
  *
  * Invite link: hotpick://join?code=XXXX
  * Invite path: https://hotpick.app/join/XXXX
+ * Password reset (token hash): https://hotpick.app/auth/reset?token_hash=...&type=recovery
  * Password reset (PKCE): hotpick://auth/reset?code=XXX
  * Password reset (implicit): hotpick://auth/reset#access_token=...&type=recovery
  */
@@ -116,17 +117,44 @@ function handleDeepLink(url: string) {
 /**
  * Extract auth data from Supabase password reset deep link and set the session.
  *
+ * Token hash — what the recovery email actually sends now:
+ *   https://hotpick.app/auth/reset?token_hash=XXX&type=recovery
+ *
  * Supabase v2 uses PKCE by default for email flows:
- *   hotpick://auth/reset?code=XXX  (PKCE — most common)
+ *   hotpick://auth/reset?code=XXX  (PKCE)
  *
  * Fallback for implicit flow:
  *   hotpick://auth/reset#access_token=XXX&refresh_token=XXX&type=recovery
+ *
+ * Why token_hash leads: Supabase's default recovery email points at
+ * <project>.supabase.co/auth/v1/verify?…&redirect_to=…, and iOS never
+ * evaluates a redirect TARGET against the AASA — only the URL actually opened.
+ * So the universal link never matched and the app never opened, even though
+ * https://hotpick.app/auth/reset opens it correctly on its own. The email
+ * template now links straight at our domain and carries {{ .TokenHash }},
+ * which this branch redeems. PKCE and fragment branches stay for the other
+ * Supabase flows that still use them.
  */
 async function handlePasswordResetLink(url: string) {
   try {
-    // --- Try PKCE flow first (Supabase v2 default) ---
-    // URL format: hotpick://auth/reset?code=XXX
     const parsed = new URL(url);
+
+    // --- Token hash (current recovery email shape) ---
+    const tokenHash = parsed.searchParams.get('token_hash');
+    const linkType = parsed.searchParams.get('type');
+
+    if (tokenHash && linkType === 'recovery') {
+      const {error} = await supabase.auth.verifyOtp({
+        token_hash: tokenHash,
+        type: 'recovery',
+      });
+      if (error) return;
+      navigateToReset();
+      return;
+    }
+
+    // --- PKCE flow (Supabase v2 default for other email flows) ---
+    // URL format: hotpick://auth/reset?code=XXX
     const pkceCode = parsed.searchParams.get('code');
 
     if (pkceCode) {

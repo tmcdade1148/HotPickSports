@@ -729,6 +729,13 @@ export function SettingsScreen({route}: any) {
                       }
                       // Confirm before switching — changing competition resets the
                       // active view; don't do it on a stray tap.
+                      //
+                      // No "restart the app" follow-up any more (SWITCHER-01
+                      // §2b/§5e): setActiveSport clears the pool selection and
+                      // refetches, and every competition-scoped screen keys its
+                      // effects on `competition`, so the switch is already
+                      // clean. The claim was stale, and it contradicted the
+                      // Home header chevron, which switches silently.
                       Alert.alert(
                         'Switch Competition',
                         `Switch to ${ev.name}?\n\nCurrent: ${activeSport?.name ?? 'none'}`,
@@ -739,7 +746,6 @@ export function SettingsScreen({route}: any) {
                             onPress: () => {
                               setCompPickerVisible(false);
                               setActiveSport(ev);
-                              Alert.alert('Switched', `Now using ${ev.name}. Restart the app for a clean state.`);
                             },
                           },
                         ],

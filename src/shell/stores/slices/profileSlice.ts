@@ -96,7 +96,7 @@ export const createProfileSlice = (set: Set, get: Get): ProfileSlice => ({
     // Settings → Competition and stay there for the rest of the session.
     //
     // Note: this fires in DEV too. Earlier versions skipped DEV to
-    // preserve the LoadingScreen DEV_ACTIVE_COMPETITION_KEY
+    // preserve the LoadingScreen ACTIVE_COMPETITION_KEY
     // hot-reload sanity, but per Tom that was sticking beta testers
     // on the wrong competition. If a dev wants to test 2026 in DEV,
     // they switch via Settings → Competition after boot.
@@ -105,7 +105,7 @@ export const createProfileSlice = (set: Set, get: Get): ProfileSlice => ({
     const current = get().activeSport;
 
     // Defense in depth — if LoadingScreen restored a persisted
-    // activeSport (e.g. AsyncStorage DEV_ACTIVE_COMPETITION_KEY
+    // activeSport (e.g. AsyncStorage ACTIVE_COMPETITION_KEY
     // carrying nfl_2025_sim from a previous super-admin session)
     // that this user can't actually see, kick them to a visible
     // one. Without this, a logout-then-login-as-different-user
@@ -217,11 +217,17 @@ export const createProfileSlice = (set: Set, get: Get): ProfileSlice => ({
       // a brief NFL2026 activeSport + 2026 pool active before the sport flips
       // to sim, and the persisted 2026 pool sticks.
       //
+      // connectedCompetitions: the Home header Event Switcher's list
+      // (SWITCHER-01 §5a). This is the single session-init call site — it
+      // covers BOTH boot paths, since LoadingScreen (stored session) and
+      // postAuthFlow (explicit sign-in) each call fetchProfile.
+      //
       // Run together to keep the added latency to a single round-trip
-      // (~50-200ms on session boot); both swallow their own errors.
+      // (~50-200ms on session boot); all three swallow their own errors.
       await Promise.all([
         get().loadManagedClub(userId).catch(() => {}),
         get().loadVisibleCompetitions().catch(() => {}),
+        get().fetchConnectedCompetitions().catch(() => {}),
       ]);
       return data as DbProfile;
     }
