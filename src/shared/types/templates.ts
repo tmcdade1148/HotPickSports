@@ -70,6 +70,20 @@ export interface BaseEventConfig {
    *  the real season rather than one that expires with the window.
    *  Omit for normal events. */
   contestsCreateIn?: string;
+  /** Overrides the week-label vocabulary for this event. `short` is the
+   *  pill prefix ("W" -> "PS", giving NFL26 · PS01); `long` is the
+   *  spelled-out form ("WEEK" -> "PRESEASON WEEK", giving PRESEASON
+   *  WEEK 1). Omit for normal events — the defaults are W and WEEK,
+   *  so absence is exactly current behaviour.
+   *
+   *  Why config rather than a check inside the label helpers: the
+   *  preseason runs with current_phase = REGULAR by design (Hard Rule
+   *  #22 — isolation comes from the competition string, never the
+   *  phase), so the phase cannot identify it and a helper has no other
+   *  way to know which competition it is describing. The next event
+   *  with its own vocabulary (an NHL series, a World Cup group stage)
+   *  sets this field instead of adding a second special case. */
+  periodLabels?: {short: string; long: string};
   color: string; // Accent color for UI
   tabs: TabConfig[];
   sportIdentity: SportIdentity;

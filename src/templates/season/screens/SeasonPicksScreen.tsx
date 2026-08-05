@@ -447,6 +447,7 @@ export function SeasonPicksScreen() {
         accentColor={colors.secondary}
         playoffStartWeek={config.playoffStartWeek}
         playoffWeekLabels={config.playoffWeekLabels}
+        weekPrefix={config.periodLabels?.short}
       />
 
       {!isLoading && games.length > 0 && (

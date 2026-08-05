@@ -26,6 +26,13 @@ export function shortPeriod(
   week: number | null,
   playoffStart = 19,
   seasonYear?: number,
+  /** Compact week prefix, from the active event's `periodLabels.short`
+   *  (LABELS-01). 'PS' inside nfl_2026_pre, giving NFL26 · PS01. */
+  shortLabel: string = 'W',
+  /** Spelled-out form, needed because the final fallback below delegates to
+   *  getPeriodLabel. Without threading it, that one path would keep saying
+   *  WEEK while every other surface said PRESEASON WEEK. */
+  longLabel: string = 'WEEK',
 ): string {
   const suffix =
     typeof seasonYear === 'number' && seasonYear > 0
@@ -50,7 +57,7 @@ export function shortPeriod(
   }
 
   if (typeof week === 'number') {
-    return `${sport} · W${String(week).padStart(2, '0')}`;
+    return `${sport} · ${shortLabel}${String(week).padStart(2, '0')}`;
   }
-  return `${sport} · ${getPeriodLabel(phase, week, playoffStart)}`;
+  return `${sport} · ${getPeriodLabel(phase, week, playoffStart, longLabel)}`;
 }

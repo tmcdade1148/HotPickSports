@@ -45,6 +45,10 @@ export function SeasonBoardScreen() {
   const {colors} = useTheme();
   const styles = createStyles(colors);
   const config = useSeasonStore(s => s.config);
+  // Compact week prefix for this event (LABELS-01) — 'PS' in the preseason,
+  // undefined everywhere else, which keeps both strings below byte-identical
+  // to today.
+  const weekPrefix = config?.periodLabels?.short;
   const navReserve = useNavReserve();
   const poolId = useSeasonStore(s => s.poolId);
   const currentWeek = useSeasonStore(s => s.currentWeek);
@@ -529,14 +533,21 @@ export function SeasonBoardScreen() {
             styles.toggleText,
             activeTab === 'week' && styles.toggleTextActive,
           ]}>
-            Week {displayedWeek} Points
+            {/* SHORT form (LABELS-01) — this tab is half a flexed row.
+                Casing is deliberately left as-is: "PS1 Points" keeps the
+                existing sentence case, which is inconsistent with the caps
+                used everywhere else but is a pre-existing copy issue with its
+                own ticket, not something to fold into a labels change. */}
+            {weekPrefix ? `${weekPrefix}${displayedWeek}` : `Week ${displayedWeek}`} Points
           </Text>
         </TouchableOpacity>
       </View>
       {activeTab === 'week' && showLockCountdown && (
         <View style={styles.lockBanner}>
           <Text style={styles.lockBannerText}>
-            {`WEEK ${currentWeek} ${LEXICON.picks.toUpperCase()} LOCK IN ${unitText.toUpperCase()}`}
+            {/* SHORT form (LABELS-01) — the spelled-out version pushed this
+                full-width banner onto a second line. */}
+            {`${weekPrefix ? `${weekPrefix}${currentWeek}` : `WEEK ${currentWeek}`} ${LEXICON.picks.toUpperCase()} LOCK IN ${unitText.toUpperCase()}`}
           </Text>
         </View>
       )}

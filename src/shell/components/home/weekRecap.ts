@@ -51,16 +51,29 @@ export type WeekRow = {
 /** Playoff rounds read as rounds, not week numbers. */
 const ROUND_LABEL: Record<number, string> = {19: 'WC', 20: 'DIV', 21: 'CONF', 22: 'SB'};
 
-/** Bar label — "W7" in the regular season, "WC"/"DIV"/"CONF"/"SB" in playoffs. */
-export function weekLabel(week: number, isPlayoffs: boolean): string {
-  if (isPlayoffs) return ROUND_LABEL[week] ?? `W${week}`;
-  return `W${week}`;
+/** Bar label — "W7" in the regular season, "WC"/"DIV"/"CONF"/"SB" in playoffs.
+ *  `shortLabel` comes from the active event's `periodLabels.short` (LABELS-01)
+ *  and defaults to today's "W". ROUND_LABEL is deliberately untouched: a
+ *  preseason has no Wild Card / Divisional / Conference / Super Bowl, so that
+ *  branch is unreachable there. */
+export function weekLabel(
+  week: number,
+  isPlayoffs: boolean,
+  shortLabel: string = 'W',
+): string {
+  if (isPlayoffs) return ROUND_LABEL[week] ?? `${shortLabel}${week}`;
+  return `${shortLabel}${week}`;
 }
 
-/** Eyebrow label — the same idea with room to spell it out: "WEEK 7" / "WC". */
-export function sectionWeekLabel(week: number, isPlayoffs: boolean): string {
-  if (isPlayoffs) return ROUND_LABEL[week] ?? `WEEK ${week}`;
-  return `WEEK ${week}`;
+/** Eyebrow label — the same idea with room to spell it out: "WEEK 7" / "WC".
+ *  `longLabel` from `periodLabels.long`; defaults to today's "WEEK". */
+export function sectionWeekLabel(
+  week: number,
+  isPlayoffs: boolean,
+  longLabel: string = 'WEEK',
+): string {
+  if (isPlayoffs) return ROUND_LABEL[week] ?? `${longLabel} ${week}`;
+  return `${longLabel} ${week}`;
 }
 
 /**

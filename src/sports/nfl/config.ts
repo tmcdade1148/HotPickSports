@@ -130,6 +130,11 @@ export const nflPreseason2026: SeasonConfig = {
   totalWeeks: 3,
   availableUntil: '2026-09-02T11:00:00Z',
   contestsCreateIn: 'nfl_2026',
+  // LABELS-01. Without this the preseason is indistinguishable from the real
+  // season on screen: it runs current_phase = REGULAR (Hard Rule #22), so
+  // every label helper correctly falls through to its REGULAR branch and
+  // renders WEEK 1 / W01 — identical to what September will show.
+  periodLabels: {short: 'PS', long: 'PRESEASON WEEK'},
 };
 
 /**

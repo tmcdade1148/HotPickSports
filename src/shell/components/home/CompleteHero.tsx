@@ -32,6 +32,7 @@ import {
   teamDisplayName,
   type WeekRow,
 } from './weekRecap';
+import {usePeriodLabels} from './usePeriodLabel';
 
 export function CompleteHero() {
   const {colors} = useTheme();
@@ -49,6 +50,7 @@ export function CompleteHero() {
   const data = selectRecap(recentWeeks, currentWeek, true);
   // Only THIS week's own result; a missed (absent) week falls back to the prior
   // one, which must not render as this week's. Unscored → null → RecapCard "—".
+  const labels = usePeriodLabels();
   const scored = data != null && data.recap.week === currentWeek;
   const cardData = scored ? data : null;
 
@@ -59,6 +61,7 @@ export function CompleteHero() {
     ? sectionWeekLabel(
         cardData.recap.week,
         PLAYOFF_PHASES.includes(String(currentPhase ?? '')),
+        labels.long,
       )
     : null;
 

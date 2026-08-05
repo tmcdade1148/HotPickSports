@@ -40,6 +40,11 @@ export function getPeriodLabel(
   phase: SeasonPhase | string,
   weekNumber: number | null,
   playoffStartWeek: number = 19,
+  /** Spelled-out week vocabulary, from the active event's `periodLabels.long`
+   *  (LABELS-01). 'PRESEASON WEEK' inside nfl_2026_pre. Defaults to today's
+   *  'WEEK', so a missed call site renders exactly as it does now rather than
+   *  breaking — deliberate, given how many surfaces build week strings. */
+  longLabel: string = 'WEEK',
 ): string {
   switch (phase) {
     case 'PRE_SEASON':
@@ -66,6 +71,8 @@ export function getPeriodLabel(
 
     case 'REGULAR':
     default:
-      return typeof weekNumber === 'number' ? `WEEK ${weekNumber}` : 'WEEK —';
+      return typeof weekNumber === 'number'
+        ? `${longLabel} ${weekNumber}`
+        : `${longLabel} —`;
   }
 }

@@ -14,6 +14,11 @@ interface WeekSelectorProps {
   playoffStartWeek?: number;
   /** Short labels for playoff week chips, keyed by week number (e.g. {19: 'WC'}). */
   playoffWeekLabels?: Record<number, string>;
+  /** Compact week prefix from the event's `periodLabels.short` (LABELS-01) —
+   *  'PS' inside the preseason, giving PS1 / PS2 / PS3. Defaults to today's
+   *  'W'. The chip is a fixed 52pt and the preseason runs 3 weeks, so the
+   *  2-character prefix is comfortable at the widest case. */
+  weekPrefix?: string;
 }
 
 const CHIP_WIDTH = 52;
@@ -38,6 +43,7 @@ export function WeekSelector({
   accentColor,
   playoffStartWeek,
   playoffWeekLabels,
+  weekPrefix = 'W',
 }: WeekSelectorProps) {
   // activeWeek = the real week from DB. currentWeek = the viewed week.
   const realWeek = activeWeek ?? currentWeek;
@@ -111,7 +117,7 @@ export function WeekSelector({
       // a visible gap appears below them on the Picks screen.
       style={styles.scroll}
       contentContainerStyle={styles.container}>
-      {regularWeeks.map(week => renderChip(week, `W${week}`))}
+      {regularWeeks.map(week => renderChip(week, `${weekPrefix}${week}`))}
 
       {playoffWeeks.length > 0 && (
         <View style={styles.separator}>
