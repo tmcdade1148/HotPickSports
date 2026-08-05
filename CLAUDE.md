@@ -174,6 +174,7 @@ These rules apply from the moment the app is live in the App Store and Google Pl
 
 - **Never commit directly to main during a live season** — all changes go through a feature branch and preview build first
 - **EAS Update (OTA) is for JavaScript-only fixes only** — new features that change app behavior require a full build and store submission
+- **expo-updates does not deliver image assets over the air on iOS in this app** — a `require`'d image renders correctly in a compiled build and disappears after the first OTA. The update manifest lists the asset but the client never resolves it. Verified 2026-08-05 from both a local and a clean-CI publish. Use `react-native-svg` components for artwork instead; they ship inside the JS bundle, which OTA delivers reliably (see `src/shell/components/HotPickLogo.tsx`). Native assets — app icon, splash, anything in `Images.xcassets` or `android/res` — are unaffected, since they're compiled into the binary. **Do not add a `require`'d image without knowing this: it will pass every check in a build and fail silently after the first update.**
 - **All Edge Functions must be committed to git before deployment** — never deploy an Edge Function that isn't in the repository
 - **Take a manual Supabase backup before every schema migration** — Project Settings → Database → Backups → Manual backup
 - **`scoring_locked` in `competition_config` is the emergency scoring brake** — set to `true` to pause all scoring computation instantly, no deployment needed
