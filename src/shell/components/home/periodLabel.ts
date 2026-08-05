@@ -1,6 +1,19 @@
 // src/shell/components/home/periodLabel.ts
-// Maps competition_config (current_phase, current_week) to the short label
-// shown in the IdentityBar's week chip and the State Hero's eyebrow.
+// Maps competition_config (current_phase, current_week) to a spelled-out
+// period label ('WEEK 8', 'WILD CARD', 'PRESEASON').
+//
+// WHO ACTUALLY CALLS THIS (corrected 2026-08-05 — the previous note here was
+// stale and cost a wrong spec):
+//   • shortPeriod()        — its final fallback, for phases with no week number
+//   • useSpokenPeriodLabel() — the screen-reader form of the header pill
+// It has NO direct component callers.
+//
+// The two surfaces the old comment named are NOT wired to this function:
+//   • the IdentityBar week chip builds its own string (`PTS THRU …`)
+//   • the State Hero eyebrow resolves to WeekSection → sectionWeekLabel()
+//     in weekRecap.ts
+// Anyone reasoning about which surfaces a change here touches should start
+// from that list, not from this file's name.
 //
 // Spec: 260513_HotPick_HomeRedesign_Spec.docx §6.4.2 (week label format)
 //
@@ -18,7 +31,8 @@ export type SeasonPhase =
   | 'SEASON_COMPLETE';
 
 /**
- * Format the short period label for the IdentityBar (and State Hero eyebrow).
+ * Format the spelled-out period label. See the file header for the real
+ * call sites — this is not the IdentityBar chip or the hero eyebrow.
  *
  * Examples:
  *   getPeriodLabel('REGULAR', 8)              → 'WEEK 8'

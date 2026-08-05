@@ -146,6 +146,21 @@ describe('short form keeps the tight surfaces inside their limits', () => {
     expect(short.length).toBeLessThan(long.length);
   });
 
+  it('IdentityBar range chip retires the third abbreviation', () => {
+    // The chip built its own string and used a THIRD prefix — "WK" — alongside
+    // W and WEEK. It is gated on currentPhase === 'REGULAR', which the
+    // preseason satisfies (Hard Rule #22), so it was live there reading
+    // "PTS THRU WK 1". Short form, because "PTS" beside it is already
+    // abbreviated and the spelled-out version would be 25 characters.
+    const chip = (prefix: string | undefined, week: number) =>
+      prefix ? `PTS THRU ${prefix}${week}` : `PTS THRU WK ${week}`;
+    expect(chip(undefined, 1)).toBe('PTS THRU WK 1');
+    expect(chip(PS.short, 1)).toBe('PTS THRU PS1');
+    expect(chip(PS.short, 1).length).toBeLessThan(
+      `PTS THRU ${PS.long} 1`.length,
+    );
+  });
+
   it('Board toggle tab keeps its existing sentence casing', () => {
     // "PS1 Points", not "PS1 POINTS" — the caps inconsistency on this tab is
     // pre-existing and has its own ticket. A labels change must not smuggle a
