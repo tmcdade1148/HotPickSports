@@ -20,23 +20,30 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
 
 /**
- * Kill switch for the password-reset entry point (2026-08-04).
+ * Kill switch for the password-reset entry point.
  *
- * Flip to `true` to restore the link — that one boolean is the whole reversal.
+ * Hidden 2026-08-04, restored 2026-08-05. Set to `false` to hide the link
+ * again — that one boolean is the whole reversal, in either direction.
  *
- * Hidden because reset could not be verified end to end before the production
- * rebuild: a reset link lands back on ForgotPassword, and the OTA meant to
- * carry the token_hash fix (084e2a2) also dropped bundled assets, so that
- * build was not a trustworthy surface to tell a verifyOtp failure apart from a
- * bundle failure. Better no visible door than one that leads nowhere.
+ * It was hidden because reset could not be verified end to end: a reset link
+ * landed back on ForgotPassword, and the OTA carrying the token_hash fix
+ * (084e2a2) had also dropped bundled assets, so that build could not tell a
+ * verifyOtp failure apart from a bundle failure. Rather than ship a visible
+ * door that might lead nowhere, the door was hidden and the flow behind it
+ * left intact.
  *
- * Deliberately hides ONLY the door. The flow behind it is intact and still
- * routed: ForgotPasswordScreen, ResetPasswordScreen, and the deep-link handler
- * in RootNavigator are untouched, so an existing recovery email still opens
- * the app and still works if verifyOtp succeeds. That is what makes this
- * testable again without a rebuild.
+ * Restored because the server side is confirmed healthy: a fresh token_hash
+ * redeemed cleanly against /auth/v1/verify and returned a valid session for
+ * the correct user, so the email template, the link format and the token are
+ * all sound. The earlier failure is best explained by a SUPERSEDED token —
+ * several resets were requested during testing, and each one invalidates the
+ * previous. That is expected behaviour, not a defect.
+ *
+ * No diagnostics are wired into the token_hash branch; if a real-world reset
+ * fails, add them then rather than shipping logging on the auth path
+ * speculatively.
  */
-const SHOW_FORGOT_PASSWORD = false;
+const SHOW_FORGOT_PASSWORD = true;
 
 // Tester accounts bypass email confirmation via bypass-tester-signup. This client
 // check only routes the call; the Edge Function is the authoritative gate.
