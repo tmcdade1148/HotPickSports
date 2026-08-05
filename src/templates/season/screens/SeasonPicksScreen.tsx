@@ -369,9 +369,20 @@ export function SeasonPicksScreen() {
   }
 
   // Outside the weekly cycle → no slate, just a holding screen (REFERENCE.md
-  // §557 idle phases). Gate on current_phase, the authority — week_state is
-  // 'idle' for these too, but it's derived from ESPN's 5-min cron and lags.
-  // No countdown here: Home owns that. Picks points, Home tells.
+  // §557 idle phases). No countdown here: Home owns that. Picks points, Home tells.
+  //
+  // The phase alone is NOT sufficient. A preseason competition (nfl_2026_pre)
+  // runs current_phase = 'REGULAR' permanently — isolation comes from the
+  // competition string, never the phase (Hard Rule #22) — so none of these
+  // names ever match there, and this screen rendered a game list while
+  // week_state was still 'idle'. week_state is the only value that can say
+  // "no week is running" for that competition.
+  //
+  // Adding 'idle' does NOT reintroduce the lag the old comment warned about.
+  // A live week cycles picks_open → locked → live → settling → complete →
+  // picks_open and never returns to 'idle'; admin_advance_season_phase forces
+  // 'idle' only for OFF_SEASON and PRE_SEASON, both already matched above. So
+  // this fires only when there genuinely is no week.
   const IDLE_PHASES = [
     'OFF_SEASON',
     'PRE_SEASON',
@@ -379,7 +390,7 @@ export function SeasonPicksScreen() {
     'SUPERBOWL_INTRO',
     'SEASON_COMPLETE',
   ];
-  if (IDLE_PHASES.includes(currentPhase)) {
+  if (IDLE_PHASES.includes(currentPhase) || weekState === 'idle') {
     const {title, body} = (() => {
       switch (currentPhase) {
         case 'SEASON_COMPLETE':
@@ -394,9 +405,11 @@ export function SeasonPicksScreen() {
             body: "That week's done. The next one's coming.",
           };
         default: {
-          // OFF_SEASON, PRE_SEASON — the storefront "you're undefeated" framing.
-          // Date reads from season_picks_open_at (never hardcoded), same
-          // formatter as PreseasonPicksOpenLine on Home.
+          // OFF_SEASON, PRE_SEASON — and now an idle week in any other phase,
+          // which is how a preseason competition (permanently 'REGULAR')
+          // reaches this copy. Date reads from season_picks_open_at (never
+          // hardcoded), so nfl_2026_pre prints its own 2026-08-11 with no
+          // special case. Same formatter as PreseasonPicksOpenLine on Home.
           const picksOpenLabel = picksOpenAt
             ? `${picksOpenAt.toLocaleDateString('en-US', {month: 'long'})} ${picksOpenAt.getDate()}${ordinalSuffix(picksOpenAt.getDate())}`
             : 'September 2nd';
@@ -447,6 +460,7 @@ export function SeasonPicksScreen() {
         accentColor={colors.secondary}
         playoffStartWeek={config.playoffStartWeek}
         playoffWeekLabels={config.playoffWeekLabels}
+        weekPrefix={config.periodLabels?.short}
       />
 
       {!isLoading && games.length > 0 && (

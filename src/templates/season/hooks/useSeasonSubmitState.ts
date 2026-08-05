@@ -84,12 +84,23 @@ export function useSeasonSubmitState(): SeasonSubmitState {
     return 'in_progress';
   })();
 
+  // SHORT form (LABELS-01). SubmitPicksFooter clamps this label to
+  // numberOfLines={1}, so anything long TRUNCATES with an ellipsis rather than
+  // wrapping — the one surface where the spelled-out form would actually be
+  // lost. "THAT'S A WRAP ON PS1" is 20 characters against the 23 rendered
+  // today, so the preseason is shorter than the regular season here, not
+  // longer. Absent periodLabels reproduces today's string exactly.
+  const shortWeek = config?.periodLabels?.short;
+  const wrapWeek = shortWeek
+    ? `${shortWeek}${currentWeek ?? ''}`
+    : `WEEK ${currentWeek ?? ''}`;
+
   const label = (() => {
     if (demoSubmitting) return 'Scoring your week…';
     switch (state) {
       case 'locked':
         return allGamesFinal
-          ? `THAT'S A WRAP ON WEEK ${currentWeek ?? ''}`
+          ? `THAT'S A WRAP ON ${wrapWeek}`
           : "PICKS ARE LOCKED";
       case 'no_picks':      return 'Start picking your winners';
       case 'needs_hotpick': return 'Select your HotPick';

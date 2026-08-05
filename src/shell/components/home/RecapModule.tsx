@@ -25,6 +25,7 @@ import {
   teamDisplayName,
   type WeekRow,
 } from './weekRecap';
+import {usePeriodLabels} from './usePeriodLabel';
 
 export function RecapModule() {
   const recentWeeks = useGlobalStore(s => s.recentWeeks) as WeekRow[];
@@ -39,6 +40,7 @@ export function RecapModule() {
 
   const phase = String(currentPhase ?? '');
   const isPlayoffs = PLAYOFF_PHASES.includes(phase);
+  const labels = usePeriodLabels();
 
   // RecapModule now shows the most recent FINISHED week (currentWeek − 1).
   // Settling/complete belong to the between-weeks heroes, and this card returns
@@ -92,7 +94,7 @@ export function RecapModule() {
 
   // ONE spelling of the week for this card: the eyebrow's "WEEK 7 RECAP" and
   // the footer's "WEEK 7 TOTAL:" can't drift apart.
-  const weekLabel = sectionWeekLabel(data.recap.week, isPlayoffs);
+  const weekLabel = sectionWeekLabel(data.recap.week, isPlayoffs, labels.long);
 
   // A missed week has to say so ON THE EYEBROW, because this module is
   // COLLAPSIBLE: collapsed, the eyebrow is all there is, and a bare "0" reads

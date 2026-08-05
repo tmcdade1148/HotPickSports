@@ -51,6 +51,10 @@ export function IdentityBar({style}: {style?: StyleProp<ViewStyle>}) {
   const currentWeek  = useNFLStore(s => s.currentWeek);
   const currentPhase = useNFLStore(s => s.currentPhase);
   const weekState    = useNFLStore(s => s.weekState);
+  // Compact week vocabulary for the active event (LABELS-01) — 'PS' inside
+  // nfl_2026_pre. SHORT form here, not long: this is a chip, "PTS" beside it
+  // is already abbreviated, and the spelled-out form would be 25 characters.
+  const weekPrefix = useGlobalStore(s => s.activeSport?.periodLabels?.short);
 
   // n = the last week FOLDED INTO the total, derived from the SAME predicate
   // loadSeasonTotal uses to decide what to sum — so the label can't claim a
@@ -60,9 +64,16 @@ export function IdentityBar({style}: {style?: StyleProp<ViewStyle>}) {
   // Only the regular season names a range. Before week 1 completes there's no
   // range yet; the playoffs, REGULAR_COMPLETE and SEASON_COMPLETE are their own
   // leaderboards where "thru week n" would mislead — those stay "SEASON PTS".
+  //
+  // The preseason satisfies `currentPhase === 'REGULAR'` (Hard Rule #22), so
+  // this chip IS live there and used to read "PTS THRU WK 1" — a third week
+  // abbreviation alongside W and WEEK. It now reads "PTS THRU PS1", which
+  // retires WK from the preseason path entirely.
   const rangeLabel =
     currentPhase === 'REGULAR' && lastCompletedWeek >= 1
-      ? `PTS THRU WK ${lastCompletedWeek}`
+      ? weekPrefix
+        ? `PTS THRU ${weekPrefix}${lastCompletedWeek}`
+        : `PTS THRU WK ${lastCompletedWeek}`
       : 'SEASON PTS';
 
   // When every game in the current week is final, the week total has

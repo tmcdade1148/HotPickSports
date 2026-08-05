@@ -30,6 +30,7 @@ import {displayType, monoType, spacing, borderRadius} from '@shared/theme';
 import {fmtPoints} from '@shared/utils/format';
 import {ModuleSection} from './ModuleSection';
 import {HIDDEN_PHASES, PLAYOFF_PHASES, weekLabel, type WeekRow} from './weekRecap';
+import {usePeriodLabels} from './usePeriodLabel';
 
 // Five week slots visible at rest — one more than before, because the head no
 // longer eats ~28% of the card. Older weeks live in the carousel behind them.
@@ -104,6 +105,7 @@ export function HistoryModule() {
 
   const phase = String(currentPhase ?? '');
   const isPlayoffs = PLAYOFF_PHASES.includes(phase);
+  const labels = usePeriodLabels();
   const isRegularComplete = phase === 'REGULAR_COMPLETE';
   // Once the week is scored (all games final) its result is real and it draws a
   // bar. Before that it holds its slot, labelled and empty.
@@ -354,7 +356,7 @@ export function HistoryModule() {
                   <Text
                     style={[displayType.display, styles.slotLabel, {color: colors.textTertiary}]}
                     numberOfLines={1}>
-                    {weekLabel(cell.week, isPlayoffs)}
+                    {weekLabel(cell.week, isPlayoffs, labels.short)}
                   </Text>
                 </View>
               );

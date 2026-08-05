@@ -19,6 +19,7 @@ import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {resolveWeekScore} from '@templates/season/utils/weekScore';
 import {ModuleSection} from './ModuleSection';
 import {PLAYOFF_PHASES, sectionWeekLabel} from './weekRecap';
+import {usePeriodLabels} from './usePeriodLabel';
 import type {HomeRow} from './homeRows';
 
 /**
@@ -47,6 +48,9 @@ export function WeekSection({row, children}: WeekSectionProps) {
   const weekPicks = useSeasonStore(s => s.weekPicks);
   const games = useSeasonStore(s => s.games);
   const viewedWeek = useSeasonStore(s => s.currentWeek);
+  // Above the early return — every hook in this component must run on every
+  // render, and the NO_WEEK_ROWS bail below is a genuine early return.
+  const labels = usePeriodLabels();
 
   if (NO_WEEK_ROWS.includes(row) || currentWeek <= 0) return <>{children}</>;
 
@@ -70,7 +74,7 @@ export function WeekSection({row, children}: WeekSectionProps) {
   const isPlayoffs = PLAYOFF_PHASES.includes(String(currentPhase));
   const betweenWeeks = row === 'settling' || row === 'complete';
   const isComplete = row === 'complete';
-  const weekLabel = sectionWeekLabel(currentWeek, isPlayoffs);
+  const weekLabel = sectionWeekLabel(currentWeek, isPlayoffs, labels.long);
   const label = isComplete ? `${weekLabel}:` : weekLabel;
 
   return (
