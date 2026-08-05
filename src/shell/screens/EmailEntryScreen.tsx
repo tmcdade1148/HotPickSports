@@ -20,21 +20,29 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
 
 /**
- * Kill switch for the password-reset entry point (2026-08-04).
+ * Kill switch for the password-reset entry point. Hidden, and it must STAY
+ * hidden until deep links reach JavaScript.
  *
- * Flip to `true` to restore the link — that one boolean is the whole reversal.
+ * ROOT CAUSE (found 2026-08-05): `expo-linking` is not installed — absent from
+ * both package.json and Podfile.lock. It supplies the native subscriber that
+ * forwards URLs from ExpoAppDelegate to React Native's `Linking`, which is
+ * what RootNavigator imports. Without it iOS opens the app correctly and then
+ * drops the URL before JS ever sees it, so `handleDeepLink` never runs. Proved
+ * on device: five Alert probes on every branch of that path, and not one
+ * fired, for either `hotpick://` or `https://hotpick.app` links.
  *
- * Hidden because reset could not be verified end to end before the production
- * rebuild: a reset link lands back on ForgotPassword, and the OTA meant to
- * carry the token_hash fix (084e2a2) also dropped bundled assets, so that
- * build was not a trustworthy surface to tell a verifyOtp failure apart from a
- * bundle failure. Better no visible door than one that leads nowhere.
+ * So the reset FLOW is not broken and never was. The server redeems a fresh
+ * token_hash cleanly, the email template is right, and every file in the path
+ * reads correctly — none of it is reachable. Turning this link on would give
+ * a Player a door that opens onto nothing.
  *
- * Deliberately hides ONLY the door. The flow behind it is intact and still
- * routed: ForgotPasswordScreen, ResetPasswordScreen, and the deep-link handler
- * in RootNavigator are untouched, so an existing recovery email still opens
- * the app and still works if verifyOtp succeeds. That is what makes this
- * testable again without a rebuild.
+ * Do NOT flip this to `true` as a standalone change. Installing expo-linking
+ * is a native dependency change, so it is [RESUBMIT], not [OTA] — this flag
+ * and that fix ship together or not at all. Tom's call (2026-08-05): 1.1 (18)
+ * ships as-is with this hidden, invite codes go out as text rather than links
+ * for the preseason, and deep links are fixed properly for the regular season.
+ *
+ * See the deep-link constraint in CLAUDE.md.
  */
 const SHOW_FORGOT_PASSWORD = false;
 
