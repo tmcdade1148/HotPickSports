@@ -558,7 +558,17 @@ export function SeasonBoardScreen() {
   // copy on both toggle sides (replaces the old full-screen PRE_SEASON early-
   // return; now keeps the tabs visible and also covers OFF_SEASON). Mid-season
   // keeps the functional "scores will appear" messages below.
-  const isPreLaunch = currentPhase === 'OFF_SEASON' || currentPhase === 'PRE_SEASON';
+  //
+  // week_state === 'idle' is the third arm, and it is what makes this correct
+  // inside a preseason competition: nfl_2026_pre runs current_phase =
+  // 'REGULAR' permanently (Hard Rule #22), so neither phase name matches and
+  // the Ladder was showing mid-season "scores will appear" copy before a
+  // single pick existed. A live week never returns to 'idle' once it starts,
+  // so this cannot fire mid-season.
+  const isPreLaunch =
+    currentPhase === 'OFF_SEASON' ||
+    currentPhase === 'PRE_SEASON' ||
+    weekState === 'idle';
   const prelaunchEmpty = (
     <View style={styles.emptyState}>
       <Text style={{fontSize: 18, fontWeight: '600', color: colors.textPrimary, marginBottom: 8, textAlign: 'center', paddingHorizontal: 32}}>
