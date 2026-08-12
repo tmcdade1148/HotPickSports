@@ -14,6 +14,7 @@ import {X, Send} from 'lucide-react-native';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
+import {LEXICON} from '@shared/lexicon';
 
 const MAX_CHARS = 160;
 const MAX_PER_DAY = 3;
@@ -35,6 +36,7 @@ export function BroadcastComposer({
   const styles = createStyles(colors);
   const broadcastToPool = useGlobalStore(s => s.broadcastToPool);
   const fetchBroadcastsToday = useGlobalStore(s => s.fetchBroadcastsToday);
+  const fetchPoolMembers = useGlobalStore(s => s.fetchPoolMembers);
   const poolMembers = useGlobalStore(s => s.poolMembers);
 
   const [message, setMessage] = useState('');
@@ -46,18 +48,38 @@ export function BroadcastComposer({
   const memberCount = poolMembers.filter(
     m => m.user_id !== useGlobalStore.getState().user?.id,
   ).length;
-  const canSend = message.trim().length > 0 && remaining > 0 && !sending;
+  // memberCount > 0 is NEW. A broadcast the app believes reaches nobody still
+  // consumes one of only three sends per 24h, so a Gaffer who tries twice has
+  // spent two thirds of the day's allowance before anything is diagnosed.
+  // This is a courtesy guard, never authority — the server counts for itself.
+  const canSend =
+    message.trim().length > 0 && remaining > 0 && memberCount > 0 && !sending;
 
   useEffect(() => {
-    if (visible) {
-      setMessage('');
-      setLoading(true);
-      fetchBroadcastsToday(poolId).then(count => {
-        setBroadcastsUsed(count);
-        setLoading(false);
-      });
-    }
-  }, [visible, poolId, fetchBroadcastsToday]);
+    if (!visible) return;
+    setMessage('');
+    setLoading(true);
+    // THE FIX. poolMembers has exactly one populator, fetchPoolMembers, and its
+    // only other caller is PoolMembersScreen — so before this the composer's
+    // count was a side effect of having visited a different screen. Settings →
+    // Broadcast without passing through Members left it at its initial [] and
+    // the composer told a Gaffer with twelve members that they had zero.
+    //
+    // The surface that DISPLAYS the number fetches the number. Do not "fix"
+    // this by calling fetchPoolMembers from a navigator or at boot — that is
+    // the same fragility moved one screen further out.
+    //
+    // Await BOTH before clearing loading: the whole content block below is
+    // gated on `loading`, so nothing renders a count mid-flight. A momentary 0
+    // that corrects itself is indistinguishable from the bug being fixed.
+    //
+    // .finally, not .then — a failed fetch must still clear the spinner. The
+    // count then stays 0 and the zero-guard blocks the send, which is the
+    // conservative outcome: better to refuse than to send blind.
+    Promise.all([fetchBroadcastsToday(poolId), fetchPoolMembers(poolId)])
+      .then(([count]) => setBroadcastsUsed(count))
+      .finally(() => setLoading(false));
+  }, [visible, poolId, fetchBroadcastsToday, fetchPoolMembers]);
 
   const handleSend = () => {
     if (!canSend) return;
@@ -158,6 +180,17 @@ export function BroadcastComposer({
               {message.length}/{MAX_CHARS}
             </Text>
 
+            {/* Zero-member state. Legitimately reachable — a brand-new Contest
+                whose Gaffer has invited nobody yet — so this is NOT an error.
+                One quiet line in secondary text, no Alert (the Player hasn't
+                acted, there is nothing to interrupt) and no error styling. */}
+            {memberCount === 0 && (
+              <Text style={styles.zeroMembers}>
+                This {LEXICON.contest.singular} has no other members yet. Invite
+                someone and you'll be able to send a broadcast.
+              </Text>
+            )}
+
             {/* Send button */}
             <TouchableOpacity
               style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
@@ -241,6 +274,14 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   charCountWarning: {
     color: colors.error,
+  },
+  // Deliberately textSecondary, NOT colors.error — an empty new Contest is a
+  // normal state, not a failure, and the copy must not read like one.
+  zeroMembers: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.textSecondary,
+    marginBottom: spacing.lg,
   },
   sendButton: {
     flexDirection: 'row',
