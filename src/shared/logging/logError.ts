@@ -17,9 +17,11 @@
 //   • Storm-guarded — dedup + a per-minute cap, because the first caller (the
 //     Ladder) sits behind a Realtime refetch that can fire in bursts.
 // ---------------------------------------------------------------------------
-import {Platform} from 'react-native';
-import Constants from 'expo-constants';
 import {supabase} from '@shared/config/supabase';
+// Second of three consumers of the one client-build derivation. See
+// clientInfo.ts — a plain function, not a hook, precisely so this module (which
+// has no React in it) can call it.
+import {getClientInfo} from '@shared/device/clientInfo';
 
 const MAX_STACK = 2000; // truncate — never ship a full stack
 const DEDUP_WINDOW_MS = 30_000; // suppress identical (screen + message) repeats
@@ -97,13 +99,14 @@ export function logError(error: unknown, context: ErrorContext = {}): void {
           const {data} = await supabase.auth.getSession();
           user_id = data.session?.user?.id ?? null;
         }
+        const client = getClientInfo();
         await supabase.from('client_error_log').insert({
           user_id,
           error_message: message,
           error_stack: stack,
           context: ctx,
-          app_version: Constants.expoConfig?.version ?? null,
-          platform: Platform.OS,
+          app_version: client.appVersion,
+          platform: client.osPlatform,
         });
       } catch {
         // swallow — logging is best-effort

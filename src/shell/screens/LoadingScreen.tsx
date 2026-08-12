@@ -14,6 +14,7 @@ import {
 import {getDefaultEvent, getEventByCompetition} from '@sports/registry';
 import {resolvePendingInviteCodeOnLaunch} from '@shell/services/pendingInvite';
 import {registerForPushNotifications} from '@shell/services/pushNotifications';
+import {reportClientInfo} from '@shell/services/reportClientInfo';
 
 /**
  * LoadingScreen — bootstraps auth session and navigates to the first real screen.
@@ -81,6 +82,16 @@ export function LoadingScreen({navigation}: any) {
         }
 
         setUser(session.user);
+
+        // Client-build telemetry, once per cold start. Fire-and-forget — it
+        // never blocks, delays or gates boot.
+        //
+        // Placed HERE, before the ProfileSetup and TosVersionGate bails below,
+        // not after them. A Player stuck at either has a valid session and is
+        // exactly the population this table exists to make visible; after the
+        // bails they would stay invisible, which is the failure that made the
+        // failed-signup investigation inferential in the first place.
+        reportClientInfo();
 
         // Restore the last-selected competition (REGISTRY-03 Part B). This is
         // what makes an invite code a durable door: switched once, it stays
