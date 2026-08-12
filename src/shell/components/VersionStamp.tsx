@@ -1,21 +1,32 @@
 import React from 'react';
 import {Text} from '@shared/components/AppText';
 import {StyleSheet} from 'react-native';
-import Constants from 'expo-constants';
-import * as Updates from 'expo-updates';
 import {useTheme} from '@shell/theme';
+import {getClientInfo} from '@shared/device/clientInfo';
 
 /**
  * VersionStamp — the cheapest "did the bundle land?" debugging tool.
  *
- * The app version (1.1.0) is stable across every OTA and tells you nothing on
- * its own — the value that MOVES is `Updates.createdAt` (when the running
- * bundle was published). `isEmbeddedLaunch` distinguishes "the OTA didn't land" from
- * "this build can't take OTAs at all."
+ * The app version (1.1) is stable across every OTA and tells you nothing on its
+ * own — the value that MOVES is `Updates.createdAt` (when the running bundle was
+ * published). `isEmbeddedLaunch` distinguishes "the OTA didn't land" from "this
+ * build can't take OTAs at all."
  *
- *   v1.1.0 · preview · Jul 17 15:10 · OTA
+ *   v1.1 · preview · Jul 17 15:10 · OTA
  *
- * Null-safe: on an embedded build or in dev, createdAt/channel are null.
+ * NOTE on the version string: this is app.json `version` ("1.1"), NOT
+ * runtimeVersion ("1.1.0"). Different fields. An earlier revision of this
+ * comment said 1.1.0 and was wrong.
+ *
+ * NOTE on null-ness, corrected against the expo-updates 55.0.24 typings: only a
+ * DEV build (expo-updates disabled) blanks these. `createdAt` is the creation
+ * time of the running update whether it was embedded or downloaded at runtime,
+ * and `channel` is a build property that is null only on Expo Go and dev builds.
+ * An earlier revision of this comment claimed both were null on an embedded
+ * build; they are not, and the telemetry checklist tests exactly that.
+ *
+ * Derivation lives in @shared/device/clientInfo — one plain function shared by
+ * this stamp, logError and reportClientInfo, so the three cannot disagree.
  */
 const MONTHS = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -32,36 +43,19 @@ function fmtDate(d: Date): string {
 
 export function VersionStamp({style}: {style?: any}) {
   const {colors} = useTheme();
-  const version = Constants.expoConfig?.version ?? '?';
+  const {appVersion, channel, updateCreatedAt, isEmbedded, updatesEnabled} =
+    getClientInfo();
 
-  // Check isEnabled FIRST. A dev build (Xcode / expo-updates disabled) cannot
-  // take an OTA at all, so channel/date are empty and "OTA" would be a lie —
-  // the exact wrong answer to the only question this stamp exists to answer.
-  // isEmbeddedLaunch is the wrong test here: it asks embedded-vs-downloaded, which
-  // only means anything once updates ARE enabled. When disabled we say "dev"
-  // and skip channel/date entirely rather than print empty separators.
-  let enabled = false;
-  let createdAt: Date | null = null;
-  let channel: string | null = null;
-  let embedded = false;
-  try {
-    enabled = Updates.isEnabled;
-    if (enabled) {
-      createdAt = Updates.createdAt;
-      channel = Updates.channel;
-      embedded = Updates.isEmbeddedLaunch;
-    }
-  } catch {
-    // updates module unavailable — treated as disabled (dev) below
-  }
-
-  const parts = [`v${version}`];
-  if (!enabled) {
+  const parts = [`v${appVersion ?? '?'}`];
+  if (!updatesEnabled) {
+    // A dev build cannot take an OTA at all, so channel/date are empty and
+    // "OTA" would be a lie — the exact wrong answer to the only question this
+    // stamp exists to answer.
     parts.push('dev');
   } else {
     parts.push(channel ?? '?');
-    if (createdAt) parts.push(fmtDate(createdAt));
-    parts.push(embedded ? 'embedded' : 'OTA');
+    if (updateCreatedAt) parts.push(fmtDate(updateCreatedAt));
+    parts.push(isEmbedded ? 'embedded' : 'OTA');
   }
 
   return (

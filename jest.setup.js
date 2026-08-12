@@ -47,11 +47,20 @@ jest.mock('expo-constants', () => ({
 // WelcomeScreen, SettingsScreen). VersionStamp's try/catch guards only the
 // render-time reads, not the import, so it can't catch this. Mock the members it
 // reads; isEnabled:false renders the "dev" branch and short-circuits the rest.
+// updateId + useUpdates + reloadAsync added for the client-telemetry build:
+// getClientInfo() reads updateId, and UpdateReadyBanner subscribes via
+// useUpdates() and calls reloadAsync() from its Restart control. Without these
+// the first suite that renders HomeScreen would fail on `useUpdates is not a
+// function` rather than on anything real. isEnabled:false still short-circuits
+// both — the banner's outer gate returns null before the hook is ever mounted.
 jest.mock('expo-updates', () => ({
   __esModule: true,
   isEnabled: false,
   isEmbeddedLaunch: false,
   channel: null,
   createdAt: null,
+  updateId: null,
+  useUpdates: () => ({isUpdatePending: false}),
+  reloadAsync: jest.fn(() => Promise.resolve()),
 }));
 

@@ -16,6 +16,7 @@ import {spacing, bodyType} from '@shared/theme';
 import {ordinalSuffix} from '@shared/utils/format';
 
 import {SystemMessageSlot} from '@shell/components/home/SystemMessageSlot';
+import {UpdateReadyBanner} from '@shell/components/home/UpdateReadyBanner';
 import {HomeHeader} from '@shell/components/home/HomeHeader';
 import {IdentityBar} from '@shell/components/home/IdentityBar';
 import {ManagedLeagueModule} from '@shell/components/home/ManagedLeagueModule';
@@ -662,6 +663,11 @@ export function HomeScreen() {
         onLayout={e => setHeaderHeight(e.nativeEvent.layout.height)}>
         <HomeHeader />
         <SystemMessageSlot />
+        {/* Below SystemMessageSlot deliberately: a message written by a human to
+            these Players outranks a bundle refresh. Inside this overlay (not the
+            ScrollView) so it never scrolls away and the existing onLayout above
+            repads the scroll for it. Self-hides unless an update is pending. */}
+        <UpdateReadyBanner />
         <IdentityBar />
       </View>
 
