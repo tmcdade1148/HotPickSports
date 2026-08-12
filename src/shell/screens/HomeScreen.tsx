@@ -34,7 +34,7 @@ import {ModuleSection} from '@shell/components/home/ModuleSection';
 import {ContestCarousel} from '@shell/components/home/ContestCarousel';
 import {ContestActions} from '@shell/components/ContestActions';
 import {PartnerModule} from '@shell/components/home/PartnerModule';
-import {resolveHomeRow} from '@shell/components/home/homeRows';
+import {resolveHomeRow, isWeekRunningRow} from '@shell/components/home/homeRows';
 import {LEXICON} from '@shared/lexicon';
 
 // The header's translucency now comes from the shared `colors.chrome` token
@@ -611,6 +611,18 @@ export function HomeScreen() {
             Director) into League Tools. Self-hides when not on a board. */}
         <ManagedLeagueModule />
 
+        {/* DEMO CARD, bridge rows (spec §6.1). reg_done, sb_intro, season_done
+            and playoff_bridge are "in cycle" but no week is RUNNING on them, so
+            there is no picks call to action for the card to compete with and the
+            Player has nothing else to do — the off_far situation exactly. They
+            had no demo entry point at all before this. Above Contests, matching
+            the off-cycle blocks above.
+
+            Gated on the exported predicate, never a list of row names: HomeRow
+            has twelve values and the complement of the three off-cycle rows is
+            NOT the same question as "is a week running". */}
+        {isInCycle && !isWeekRunningRow(homeRow) && <DemoButton />}
+
         {/* In-cycle CONTESTS section — replaced on off-cycle states
             (off_season_idle / pre_season_games) by the action stack +
             cross-Contest strip above. The carousel carries the eyebrow (it owns
@@ -628,6 +640,16 @@ export function HomeScreen() {
             )}
           </>
         )}
+
+        {/* DEMO LINE, running rows (spec §6.2). A week IS running, so Home
+            already carries the picks call to action and this must stay out of
+            its way — BELOW Contests, always, never above. Quiet enough that it
+            never needs to disappear, which is what removes any need for a
+            counter or threshold.
+
+            Same exported predicate as the card branch above; the two are
+            complements of one function, not two hand-written lists. */}
+        {configLoaded && isWeekRunningRow(homeRow) && <DemoButton variant="line" />}
 
         {configLoaded
           && showPartnerStack

@@ -21,6 +21,9 @@ import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {supabase} from '@shared/config/supabase';
 import {DemoIntroModal, DemoScoreModal} from '@shell/components/home/DemoModals';
+import {DemoButton} from '@shell/components/home/DemoButton';
+import {PracticeBanner} from '@shell/components/PracticeBanner';
+import {useExitDemo} from '@shell/hooks/useExitDemo';
 
 // ---------------------------------------------------------------------------
 // Game ordering — once a game actually kicks off it rises to the top, grouped
@@ -101,20 +104,14 @@ export function SeasonPicksScreen() {
   const demoRevealed = demoResult != null; // results shown once a result exists
   const dismissDemoIntro = useGlobalStore(s => s.dismissDemoIntro);
   const dismissDemoScore = useGlobalStore(s => s.dismissDemoScore);
-  const exitDemo = useGlobalStore(s => s.exitDemo);
-
-  // Exit the demo straight to Home — shared by both popup escape hatches (tap
-  // outside). Mirrors DemoResultScreen.handleDone: best-effort server reset,
-  // restore the pre-demo selection, hold HISTORY from the demo's leftover week
-  // (Item B), then reset the stack to Home.
-  const handleExitHome = () => {
-    // Navigate FIRST so the Picks screen never flashes during the reset; the
-    // server cleanup runs in the background (non-blocking, errors swallowed).
-    exitDemo();
-    useNFLStore.getState().markConfigStale();
-    navigation.reset({index: 0, routes: [{name: 'Home'}]});
-    Promise.resolve(supabase.rpc('reset_demo')).catch(() => {});
-  };
+  // Exit the demo straight to Home — shared by the two popup escape hatches
+  // (tap outside) and the PRACTICE banner's Exit control.
+  //
+  // The body used to live here and was duplicated byte-for-byte in
+  // DemoResultScreen.handleDone, while MainTabNavigator's tab listener ran a
+  // THIRD, shorter version that had already dropped markConfigStale and the
+  // reset_demo RPC. All three now share @shell/hooks/useExitDemo.
+  const handleExitHome = useExitDemo();
 
   // Check if all games are final for this week
   const allGamesFinal = games.length > 0 && games.every(g => {
@@ -452,6 +449,11 @@ export function SeasonPicksScreen() {
 
   return (
     <View style={styles.container}>
+      {/* PRACTICE banner — pinned to the very top of the content area, above
+          the WeekSelector, so it is in normal flow and can never scroll away.
+          Present from entry to exit whenever the demo is active. */}
+      {isDemoActive && <PracticeBanner />}
+
       <WeekSelector
         totalWeeks={config.totalWeeks}
         currentWeek={currentWeek}
@@ -548,6 +550,19 @@ export function SeasonPicksScreen() {
             keyExtractor={item => item.game_id}
             renderItem={renderGame}
             renderSectionHeader={renderSectionHeader}
+            // Demo entry point (spec §6.3) — a ListHeaderComponent, NOT a fixed
+            // block. WeekSelector, PicksProgressHeader and the widget row are
+            // already stacked above this list; a fourth fixed block would push
+            // the first game off screen on the smallest supported device. As a
+            // list header it scrolls away and costs no permanent height.
+            //
+            // Hidden while the demo is active: the demo must never offer to
+            // launch itself.
+            ListHeaderComponent={
+              isDemoActive ? null : (
+                <DemoButton variant="line" label="What's a HotPick?" />
+              )
+            }
             // Clears BOTH stacked pills — the nav (navReserve) and the floating
             // submit pill above it (its height + the gap it sits on) — so the
             // last game card scrolls fully above the pair. The submit pill is

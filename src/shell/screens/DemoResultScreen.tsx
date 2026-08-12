@@ -18,7 +18,7 @@ import {useAuth} from '@shared/hooks/useAuth';
 import {useTheme} from '@shell/theme';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
-import {useNFLStore} from '@sports/nfl/stores/nflStore';
+import {useExitDemo} from '@shell/hooks/useExitDemo';
 import {DEMO_COMPETITION} from '@sports/registry';
 import {LEXICON} from '@shared/lexicon';
 import {fmtPoints, ordinal} from '@shared/utils/format';
@@ -53,7 +53,6 @@ export function DemoResultScreen() {
   const navigation = useNavigation<any>();
   const {user} = useAuth();
   const userProfile = useGlobalStore(s => s.userProfile);
-  const exitDemo = useGlobalStore(s => s.exitDemo);
   const clearDemoReveal = useGlobalStore(s => s.clearDemoReveal);
   const resetDemoGames = useSeasonStore(s => s.resetDemoGames);
 
@@ -90,17 +89,13 @@ export function DemoResultScreen() {
 
   const myRank = ladder.findIndex(r => r.isUser) + 1;
 
-  const handleDone = () => {
-    exitDemo();
-    // Hold HISTORY from flashing the demo's leftover week until the real config
-    // re-inits (Item B) — exitDemo restores activeSport but not nflStore.
-    useNFLStore.getState().markConfigStale();
-    // reset, not navigate — clears the demo/onboarding + Welcome screens
-    // beneath Home so a back-gesture/swipe can't pop back to the login screen.
-    navigation.reset({index: 0, routes: [{name: 'Home'}]});
-    // Server cleanup runs in the background — never blocks the exit.
-    Promise.resolve(supabase.rpc('reset_demo')).catch(() => {});
-  };
+  // Was a byte-for-byte duplicate of SeasonPicksScreen.handleExitHome. Both now
+  // share @shell/hooks/useExitDemo, which keeps the same four steps: exitDemo,
+  // markConfigStale (holds HISTORY from flashing the demo's leftover week until
+  // the real config re-inits), a stack reset to Home rather than a navigate (so
+  // a back-gesture can't pop to the login screen), and the background
+  // reset_demo RPC.
+  const handleDone = useExitDemo();
   const handleTryAgain = async () => {
     // Wipe the previous run (server picks + scores), clear the local reveal,
     // and restore fresh scheduled games, then return to the Picks tab.

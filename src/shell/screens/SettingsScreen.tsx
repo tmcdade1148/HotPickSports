@@ -33,8 +33,10 @@ import {
   Bell,
   HelpCircle,
   Check,
+  Play,
 } from 'lucide-react-native';
 import {supabase} from '@shared/config/supabase';
+import {useLaunchDemo} from '@shell/hooks/useLaunchDemo';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {SYSTEM_AVATARS} from '@shell/components/AvatarSelector';
 import {getDisplayName} from '@shared/utils/displayName';
@@ -52,6 +54,9 @@ import {LEXICON} from '@shared/lexicon';
 
 export function SettingsScreen({route}: any) {
   const navigation = useNavigation<any>();
+  // Third consumer of the one launch hook (spec §6.5). Exported rather than
+  // copied — a second copy is the same failure mode as the exit paths.
+  const launchDemo = useLaunchDemo();
   const expandPools = route?.params?.expandPools ?? false;
 
   const user = useGlobalStore(s => s.user);
@@ -611,6 +616,24 @@ export function SettingsScreen({route}: any) {
           <View style={styles.linkLeft}>
             <BookOpen size={20} color={colors.primary} />
             <Text style={[styles.linkText, {color: colors.textPrimary}]}>How HotPick Works</Text>
+          </View>
+          <ChevronRight size={18} color={colors.textSecondary} />
+        </TouchableOpacity>
+        <View style={[styles.groupDivider, {backgroundColor: colors.border}]} />
+        {/* Demo entry point (spec §6.4) — the reliable home for anyone who
+            cannot find it elsewhere, present in every calendar state.
+
+            NOTE: the spec asked for a row labelled "How HotPick works", but that
+            label was already taken by the row directly above, which opens the
+            static Instructions screen. Two identical labels doing different
+            things is worse than a deviation, so this one says what it actually
+            does and borrows the shipped PRACTICE vocabulary. Flagged for Tom. */}
+        <TouchableOpacity
+          style={styles.groupRow}
+          onPress={launchDemo}>
+          <View style={styles.linkLeft}>
+            <Play size={20} color={colors.primary} />
+            <Text style={[styles.linkText, {color: colors.textPrimary}]}>Try a practice week</Text>
           </View>
           <ChevronRight size={18} color={colors.textSecondary} />
         </TouchableOpacity>
