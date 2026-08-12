@@ -54,8 +54,6 @@ function applyPlayoffEscalation(ranked: any[], week: number) {
 
 Deno.serve(async (req) => {
   // Cron auth gate (verify_jwt=false): require the dedicated cron shared secret.
-  // CRON_SHARED_SECRET (Edge Secret) is compared to the x-cron-secret header that
-  // pg_cron sends (value from Vault by reference). Decoupled from SB_SECRET_KEY.
   const cronSecret = Deno.env.get("CRON_SHARED_SECRET");
   if (!cronSecret || req.headers.get("x-cron-secret") !== cronSecret) {
     return new Response(JSON.stringify({ error: "unauthorized" }), {
@@ -63,17 +61,12 @@ Deno.serve(async (req) => {
     });
   }
   if (req.method !== "POST") return new Response("Method not allowed", { status: 405 });
-  // Hoisted so the catch block can record a readiness failure (§5b).
   let competition = "nfl_2026";
   let week = 0;
   try {
     const body = await req.json().catch(() => ({}));
     competition = body.competition ?? "nfl_2026";
     const force = Boolean(body.force);
-    // silent: skip the "picks locked" SmackTalk broadcast. Used when re-ranking
-    // PAST weeks during an odds backfill so we don't spam pools with backdated
-    // lock messages. Live weekly cron passes no `silent`, so its behavior is
-    // unchanged.
     const silent = Boolean(body.silent);
 
     const { data: configRows } = await supabase
@@ -81,7 +74,13 @@ Deno.serve(async (req) => {
     const cfg = Object.fromEntries((configRows ?? []).map((r) => [r.key, r.value]));
     if (!cfg.is_active) return json({ success: true, reason: "competition_inactive" }, 200);
 
-    // Week: explicit param wins; otherwise derive from the clock (cron passes none).
+    // PENCIL MODE (freeze_on_open=true, the real competitions): this function
+    // writes provisional `rank` only. frozen_rank is written exclusively by
+    // open_week_picks at the moment picks open (Option B). Legacy competitions
+    // (sim/demo, flag absent/false) keep the original rank+freeze behavior.
+    const freezeOnOpen = cfg.freeze_on_open === true
+      || String(cfg.freeze_on_open ?? "").replace(/^"|"$/g, "") === "true";
+
     week = Number(body.week) || deriveWeek(cfg);
     if (!week) return json({ success: true, reason: "no_active_week" }, 200);
 
@@ -101,10 +100,11 @@ Deno.serve(async (req) => {
       return json({ competition, season_year: seasonYear, week, updated: 0, message: "No games found" }, 200);
     }
 
+    // Post-open protection: once open_week_picks has frozen the week, stop
+    // re-ranking (Hard Rule #6 — frozen ranks are immutable). Pre-open, frozen
+    // is null everywhere in pencil mode, so re-ranks run freely on fresh odds.
     const alreadyFrozen = games.filter((g) => g.frozen_rank !== null);
     if (alreadyFrozen.length > 0 && !force) {
-      // Ranks already frozen = ranks ARE ready (Hard Rule #6 keeps them immutable
-      // after the deadline). Record OK so the gate isn't falsely blocked.
       await markReadiness(competition, week, { ranks_status: "ok", ranks_count: alreadyFrozen.length, ranks_error: null, ranks_at: new Date().toISOString() });
       return json({ competition, season_year: seasonYear, week, updated: 0, frozen: alreadyFrozen.length, message: "Ranks already frozen. Use force=true to re-rank." }, 200);
     }
@@ -112,15 +112,7 @@ Deno.serve(async (req) => {
     const baseRanked = rankGames(games);
     const ranked = applyPlayoffEscalation(baseRanked, week);
 
-    // Fewer than a third as many distinct win probabilities as games means most
-    // ranks are decided by the kickoff tiebreak, not by odds. Refuse to freeze.
-    // Threshold set from 21 real full weeks (nfl_2025 + nfl_2025_sim, >=14 games):
-    // min 9 distinct spreads, avg 11.5. A *2 multiplier fires at 8 on a 16-game
-    // week — one game of margin. *3 fires at 5, well clear of any real slate.
-    // Ties in competitiveness fall through the comparator to kickoff time, so a
-    // low-information slate yields a reverse-chronological 1..N that looks
-    // entirely valid. frozen_rank is immutable (Hard Rule #6): a false refusal
-    // costs a forced re-rank, a false pass costs a permanently wrong week.
+    // Degenerate-odds guard (unchanged): refuse to write meaningless ranks.
     const probs = games.map((g) => homeWinProb(g));
     const distinctProbs = new Set(probs.map((p) => p.toFixed(6))).size;
 
@@ -129,7 +121,7 @@ Deno.serve(async (req) => {
         ranks_status: "failed",
         ranks_error: `Degenerate odds: ${games.length} games yield only`
           + ` ${distinctProbs} distinct win probabilities. Most ranks would be`
-          + ` decided by the kickoff tiebreak. Refusing to freeze. Run`
+          + ` decided by the kickoff tiebreak. Refusing to rank. Run`
           + ` nfl-fetch-odds, then re-run.`,
         ranks_at: new Date().toISOString(),
       });
@@ -142,49 +134,49 @@ Deno.serve(async (req) => {
     const errors: string[] = [];
 
     for (const r of ranked) {
+      const updateData: Record<string, unknown> = freezeOnOpen
+        ? { rank: r.rank }                      // pencil only
+        : { rank: r.rank, frozen_rank: r.rank }; // legacy: rank + freeze
       const { error } = await supabase.from("season_games")
-        .update({ rank: r.rank, frozen_rank: r.rank })
+        .update(updateData)
         .eq("game_id", r.game_id).eq("competition", competition).eq("season_year", seasonYear);
       if (error) errors.push(`${r.game_id}: ${error.message}`);
     }
 
-    // ── SmackTalk: post "picks locked" to all pools with per-pool counts ──
-    const { data: pools } = silent
-      ? { data: [] as { id: string }[] }
-      : await supabase
-          .from("pools").select("id").eq("competition", competition).eq("is_archived", false);
+    // SmackTalk "picks locked": only in legacy freeze mode. In pencil mode this
+    // function may run every few hours — announcing each run would spam pools;
+    // the announcement now happens once, in open_week_picks.
+    if (!freezeOnOpen && !silent) {
+      const { data: pools } = await supabase
+        .from("pools").select("id").eq("competition", competition).eq("is_archived", false);
 
-    if (pools && pools.length > 0) {
-      // Count distinct users who submitted picks this week
-      const { data: pickUsers } = await supabase
-        .from("season_picks").select("user_id, game_id")
-        .eq("competition", competition).eq("season_year", seasonYear).eq("week", week);
+      if (pools && pools.length > 0) {
+        const { data: pickUsers } = await supabase
+          .from("season_picks").select("user_id, game_id")
+          .eq("competition", competition).eq("season_year", seasonYear).eq("week", week);
+        const pickerIds = new Set((pickUsers ?? []).map((p: any) => p.user_id));
 
-      // Build set of user_ids who picked, keyed by pool membership
-      const pickerIds = new Set((pickUsers ?? []).map((p: any) => p.user_id));
-
-      await Promise.allSettled(pools.map(async (pool: any) => {
-        const { count: memberCount } = await supabase
-          .from("pool_members").select("*", { count: "exact", head: true })
-          .eq("pool_id", pool.id).eq("status", "active");
-
-        // Count pool members who submitted picks
-        const { data: poolMembers } = await supabase
-          .from("pool_members").select("user_id")
-          .eq("pool_id", pool.id).eq("status", "active");
-        const poolPickerCount = (poolMembers ?? []).filter((m: any) => pickerIds.has(m.user_id)).length;
-
-        const text = `Picks locked 🔒 — ${poolPickerCount} of ${memberCount ?? 0} poolies are in.`;
-        await supabase.rpc("post_system_message", {
-          p_pool_id: pool.id, p_text: text, p_message_type: "pick_lock"
-        });
-      }));
+        await Promise.allSettled(pools.map(async (pool: any) => {
+          const { count: memberCount } = await supabase
+            .from("pool_members").select("*", { count: "exact", head: true })
+            .eq("pool_id", pool.id).eq("status", "active");
+          const { data: poolMembers } = await supabase
+            .from("pool_members").select("user_id")
+            .eq("pool_id", pool.id).eq("status", "active");
+          const poolPickerCount = (poolMembers ?? []).filter((m: any) => pickerIds.has(m.user_id)).length;
+          const text = `Picks locked \u{1F512} — ${poolPickerCount} of ${memberCount ?? 0} poolies are in.`;
+          await supabase.rpc("post_system_message", {
+            p_pool_id: pool.id, p_text: text, p_message_type: "pick_lock"
+          });
+        }));
+      }
     }
 
-    // §5b — ranks computed/frozen OK.
     await markReadiness(competition, week, { ranks_status: "ok", ranks_count: ranked.length, ranks_error: null, ranks_at: new Date().toISOString() });
 
-    return json({ success: true, competition, season_year: seasonYear, week, updated: ranked.length, frozen: ranked.length, errors, rankings: ranked }, 200);
+    return json({ success: true, competition, season_year: seasonYear, week,
+      mode: freezeOnOpen ? "pencil" : "rank_and_freeze",
+      updated: ranked.length, frozen: freezeOnOpen ? 0 : ranked.length, errors, rankings: ranked }, 200);
   } catch (err) {
     if (week) await markReadiness(competition, week, { ranks_status: "failed", ranks_error: String(err), ranks_at: new Date().toISOString() });
     return json({ success: false, error: String(err) }, 500);
@@ -195,13 +187,8 @@ function json(body: unknown, status: number) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 }
 
-// Derive which week to prep when the caller (cron) passes none. After a week
-// wraps up (settling/complete) prep the NEXT week (for the advance gate);
-// otherwise the current week (covers the Week-1 initial open while idle).
 function deriveWeek(cfg: Record<string, any>): number {
   const strip = (v: any) => String(v ?? "").replace(/^"|"$/g, "");
-  // Auto-prep only runs inside the weekly cycle — never off-season / pre-season,
-  // which would prematurely import and FREEZE ranks on stale odds (Hard Rule #6).
   const phase = strip(cfg.current_phase);
   if (!["REGULAR", "PLAYOFFS", "SUPERBOWL"].includes(phase)) return 0;
   const current = Number(strip(cfg.current_week)) || 0;
@@ -210,9 +197,6 @@ function deriveWeek(cfg: Record<string, any>): number {
   return (ws === "settling" || ws === "complete") ? current + 1 : current;
 }
 
-// §5b — best-effort upsert of this step's slice of week_readiness. Wrapped so a
-// readiness write never breaks the prep step. Partial column set; sibling columns
-// (games_*, odds_*) are preserved on conflict.
 async function markReadiness(competition: string, week: number, fields: Record<string, unknown>) {
   try {
     await supabase.from("week_readiness").upsert(
