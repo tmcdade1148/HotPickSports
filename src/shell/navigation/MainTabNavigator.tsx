@@ -25,6 +25,7 @@ import {SettingsScreen} from '@shell/screens/SettingsScreen';
 import {useTheme} from '@shell/theme';
 import {useBrand} from '@shell/theme';
 import {useGlobalStore} from '@shell/stores/globalStore';
+import {exitDemoAndReset} from '@shell/hooks/useExitDemo';
 import {consumePendingInviteCode} from '@shell/services/pendingInvite';
 import {PoweredByHotPick} from '@shell/components/PoweredByHotPick';
 import {PoolHeader} from '@shell/components/PoolHeader';
@@ -565,7 +566,15 @@ export function MainTabNavigator() {
           const st = e?.data?.state;
           const focused = st?.routes?.[st.index]?.name;
           if (focused && focused !== 'PicksTab') {
-            useGlobalStore.getState().exitDemo();
+            // THE FIX. This path used to call a bare exitDemo(), skipping
+            // markConfigStale() and the reset_demo RPC that the other two exit
+            // paths both ran — three copies, already drifted.
+            //
+            // exitDemoAndReset (a plain function) NOT useExitDemo (the hook):
+            // this is a navigator callback and cannot call a hook. It also must
+            // NOT navigate — the Player is already moving to the tab they
+            // tapped, and a reset to Home would yank them off it.
+            exitDemoAndReset();
           }
         },
       }}

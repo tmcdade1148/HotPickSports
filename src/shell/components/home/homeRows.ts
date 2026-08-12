@@ -252,6 +252,31 @@ const WEEKSTATE_ROW: Record<string, HomeRow> = {
 };
 
 /**
+ * Is a week actually RUNNING on this row?
+ *
+ * DERIVED from WEEKSTATE_ROW's values, never a retyped list of the five names —
+ * that derivation is what makes drift impossible, and it keeps the
+ * single-state-table discipline this file was built for.
+ *
+ * The split callers need is NOT "off-cycle vs everything else." HomeRow has
+ * TWELVE values, and the complement of the three off-cycle rows sweeps in four
+ * BRIDGE rows — reg_done, sb_intro, season_done, playoff_bridge — where no week
+ * is running and there is no picks call to action to compete with. Anything
+ * that must yield to the picks CTA should ask THIS, not subtract phases.
+ *
+ * (Hard Rule #22's corollary in practice: ask week_state whether a week is
+ * running; a preseason competition is permanently REGULAR, so the phase cannot
+ * answer it.)
+ */
+const WEEK_RUNNING_ROWS: ReadonlySet<HomeRow> = new Set(
+  Object.values(WEEKSTATE_ROW),
+);
+
+export function isWeekRunningRow(row: HomeRow): boolean {
+  return WEEK_RUNNING_ROWS.has(row);
+}
+
+/**
  * Loud, dev-only warning for any (phase, weekState) the resolver — or the store's
  * config parse — does not recognise. Never a silent default: an unrecognised
  * state is a real signal (a new phase shipped, a config typo, an admin RPC that

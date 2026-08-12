@@ -8,6 +8,7 @@
 import {useNFLStore} from '@sports/nfl/stores/nflStore';
 import {useSeasonStore} from '@templates/season/stores/seasonStore';
 import {useGlobalStore} from '@shell/stores/globalStore';
+import {LEXICON} from '@shared/lexicon';
 import {shortPeriod} from './shortPeriod';
 import {getPeriodLabel} from './periodLabel';
 
@@ -33,7 +34,7 @@ export function usePeriodLabel(): string {
   const isDemoActive     = useGlobalStore(s => s.isDemoActive);
   const labels           = usePeriodLabels();
 
-  if (isDemoActive) return 'PRACTICE';
+  if (isDemoActive) return LEXICON.practice;
   return shortPeriod(
     currentPhase,
     currentWeek,
@@ -67,7 +68,7 @@ export function useSpokenPeriodLabel(): string {
   const isDemoActive     = useGlobalStore(s => s.isDemoActive);
   const labels           = usePeriodLabels();
 
-  if (isDemoActive) return 'PRACTICE';
+  if (isDemoActive) return LEXICON.practice;
   // OFF_SEASON was added to shortPeriod but never to getPeriodLabel, which
   // falls through to its 'WEEK n' default for it — so the spoken label would
   // say "WEEK 1" while the pill says OFFSEASON. Handled here rather than in

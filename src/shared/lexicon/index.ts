@@ -99,6 +99,14 @@ export const LEXICON = {
   roster: 'Roster',
   perks:  'Perks',
   picks:  'Picks',
+
+  /** The onboarding demo's user-facing name — the ONE word for that state.
+   *  The header period pill has read PRACTICE since the demo shipped, and the
+   *  Picks-screen safety banner reads the same word. A banner and a pill that
+   *  can drift to two names for one state is the bug that constant exists to
+   *  prevent, so both import THIS rather than holding their own literal.
+   *  Deliberately not "DEMO": two names for one state is worse than no name. */
+  practice: 'PRACTICE',
 } as const;
 
 // ---------------------------------------------------------------------------

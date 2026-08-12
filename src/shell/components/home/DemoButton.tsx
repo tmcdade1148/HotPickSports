@@ -1,39 +1,60 @@
-// DemoButton — the "See how it works" demo CTA, extracted from OffCycleActions so
-// it renders standalone on the off-season AND pre-season home for ALL users
-// (Slice 7c: the old "new-users-only" gate is retired). Wired to useLaunchDemo,
-// the demo-launch behavior.
+// DemoButton — the demo entry point, in two weights.
 //
+// Spec: 260811_HotPick_DemoAccessAndSafety_Spec v1.4 §6.1 / §6.2 / §6.3.
+//
+//   variant="card" (default) — the full CTA. Shown on the SEVEN rows where no
+//   week is running (off_far, off_near, pre_bridge, reg_done, sb_intro,
+//   season_done, playoff_bridge). There is no picks call to action on those
+//   rows for it to compete with, and the Player has nothing else to do.
+//
+//   variant="line" — one quiet line, icon + text, no border/card/subtitle.
+//   Shown on the FIVE rows where a week IS running, below Contests, so it never
+//   competes with the picks CTA. Also used on the Season Picks screen.
+//
+// ONE component in several places beats several components showing the same
+// thing, which is why this is a variant prop and not a second file.
+//
+// No threshold, no dismissal, no counter. The line is small enough to ignore,
+// which is exactly what makes a threshold unnecessary — and the only column
+// that could have backed one (career_hotpick_total) is dead (Finding D).
+//
+// Hard Rule #19 is unaffected: a text line is not an event card.
 // HotPick-themed via useTheme (Hard Rule #9).
 
 import React from 'react';
 import {Text} from '@shared/components/AppText';
 import {Pressable, StyleSheet, View} from 'react-native';
-import {useNavigation} from '@react-navigation/native';
 import {ArrowRight, Play} from 'lucide-react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {bodyType, spacing, borderRadius} from '@shared/theme';
-import {useGlobalStore} from '@shell/stores/globalStore';
-import {useSeasonStore} from '@templates/season/stores/seasonStore';
+import {useLaunchDemo} from '@shell/hooks/useLaunchDemo';
 
-// Shared demo launcher — enters the nfl_demo sandbox (snapshotting the prior
-// active selection), resets to a clean slate (fresh games + no picks, even if a
-// prior run left completed games cached), then lands on the Picks tab. Spec:
-// docs/DEMO_WEEK_SPEC.md §7.1.
-function useLaunchDemo() {
-  const navigation = useNavigation<any>();
-  const enterDemo = useGlobalStore(s => s.enterDemo);
-  const resetDemoGames = useSeasonStore(s => s.resetDemoGames);
-  return async () => {
-    // Independent: enterDemo resets DB picks + swaps active competition;
-    // resetDemoGames reloads the (self-contained) demo games. Run together.
-    await Promise.all([enterDemo(), resetDemoGames()]);
-    navigation.navigate('PicksTab');
-  };
+export interface DemoButtonProps {
+  /** 'card' = full CTA (no week running). 'line' = quiet one-liner. */
+  variant?: 'card' | 'line';
+  /** Line variant only. Home uses the default; Picks passes "What's a HotPick?". */
+  label?: string;
 }
 
-export function DemoButton() {
+export function DemoButton({variant = 'card', label}: DemoButtonProps) {
   const {colors} = useTheme();
   const launchDemo = useLaunchDemo();
+
+  if (variant === 'line') {
+    const lineLabel = label ?? 'How HotPick works';
+    return (
+      <Pressable
+        onPress={launchDemo}
+        style={({pressed}) => [styles.line, {opacity: pressed ? 0.6 : 1}]}
+        accessibilityRole="button"
+        accessibilityLabel={`${lineLabel} — play a quick demo week`}>
+        <Play size={13} color={colors.primary} strokeWidth={2.25} fill={colors.primary} />
+        <Text style={[bodyType.regular, styles.lineLabel, {color: colors.primary}]}>
+          {lineLabel}
+        </Text>
+      </Pressable>
+    );
+  }
 
   return (
     <View style={styles.wrap}>
@@ -63,6 +84,7 @@ export function DemoButton() {
 }
 
 const styles = StyleSheet.create({
+  // ── card variant (unchanged from the original) ──
   wrap: {
     paddingHorizontal: spacing.lg,
     marginTop: spacing.lg,
@@ -85,4 +107,14 @@ const styles = StyleSheet.create({
   labelWrap: {flex: 1, gap: 1},
   title: {fontSize: 16, letterSpacing: 0.2},
   subtitle: {fontSize: 13, lineHeight: 17},
+
+  // ── line variant: no border, no card, no subtitle ──
+  line: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  lineLabel: {fontSize: 13, letterSpacing: 0.2},
 });
