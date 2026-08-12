@@ -14,8 +14,16 @@
 //
 // FIRE-AND-FORGET. It must never block, delay or gate boot. Missing telemetry is
 // a diagnostic inconvenience; a boot blocked on a diagnostic write is an outage.
-// supabase.rpc RESOLVES with an { error } rather than rejecting on a Postgres
-// error, so both paths are handled — otherwise a failed RPC would be silent.
+//
+// supabase.rpc() returns a thenable QUERY BUILDER, not a real Promise: it has
+// .then() but NO .catch(), so chaining .catch directly onto it fails to compile
+// (TS2339). Promise.resolve() adapts it to a real Promise — the same idiom the
+// repo already uses at DemoResultScreen.tsx:102 and SeasonPicksScreen.tsx:116.
+//
+// BOTH branches are needed and neither is redundant: the RPC RESOLVES with an
+// { error } rather than rejecting on a Postgres error, so .then is the branch
+// that actually fires on a failed call, and .catch covers a genuine throw
+// (transport/network). Removing either one loses a real error path.
 // ---------------------------------------------------------------------------
 import {supabase} from '@shared/config/supabase';
 import {getClientInfo} from '@shared/device/clientInfo';
@@ -23,8 +31,8 @@ import {getClientInfo} from '@shared/device/clientInfo';
 export function reportClientInfo(): void {
   const c = getClientInfo();
 
-  void supabase
-    .rpc('record_client_info', {
+  void Promise.resolve(
+    supabase.rpc('record_client_info', {
       p_app_version: c.appVersion,
       p_os_platform: c.osPlatform,
       p_channel: c.channel,
@@ -34,7 +42,8 @@ export function reportClientInfo(): void {
         ? c.updateCreatedAt.toISOString()
         : null,
       p_is_embedded: c.isEmbedded,
-    })
+    }),
+  )
     .then(({error}) => {
       if (error) console.warn('[reportClientInfo] rpc failed:', error.message);
     })
