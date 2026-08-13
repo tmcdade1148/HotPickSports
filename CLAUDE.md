@@ -49,6 +49,40 @@ These are non-negotiable. If a task requires violating one, stop and ask.
 26. **No member-data export exists or may be added anywhere in the app, product-wide** — no CSV, no roster download, no bulk export of member/roster data, in any UI or via any endpoint/RPC. Rationale: a member-data export is a portable money-ledger scaffold *and* a bulk export of other members' personal data — both a money-posture and privacy risk (locked, June 23 Money Posture spec). This does **not** affect the individual "your own data" request path (Privacy Policy §8.4, handled via privacy@hotpicksports.com) — that is a separate legal right and stays.
 
 ---
+## Claim Discipline
+
+A count is not a finding. Reading a value at one layer and inferring its
+effect at the next is the most common failure in this project's analysis —
+seven instances in a single day, 12–13 August 2026, every one of them mine.
+
+**The rule:** any claim about what users see, experience, or are affected by
+must be traced end to end — database → query → client → render — with every
+step actually read. Where a step has not been opened, say so in the claim
+itself.
+
+**Say this:** "197 rows in the database. I have not traced whether the client
+can reach them."
+**Not this:** "197 users are affected."
+
+**The tell:** the error runs toward the more urgent conclusion. "22 real users
+see a dead pool" is a better finding than "10 of your own junk test pools," so
+that is the one that gets asserted without checking. When a conclusion is
+conveniently interesting, that is the moment to open the next layer rather
+than the moment to report it.
+
+**Worked examples, all real:**
+- `enterDemo` sets `userPools: []` → inferred Home shows an empty list. Home
+  reads `visiblePools`. Never opened HomeScreen.
+- 197 archived memberships → inferred 197 users see them. `nfl_2025` is not in
+  `ALL_EVENTS`, so competition scoping already hid the largest pool. Never
+  opened the registry.
+- `notification_queue.status = 'sent'` → inferred delivered. It means Expo
+  accepted the handoff. Never checked the receipt path.
+- Three exit call sites → inferred one shared hook would serve all three. One
+  is a navigator callback and cannot call a hook. Never opened it.
+
+**Scope numbers in specs are hypotheses until traced.** Mark them as such, and
+expect them to be checked.
 
 ## Critical Red Flags
 
