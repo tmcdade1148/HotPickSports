@@ -3,8 +3,11 @@
 //
 // Subject (60 chars) + body (280 chars) + target (all | competition).
 // Preview shows what the push + Message Center entry will look like.
-// Send button shows the recipient count + an explicit "this cannot be
-// undone" confirmation before invoking admin-broadcast Edge Function.
+// The confirmation names the TARGET SEGMENT and warns the action cannot be
+// undone; it does NOT show a recipient count, by decision. Super-admin targets
+// are audience segments whose size is a server-side question, so the honest
+// number is the one admin-broadcast returns AFTER sending. (An earlier version
+// of this comment claimed the send button showed a count. It never did.)
 //
 // Rate limit is enforced SERVER-SIDE and the server is the SOLE gate. The
 // admin-broadcast Edge Function reads the cadence from the competition_config
@@ -22,6 +25,8 @@ import {supabase} from '@shared/config/supabase';
 import {useTheme} from '@shell/theme/hooks';
 import {bodyType, displayType, spacing, borderRadius} from '@shared/theme';
 import {RequireSuperAdmin} from '@shell/components/RequireSuperAdmin';
+import {isSandboxCompetition} from '@shared/utils/competition';
+import {DEMO_COMPETITION} from '@sports/registry';
 
 type TargetOption = {label: string; value: string};
 
@@ -50,13 +55,39 @@ function AdminBroadcastScreenImpl() {
 
   useEffect(() => {
     (async () => {
-      // Active competitions for the target dropdown
+      // Broadcastable competitions for the target dropdown.
+      //
+      // The old query selected every distinct competition string and filtered
+      // only `global`, so the dropdown offered NINE targets when two are real
+      // audiences. The comment above it claimed "active competitions" — the
+      // intent was written down and never implemented.
+      //
+      // Reading `key = 'is_active'` does the first cut server-side: rows that
+      // carry no is_active key at all never come back. That drops `global` (the
+      // platform config bucket) and `rank_audit` (audit rows filed under a fake
+      // competition string, not a competition), so the old .neq('global') is no
+      // longer needed. The value test then drops nfl_2025 and world_cup_2026.
+      //
+      // is_active alone is NOT enough, and this is the trap: the three sims and
+      // nfl_demo are all is_active = true. They are live config, but they are
+      // not audiences — sandboxes for App Review and the practice week.
       const {data: cfg} = await supabase
         .from('competition_config')
-        .select('competition')
-        .neq('competition', 'global');
+        .select('competition, value')
+        .eq('key', 'is_active');
+
       const seen = new Set<string>();
-      for (const r of (cfg ?? []) as {competition: string}[]) seen.add(r.competition);
+      for (const r of (cfg ?? []) as {competition: string; value: unknown}[]) {
+        if (r.value !== true) continue;
+        // Reuses the two definitions that already exist rather than inventing a
+        // third: isSandboxCompetition centralizes the _sim / _simA / _simG rule
+        // (an earlier endsWith('_sim') silently missed the suffixed ones), and
+        // DEMO_COMPETITION is the registry's own name for the practice week.
+        if (isSandboxCompetition(r.competition)) continue;
+        if (r.competition === DEMO_COMPETITION) continue;
+        seen.add(r.competition);
+      }
+
       setCompetitions([
         {label: 'All users', value: 'all'},
         ...Array.from(seen).sort().map(c => ({label: c, value: c})),

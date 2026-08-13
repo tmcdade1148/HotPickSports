@@ -235,10 +235,23 @@ export const createProfileSlice = (set: Set, get: Get): ProfileSlice => ({
   },
 
   updateProfile: async (userId, fields) => {
+    // UPSERT, not UPDATE. An `.update().eq('id', userId)` that matches zero rows
+    // is NOT an error in Postgres: it returns no error, this function returned
+    // true, the fields were merged into local state, and the screen reported
+    // success. Accounts predating the on_auth_user_created trigger have no
+    // profiles row, so for them every profile save silently discarded the input
+    // and the screen looked like it had saved (live incident, 12 Aug 2026).
+    //
+    // The sharp edge: needsProfileSetup() returns true BECAUSE userProfile is
+    // null — the app had already established there was no row, and then issued
+    // an UPDATE against it.
+    //
+    // Upsert conflicts on the primary key: row exists, it updates; row doesn't,
+    // it creates. RLS permits both — profiles_insert has
+    // with_check (id = (select auth.uid())) and profiles_update the same qual.
     const {error} = await supabase
       .from('profiles')
-      .update(fields)
-      .eq('id', userId);
+      .upsert({id: userId, ...fields});
 
     if (error) {
       return false;
