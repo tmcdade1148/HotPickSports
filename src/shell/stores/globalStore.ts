@@ -256,12 +256,21 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   fetchUserPools: async (userId, competition, options) => {
     const silent = options?.silent === true;
     if (!silent) set({isLoadingPools: true});
-    // Join pools with pool_members to get pools this user belongs to
+    // Join pools with pool_members to get pools this user belongs to.
+    //
+    // The is_archived / deleted_at filters carry the `pools.` prefix because
+    // they filter the JOINED table (pools!inner), exactly like the competition
+    // filter above them. Without them this leg disagreed with the owned-pools
+    // leg below, which has always had both: an archived Contest you OWN
+    // correctly disappeared, while an archived Contest you were still an active
+    // member of kept rendering. Display only — no membership row is touched.
     const {data, error} = await supabase
       .from('pool_members')
       .select('pool_id, role, invite_code_used, pools!inner(*)')
       .eq('user_id', userId)
       .eq('pools.competition', competition)
+      .eq('pools.is_archived', false)
+      .is('pools.deleted_at', null)
       .eq('status', 'active');
     if (error) {
       logError(error, {
