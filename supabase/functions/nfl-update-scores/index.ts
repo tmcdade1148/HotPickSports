@@ -89,6 +89,8 @@ Deno.serve(async (req) => {
         const espnWeek = event.week?.number ?? 1;
         // In the postseason, map only the rounds we score; skip unmapped weeks
         // (Pro Bowl = 4, or anything unexpected) rather than guessing a DB week.
+        // dbWeek is REPORTING ONLY — it is no longer part of the row match. See
+        // the game_id note below.
         let dbWeek: number;
         if (isPlayoffs) {
           const mapped = mapPlayoffWeek(espnWeek);
@@ -114,31 +116,30 @@ Deno.serve(async (req) => {
         if (q3h !== null) updateData.q3_home_score = q3h;
         if (q3a !== null) updateData.q3_away_score = q3a;
 
-        // MATCH ON THE PRIMARY KEY, never on week + teams.
+        // Match on game_id, NOT on week + team abbreviations.
         //
-        // This five-column match froze preseason Week 1 at 0-0 (2026-08-13).
-        // nfl-import-schedule stores OUR week number but fetches ESPN's:
-        // "ESPN indexes seasontype=1 week 1 as the Hall of Fame Game, so our
-        // preseason weeks 1-3 are ESPN weeks 2-4" (import:88, espnWeek = week+1).
-        // This function took ESPN's number literally, looked for our Wk2, found
-        // matchups that don't line up, and skipped all 16. Nothing went FINAL,
-        // so finalize-week never fired and calculate-scores returned 0.
+        // season_games.game_id IS ESPN's event.id — nfl-import-schedule writes
+        // `game_id: event.id` and the column is the table's PRIMARY KEY. Matching
+        // on it directly removes two long-standing failure modes:
         //
-        // ESPN's event.id IS season_games.game_id — the sole primary key,
-        // written by nfl-import-schedule:135 as `game_id: event.id`. Matching on
-        // it removes the week arithmetic entirely, so ESPN's numbering can never
-        // break this again, and it sidesteps the WSH/WAS abbreviation hazard
-        // this file's own comments warn can leave a real game un-scored.
+        //  1. WEEK NUMBERING. ESPN indexes seasontype=1 week 1 as the Hall of
+        //     Fame Game, so our preseason weeks 1-3 are ESPN weeks 2-4.
+        //     nfl-import-schedule applies that offset (`espnWeek = week + 1`);
+        //     this function never did, so it looked for our Wk2 while scoring
+        //     our Wk1 and every game silently failed to match. Live incident,
+        //     preseason Wk1, 2026-08-13: "No match: DAL@SEA (nfl_2026_pre 2026
+        //     Wk2)", 16 of 16 skipped, no game ever reached FINAL, so
+        //     finalize-week and calculate-scores were both blocked behind it.
+        //     game_id has no such offset to get wrong.
         //
-        // A -1 offset was rejected deliberately: it would put the same magic
-        // number in two files that must stay in sync, and that drift IS this bug.
+        //  2. TEAM ABBREVIATIONS. The old match keyed on home_team/away_team,
+        //     so a drift like WSH vs WAS would leave a real game un-scored. That
+        //     hazard is now structurally gone.
         //
-        // .eq("competition") IS NOT OPTIONAL. The regular-season job runs against
-        // ESPN's DEFAULT scoreboard, which in preseason returns these very same
-        // events — it was logging its own "No match: DAL@SEA (nfl_2026 2026 Wk2)"
-        // at the same time. game_id alone would let that job write preseason
-        // scores into the wrong competition. Verified: no game_id appears under
-        // more than one competition today, and this keeps it that way.
+        // KEEP the competition filter. game_id is globally unique, but the
+        // regular-season job also runs during preseason (it fetches ESPN's
+        // default scoreboard, which returns preseason games), so without this
+        // guard nfl_2026 could write scores onto nfl_2026_pre rows.
         const { data, error } = await supabase
           .from("season_games")
           .update(updateData)
@@ -153,7 +154,7 @@ Deno.serve(async (req) => {
           updates.push({ game: `${awayAbbr}@${homeAbbr}`, status, score: `${awayScore}-${homeScore}`, winner: winnerTeam, week: dbWeek });
         } else {
           skippedCount++;
-          console.log(`[nfl-update-scores] No match: ${awayAbbr}@${homeAbbr} (${competition} ${seasonYear} Wk${dbWeek})`);
+          console.log(`[nfl-update-scores] No match: ${awayAbbr}@${homeAbbr} id=${event.id} (${competition} ${seasonYear} espnWk${espnWeek})`);
         }
       } catch (gameErr) {
         skippedCount++;
@@ -165,7 +166,7 @@ Deno.serve(async (req) => {
     // leaving a real game un-scored). Surface it loudly. Regular-season skips
     // are normal (the scoreboard spans states/weeks) so we don't warn there.
     if (isPlayoffs && skippedCount > 0) {
-      console.warn(`[nfl-update-scores] ⚠️ PLAYOFFS: ${skippedCount} game(s) skipped/unmatched for ${competition} ${seasonYear} — check for team-abbreviation mismatches; a real game may be un-scored.`);
+      console.warn(`[nfl-update-scores] PLAYOFFS: ${skippedCount} game(s) skipped/unmatched for ${competition} ${seasonYear} — a real game may be un-scored.`);
     }
 
     return json({ success: true, updated: updatedCount, skipped: skippedCount, updates, isPlayoffs }, 200);
