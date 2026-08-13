@@ -20,7 +20,21 @@ export function resolveDefaultPoolId(
   rawDefaultPoolId: string | null,
 ): string | null {
   return (
-    rawDefaultPoolId ??
+    // The star is RESOLVED AGAINST THE LIST, not returned on trust. It used to
+    // be `rawDefaultPoolId ??`, which handed back the persisted id even when no
+    // such pool was present — harmless only because every pool a user could
+    // star was also in the list.
+    //
+    // Archived Contests used to be in that list (fetchUserPools' membership leg
+    // didn't filter is_archived). Now they aren't, so a Player whose ONLY
+    // Contest was archived, and who had starred it, would otherwise get a
+    // dangling id here: activePoolId is null, this returns the dead star, and
+    // useViewingPoolId scopes the Ladder and Chirps to a Contest absent from
+    // their list. `null` is the correct terminal case — see this file's header.
+    //
+    // A stale star falls THROUGH to the remaining precedence rather than
+    // blanking the screen, so a Player with other Contests still lands on one.
+    pools.find(p => p.id === rawDefaultPoolId)?.id ??
     pools.find(p => poolRoles[p.id] === 'organizer')?.id ??
     pools.find(p => !!(p.brand_config as any)?.is_branded)?.id ??
     pools[0]?.id ??
