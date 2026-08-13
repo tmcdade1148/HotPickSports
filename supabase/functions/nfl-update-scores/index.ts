@@ -114,14 +114,36 @@ Deno.serve(async (req) => {
         if (q3h !== null) updateData.q3_home_score = q3h;
         if (q3a !== null) updateData.q3_away_score = q3a;
 
+        // MATCH ON THE PRIMARY KEY, never on week + teams.
+        //
+        // This five-column match froze preseason Week 1 at 0-0 (2026-08-13).
+        // nfl-import-schedule stores OUR week number but fetches ESPN's:
+        // "ESPN indexes seasontype=1 week 1 as the Hall of Fame Game, so our
+        // preseason weeks 1-3 are ESPN weeks 2-4" (import:88, espnWeek = week+1).
+        // This function took ESPN's number literally, looked for our Wk2, found
+        // matchups that don't line up, and skipped all 16. Nothing went FINAL,
+        // so finalize-week never fired and calculate-scores returned 0.
+        //
+        // ESPN's event.id IS season_games.game_id — the sole primary key,
+        // written by nfl-import-schedule:135 as `game_id: event.id`. Matching on
+        // it removes the week arithmetic entirely, so ESPN's numbering can never
+        // break this again, and it sidesteps the WSH/WAS abbreviation hazard
+        // this file's own comments warn can leave a real game un-scored.
+        //
+        // A -1 offset was rejected deliberately: it would put the same magic
+        // number in two files that must stay in sync, and that drift IS this bug.
+        //
+        // .eq("competition") IS NOT OPTIONAL. The regular-season job runs against
+        // ESPN's DEFAULT scoreboard, which in preseason returns these very same
+        // events — it was logging its own "No match: DAL@SEA (nfl_2026 2026 Wk2)"
+        // at the same time. game_id alone would let that job write preseason
+        // scores into the wrong competition. Verified: no game_id appears under
+        // more than one competition today, and this keeps it that way.
         const { data, error } = await supabase
           .from("season_games")
           .update(updateData)
+          .eq("game_id", event.id)
           .eq("competition", competition)
-          .eq("season_year", seasonYear)
-          .eq("week", dbWeek)
-          .eq("home_team", homeAbbr)
-          .eq("away_team", awayAbbr)
           .select("game_id");
 
         if (error) {
