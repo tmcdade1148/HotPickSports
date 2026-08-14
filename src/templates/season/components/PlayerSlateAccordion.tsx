@@ -20,6 +20,7 @@ import {Text} from '@shared/components/AppText';
 import {useTheme} from '@shell/theme';
 import {bodyType, spacing, borderRadius} from '@shared/theme';
 import {fmtPoints} from '@shared/utils/format';
+import {isFinalStatus} from '@sports/nfl/utils/gameStatus';
 import type {DbSeasonGame} from '@shared/types/database';
 import {sortByKickoff} from '../utils/gameOrder';
 
@@ -30,7 +31,27 @@ export interface PlayerSlatePick {
   /** Server-computed result (season_picks.is_correct): true=win, false=loss,
    *  null=pending. READ only — the client never derives win/loss. */
   is_correct: boolean | null;
+  /** `season_games.winner_team` — null on a draw AND on a game that hasn't
+   *  finished. Only meaningful alongside game_status. */
+  winner_team: string | null;
+  /** `season_games.status`. LEFT JOINed, so null when the game row is missing. */
+  game_status: string | null;
 }
+
+/**
+ * A FINAL game with no winner is a TIE — RESOLVED, not pending.
+ *
+ * `is_correct` stays NULL forever on a draw (scoring.ts skips draws
+ * deliberately — a draw is never a loss, register 2.7), so without this the row
+ * reads as pending for the rest of the season. This is the SAME condition
+ * GameChip applies, deliberately not a second rule.
+ *
+ * The LEFT JOIN in get_player_week_picks returns NULL for both columns when the
+ * game row is missing; `isFinalStatus(null)` is false, so that reads as PENDING.
+ * A tie is never inferred from an absent game.
+ */
+const isTiePick = (p: PlayerSlatePick | undefined): boolean =>
+  !!p && isFinalStatus(p.game_status) && p.winner_team === null;
 
 export interface PlayerSlateState {
   status: 'loading' | 'ready' | 'error';
@@ -116,12 +137,17 @@ export function PlayerSlateAccordion({games, slate, isNonPrivate, teams}: Props)
   ) => {
     const isPicked = pick?.picked_team === code;
     const isHot = isPicked && pick?.is_hotpick === true;
-    const resultColor =
-      !isPicked || pick?.is_correct == null
-        ? null
-        : pick.is_correct
-          ? colors.gameWon
-          : colors.gameLost;
+    // Tie is checked BEFORE is_correct: on a draw is_correct is null, which the
+    // old order read as "pending" and left the pick uncoloured forever.
+    const resultColor = !isPicked
+      ? null
+      : isTiePick(pick)
+        ? colors.textSecondary
+        : pick?.is_correct == null
+          ? null
+          : pick.is_correct
+            ? colors.gameWon
+            : colors.gameLost;
     const color = isPicked ? (resultColor ?? colors.textPrimary) : colors.textTertiary;
     const label = isHot ? nick(code).toUpperCase() : nick(code);
     return (
@@ -155,7 +181,11 @@ export function PlayerSlateAccordion({games, slate, isNonPrivate, teams}: Props)
         // only a miss carries its minus (app-wide rule).
         let ptsEl: React.ReactNode = null;
         if (isHotRow && rank != null) {
-          if (pick?.is_correct === true) {
+          if (isTiePick(pick)) {
+            // A HotPick on a tie takes a 0 swing — resolved, neutral, never
+            // the unsigned rank (which would read as still-at-stake).
+            ptsEl = <Text style={[bodyType.bold, styles.pts, {color: colors.textSecondary}]}>0</Text>;
+          } else if (pick?.is_correct === true) {
             ptsEl = <Text style={[bodyType.bold, styles.pts, {color: colors.gameWon}]}>{fmtPoints(rank)}</Text>;
           } else if (pick?.is_correct === false) {
             ptsEl = <Text style={[bodyType.bold, styles.pts, {color: colors.gameLost}]}>{fmtPoints(-rank)}</Text>;

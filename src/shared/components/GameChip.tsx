@@ -208,14 +208,25 @@ export function GameChip({
   // The COLOUR still carries the state — green gain / neutral / red miss — so
   // dropping the "+" costs no information and stops a settled result from
   // reading like a swing that could still move.
-  const boxValue =
-    isFinal && earnedPoints !== null
+  // A FINAL game with no winner is a TIE — RESOLVED, not pending. scoring.ts
+  // skips draws deliberately (a draw is never a loss — register 2.7), so
+  // `season_picks.points` stays null forever. Without this branch the resolve
+  // gate below reads that permanent null as "not scored yet" and falls back to
+  // the STAKE, so a tied game shows a phantom point that can never clear.
+  // Display only: totals are already correct, and nothing writes points = 0
+  // server-side. `winnerTeam` is a required prop, so `=== null` is exact.
+  const isTie = isFinal && winnerTeam === null;
+
+  const boxValue = isTie
+    ? '0'
+    : isFinal && earnedPoints !== null
       ? fmtPoints(earnedPoints)
       : noPickLocked
         ? '0'
         : String(points);
-  const boxColor =
-    isFinal && earnedPoints !== null
+  const boxColor = isTie
+    ? boxTint?.text ?? colors.textSecondary
+    : isFinal && earnedPoints !== null
       ? earnedPoints > 0
         ? colors.gameWon
         : earnedPoints < 0
@@ -225,17 +236,30 @@ export function GameChip({
 
   // The "pts" label under the number: white on an orange panel; at FINAL it
   // follows the resolved number's colour (green hit / red miss); muted otherwise.
-  const labelColor =
-    boxTint?.text ??
-    (isFinal && earnedPoints !== null ? boxColor : colors.textSecondary);
+  const labelColor = isTie
+    ? boxTint?.text ?? colors.textSecondary
+    : boxTint?.text ??
+      (isFinal && earnedPoints !== null ? boxColor : colors.textSecondary);
 
   // Written-out unit, pluralised off the DISPLAYED number's magnitude — singular
   // ONLY when |value| === 1, so 0 and −1 pluralise correctly (0 → "points",
   // −1 → "point"). `pointsLabel` is the singular base ("point" / "HotPick
   // Point"); the chip appends the s.
-  const displayedValue =
-    isFinal && earnedPoints !== null ? earnedPoints : noPickLocked ? 0 : points;
-  const labelText = pointsLabel + (Math.abs(displayedValue) === 1 ? '' : 's');
+  const displayedValue = isTie
+    ? 0
+    : isFinal && earnedPoints !== null
+      ? earnedPoints
+      : noPickLocked
+        ? 0
+        : points;
+  // "TIE" replaces the unit entirely — the panel reads 0 over TIE, so the state
+  // is named rather than inferred from a bare zero. Deliberately NOT "PUSH":
+  // that is sportsbook vocabulary and this app carries no gambling language.
+  // Generic game-state word, so no lexicon entry — same treatment as the
+  // hardcoded "FINAL" status label below.
+  const labelText = isTie
+    ? 'TIE'
+    : pointsLabel + (Math.abs(displayedValue) === 1 ? '' : 's');
 
   // Score colour (rule 9). Only the WINNER's score greens, and only at FINAL.
   const awayScoreColor =
