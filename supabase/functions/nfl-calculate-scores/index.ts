@@ -118,15 +118,26 @@ async function scoreWeek(competition: string, seasonYear: number, week: number) 
   // is_no_show and mulligan_used (the old full-row .upsert() rewrote them every
   // pass, and read-then-wrote mulligan racily). The scorer now only touches the
   // columns it owns; no need to pre-read existing rows.
-  const { error: upsertError } = await supabase.rpc("upsert_season_week_scores", {
-    p_competition: competition,
-    p_season_year: seasonYear,
-    p_week: week,
-    p_phase: phase,
-    p_aggs: userAggs,
-  });
+  const { data: upsertResult, error: upsertError } = await supabase.rpc(
+    "upsert_season_week_scores",
+    {
+      p_competition: competition,
+      p_season_year: seasonYear,
+      p_week: week,
+      p_phase: phase,
+      p_aggs: userAggs,
+    }
+  );
 
   if (upsertError) return { users_scored: 0, final_games: games.length, error: upsertError.message };
+
+  // Users whose HotPick result became known on THIS run. Everyone else was
+  // already announced on an earlier run and must stay silent. auto_detect
+  // re-scores every week containing a FINAL game on every tick, so without this
+  // the same result reposts forever (mirrors nfl-finalize-week's transition gate).
+  const newlyResolved = new Set<string>(
+    (upsertResult?.newly_resolved_hotpick_user_ids ?? []) as string[]
+  );
 
   // ── SmackTalk: post per-user HotPick results to each pool they belong to ──
   // Suppressed for sandbox/sim competitions — the App Review sandboxes
@@ -137,6 +148,13 @@ async function scoreWeek(competition: string, seasonYear: number, week: number) 
   if (/_sim[a-z]?$/i.test(competition)) {
     return { users_scored: scoredUserIds.size, final_games: games.length };
   }
+
+  // Nothing became known on this run -> nothing to announce. Skip the profile,
+  // pool and membership lookups entirely. This is what makes a */5 cadence cheap.
+  if (newlyResolved.size === 0) {
+    return { users_scored: scoredUserIds.size, final_games: games.length };
+  }
+
   try {
     // Find users whose HotPick game is in this batch of FINAL games
     const hotPickPicks = (picks ?? []).filter((p: any) => p.is_hotpick && gameMap.has(p.game_id));
@@ -171,6 +189,7 @@ async function scoreWeek(competition: string, seasonYear: number, week: number) 
       // Post one message per user per pool
       const msgs: Promise<any>[] = [];
       for (const pick of hotPickPicks) {
+        if (!newlyResolved.has(pick.user_id)) continue; // already announced on an earlier run
         if (superAdminIds.has(pick.user_id)) continue; // hidden super-admin
         const game = gameMap.get(pick.game_id);
         if (!game || !game.winner_team) continue;
