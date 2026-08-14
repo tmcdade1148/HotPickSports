@@ -21,6 +21,7 @@ import {useTheme} from '@shell/theme';
 import {bodyType, spacing, borderRadius} from '@shared/theme';
 import {fmtPoints} from '@shared/utils/format';
 import type {DbSeasonGame} from '@shared/types/database';
+import {sortByKickoff} from '../utils/gameOrder';
 
 export interface PlayerSlatePick {
   game_id: string;
@@ -91,11 +92,18 @@ export function PlayerSlateAccordion({games, slate, isNonPrivate, teams}: Props)
     );
   }
 
-  // Rank order (1→16), matching the Picks screen and the raw slate order.
-  const ordered = [...games].sort(
-    (a, b) =>
-      (a.frozen_rank ?? a.rank ?? 999) - (b.frozen_rank ?? b.rank ?? 999),
-  );
+  // CHRONOLOGICAL, and unconditionally so — this view only exists after lock,
+  // so there is no open/locked split to make here.
+  //
+  // Why not rank: this surface is for reading two Players' slates head to head,
+  // so the order has to be one BOTH readers share. Rank is a private ordering —
+  // "which of my picks is worth the most" — and cannot be scanned against
+  // someone else's. It also read as broken, showing 7:00, 9:00, 7:30, 8:00.
+  //
+  // Shared comparator, not a local copy: this used to sort by rank "matching the
+  // Picks screen", which is precisely how two orderings that must agree stop
+  // agreeing. See utils/gameOrder.ts.
+  const ordered = sortByKickoff(games);
 
   // One team's rendered name within a matchup. The picked team is bold and
   // brighter (that IS "who they picked"); the opponent is muted. The HotPick
