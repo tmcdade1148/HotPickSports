@@ -1,6 +1,8 @@
 import React, {useEffect, useRef, useState, useCallback} from 'react';
 import {Text, TextInput} from '@shared/components/AppText';
 import {
+  AppState,
+  type AppStateStatus,
   View,
   TouchableOpacity,
   FlatList,
@@ -13,7 +15,9 @@ import {
   RefreshControl,
   StyleSheet,
 } from 'react-native';
+import {useFocusEffect} from '@react-navigation/native';
 import {supabase} from '@shared/config/supabase';
+import {logError} from '@shared/logging/logError';
 import {useAuth} from '@shared/hooks/useAuth';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {getDisplayName} from '@shared/utils/displayName';
@@ -179,34 +183,69 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
   // rendering treats them as ordinary chirps. We simply stop producing it — new
   // messages are always 'user'.
 
+  // ── Realtime instrumentation ─────────────────────────────────────────
+  // Both .subscribe() calls below were bare, so a channel that never connected
+  // was indistinguishable from a working one. These log to client_error_log via
+  // the existing logError sink — a device console is unreadable after the fact,
+  // and the point is having data on Monday.
+  //
+  // EVERY status is logged, not only failures, because three outcomes need
+  // telling apart and two of them look identical under error-only logging:
+  //   1. no rows at all       -> callback never fired; setup never completed
+  //   2. SUBSCRIBED, no INSERT-received rows -> channel up, events not
+  //      delivering; look at the socket/service, not the RLS policies
+  //   3. CHANNEL_ERROR/TIMED_OUT -> connection failure; directly actionable
+  //
+  // The channel name goes in the MESSAGE, not just the context: logError dedups
+  // on (screen + message) for 30s, so two channels reporting the same status
+  // would otherwise collapse into a single row and lose which one spoke.
+  // No message content, no PII — existence, channel, status, pool only.
+  const logChannelStatus = useCallback(
+    (channel: 'messages' | 'reactions', status: string) => {
+      logError(`realtime ${channel} channel: ${status}`, {
+        screen: 'SmackTalkScreen',
+        action: 'realtimeSubscribe',
+        channel,
+        status,
+        poolId,
+      });
+    },
+    [poolId],
+  );
+
   // ── Fetch messages + reactions ──────────────────────────────────────
+  // Hoisted out of the mount effect so the focus/foreground refetches below can
+  // call the SAME loader. Before this, the fetch ran on [poolId, blockedUserIds]
+  // only, which made Realtime the ONLY path to a new message after first load —
+  // so a dropped channel meant a force-quit was the sole way to see a new chirp.
+  const fetchMessages = useCallback(async () => {
+    const {data} = await supabase
+      .from('smack_messages')
+      .select('*')
+      .eq('pool_id', poolId)
+      .is('reply_to', null)
+      .order('created_at', {ascending: false})
+      .limit(50);
+
+    if (data) {
+      // Filter out messages from blocked users
+      const filtered = (data as DbSmackMessage[]).reverse().filter(
+        m => !blockedUserIds.has(m.user_id),
+      );
+      setMessages(filtered);
+      setHasOlderMessages(data.length === 50);
+      // Fetch reactions for all messages
+      const msgIds = filtered.map(m => m.id);
+      if (msgIds.length > 0) {
+        await fetchReactions(msgIds);
+        await fetchReplyCounts(msgIds);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [poolId, blockedUserIds]);
+
   useEffect(() => {
     markPoolAsRead(poolId);
-
-    const fetchMessages = async () => {
-      const {data} = await supabase
-        .from('smack_messages')
-        .select('*')
-        .eq('pool_id', poolId)
-        .is('reply_to', null)
-        .order('created_at', {ascending: false})
-        .limit(50);
-
-      if (data) {
-        // Filter out messages from blocked users
-        const filtered = (data as DbSmackMessage[]).reverse().filter(
-          m => !blockedUserIds.has(m.user_id),
-        );
-        setMessages(filtered);
-        setHasOlderMessages(data.length === 50);
-        // Fetch reactions for all messages
-        const msgIds = filtered.map(m => m.id);
-        if (msgIds.length > 0) {
-          await fetchReactions(msgIds);
-          await fetchReplyCounts(msgIds);
-        }
-      }
-    };
 
     isInitialLoad.current = true;
     fetchMessages().then(() => {
@@ -229,6 +268,17 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
           filter: `pool_id=eq.${poolId}`,
         },
         payload => {
+          // Arrival log — proves the handler FIRED. Without it, "SUBSCRIBED and
+          // silent" is indistinguishable from "SUBSCRIBED, delivering, and the
+          // UI drops it", and those have opposite fixes. Logged BEFORE the
+          // blocked-user filter, so a message discarded by the client still
+          // records that delivery worked. Existence only — no content, no PII.
+          logError('realtime messages channel: INSERT received', {
+            screen: 'SmackTalkScreen',
+            action: 'realtimeArrival',
+            channel: 'messages',
+            poolId,
+          });
           const msg = payload.new as DbSmackMessage;
           // Skip messages from blocked users
           if (msg.user_id && blockedUserIds.has(msg.user_id)) return;
@@ -263,7 +313,7 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
           );
         },
       )
-      .subscribe();
+      .subscribe(status => logChannelStatus('messages', status));
 
     // Realtime: reactions
     const rxnChannel = supabase
@@ -283,14 +333,40 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
           }
         },
       )
-      .subscribe();
+      .subscribe(status => logChannelStatus('reactions', status));
 
     return () => {
       supabase.removeChannel(msgChannel);
       supabase.removeChannel(rxnChannel);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [poolId, blockedUserIds]);
+  }, [poolId, blockedUserIds, fetchMessages]);
+
+  // ── Refetch on focus and on foreground ───────────────────────────────
+  // Symptom fix, NOT a Realtime fix: a new chirp currently needs a force-quit to
+  // appear. These two paths reload the feed whether or not the channel is
+  // healthy, so they hold even if the (still undiagnosed) Realtime fault stays.
+  // Deliberately no scroll — the user may be reading older messages.
+  useFocusEffect(
+    useCallback(() => {
+      fetchMessages();
+    }, [fetchMessages]),
+  );
+
+  // useFocusEffect covers tab focus but NOT an app foreground while this screen
+  // is already focused — the common case for a chirp arriving while the phone is
+  // in a pocket. The global useForegroundRefetch refreshes unread COUNTS, never
+  // an open message list, so this screen needs its own listener. Same
+  // background/inactive → active guard as that hook.
+  useEffect(() => {
+    let previous: AppStateStatus = AppState.currentState;
+    const sub = AppState.addEventListener('change', next => {
+      const wasBackgrounded = previous === 'background' || previous === 'inactive';
+      previous = next;
+      if (wasBackgrounded && next === 'active') fetchMessages();
+    });
+    return () => sub.remove();
+  }, [fetchMessages]);
 
   // ── Load older messages (scroll-to-top pagination) ─────────────────
   const loadMore = async () => {
