@@ -8,6 +8,7 @@ import {WeekSelector} from '../components/WeekSelector';
 import {SeasonMatchCard} from '../components/SeasonMatchCard';
 import {isWeekLocked} from '../utils/weekLock';
 import {hasStarted, resolveWeekScore} from '../utils/weekScore';
+import {byKickoff} from '../utils/gameOrder';
 import {PicksProgressHeader} from '../components/PicksProgressHeader';
 import {SubmitPicksFooter} from '../components/SubmitPicksFooter';
 import {useAuth} from '@shared/hooks/useAuth';
@@ -309,12 +310,19 @@ export function SeasonPicksScreen() {
   const weekLocked = isWeekLocked(games);
 
   // Started games (or the whole week locked) rise to the top, grouped into
-  // kickoff-time WAVES — one section per kickoff time, labelled with that time
-  // (e.g. "SUN 1:00 PM"), newest wave first. So as the week plays out each new
-  // wave lands on top with its own time header. A game only lifts up once it
-  // actually kicks off, not when its picks merely lock (Sunday seal). Games not
-  // yet started stay in a single rank-ordered "OPEN" group below (rank helps
-  // prioritize the picks you can still make).
+  // kickoff-time WAVES — one section per wave, labelled with that wave's time
+  // (e.g. "SUN 1:00 PM"), earliest wave first. So as the week plays out each new
+  // wave lands below the ones already running. A game only lifts up once it
+  // actually kicks off, not when its picks merely lock (Sunday seal).
+  //
+  // WITHIN a started wave, games read CHRONOLOGICALLY. Waves are broad day-parts
+  // (waveBucket: "THURSDAY NIGHT" is any Thursday game from 17:00Z on), so one
+  // section can span two hours — and sorting that span by rank showed 7:00,
+  // 9:00, 7:30, 8:00, 8:00, 7:00. Once a game is running you are watching, not
+  // choosing, and the only order that reads is the clock.
+  //
+  // The OPEN group below stays RANK-ordered, deliberately: while picks are open
+  // you ARE choosing, and rank is the decision input. Two sections, two jobs.
   const sections = useMemo(() => {
     const started: DbSeasonGame[] = [];
     const open: DbSeasonGame[] = [];
@@ -322,11 +330,6 @@ export function SeasonPicksScreen() {
       (!picksAreOpen || weekLocked || hasStarted(g) ? started : open).push(g);
     }
     const byRank = (a: DbSeasonGame, b: DbSeasonGame) => effectiveRank(a) - effectiveRank(b);
-    // The user's HotPick sorts to the top of its wave — a wrapper-level sort, so
-    // the chip never learns HotPick status. byRank orders the rest of the wave.
-    const hotPickGameId = weekPicks.find(p => p.is_hotpick)?.game_id ?? null;
-    const byWave = (a: DbSeasonGame, b: DbSeasonGame) =>
-      a.game_id === hotPickGameId ? -1 : b.game_id === hotPickGameId ? 1 : byRank(a, b);
 
     const out: {title: string; data: DbSeasonGame[]}[] = [];
 
@@ -345,9 +348,14 @@ export function SeasonPicksScreen() {
         waves.set(key, {label, start, games: [g]});
       }
     }
-    // Chronological (earliest wave on top); the HotPick first in its wave, then rank-order (reads 1→16).
+    // Chronological at BOTH levels: earliest wave on top, and kickoff order
+    // within each wave (shared comparator — PlayerSlateAccordion reads the same
+    // one, see utils/gameOrder.ts). No HotPick pin: the flame already marks it
+    // on its own row, so hoisting it would reorder the slate to repeat what the
+    // row says, and it made the wave's first row disagree with the wave's own
+    // time label.
     for (const w of [...waves.values()].sort((a, b) => a.start - b.start)) {
-      out.push({title: w.label, data: w.games.sort(byWave)});
+      out.push({title: w.label, data: w.games.sort(byKickoff)});
     }
 
     if (open.length) {
@@ -355,7 +363,27 @@ export function SeasonPicksScreen() {
       out.push({title: 'OPEN', data: open});
     }
     return out;
-  }, [games, picksAreOpen, weekLocked, weekPicks]);
+    // weekPicks is deliberately NOT a dependency any more. It fed only the
+    // HotPick pin, which is gone; leaving it here would recompute every section
+    // on every pick tap for a value this memo no longer reads.
+  }, [games, picksAreOpen, weekLocked]);
+
+  // Only a genuine FIRST load owns the full-screen spinner.
+  //
+  // `isLoading` is a SHARED seasonStore flag, not a games flag: fetchLeaderboard
+  // raises it too (seasonStore:516-522), and the Ladder refetches on every live
+  // score change — so during a game that flag flips every few seconds and the
+  // old `isLoading ?` gate swapped the whole list for a spinner each time. (The
+  // games fetches are already innocent: fetchWeekGames has its own ownsSpinner
+  // guard at seasonStore:295, added as an earlier pass at this same flash.)
+  //
+  // The test is "no games for the week being VIEWED", not games.length === 0.
+  // On a switch to an uncached week, setCurrentWeek raises isLoading but leaves
+  // the PREVIOUS week's games in place (seasonStore:247), so a bare length check
+  // would render last week's slate under this week's header — the exact thing
+  // that comment says the spinner exists to prevent.
+  const gamesMatchViewedWeek = games.length > 0 && games[0].week === currentWeek;
+  const showFirstLoadSpinner = isLoading && !gamesMatchViewedWeek;
 
   if (!config) {
     return (
@@ -465,7 +493,10 @@ export function SeasonPicksScreen() {
         weekPrefix={config.periodLabels?.short}
       />
 
-      {!isLoading && games.length > 0 && (
+      {/* Same shared-flag problem as the list below: `!isLoading` here made the
+          progress header and the score widgets blink out and back on every
+          leaderboard refetch. Gate on "we have this week's games" instead. */}
+      {gamesMatchViewedWeek && (
         <>
           <PicksProgressHeader
             currentWeek={currentWeek}
@@ -530,7 +561,7 @@ export function SeasonPicksScreen() {
         </>
       )}
 
-      {isLoading ? (
+      {showFirstLoadSpinner ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={config.color} />
         </View>
@@ -744,21 +775,29 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: '400',
     color: colors.textSecondary,
   },
+  // backgroundColor is NOT optional here. Without it this View paints the
+  // platform default — white — so on a dark theme every render of the loading
+  // branch flashed a solid white screen over the list. Theme value, never a
+  // literal (Hard Rule #9).
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.xl,
+    backgroundColor: colors.background,
   },
   emptyState: {
     alignItems: 'center',
     paddingTop: spacing.md,
     paddingHorizontal: spacing.lg,
   },
+  // Same omission as `centered` above — this branch also fully replaces the
+  // list, so it needs its own background or it paints white too.
   emptyStateCentered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.background,
   },
   emptyTitle: {
     fontSize: 18,
