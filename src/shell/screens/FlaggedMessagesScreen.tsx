@@ -16,7 +16,7 @@ import {ChevronLeft, Check, X, Eye, MessageSquare} from 'lucide-react-native';
 import {supabase} from '@shared/config/supabase';
 import {useAuth} from '@shared/hooks/useAuth';
 import {useGlobalStore} from '@shell/stores/globalStore';
-import {getDisplayName} from '@shared/utils/displayName';
+import {getDisplayName, getMemberName} from '@shared/utils/displayName';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 
@@ -79,19 +79,12 @@ export function FlaggedMessagesScreen() {
       if (flaggerIds.length > 0) {
         const {data: profiles} = await supabase
           .from('profiles')
-          .select('id, first_name, last_name, poolie_name, display_name_preference')
+          .select('id, first_name, poolie_name')
           .in('id', flaggerIds);
         if (profiles) {
           const names: Record<string, string> = {};
           for (const p of profiles) {
-            const pref = p.display_name_preference ?? 'first_name';
-            if (pref === 'poolie_name' && p.poolie_name) {
-              names[p.id] = p.poolie_name;
-            } else {
-              names[p.id] = [p.first_name, p.last_name?.charAt(0)]
-                .filter(Boolean)
-                .join(' ') || 'Unknown';
-            }
+            names[p.id] = getMemberName(p);
           }
           setFlaggerNames(names);
         }

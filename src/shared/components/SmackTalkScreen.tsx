@@ -20,7 +20,7 @@ import {supabase} from '@shared/config/supabase';
 import {logError} from '@shared/logging/logError';
 import {useAuth} from '@shared/hooks/useAuth';
 import {useGlobalStore} from '@shell/stores/globalStore';
-import {getDisplayName} from '@shared/utils/displayName';
+import {getDisplayName, getMemberName} from '@shared/utils/displayName';
 import {SMACK_REACTIONS} from '@shared/config/smackTalk';
 import {LEXICON} from '@shared/lexicon';
 import {spacing, borderRadius} from '@shared/theme';
@@ -427,19 +427,12 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
       if (userIds.length > 0) {
         const {data: profiles} = await supabase
           .from('profiles')
-          .select('id, first_name, last_name, poolie_name, display_name_preference')
+          .select('id, first_name, poolie_name')
           .in('id', userIds);
         if (profiles) {
           const names: Record<string, string> = {};
           for (const p of profiles) {
-            const pref = p.display_name_preference ?? 'first_name';
-            if (pref === 'poolie_name' && p.poolie_name) {
-              names[p.id] = p.poolie_name;
-            } else {
-              names[p.id] = [p.first_name, p.last_name?.charAt(0)]
-                .filter(Boolean)
-                .join(' ') || 'Unknown';
-            }
+            names[p.id] = getMemberName(p);
           }
           setReactionNames(names);
         }

@@ -2,6 +2,8 @@
 // globalStore.ts; receives the store's own set/get so behaviour is identical.
 import type {StoreApi} from 'zustand';
 import {supabase} from '@shared/config/supabase';
+import {getMemberName} from '@shared/utils/displayName';
+import {LEXICON} from '@shared/lexicon';
 import type {GlobalState} from '../globalStore.types';
 
 type Set = StoreApi<GlobalState>['setState'];
@@ -60,19 +62,16 @@ export const createBroadcastsSlice = (set: Set, get: Get): BroadcastsSlice => ({
     const senderIds = [...new Set(data.map((r: any) => r.organizer_id))];
     const {data: profiles} = await supabase
       .from('profiles')
-      .select('id, first_name, last_name, poolie_name, display_name_preference')
+      .select('id, first_name, poolie_name')
       .in('id', senderIds);
 
+    // Same resolution as Chirp reactions and the moderation queue. The fallback
+    // is the Gaffer rather than 'Player' — this name is always a Contest's
+    // Gaffer. Short form (no article): this fills a name slot, not sentence
+    // copy, matching MessageCenterScreen's equivalent default.
     const nameMap: Record<string, string> = {};
     for (const p of profiles ?? []) {
-      const pref = p.display_name_preference ?? 'first_name';
-      if (pref === 'poolie_name' && p.poolie_name) {
-        nameMap[p.id] = p.poolie_name;
-      } else {
-        nameMap[p.id] = [p.first_name, p.last_name?.charAt(0)]
-          .filter(Boolean)
-          .join(' ') || 'Organizer';
-      }
+      nameMap[p.id] = getMemberName(p, LEXICON.gaffer.short);
     }
 
     const poolNameMap: Record<string, string> = {};
@@ -85,7 +84,7 @@ export const createBroadcastsSlice = (set: Set, get: Get): BroadcastsSlice => ({
       poolName: poolNameMap[r.pool_id] ?? 'Pool',
       message: r.message,
       sentAt: r.sent_at,
-      senderName: nameMap[r.organizer_id] ?? 'Organizer',
+      senderName: nameMap[r.organizer_id] ?? LEXICON.gaffer.short,
     }));
 
     set({recentBroadcasts: broadcasts});
