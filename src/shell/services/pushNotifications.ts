@@ -65,12 +65,27 @@ async function recordPushPermission(status: PushPermissionStatus): Promise<void>
       p_status: status,
     });
     if (error) {
-      console.warn('[Push] record_push_permission failed:', error.message);
+      // console.warn made this invisible. Dirk (cea7fc35) reached this call
+      // with the permission OFF on 2026-08-20 and his push_permission_status
+      // is STILL NULL — and the column is NULL for all 118 users, so this RPC
+      // has never once written. Whatever is failing here has been failing
+      // silently since the column shipped.
+      logError(error, {
+        screen: 'pushNotifications',
+        action: 'record_push_permission-error',
+        status,
+        os: Platform.OS,
+      });
       return;
     }
     lastReportedStatus = status;
   } catch (err) {
-    console.warn('[Push] record_push_permission threw:', err);
+    logError(err, {
+      screen: 'pushNotifications',
+      action: 'record_push_permission-threw',
+      status,
+      os: Platform.OS,
+    });
   }
 }
 
@@ -159,16 +174,49 @@ async function ensureModules(): Promise<boolean> {
 export async function registerForPushNotifications(
   userId: string,
 ): Promise<string | null> {
-  console.log('[Push] registerForPushNotifications: entry', {userId});
+  // ENTRY TRACE — deliberately NOT on a failure branch.
+  //
+  // Every instrument added so far sits in a catch, which makes "never invoked"
+  // and "ran and succeeded" produce identical evidence: nothing. After the
+  // 2026-08-20 OTA (confirmed applied on Tom's device via the build stamp),
+  // four restored-session relaunches produced no row at :128, no row at :203,
+  // nothing from either call site, and `last_used_at` still 2026-07-30. Since
+  // every path from here to success emits either a logError row or a moved
+  // `last_used_at`, and we have neither, this function is not being entered.
+  // This line is what proves that, one way or the other.
+  //
+  // Remove once 1.13 closes — it writes on every launch and inflates
+  // client_error_log, which register item 1.4 is already unhappy about.
+  logError('push-trace: registerForPushNotifications ENTERED', {
+    screen: 'pushNotifications',
+    action: 'entry',
+    userId,
+    os: Platform.OS,
+  });
+
   const ready = await ensureModules();
   if (!ready || !Notifications || !Device) {
-    console.log('[Push] Modules not available — skipping registration');
+    // Early RETURN, not a throw — previously console.log only, so it produced
+    // no server-side trace at all. Distinct from the :128 catch: ensureModules
+    // returns false without throwing when a PRIOR call already failed
+    // (`isInitialized` short-circuit), in which case :128 never fires again.
+    logError('push-trace: modules unavailable — registration skipped', {
+      screen: 'pushNotifications',
+      action: 'exit-no-modules',
+      userId,
+      os: Platform.OS,
+    });
     return null;
   }
 
   // Push tokens are not available on simulators
   if (!Device.isDevice) {
-    console.log('[Push] Not a physical device — skipping token registration');
+    logError('push-trace: not a physical device — registration skipped', {
+      screen: 'pushNotifications',
+      action: 'exit-not-device',
+      userId,
+      os: Platform.OS,
+    });
     return null;
   }
 
@@ -192,7 +240,18 @@ export async function registerForPushNotifications(
   if (resolved) void recordPushPermission(resolved);
 
   if (finalStatus !== 'granted') {
-    console.log('[Push] Permission not granted');
+    // Path 3. Dirk (cea7fc35) confirmed on 2026-08-20 that he had the OS
+    // permission OFF — so this branch demonstrably runs — yet his
+    // push_permission_status is still NULL. The column we were relying on to
+    // identify this group has never recorded a value for anyone, so this
+    // branch needs its own trace rather than trusting that write.
+    logError('push-trace: permission not granted — registration skipped', {
+      screen: 'pushNotifications',
+      action: 'exit-permission-not-granted',
+      userId,
+      os: Platform.OS,
+      finalStatus,
+    });
     return null;
   }
 
