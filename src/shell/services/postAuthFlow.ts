@@ -169,16 +169,10 @@ export async function runPostAuthFlow({
   // here, and an empty catch erased them. This is the explicit-sign-in path;
   // LoadingScreen is the restored-session path. Both are instrumented because
   // which one runs depends on how the Player got into the app.
-  // ENTRY TRACE — before the call, not in its catch. This is the
-  // explicit-sign-in path. Tom has not signed out in three weeks, so this site
-  // should NOT have run in that window; a row here is the signature of the
-  // sign-out/sign-in test rather than of an ordinary relaunch, which is what
-  // makes the two call sites distinguishable in the log.
-  logError('push-trace: postAuthFlow call site REACHED', {
-    screen: 'postAuthFlow',
-    action: 'pre-registerForPushNotifications',
-    userId: user.id,
-  });
+  // The pre-call trace here was removed 2026-08-20 having served its purpose:
+  // the sign-out/sign-in test passed, confirming this explicit-sign-in site is
+  // reached and registration completes from it. The failure-path logError
+  // below stays.
   registerForPushNotifications(user.id).catch(err => {
     logError(err, {
       screen: 'postAuthFlow',

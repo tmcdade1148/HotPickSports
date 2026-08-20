@@ -209,19 +209,10 @@ export function LoadingScreen({navigation}: any) {
         // vanish entirely — no row, no console line, nothing. This is the
         // restored-session launch path, the one that has not stamped
         // user_devices.last_used_at on Tom's device since 2026-07-30.
-        // ENTRY TRACE — before the call, not in its catch. This is the
-        // restored-session launch path (no sign-out required), and it is the
-        // one under suspicion: Tom has not signed out in three weeks, so
-        // postAuthFlow:166 has not run in that time and THIS is the only site
-        // that should have been firing. If this row appears and the one inside
-        // registerForPushNotifications does not, the call site is reached but
-        // the function is not — which would point at the module boundary
-        // rather than anything inside push registration.
-        logError('push-trace: LoadingScreen call site REACHED', {
-          screen: 'LoadingScreen',
-          action: 'pre-registerForPushNotifications',
-          userId: session.user.id,
-        });
+        // The pre-call trace here was removed 2026-08-20 having served its
+        // purpose: it confirmed this restored-session site is reached on every
+        // cold start, and that registration then enters and completes. The
+        // failure-path logError below stays.
         registerForPushNotifications(session.user.id).catch(err => {
           logError(err, {
             screen: 'LoadingScreen',
