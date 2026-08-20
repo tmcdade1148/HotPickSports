@@ -95,6 +95,7 @@ If you find yourself writing any of the following, stop and revise.
 - `season_year` hardcoded anywhere → always read from `competition_config` via `seasonStore.seasonYear`
 - `scoring_locked` missing from new competition seed data → always include it
 - Award computation in a React component → `compute-hardware` Edge Function only
+- **Gating pick availability on `season_games.lock_at`** → the lock is WHOLE-WEEK: `get_week_lock_time()` = `MIN(kickoff_at)`, enforced by `enforce_pick_lock`. Client mirror: `src/templates/season/utils/weekLock.ts`. `lock_at` is WRITTEN (by `admin_advance_week`, `open_week_picks`, `refresh_reviewer_sim_countdown`, `reset_reviewer_sim`) but READ by nothing in gameplay, and its per-game values differ from each other and from the real deadline. Never gate on it — a second lock concept is how the footer, the cards and the server drift apart. Both columns carry this in their DB comments (migration `comment_season_games_lock_columns`).
 
 ### Data Architecture
 - New table per sport or event → use template tables with `event_id`

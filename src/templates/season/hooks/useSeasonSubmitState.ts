@@ -52,20 +52,29 @@ export function useSeasonSubmitState(): SeasonSubmitState {
     return status === 'FINAL' || status === 'COMPLETED' || status === 'STATUS_FINAL';
   });
 
+  // STATUS ONLY. This used to fall back to `g.lock_at` when the status hadn't
+  // moved yet — a dead read of a column that is not the pick lock.
+  // season_games.lock_at is written by admin_advance_week, open_week_picks and
+  // the two reviewer-sim resets, and read by NOTHING in gameplay; its per-game
+  // values differ from each other and from the real deadline. The authoritative
+  // lock is whole-week — get_week_lock_time() = MIN(kickoff_at), enforced by
+  // enforce_pick_lock — and `weekLocked` below already carries it via
+  // weekLock.ts. Keeping a second lock concept alive here meant the footer could
+  // disagree with both the cards and the server.
   const allGamesLocked = games.length > 0 && games.every(g => {
     const status = (g.status ?? '').toUpperCase();
-    if (status === 'FINAL' || status === 'STATUS_FINAL' || status === 'COMPLETED'
-      || status === 'IN_PROGRESS' || status === 'LIVE') return true;
-    if (g.lock_at && new Date(g.lock_at).getTime() <= Date.now()) return true;
-    return false;
+    return status === 'FINAL' || status === 'STATUS_FINAL' || status === 'COMPLETED'
+      || status === 'IN_PROGRESS' || status === 'LIVE';
   });
 
   // Picks are editable ONLY in the picks_open / live window of the CURRENT week
   // (mirrors SeasonPicksScreen.picksAreOpen). Outside it — weekState
   // locked/settling/complete, or browsing a past/future week — every pick is
   // locked even when the game rows still read 'scheduled' (e.g. the sim's
-  // 'locked' state before kickoff, where lock_at may be unset). Within 'live',
-  // allGamesLocked still covers the case where every game has kicked off.
+  // 'locked' state before kickoff). Within 'live', allGamesLocked still covers
+  // the case where every game has kicked off. If a reviewer-sim week ever needs
+  // to read as locked before its statuses move, give those rows a kickoff_at —
+  // that feeds weekLocked and the server alike. Do not reintroduce lock_at.
   const picksWindowOpen =
     (weekState === 'picks_open' || weekState === 'live') && viewedWeek === currentWeek;
   // Whole-week lock (matches server enforce_pick_lock) — the SAME shared value
