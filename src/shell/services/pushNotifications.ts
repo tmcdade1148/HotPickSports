@@ -16,6 +16,83 @@ let Notifications: typeof import('expo-notifications') | null = null;
 let Device: typeof import('expo-device') | null = null;
 let isInitialized = false;
 
+/** The three values notification_preferences.push_permission_status accepts. */
+export type PushPermissionStatus = 'granted' | 'denied' | 'undetermined';
+
+/**
+ * Last value THIS client successfully reported, so an unchanged status doesn't
+ * take a row update every time it is observed.
+ *
+ * MODULE-SCOPED ON PURPOSE, not AsyncStorage (spec Part D). The cache dies on
+ * cold start, so every app launch produces exactly one write — accepted
+ * deliberately. The Settings screen re-checks on every foreground, and without
+ * a cache each of those would write; this reduces it to one per launch.
+ * Persisting instead would buy one write per launch at the cost of a new
+ * storage key, a migration surface and a reinstall edge case.
+ *
+ * Only ever set after a SUCCESSFUL write: caching a failed attempt would
+ * suppress every retry for the rest of the session.
+ */
+let lastReportedStatus: PushPermissionStatus | null = null;
+
+/**
+ * Narrow Expo's permission status to the three values the CHECK constraint
+ * allows, or null if it is anything else.
+ *
+ * Read the NORMALIZED top-level `status`, never `ios.status` — the latter
+ * carries finer values (PROVISIONAL, EPHEMERAL) that would fail the constraint.
+ * The top-level field is already the three-value enum today; this guard exists
+ * so an unexpected value is dropped rather than sent to an RPC that raises.
+ */
+function normalizePermissionStatus(status: string): PushPermissionStatus | null {
+  return status === 'granted' || status === 'denied' || status === 'undetermined'
+    ? status
+    : null;
+}
+
+/**
+ * Record the OS permission outcome against the caller's own row, via a SECURITY
+ * DEFINER RPC that derives auth.uid() server-side (never a direct .update(),
+ * which returns success having changed zero rows when RLS filters it).
+ *
+ * Fire-and-forget: never blocks registration, never surfaces to the user.
+ */
+async function recordPushPermission(status: PushPermissionStatus): Promise<void> {
+  if (status === lastReportedStatus) return;
+  try {
+    const {error} = await supabase.rpc('record_push_permission', {
+      p_status: status,
+    });
+    if (error) {
+      console.warn('[Push] record_push_permission failed:', error.message);
+      return;
+    }
+    lastReportedStatus = status;
+  } catch (err) {
+    console.warn('[Push] record_push_permission threw:', err);
+  }
+}
+
+/**
+ * The current OS push permission, or null when the Expo modules are unavailable.
+ *
+ * null is a real answer and must NOT be recorded: writing 'undetermined' for a
+ * device where the module never loaded would make a module failure
+ * indistinguishable from a user who was simply never asked, destroying the
+ * signal the column exists to capture. Absence means absence.
+ */
+export async function getPushPermissionStatus(): Promise<PushPermissionStatus | null> {
+  const ready = await ensureModules();
+  if (!ready || !Notifications) return null;
+  try {
+    const {status} = await Notifications.getPermissionsAsync();
+    return normalizePermissionStatus(status);
+  } catch (err) {
+    console.warn('[Push] getPermissionsAsync failed:', err);
+    return null;
+  }
+}
+
 /**
  * Lazily load expo-notifications and expo-device.
  * Returns false if modules are unavailable (e.g., not linked).
@@ -87,6 +164,14 @@ export async function registerForPushNotifications(
     const {status} = await Notifications.requestPermissionsAsync();
     finalStatus = status;
   }
+
+  // Record the outcome BEFORE the early return below, so a decline is written
+  // rather than silently dropped — a denied status is the whole point of the
+  // column. Not recorded above this point on purpose: the module-unavailable and
+  // simulator returns both happen before any permission is resolved, and there
+  // is no status to report.
+  const resolved = normalizePermissionStatus(finalStatus);
+  if (resolved) void recordPushPermission(resolved);
 
   if (finalStatus !== 'granted') {
     console.log('[Push] Permission not granted');

@@ -1,4 +1,4 @@
-import React, {useEffect, useState, useCallback} from 'react';
+import React, {useEffect, useRef, useState, useCallback} from 'react';
 import {Text} from '@shared/components/AppText';
 import {
   View,
@@ -7,14 +7,22 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  AppState,
+  Linking,
+  Platform,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {ChevronLeft} from 'lucide-react-native';
+import {ChevronLeft, ChevronRight} from 'lucide-react-native';
 import {useNavigation} from '@react-navigation/native';
 import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {spacing, borderRadius} from '@shared/theme';
-import {useTheme} from '@shell/theme';
+import {useTheme, useBrand} from '@shell/theme';
+import {
+  getPushPermissionStatus,
+  registerForPushNotifications,
+  type PushPermissionStatus,
+} from '@shell/services/pushNotifications';
 
 // The notification_preferences table is WIDE: one row per user, one boolean
 // column per type (all default true). These keys ARE the column names.
@@ -79,9 +87,16 @@ const VISIBLE_PREF_ORDER = [
 export function NotificationPreferencesScreen() {
   const navigation = useNavigation<any>();
   const {colors} = useTheme();
+  // Brand string, not a literal (Hard Rule #9) — the state line names the app.
+  const {appName} = useBrand();
   const userId = useGlobalStore(s => s.user?.id);
   const [prefs, setPrefs] = useState<PrefMap>({});
   const [loading, setLoading] = useState(true);
+  const [permission, setPermission] = useState<PushPermissionStatus | null>(null);
+  // Previous observed permission, for detecting the denied → granted transition.
+  // A ref, not state: reading it inside a state updater would put a side effect
+  // in a function React is allowed to call twice.
+  const lastPermission = useRef<PushPermissionStatus | null>(null);
 
   const fetchPrefs = useCallback(async () => {
     if (!userId) return;
@@ -108,6 +123,40 @@ export function NotificationPreferencesScreen() {
     fetchPrefs();
   }, [fetchPrefs]);
 
+  // OS permission state. Separate from prefs on purpose: the toggles are a
+  // HotPick-side preference and persist regardless, while this is the OS gate
+  // that decides whether anything can be delivered at all. Rendering ON toggles
+  // to a user whose permission is denied is the defect this repairs.
+  const refreshPermission = useCallback(async () => {
+    const next = await getPushPermissionStatus();
+    const prev = lastPermission.current;
+    lastPermission.current = next;
+    setPermission(next);
+
+    // Only a TRANSITION into 'granted' registers — typically the user coming
+    // back from device Settings having just enabled it, who should get a token
+    // in this session rather than waiting for the next cold start. Not on every
+    // observation: an already-granted permission is registered at sign-in and
+    // on session restore, so firing here too would add a network call every
+    // time this screen opened. prev === null is first mount, not a transition.
+    if (next === 'granted' && prev !== null && prev !== 'granted' && userId) {
+      registerForPushNotifications(userId).catch(() => {});
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    refreshPermission();
+  }, [refreshPermission]);
+
+  // Re-check on return to foreground so a user who enables notifications in
+  // device Settings sees the state line disappear without restarting the app.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'active') refreshPermission();
+    });
+    return () => sub.remove();
+  }, [refreshPermission]);
+
   const togglePref = async (type: string, newValue: boolean) => {
     const previous = prefs[type] ?? true;
     // Optimistic update
@@ -131,6 +180,32 @@ export function NotificationPreferencesScreen() {
 
   const getPref = (type: string): boolean => prefs[type] ?? true;
 
+  // 'denied' and 'undetermined' both mean nothing can be delivered right now.
+  // null — the Expo modules were unavailable — deliberately makes NO claim and
+  // renders the screen unchanged, rather than telling a user notifications are
+  // off when we simply could not ask.
+  const needsPermission =
+    permission === 'denied' || permission === 'undetermined';
+
+  // Never hardcode "iOS" — this screen ships on both platforms.
+  const settingsLabel =
+    Platform.OS === 'ios' ? 'Open iOS Settings' : 'Open Android settings';
+
+  // Linking.openSettings() REJECTS when the OS refuses; it does not silently
+  // no-op, and an un-caught rejection in a tap handler is an unhandled promise
+  // rejection. Log and leave the screen as it is — deliberately no alert: a
+  // failed settings launch is not something the user can act on, and an error
+  // dialog on a recovery screen reads as a second failure.
+  //
+  // openSettings, never a hand-built 'app-settings:' URL — those are
+  // undocumented, break between iOS versions, and have been grounds for App
+  // Store rejection.
+  const openDeviceSettings = () => {
+    Linking.openSettings().catch(err => {
+      console.warn('[NotificationPreferences] openSettings failed:', err);
+    });
+  };
+
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]} edges={['top']}>
       <View style={styles.header}>
@@ -149,9 +224,35 @@ export function NotificationPreferencesScreen() {
         </View>
       ) : (
         <ScrollView style={styles.flex} contentContainerStyle={styles.content}>
-          <Text style={[styles.sectionNote, {color: colors.textSecondary}]}>
-            Choose which notifications you'd like to receive. You can also manage notifications in your device Settings.
-          </Text>
+          {/* When the OS permission is off, this screen used to render two ON
+              toggles above a sentence that merely mentioned device settings —
+              stating the opposite of the truth, with nothing tappable to fix
+              it. The state line says what is actually happening; the sentence
+              below becomes the way out. Granted (or unknown, where the modules
+              are unavailable) renders exactly as before. */}
+          {needsPermission && (
+            <Text style={[styles.stateLine, {color: colors.textPrimary}]}>
+              Notifications are turned off for {appName}. These settings take
+              effect once you turn them on.
+            </Text>
+          )}
+
+          {needsPermission ? (
+            <TouchableOpacity
+              style={[styles.settingsRow, {borderColor: colors.border}]}
+              onPress={openDeviceSettings}
+              accessibilityRole="button"
+              accessibilityLabel={settingsLabel}>
+              <Text style={[styles.settingsRowLabel, {color: colors.primary}]}>
+                {settingsLabel}
+              </Text>
+              <ChevronRight size={18} color={colors.primary} />
+            </TouchableOpacity>
+          ) : (
+            <Text style={[styles.sectionNote, {color: colors.textSecondary}]}>
+              Choose which notifications you'd like to receive. You can also manage notifications in your device Settings.
+            </Text>
+          )}
 
           <View style={[styles.card, {backgroundColor: colors.surface}]}>
             {VISIBLE_PREF_ORDER.map((type, index) => {
@@ -220,6 +321,28 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     marginBottom: spacing.lg,
+  },
+  // Shown only when the OS permission is off. Colours come from useTheme at the
+  // call site (Hard Rule #9) — deliberately textPrimary, not an error colour:
+  // this is a state, not a failure.
+  stateLine: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '600',
+    marginBottom: spacing.md,
+  },
+  settingsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.md,
+    marginBottom: spacing.lg,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+  },
+  settingsRowLabel: {
+    fontSize: 15,
+    fontWeight: '600',
   },
   card: {
     borderRadius: borderRadius.lg,
