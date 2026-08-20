@@ -221,9 +221,22 @@ export async function registerForPushNotifications(
  * we always fetch an Expo token here.)
  */
 async function upsertDeviceToken(token: string): Promise<void> {
+  // p_os is the DEVICE OS and is a different column from p_platform above.
+  // Passing Platform.OS as p_platform would fail both the table CHECK
+  // (expo|apns|fcm) and the RPC's own whitelist, breaking every registration.
+  // Only 'ios'/'android' are accepted; anything else is sent as null rather
+  // than raising invalid_os.
+  //
+  // SHIP ORDER: this three-argument call REQUIRES migration
+  // 20260820200000_add_user_devices_os.sql to be applied first. Against the
+  // current two-argument function it fails and breaks ALL registration.
+  const os =
+    Platform.OS === 'ios' || Platform.OS === 'android' ? Platform.OS : null;
+
   const {error} = await supabase.rpc('register_device_token', {
     p_push_token: token,
     p_platform: 'expo',
+    p_os: os,
   });
 
   if (error) {
