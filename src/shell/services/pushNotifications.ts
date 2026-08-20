@@ -174,26 +174,17 @@ async function ensureModules(): Promise<boolean> {
 export async function registerForPushNotifications(
   userId: string,
 ): Promise<string | null> {
-  // ENTRY TRACE — deliberately NOT on a failure branch.
+  // The unconditional ENTRY trace that lived here was removed on 2026-08-20
+  // once it had done its job: it proved registration DOES run on a
+  // restored-session launch, enters, completes and stamps `last_used_at`
+  // (3 cold starts, 21:40:40–21:40:52Z, on the live account). It fired on
+  // every launch for every user, which `client_error_log` should not carry as
+  // steady-state traffic — see register item 1.4.
   //
-  // Every instrument added so far sits in a catch, which makes "never invoked"
-  // and "ran and succeeded" produce identical evidence: nothing. After the
-  // 2026-08-20 OTA (confirmed applied on Tom's device via the build stamp),
-  // four restored-session relaunches produced no row at :128, no row at :203,
-  // nothing from either call site, and `last_used_at` still 2026-07-30. Since
-  // every path from here to success emits either a logError row or a moved
-  // `last_used_at`, and we have neither, this function is not being entered.
-  // This line is what proves that, one way or the other.
-  //
-  // Remove once 1.13 closes — it writes on every launch and inflates
-  // client_error_log, which register item 1.4 is already unhappy about.
-  logError('push-trace: registerForPushNotifications ENTERED', {
-    screen: 'pushNotifications',
-    action: 'entry',
-    userId,
-    os: Platform.OS,
-  });
-
+  // The three early-return traces below are deliberately KEPT: they fire only
+  // on an abnormal path, and they are what will identify the 7 still-untraced
+  // members with no device row (register item 1.12) the next time any of them
+  // launches.
   const ready = await ensureModules();
   if (!ready || !Notifications || !Device) {
     // Early RETURN, not a throw — previously console.log only, so it produced
