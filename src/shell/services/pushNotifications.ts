@@ -11,6 +11,7 @@
 
 import {Platform} from 'react-native';
 import {supabase} from '@shared/config/supabase';
+import {logError} from '@shared/logging/logError';
 
 let Notifications: typeof import('expo-notifications') | null = null;
 let Device: typeof import('expo-device') | null = null;
@@ -125,7 +126,24 @@ async function ensureModules(): Promise<boolean> {
 
     return true;
   } catch (err) {
-    console.warn('[Push] expo-notifications not available:', err);
+    // logError, NOT console.warn. On a production iPhone build a failed
+    // require('expo-notifications') is a bug, not an expected environment —
+    // and it is the ONE remaining path that produces no server-side trace at
+    // all: registration returns null at :146 before any permission is
+    // resolved, so nothing is written to user_devices AND nothing to
+    // notification_preferences.push_permission_status. Without this line a
+    // relaunch that fails here is indistinguishable from one where
+    // registration was never called, and the 1.12/1.13 diagnosis stalls.
+    //
+    // Prime suspect: the comment above documents a previous bug with exactly
+    // this fingerprint — a NativeModules pre-check that short-circuited
+    // registration on every iOS login, leaving no prompt, no token and an
+    // empty user_devices.
+    logError(err, {
+      screen: 'pushNotifications',
+      action: 'ensureModules',
+      os: Platform.OS,
+    });
     Notifications = null;
     Device = null;
     return false;
@@ -200,7 +218,19 @@ export async function registerForPushNotifications(
 
     return token;
   } catch (err) {
-    console.error('[Push] Token registration failed:', err);
+    // logError, NOT console.error. This is the only report of a failure that
+    // has ALREADY passed the permission grant — getExpoPushTokenAsync throwing
+    // (no APNs entitlement, network, bad projectId, Expo outage) or
+    // register_device_token rejecting. Every caller is fire-and-forget, so a
+    // console line is discarded and the device ends up with NO user_devices
+    // row and no trace anywhere. console.error does not reach
+    // client_error_log — only logError does. Register item 1.12/1.13.
+    logError(err, {
+      screen: 'pushNotifications',
+      action: 'registerForPushNotifications',
+      userId,
+      os: Platform.OS,
+    });
     return null;
   }
 }

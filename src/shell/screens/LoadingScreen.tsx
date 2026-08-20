@@ -15,6 +15,7 @@ import {getDefaultEvent, getEventByCompetition} from '@sports/registry';
 import {resolvePendingInviteCodeOnLaunch} from '@shell/services/pendingInvite';
 import {registerForPushNotifications} from '@shell/services/pushNotifications';
 import {reportClientInfo} from '@shell/services/reportClientInfo';
+import {logError} from '@shared/logging/logError';
 
 /**
  * LoadingScreen — bootstraps auth session and navigates to the first real screen.
@@ -201,7 +202,20 @@ export function LoadingScreen({navigation}: any) {
         // push token was never replaced (user_devices stayed empty and no push
         // could deliver). The token upsert is idempotent and safe to call every
         // launch.
-        registerForPushNotifications(session.user.id).catch(() => {});
+        // Was `.catch(() => {})`. registerForPushNotifications guards its own
+        // token step, but THREE awaits inside it are unguarded and reject
+        // outward to here: getPermissionsAsync, requestPermissionsAsync and
+        // (Android) setNotificationChannelAsync. An empty catch made those
+        // vanish entirely — no row, no console line, nothing. This is the
+        // restored-session launch path, the one that has not stamped
+        // user_devices.last_used_at on Tom's device since 2026-07-30.
+        registerForPushNotifications(session.user.id).catch(err => {
+          logError(err, {
+            screen: 'LoadingScreen',
+            action: 'registerForPushNotifications',
+            userId: session.user.id,
+          });
+        });
 
         BootSplash.hide({fade: true}).catch(() => {});
         // reset, not replace — guarantees Home is the only route so a

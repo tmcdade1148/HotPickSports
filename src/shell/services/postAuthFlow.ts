@@ -23,6 +23,7 @@ import {
 } from '@shell/stores/persistedCompetition';
 import {getDefaultEvent, getEventByCompetition} from '@sports/registry';
 import {registerForPushNotifications} from '@shell/services/pushNotifications';
+import {logError} from '@shared/logging/logError';
 import type {User} from '@supabase/supabase-js';
 
 interface PostAuthOptions {
@@ -162,8 +163,19 @@ export async function runPostAuthFlow({
   // Load hardware for History tab gate (non-blocking)
   store.loadUserHardware();
 
-  // Register push token for returning users (non-blocking)
-  registerForPushNotifications(user.id).catch(() => {});
+  // Register push token for returning users (non-blocking).
+  // Was `.catch(() => {})` — see the matching note in LoadingScreen. The three
+  // unguarded awaits inside registerForPushNotifications reject outward to
+  // here, and an empty catch erased them. This is the explicit-sign-in path;
+  // LoadingScreen is the restored-session path. Both are instrumented because
+  // which one runs depends on how the Player got into the app.
+  registerForPushNotifications(user.id).catch(err => {
+    logError(err, {
+      screen: 'postAuthFlow',
+      action: 'registerForPushNotifications',
+      userId: user.id,
+    });
+  });
 
   // reset (not replace) so Welcome/EmailEntry/onboarding screens are cleared
   // from the stack. With replace, the stack ended up [Welcome, Home] (Welcome
