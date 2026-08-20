@@ -16,15 +16,10 @@ import {getEventByCompetition} from '@sports/registry';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 import {FoundingWall} from '@shell/paywall';
-import {organizerMoneyAcknowledgment} from '@shared/lexicon';
-
-/**
- * Organizer money-posture acknowledgment version. Bumped 1.0 → 2.0 for the
- * counsel-approved v2.0 wording (June 23 Money Posture spec §6). Logged to
- * organizer_acknowledgments on acceptance. Keep in lockstep with the
- * organizerMoneyAcknowledgment copy in @shared/lexicon.
- */
-const ORGANIZER_ACK_VERSION = '2.0';
+import {
+  ORGANIZER_ACK_VERSION,
+  organizerMoneyAcknowledgment,
+} from '@shared/lexicon';
 
 /**
  * CreatePoolScreen — Form to create a new pool for the active event.
@@ -69,11 +64,40 @@ export function CreatePoolScreen({navigation}: any) {
     setCreating(true);
     setError(null);
 
-    // Log organizer acknowledgment
-    await supabase.from('organizer_acknowledgments').insert({
-      user_id: user.id,
-      version: ORGANIZER_ACK_VERSION,
-    });
+    // The acknowledgment row is the whole reason the Alert above exists, so a
+    // failed write has to fail the create. A bare .insert() reports success
+    // even when RLS filters the row (CLAUDE.md — silent RLS-filtered writes),
+    // so .select('id').single() forces the failure to surface. Retry once,
+    // then stop: a Contest created without a row carries the friction and
+    // none of the protection. Returning here leaves the database untouched —
+    // createPool's first act is the atomic create_pool RPC, so nothing has
+    // been created yet and there is no cleanup path to run.
+    const userId = user.id;
+    const logAcknowledgment = async () => {
+      try {
+        const {error: writeError} = await supabase
+          .from('organizer_acknowledgments')
+          .insert({user_id: userId, version: ORGANIZER_ACK_VERSION})
+          .select('id')
+          .single();
+        return writeError;
+      } catch (thrown) {
+        return thrown;
+      }
+    };
+
+    let ackFailure = await logAcknowledgment();
+    if (ackFailure) {
+      ackFailure = await logAcknowledgment();
+    }
+    if (ackFailure) {
+      console.error('[CreatePool] Acknowledgment write failed:', ackFailure);
+      setCreating(false);
+      setError(
+        "Couldn't complete setup — check your connection and try again.",
+      );
+      return;
+    }
 
     const result = await createPool({
       userId: user.id,

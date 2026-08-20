@@ -219,13 +219,24 @@ export const confirmEmailMessage =
   'Almost in. Confirm your email with the link we sent, then sign in.';
 
 /**
- * Organizer money-posture acknowledgment (v2.0). Counsel-approved verbatim
- * wording — June 23 Money Posture spec §6. Do NOT paraphrase. Shown in the
- * unskippable native Alert before a Contest is created; acceptance logs to
- * organizer_acknowledgments at ORGANIZER_ACK_VERSION (CreatePoolScreen).
+ * Organizer money-posture acknowledgment (v3.0). Counsel-approved verbatim
+ * wording — supersedes the June 23 Money Posture spec §6 wording. Do NOT
+ * paraphrase. Shown in the unskippable native Alert before a Contest is
+ * created; acceptance logs to organizer_acknowledgments at
+ * ORGANIZER_ACK_VERSION, defined directly below so the wording and the
+ * version that records it cannot drift.
  */
 export const organizerMoneyAcknowledgment =
-  'HotPick has no payment features and does not process, collect, hold, or record money. By creating a Contest, you agree that you will not use HotPick — including any Contest, message, profile field, note, or other feature — to collect, request, advertise, track, or administer money, entry fees, buy-ins, prizes, or payouts. Any money arrangement between you and your participants takes place entirely outside HotPick, is solely your responsibility, and is not facilitated, endorsed, or monitored by HotPick.';
+  'By creating a Contest, you agree that you will not use HotPick — including any note, message, or other feature — to collect, request, advertise, track, or administer money or anything of value. Anything you arrange with your players happens entirely outside HotPick, is your responsibility alone, and is not facilitated or monitored by HotPick.';
+
+/**
+ * Version recorded in organizer_acknowledgments when the Alert above is
+ * accepted. Bump it in the same edit as the wording, never separately — an
+ * attestation row is only meaningful if the version identifies the exact text
+ * that organizer read. Prior rows are never backfilled: v1.0 and v2.0 rows
+ * attest to the wording those people actually saw.
+ */
+export const ORGANIZER_ACK_VERSION = '3.0';
 
 /**
  * Affiliation line for a Contest affiliated with one or more Leagues. Scales
