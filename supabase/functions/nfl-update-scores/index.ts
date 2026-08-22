@@ -45,6 +45,62 @@ const ESPN_HEADERS = {
   "Accept-Language": "en-US,en;q=0.9",
 };
 
+// One retry, fixed delay, fetch only. The 5-minute cron IS the outer retry
+// loop, so more attempts inside one invocation buy latency, not reliability.
+const RETRY_DELAY_MS = 2000;
+const ATTEMPT_TIMEOUT_MS = 10000;
+
+// A single bad ESPN response used to kill the whole run: .json() threw, the
+// function returned 500, and no game moved until the next cron tick. Measured
+// 2026-08-22: 16 "Unexpected end of JSON input" failures in a 6-hour window
+// (~8% of ticks), plus one request that never came back at all (a null row in
+// net._http_response) -- which is why the timeout matters as much as the retry.
+//
+// Five failure modes funnel through the same retry: non-2xx, timeout, empty
+// body, unparseable JSON, and a parsed body with no events array. An EMPTY
+// events array is accepted -- an offseason scoreboard legitimately has none.
+//
+// Both attempts failing throws, which the handler's catch turns into
+// success:false / HTTP 500. That is deliberate: a dead fetch must be loudly
+// visible in net._http_response. Reporting success on no data is the exact
+// pattern that hid the Aug 20 blackout for 12 hours.
+async function fetchScoreboard(): Promise<{ data: any; attempts: number }> {
+  let lastErr = "";
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const res = await fetch(ESPN_SCOREBOARD_URL, {
+        headers: ESPN_HEADERS,
+        signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),
+      });
+      if (!res.ok) { lastErr = `HTTP ${res.status}`; }
+      else {
+        const text = await res.text();
+        if (text.length === 0) { lastErr = "empty body"; }
+        else {
+          try {
+            const raw = JSON.parse(text);
+            // cdn.espn.com nests the scoreboard under content.sbData; the
+            // `?? raw` fallback keeps us working if ESPN ever flattens it.
+            const sb = raw?.content?.sbData ?? raw;
+            if (!Array.isArray(sb?.events)) {
+              lastErr = `no events array (body ${text.length}b)`;
+            } else {
+              return { data: sb, attempts: attempt };
+            }
+          } catch { lastErr = `unparseable body (${text.length}b)`; }
+        }
+      }
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e); // incl. timeout
+    }
+    if (attempt === 1) {
+      console.warn(`[nfl-update-scores] attempt 1 failed (${lastErr}), retrying`);
+      await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+    }
+  }
+  throw new Error(`ESPN fetch failed after 2 attempts: ${lastErr}`);
+}
+
 Deno.serve(async (req) => {
   // Cron auth gate (verify_jwt=false): require the dedicated cron shared secret.
   // CRON_SHARED_SECRET (Edge Secret) is compared to the x-cron-secret header that
@@ -73,12 +129,9 @@ Deno.serve(async (req) => {
     const espnSeasonType = String(cfg.espn_season_type ?? "").replace(/^\"|\"$/g, "");
     const isPreseason = espnSeasonType === "1";
 
-    const espnRes = await fetch(ESPN_SCOREBOARD_URL, { headers: ESPN_HEADERS });
-    if (!espnRes.ok) throw new Error(`ESPN API error: ${espnRes.status}`);
-
-    // cdn.espn.com nests the scoreboard under content.sbData.
-    const rawData = await espnRes.json();
-    const espnData = rawData?.content?.sbData ?? rawData;
+    // Throws only if BOTH attempts fail, and it throws here -- before the
+    // update loop -- so a failed fetch writes nothing. Keep that ordering.
+    const { data: espnData, attempts } = await fetchScoreboard();
 
     const seasonType = espnData.season?.type ?? 2;
     const isPlayoffs = seasonType === 3;
@@ -205,7 +258,11 @@ Deno.serve(async (req) => {
       console.warn(`[nfl-update-scores] PLAYOFFS: ${skippedCount} game(s) skipped/unmatched for ${competition} ${seasonYear} -- a real game may be un-scored.`);
     }
 
-    return json({ success: true, competition, updated: updatedCount, skipped: skippedCount, updates, isPlayoffs, isPreseason, espnSeasonType: seasonType }, 200);
+    // `attempts` is here so every invocation self-reports in net._http_response:
+    // 1 on a clean tick, 2 when the retry saved the run.
+    return json({ success: true, competition, updated: updatedCount,
+      skipped: skippedCount, attempts, updates, isPlayoffs, isPreseason,
+      espnSeasonType: seasonType }, 200);
   } catch (err) {
     return json({ success: false, error: String(err) }, 500);
   }
