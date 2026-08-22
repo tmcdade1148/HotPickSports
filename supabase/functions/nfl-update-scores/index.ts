@@ -7,6 +7,44 @@ const supabase = createClient(
   { auth: { persistSession: false } }
 );
 
+// ESPN HOST: cdn.espn.com, NOT site.api.espn.com. And NO seasontype param.
+//
+// Live incident, preseason Wk2, 2026-08-21: site.api.espn.com began returning a
+// hard Akamai 403 "Access Denied" to every request from Supabase. 24 failures
+// per hour for 12+ hours, on BOTH nfl_2026 and nfl_2026_pre. The function threw
+// at the fetch and never reached the update loop, so no game ever left
+// SCHEDULED, so nfl-calculate-scores found no FINAL games (it re-scored Wk1 on a
+// loop) and nfl-finalize-week reported "No completed unfinalized week found".
+//
+// Three things worth remembering:
+//   1. pg_cron reported "succeeded" the entire time. net.http_post only QUEUES
+//      the request; it never sees the response. Green cron, dead pipeline.
+//      The truth lives in net._http_response -- check it FIRST next time.
+//   2. A browser User-Agent did NOT fix it. The block is on the site.api host,
+//      not the request signature. cdn.espn.com returns 200 with full data from
+//      the same network with the same UA.
+//   3. DO NOT add `&seasontype=1` back. On cdn.espn.com that combination returns
+//      an EMPTY body -- the request hangs and json() throws "Unexpected end of
+//      JSON input". Verified 2026-08-21.
+//
+// Preseason isolation does NOT come from the URL. It comes from the
+// `.eq("competition", competition)` filter on the update below, combined with
+// the game_id match -- see the long note at the update call. The plain URL
+// returns whatever ESPN considers current (preseason now, regular season from
+// September), which is exactly what both competitions want.
+//
+// The payload is the same scoreboard object as site.api returned, just nested
+// one level under content.sbData -- events[].id, .week.number and
+// .status.type.state are identical, so the parsing loop is unchanged. The
+// `?? raw` fallback keeps us working if ESPN ever flattens it again.
+const ESPN_SCOREBOARD_URL = "https://cdn.espn.com/core/nfl/scoreboard?xhr=1";
+
+const ESPN_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Accept": "application/json, text/plain, */*",
+  "Accept-Language": "en-US,en;q=0.9",
+};
+
 Deno.serve(async (req) => {
   // Cron auth gate (verify_jwt=false): require the dedicated cron shared secret.
   // CRON_SHARED_SECRET (Edge Secret) is compared to the x-cron-secret header that
@@ -30,20 +68,18 @@ Deno.serve(async (req) => {
 
     const seasonYear = Number(cfg.season_year ?? 2026);
 
-    // Preseason isolation: espn_season_type is a preseason-only config key. When
-    // set to '1', pin the ESPN scoreboard call to seasontype=1 so we score
-    // preseason games. Absent (every regular competition, incl. nfl_2026) =>
-    // isPreseason=false => the default scoreboard URL runs EXACTLY as before.
-    const espnSeasonType = String(cfg.espn_season_type ?? "").replace(/^"|"$/g, "");
+    // Reported for observability only -- it no longer selects a URL. See the
+    // note above: isolation is the competition filter, not the endpoint.
+    const espnSeasonType = String(cfg.espn_season_type ?? "").replace(/^\"|\"$/g, "");
     const isPreseason = espnSeasonType === "1";
 
-    const scoreboardUrl = isPreseason
-      ? "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=1"
-      : "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard";
-    const espnRes = await fetch(scoreboardUrl);
+    const espnRes = await fetch(ESPN_SCOREBOARD_URL, { headers: ESPN_HEADERS });
     if (!espnRes.ok) throw new Error(`ESPN API error: ${espnRes.status}`);
 
-    const espnData = await espnRes.json();
+    // cdn.espn.com nests the scoreboard under content.sbData.
+    const rawData = await espnRes.json();
+    const espnData = rawData?.content?.sbData ?? rawData;
+
     const seasonType = espnData.season?.type ?? 2;
     const isPlayoffs = seasonType === 3;
 
@@ -89,7 +125,7 @@ Deno.serve(async (req) => {
         const espnWeek = event.week?.number ?? 1;
         // In the postseason, map only the rounds we score; skip unmapped weeks
         // (Pro Bowl = 4, or anything unexpected) rather than guessing a DB week.
-        // dbWeek is REPORTING ONLY — it is no longer part of the row match. See
+        // dbWeek is REPORTING ONLY -- it is no longer part of the row match. See
         // the game_id note below.
         let dbWeek: number;
         if (isPlayoffs) {
@@ -118,7 +154,7 @@ Deno.serve(async (req) => {
 
         // Match on game_id, NOT on week + team abbreviations.
         //
-        // season_games.game_id IS ESPN's event.id — nfl-import-schedule writes
+        // season_games.game_id IS ESPN's event.id -- nfl-import-schedule writes
         // `game_id: event.id` and the column is the table's PRIMARY KEY. Matching
         // on it directly removes two long-standing failure modes:
         //
@@ -137,9 +173,10 @@ Deno.serve(async (req) => {
         //     hazard is now structurally gone.
         //
         // KEEP the competition filter. game_id is globally unique, but the
-        // regular-season job also runs during preseason (it fetches ESPN's
-        // default scoreboard, which returns preseason games), so without this
-        // guard nfl_2026 could write scores onto nfl_2026_pre rows.
+        // regular-season job also runs during preseason (the scoreboard returns
+        // whatever ESPN considers current, which is preseason right now), so
+        // without this guard nfl_2026 could write scores onto nfl_2026_pre rows.
+        // This filter IS the preseason isolation -- see the header note.
         const { data, error } = await supabase
           .from("season_games")
           .update(updateData)
@@ -162,19 +199,18 @@ Deno.serve(async (req) => {
     }
 
     // In the postseason there are only a handful of games, so any skip is
-    // suspicious (most likely a team-abbreviation mismatch, e.g. WSH vs WAS,
-    // leaving a real game un-scored). Surface it loudly. Regular-season skips
-    // are normal (the scoreboard spans states/weeks) so we don't warn there.
+    // suspicious. Surface it loudly. Regular-season skips are normal (the
+    // scoreboard spans states/weeks) so we don't warn there.
     if (isPlayoffs && skippedCount > 0) {
-      console.warn(`[nfl-update-scores] PLAYOFFS: ${skippedCount} game(s) skipped/unmatched for ${competition} ${seasonYear} — a real game may be un-scored.`);
+      console.warn(`[nfl-update-scores] PLAYOFFS: ${skippedCount} game(s) skipped/unmatched for ${competition} ${seasonYear} -- a real game may be un-scored.`);
     }
 
-    return json({ success: true, updated: updatedCount, skipped: skippedCount, updates, isPlayoffs }, 200);
+    return json({ success: true, competition, updated: updatedCount, skipped: skippedCount, updates, isPlayoffs, isPreseason, espnSeasonType: seasonType }, 200);
   } catch (err) {
     return json({ success: false, error: String(err) }, 500);
   }
 });
 
-function json(body: unknown, status: number) {
+function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 }
