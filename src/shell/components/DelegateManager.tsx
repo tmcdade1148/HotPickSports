@@ -1,8 +1,13 @@
 // DelegateManager — the "add people who help you run this" control, shared by
-// League Tools (Chairman adds Directors) and Gaffer Tools (Gaffer adds
-// Assistant Gaffers). Both are the same primitive: the pool's organizer
-// grants `admin` to an email. Only the organizer (canManage) sees the
-// add/remove controls; delegates can view the list.
+// League Tools (any Director adds Directors) and Gaffer Tools (Gaffer adds
+// Assistant Gaffers). Both are the same primitive: grant a role to an email.
+// Only those who may manage (canManage) see the add/remove controls; the rest
+// can view the list.
+//
+// The two targets differ in who may manage. A Contest's board is the
+// organizer's alone. A League's board is flat as of 2026-08-22 — every
+// Director may add or remove Directors, with one server-enforced guard: the
+// last Director cannot be removed (LAST_DIRECTOR).
 //
 // Adding an email that isn't a HotPick user yet parks a pending grant; the
 // role attaches when that person signs up with that exact email (server-side
@@ -32,7 +37,9 @@ interface Props {
   roleNoun: string;
   /** Which role value counts as a delegate row in the list. */
   delegateRole: 'admin' | 'director';
-  /** True when the viewer may add/remove (Gaffer for a Contest, Chairman for a League). */
+  /** True when the viewer may add/remove (the Gaffer for a Contest, any
+   *  Director for a League). The server gates are the enforcement; this only
+   *  decides whether the controls render. */
   canManage: boolean;
   /** Render the component's own title + hint. Set false when the host
    *  screen supplies a section header in its own style. Defaults true. */
@@ -42,8 +49,10 @@ interface Props {
 function mapError(code: string | undefined, label: string): string {
   switch (code) {
     case 'NOT_ORGANIZER':
-    case 'NOT_CHAIRMAN':
+    case 'NOT_AUTHORIZED':
       return `Only the owner can add ${label}s.`;
+    case 'LAST_DIRECTOR':
+      return 'A Club must keep at least one Director. Add another Director first.';
     case 'EMPTY_EMAIL':
       return 'Enter an email address.';
     case 'ALREADY_ORGANIZER':
@@ -130,7 +139,12 @@ export function DelegateManager({target, roleNoun, delegateRole, canManage, show
                 ? await revokePoolDelegate(target.poolId, arg)
                 : await revokePartnerMember(target.partnerId, arg);
             if (!res.success) {
-              Alert.alert('Error', res.error ?? 'Failed to remove.');
+              // Through mapError, not raw: the server's LAST_DIRECTOR guard
+              // would otherwise surface to the user as that literal string.
+              Alert.alert(
+                'Could Not Remove',
+                res.error ? mapError(res.error, label) : 'Failed to remove.',
+              );
               return;
             }
             load();
@@ -140,8 +154,9 @@ export function DelegateManager({target, roleNoun, delegateRole, canManage, show
     );
   };
 
-  // The owner (Chairman/Gaffer) is shown by the host screen; this manager
-  // lists the delegates (Directors / Assistant Gaffers + pending).
+  // A Contest's Gaffer is shown by the host screen; this manager lists the
+  // delegates (Assistant Gaffers) or, for a League, the full flat board of
+  // Directors — live rows and pending invites alike.
   const delegates = rows.filter(r => r.role === delegateRole);
 
   return (

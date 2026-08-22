@@ -11,7 +11,6 @@ type DelegateSlice = Pick<
   | 'grantPoolDelegate'
   | 'revokePoolDelegate'
   | 'listPoolDelegates'
-  | 'setLeagueChairman'
   | 'setClubPoolGaffer'
   | 'grantPartnerDirector'
   | 'revokePartnerMember'
@@ -52,16 +51,6 @@ export const createDelegateSlice = (): DelegateSlice => ({
         role: r.role as PoolDelegate['role'],
         status: r.status as PoolDelegate['status'],
       }));
-  },
-
-  setLeagueChairman: async (partnerId, email) => {
-    const {data, error} = await supabase.rpc('admin_set_league_chairman', {
-      p_partner_id: partnerId,
-      p_email: email,
-    });
-    if (error) return {success: false, error: error.message};
-    if (data?.error) return {success: false, error: data.error};
-    return {success: true, pending: data?.assigned === 'pending'};
   },
 
   setClubPoolGaffer: async (partnerId, email) => {

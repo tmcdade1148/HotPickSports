@@ -48,15 +48,10 @@ export const LEXICON = {
     long:  'Assistant Gaffer',
   },
 
-  /** "organizer" of a League's own Club Pool → "the Chairman". One per
-   *  League (a pool has exactly one organizer). */
-  chairman: {
-    short: 'Chairman',
-    long:  'the Chairman',
-  },
-
-  /** "admin" of a League's own Club Pool → "Director". Multiple allowed;
-   *  same League Tools access as the Chairman today. */
+  /** The League's board seat (`partner_members`, role 'director'). One or
+   *  more per League; every Director has the same League Tools access, and
+   *  any Director may add or remove another. There is no Chairman — the role
+   *  was removed 2026-08-22 (Hard Rule #24, amended). */
   director: {
     short:  'Director',
     plural: 'Directors',
@@ -90,8 +85,8 @@ export const LEXICON = {
 
   /** Management-surface names. "Tools" = what a user operates to run their
    *  own Contest/League; contrast with "Admin" = HotPick behind-the-scenes
-   *  (PartnerAdminScreen, AdminHome). The Gaffer/Chairman and their
-   *  delegates (Assistant Gaffer/Director) use these. */
+   *  (PartnerAdminScreen, AdminHome). The Gaffer and their delegates
+   *  (Assistant Gaffer), and a League's Directors, use these. */
   gafferTools: 'Gaffer Tools',
   leagueTools: 'League Tools',
 
@@ -127,7 +122,7 @@ export function gafferOf(contestName: string): string {
  * Badge label for a `pool_members.role`, resolved per tier. The same three
  * internal roles (member / admin / organizer — these NEVER change) render
  * with Contest-tier or League-tier vocabulary:
- *   organizer → Gaffer            (Chairman in a League's Club Pool)
+ *   organizer → Gaffer            (every tier, Club Contest included)
  *   admin     → Assistant Gaffer  (Director in a League's Club Pool)
  *   member    → Player
  * Pass isLeagueTier=true when the pool is the League's own Club Pool
@@ -136,7 +131,9 @@ export function gafferOf(contestName: string): string {
 export function roleLabel(role: string, isLeagueTier = false): string {
   switch (role) {
     case 'organizer':
-      return isLeagueTier ? LEXICON.chairman.short : LEXICON.gaffer.short;
+      // Always the Gaffer, including in a League's Club Contest — that pool's
+      // organizer used to render as "Chairman", a role removed 2026-08-22.
+      return LEXICON.gaffer.short;
     case 'admin':
       return isLeagueTier ? LEXICON.director.short : LEXICON.assistantGaffer.long;
     default:

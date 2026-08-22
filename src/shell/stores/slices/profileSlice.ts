@@ -143,15 +143,15 @@ export const createProfileSlice = (set: Set, get: Get): ProfileSlice => ({
 
   loadManagedClub: async userId => {
     // The League (partner) this user is on the board of — a partner_members
-    // row (chairman/director), independent of any Club Pool. Server-side
-    // League Tools auth (_caller_can_manage_partner) admits both roles.
+    // row (director), independent of any Club Contest. Server-side League
+    // Tools auth (_caller_can_manage_partner) admits any board row.
     const {data: memberRows} = await supabase
       .from('partner_members')
       .select('partner_id, role')
       .eq('user_id', userId)
       .limit(1);
     const membership = (memberRows ?? [])[0] as
-      | {partner_id: string; role: 'chairman' | 'director'}
+      | {partner_id: string; role: 'director'}
       | undefined;
     if (!membership) {
       set({managedClub: null});
@@ -204,11 +204,11 @@ export const createProfileSlice = (set: Set, get: Get): ProfileSlice => ({
       // route on the result have it ready.
       //
       // managedClub: onboarding (ProfileSetup / PoolWelcome) branches on
-      // whether the user is a League board member (Chairman/Director). A
-      // freshly-seeded Chairman's partner_members row attaches on signup, so
-      // we must let it resolve before ProfileSetup renders — otherwise they
-      // briefly fall through to the generic player welcome. Also saves
-      // Settings + ClubAdminScreen a refetch on mount.
+      // whether the user is a League board member (Director). A freshly-seeded
+      // Director's partner_members row attaches on signup, so we must let it
+      // resolve before ProfileSetup renders — otherwise they briefly fall
+      // through to the generic player welcome. Also saves Settings +
+      // ClubAdminScreen a refetch on mount.
       //
       // visibleCompetitions: filters the sport switcher; beta-only comps like
       // nfl_2025_sim only surface for whitelisted testers. AWAITED so the beta
