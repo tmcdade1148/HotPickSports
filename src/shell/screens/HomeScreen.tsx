@@ -607,8 +607,8 @@ export function HomeScreen() {
         <RecapModule />
         <HistoryModule />
 
-        {/* Board Discovery Tile — routes partner board members (Chairman /
-            Director) into League Tools. Self-hides when not on a board. */}
+        {/* Board Discovery Tile — routes partner board members (Directors)
+            into League Tools. Self-hides when not on a board. */}
         <ManagedLeagueModule />
 
         {/* DEMO CARD, bridge rows (spec §6.1). reg_done, sb_intro, season_done

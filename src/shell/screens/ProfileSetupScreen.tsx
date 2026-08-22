@@ -46,7 +46,7 @@ export function ProfileSetupScreen({navigation}: any) {
   const managedClub = useGlobalStore(s => s.managedClub);
   const updateProfile = useGlobalStore(s => s.updateProfile);
 
-  // League board members (Chairman/Director) get their League welcome here,
+  // League board members (Directors) get their League welcome here,
   // folded into onboarding — they don't see the separate player PoolWelcome.
   const leagueWelcome = leagueWelcomeCopy(managedClub?.role);
 

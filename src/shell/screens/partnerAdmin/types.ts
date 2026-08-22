@@ -49,6 +49,17 @@ export interface Partner {
   // Gaffers to authorize affiliating their Contest with this Club's
   // roster (see 260527_partners_roster_pass migration).
   roster_pass: string;
+  // Partner-authored public details, surfaced on the roster page. The SAME
+  // jsonb League Tools (ClubAdminScreen) writes — the super admin card edits
+  // `address` through it rather than adding a column of its own. Every key is
+  // optional and null/absent are both valid.
+  public_info: {
+    hours?: string | null;
+    address?: string | null;
+    perk_redeem_text?: string | null;
+    link?: {url?: string; label?: string} | null;
+    roster_page_message?: string | null;
+  } | null;
 }
 
 /** Partners set 4 colors — the rest are auto-derived */

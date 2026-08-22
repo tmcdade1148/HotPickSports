@@ -88,7 +88,7 @@ export function PoolWelcomeScreen({navigation}: any) {
 
   const displayName = getDisplayName(userProfile);
   const hasDeepLinkInvite = !!pendingInviteCode;
-  // Chairman or Director of a League (partner board). Their welcome lives on
+  // Director of a League (partner board). Their welcome lives on
   // ProfileSetup, so they skip this player-oriented page entirely (see the
   // auto-forward effect below).
   const isLeagueManager = !!managedClub;
@@ -130,7 +130,7 @@ export function PoolWelcomeScreen({navigation}: any) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // League board members (Chairman/Director) are welcomed on ProfileSetup, so
+  // League board members (Directors) are welcomed on ProfileSetup, so
   // they skip this player-oriented page. Once we know they manage a League and
   // there's no invite code to consume, initialize and head straight to Home.
   useEffect(() => {

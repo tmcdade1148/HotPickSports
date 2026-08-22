@@ -91,7 +91,7 @@ export function PoolMembersScreen() {
   }, [isOrganizer, paywallConfig, pool?.member_limit, poolMembers.length, poolId]);
 
   // League tier: this pool is a League's own Club Pool, so roles read as
-  // Chairman/Director rather than Gaffer/Assistant Gaffer. (The internal
+  // Director rather than Assistant Gaffer. (The internal
   // roles are identical; only the labels differ — see roleLabel().)
   const managedClub = useGlobalStore(s => s.managedClub);
   const isLeagueTier = managedClub?.clubPoolId === poolId;

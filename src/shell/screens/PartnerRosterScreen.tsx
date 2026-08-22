@@ -74,7 +74,7 @@ export function PartnerRosterScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<Params, 'PartnerRoster'>>();
   const slug = route.params.slug;
-  // Preview mode: a Chairman/Director opening their own roster page from League
+  // Preview mode: a Director opening their own roster page from League
   // Tools. They may not be a Player in any roster Contest, so skip the
   // membership-scoped denial and render the public page as members see it.
   const preview = route.params.preview ?? false;
@@ -172,7 +172,7 @@ export function PartnerRosterScreen() {
   }
 
   // Denial: user is not in any aligned pool (e.g. stale deep link). Skipped in
-  // preview mode — a Chairman previewing their own page need not be a member.
+  // preview mode — a Director previewing their own page need not be a member.
   if (!preview && alignedPools.length === 0) {
     return (
       <DenialState
