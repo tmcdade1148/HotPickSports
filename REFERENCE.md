@@ -317,7 +317,7 @@ Free organizers: can create up to 1 pool per competition, max 10 members (no sub
 
 `pools.partner_id` is the alignment edge (set for *both* shapes). `partners.club_pool_id` distinguishes the Club Pool from roster members.
 
-**Partner Admin = `partner_members`, not the Club Pool.** A partner's board is a **Chairman** (one) + **Directors** (`partner_members(partner_id, user_id, role)`), independent of whether the partner runs a Club Pool — so **sponsor-only partners have admins too**. HotPick staff seed the Chairman by email (`admin_set_league_chairman`); the Chairman adds Directors (`grant_partner_director_by_email`). Perk/public-info/roster-pass edits (`_caller_can_manage_partner`) and `send-partner-broadcast` gate on `partner_members`. Email invites to people without an account yet park in `pending_role_grants` (partner-scoped) and attach on signup. (Migration `20260604150000` backfilled existing Club Pool organizers→Chairman, admins→Directors.)
+**Partner Admin = `partner_members`, not the Club Pool.** A partner's board is one or more **Directors** (`partner_members(partner_id, user_id, role)`, role always `'director'`), independent of whether the partner runs a Club Contest — so **sponsor-only partners have admins too**. HotPick staff seed the first Director by email (`grant_partner_director_by_email`, whose gate admits super admins); from there any Director adds or removes Directors through the same RPC pair, with one server guard — `revoke_partner_member` refuses to remove the last live Director (`LAST_DIRECTOR`). Perk/public-info/roster-pass edits (`_caller_can_manage_partner`) and `send-partner-broadcast` gate on `partner_members`. Email invites to people without an account yet park in `pending_role_grants` (partner-scoped) and attach on signup. A super admin opens any partner's League Tools via the `ClubAdmin` route's `partnerId` param — honored only for super admins — rather than by holding a board seat. (Migration `260822_partner_roles_simplification` removed the Chairman role and dropped `admin_set_league_chairman`; the earlier `20260604150000` backfill that created Chairmen is superseded.)
 
 - `invite_slug` doubles as invite code (e.g., "MESQUE")
 - `join_pool_by_invite` RPC checks BOTH `invite_code` AND `UPPER(invite_slug)`
@@ -619,7 +619,7 @@ Tokens live in `user_devices` table — never on `profiles`. One row per device.
 
 **Delivery flow:** `notification_queue` table → `process-notification-queue` Edge Function (cron every 60s) → Expo push service. A queued row is skipped if the user has set the matching `notification_preferences` column to `false`.
 
-**Broadcasts** (both Gaffer/pool and Chairman/League) deliver two ways:
+**Broadcasts** (both Gaffer/pool and Director/League) deliver two ways:
 - **In-app Message Center:** a row in `organizer_notifications` (Gaffer broadcasts) or `partner_notifications` (League broadcasts).
 - **Mobile push:** a `notification_queue` row with `notification_type = 'organizer_broadcast'` — the only broadcast type the processor's `PREF_COLUMN_MAP` honors, so the user's `organizer_broadcast` toggle gates both. `broadcast_to_pool` enqueues the Gaffer fan-out; `send-partner-broadcast` enqueues the League fan-out.
 
