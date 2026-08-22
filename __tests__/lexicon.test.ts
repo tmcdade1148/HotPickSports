@@ -35,9 +35,8 @@ describe('LEXICON constants', () => {
     expect(LEXICON.assistantGaffer.long).toBe('Assistant Gaffer');
   });
 
-  it('Chairman short and long', () => {
-    expect(LEXICON.chairman.short).toBe('Chairman');
-    expect(LEXICON.chairman.long).toBe('the Chairman');
+  it('has no Chairman — the role was removed 2026-08-22', () => {
+    expect((LEXICON as Record<string, unknown>).chairman).toBeUndefined();
   });
 
   it('Director short and plural', () => {
@@ -85,8 +84,10 @@ describe('roleLabel()', () => {
     expect(roleLabel('admin')).toBe('Assistant Gaffer');
     expect(roleLabel('member')).toBe('Player');
   });
-  it('League tier maps to Chairman / Director / Player', () => {
-    expect(roleLabel('organizer', true)).toBe('Chairman');
+  it('League tier maps to Gaffer / Director / Player', () => {
+    // The organizer of a League's Club Contest is the Gaffer at every tier —
+    // it used to read "Chairman", a role removed 2026-08-22.
+    expect(roleLabel('organizer', true)).toBe('Gaffer');
     expect(roleLabel('admin', true)).toBe('Director');
     expect(roleLabel('member', true)).toBe('Player');
   });
