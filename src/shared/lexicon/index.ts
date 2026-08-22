@@ -42,7 +42,7 @@ export const LEXICON = {
 
   /** "admin" pool_members role in a regular Contest → "Assistant Gaffer".
    *  The Gaffer's delegated helper (the "No. 2"). Short form "AG". Same
-   *  internal role as a League-tier Director — see roleLabel(). */
+   *  label at every tier, Club Contest included — see roleLabel(). */
   assistantGaffer: {
     short: 'AG',
     long:  'Assistant Gaffer',
@@ -119,23 +119,26 @@ export function gafferOf(contestName: string): string {
 }
 
 /**
- * Badge label for a `pool_members.role`, resolved per tier. The same three
- * internal roles (member / admin / organizer — these NEVER change) render
- * with Contest-tier or League-tier vocabulary:
- *   organizer → Gaffer            (every tier, Club Contest included)
- *   admin     → Assistant Gaffer  (Director in a League's Club Pool)
+ * Badge label for a `pool_members.role`. The three internal roles (member /
+ * admin / organizer — these NEVER change) render as:
+ *   organizer → Gaffer
+ *   admin     → Assistant Gaffer
  *   member    → Player
- * Pass isLeagueTier=true when the pool is the League's own Club Pool
- * (partners.club_pool_id === pool.id).
+ *
+ * Tier-independent since 2026-08-22. A League's own Club Contest used to
+ * relabel these seats (organizer → "Chairman", admin → "Director"), which is
+ * why this took an isLeagueTier flag. Chairman is gone, and "Director" now
+ * means a seat on the partner board (`partner_members`) — a different table
+ * from `pool_members`. Reusing the word for a pool admin implied a fused
+ * partner-gaffer role that does not exist, so a Club Contest's seats read
+ * exactly like every other Contest's. Hard Rule #24, amended.
  */
-export function roleLabel(role: string, isLeagueTier = false): string {
+export function roleLabel(role: string): string {
   switch (role) {
     case 'organizer':
-      // Always the Gaffer, including in a League's Club Contest — that pool's
-      // organizer used to render as "Chairman", a role removed 2026-08-22.
       return LEXICON.gaffer.short;
     case 'admin':
-      return isLeagueTier ? LEXICON.director.short : LEXICON.assistantGaffer.long;
+      return LEXICON.assistantGaffer.long;
     default:
       return LEXICON.player.singular;
   }
