@@ -90,13 +90,10 @@ export function PoolMembersScreen() {
     }
   }, [isOrganizer, paywallConfig, pool?.member_limit, poolMembers.length, poolId]);
 
-  // League tier: this pool is a League's own Club Pool, so roles read as
-  // Chairman/Director rather than Gaffer/Assistant Gaffer. (The internal
-  // roles are identical; only the labels differ — see roleLabel().)
-  const managedClub = useGlobalStore(s => s.managedClub);
-  const isLeagueTier = managedClub?.clubPoolId === poolId;
-  const assistantLabel = roleLabel('admin', isLeagueTier);   // Assistant Gaffer | Director
-  const memberLabel = roleLabel('member', isLeagueTier);     // Player
+  // Seat labels are tier-independent — a League's own Club Contest reads like
+  // every other Contest. See roleLabel().
+  const assistantLabel = roleLabel('admin');    // Assistant Gaffer
+  const memberLabel = roleLabel('member');      // Player
 
   // Member notes — shared across all Gaffers/Admins of the Contest.
   // RLS gates SELECT to managers, so non-managers get an empty map and
@@ -465,7 +462,7 @@ export function PoolMembersScreen() {
               item.role === 'organizer' && styles.roleTextOrganizer,
               item.role === 'admin' && styles.roleTextAdmin,
             ]}>
-            {roleLabel(item.role, isLeagueTier)}
+            {roleLabel(item.role)}
           </Text>
         </View>
       </TouchableOpacity>
@@ -646,7 +643,7 @@ export function PoolMembersScreen() {
               {actionMember ? getDisplayName(actionMember.profile ?? null) : ''}
             </Text>
             <Text style={styles.actionSubtitle}>
-              {actionMember ? roleLabel(actionMember.role, isLeagueTier) : ''}
+              {actionMember ? roleLabel(actionMember.role) : ''}
             </Text>
             <View style={styles.actionList}>
               {actionMember &&

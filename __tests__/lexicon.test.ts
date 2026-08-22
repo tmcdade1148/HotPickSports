@@ -35,9 +35,8 @@ describe('LEXICON constants', () => {
     expect(LEXICON.assistantGaffer.long).toBe('Assistant Gaffer');
   });
 
-  it('Chairman short and long', () => {
-    expect(LEXICON.chairman.short).toBe('Chairman');
-    expect(LEXICON.chairman.long).toBe('the Chairman');
+  it('has no Chairman — the role was removed 2026-08-22', () => {
+    expect((LEXICON as Record<string, unknown>).chairman).toBeUndefined();
   });
 
   it('Director short and plural', () => {
@@ -80,15 +79,17 @@ describe('gafferOf()', () => {
 });
 
 describe('roleLabel()', () => {
-  it('Contest tier maps to Gaffer / Assistant Gaffer / Player', () => {
+  // One case, not two. These seats used to relabel inside a League's own Club
+  // Contest (organizer → "Chairman", admin → "Director"), so this had a
+  // per-tier test pair. Chairman is gone, and "Director" now means a
+  // partner_members seat — a different table — so reusing it for a pool admin
+  // implied a fused partner-gaffer role that doesn't exist. The labels are
+  // tier-independent now, and a second identical case would only look like
+  // coverage. Amended 2026-08-22 (Hard Rule #24).
+  it('maps to Gaffer / Assistant Gaffer / Player at every tier', () => {
     expect(roleLabel('organizer')).toBe('Gaffer');
     expect(roleLabel('admin')).toBe('Assistant Gaffer');
     expect(roleLabel('member')).toBe('Player');
-  });
-  it('League tier maps to Chairman / Director / Player', () => {
-    expect(roleLabel('organizer', true)).toBe('Chairman');
-    expect(roleLabel('admin', true)).toBe('Director');
-    expect(roleLabel('member', true)).toBe('Player');
   });
 });
 

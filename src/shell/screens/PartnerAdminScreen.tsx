@@ -58,6 +58,7 @@ import {
   uploadPartnerImage,
 } from './partnerAdmin/assetUtils';
 import {createStyles} from './partnerAdmin/styles';
+import {DelegateManager} from '@shell/components/DelegateManager';
 
 export function PartnerAdminScreen() {
   const {colors} = useTheme();
@@ -82,18 +83,28 @@ export function PartnerAdminScreen() {
   const [editPartnerType, setEditPartnerType] = useState<PartnerType>('other');
   const [saving, setSaving] = useState(false);
   const [creatingPoolForPartnerId, setCreatingPoolForPartnerId] = useState<string | null>(null);
-  // Chairman assignment (partner board) — staff-only on-ramp.
-  const [chairmanEmail, setChairmanEmail] = useState('');        // edit card
-  const [formChairmanEmail, setFormChairmanEmail] = useState(''); // create form
-  const [assigningChairman, setAssigningChairman] = useState(false);
-  const setLeagueChairman = useGlobalStore(s => s.setLeagueChairman);
-  // Gaffer assignment — the Club Pool's organizer. Only meaningful once the
-  // partner has a Club Pool. Separate from the Chairman (can be the same email).
+  // Director seeding (partner board) — staff-only on-ramp. The first Director
+  // is seeded here by email; from then on the board adds its own.
+  const [formDirectorEmail, setFormDirectorEmail] = useState(''); // create form
+  const grantPartnerDirector = useGlobalStore(s => s.grantPartnerDirector);
+  // Address — partners.public_info->'address'. Same field and same save path
+  // League Tools uses; blank clears it. No new column.
+  const [editAddress, setEditAddress] = useState('');
+  const [addressSaving, setAddressSaving] = useState(false);
+  // Which competition a new Club Contest lands in. Read from the registry via
+  // activeSport (never hardcoded), but CONFIRMED by the admin before creating
+  // — a super admin on the beta list can be sitting on nfl_2025_sim, which is
+  // exactly the sandbox the server-side DEFAULT used to trap partners in.
+  const activeSport = useGlobalStore(s => s.activeSport);
+  const targetCompetition =
+    activeSport?.contestsCreateIn ?? activeSport?.competition ?? null;
+  // Gaffer assignment — the Club Contest's organizer. Only meaningful once the
+  // partner has a Club Contest. A pool-level seat, separate from the board.
   const [gafferEmail, setGafferEmail] = useState('');
   const [assigningGaffer, setAssigningGaffer] = useState(false);
   const setClubPoolGaffer = useGlobalStore(s => s.setClubPoolGaffer);
   // partner_id → existing pool id+name, so we know whether to show
-  // "Create Partner Pool" or "View Partner Pool" inside an edit card.
+  // "Start Club Contest" or the existing-Contest card inside an edit card.
   const [partnerPoolByPartnerId, setPartnerPoolByPartnerId] = useState<
     Record<string, {id: string; name: string; invite_code: string | null}>
   >({});
@@ -154,7 +165,7 @@ export function PartnerAdminScreen() {
     setFormBannerPick(null);
     setFormPartnerType('other');
     setFormCanRunPools(DEFAULT_CAN_RUN_POOLS_BY_TYPE.other);
-    setFormChairmanEmail('');
+    setFormDirectorEmail('');
   }, []);
 
   const fetchPartners = useCallback(async () => {
@@ -167,10 +178,10 @@ export function PartnerAdminScreen() {
     const partnerRows = (data as Partner[]) ?? [];
     setPartners(partnerRows);
 
-    // Club Pool per partner — drives the create-vs-view CTA + the Chairman
-    // field in each card. Keyed off the authoritative partners.club_pool_id,
-    // NOT pools.partner_id (that's the roster-affiliation edge, which many
-    // roster members share — using it falsely reports a Club Pool for any
+    // Club Contest per partner — drives the create-vs-view CTA in each card.
+    // Keyed off the authoritative partners.club_pool_id, NOT pools.partner_id
+    // (that's the roster-affiliation edge, which many roster members share —
+    // using it falsely reports a Club Contest for any
     // partner that merely has affiliated Contests).
     const clubPoolIds = partnerRows
       .map(p => p.club_pool_id)
@@ -367,22 +378,22 @@ export function PartnerAdminScreen() {
       }
     }
 
-    // Assign the Chairman if an email was provided at create time. Works for
-    // every partner (Contest-hosting or not) — the Chairman is partner-level.
-    const chairman = formChairmanEmail.trim();
-    if (chairman) {
-      const res = await setLeagueChairman(partnerId, chairman);
+    // Seed the first Director if an email was provided at create time. Works
+    // for every partner (Contest-hosting or not) — the board is partner-level.
+    const director = formDirectorEmail.trim();
+    if (director) {
+      const res = await grantPartnerDirector(partnerId, director);
       if (!res.success) {
         Alert.alert(
-          'Partner Created — Chairman Not Set',
-          `${res.error ?? 'Something went wrong.'} You can assign the Chairman from the partner's edit form.`,
+          'Partner Created — Director Not Set',
+          `${res.error ?? 'Something went wrong.'} You can add the Director from the partner's edit form.`,
         );
       } else {
         Alert.alert(
-          res.pending ? 'Chairman Invited' : 'Chairman Assigned',
+          res.pending ? 'Director Invited' : 'Director Added',
           res.pending
-            ? `${chairman} isn't on HotPick yet. They'll become Chairman when they create an account with that exact email.`
-            : `${chairman} is now the Chairman of ${name}.`,
+            ? `${director} isn't on HotPick yet. They'll become a Director when they create an account with that exact email.`
+            : `${director} is now a Director of ${name}.`,
         );
       }
     }
@@ -420,16 +431,44 @@ export function PartnerAdminScreen() {
     setEditPerkIcon(partner.perk_icon ?? '');
     setEditCanRunPools(partner.can_run_pools ?? false);
     setEditPartnerType((partner.partner_type as PartnerType) ?? 'other');
+    setEditAddress(partner.public_info?.address ?? '');
   };
 
-  const handleCreatePartnerPool = async (partner: Partner) => {
+  // Named the competition, every time. The server default used to be
+  // 'nfl_2025_sim', which would have put the first real Partner's Contest in
+  // the tester sandbox; that default is gone, so the caller must be explicit.
+  // Confirming out loud is the point — the value is visible before it is
+  // committed rather than inherited from wherever the admin happened to be.
+  const handleCreatePartnerPool = (partner: Partner) => {
+    if (!targetCompetition) {
+      Alert.alert(
+        'No Active Competition',
+        "Can't tell which competition this Contest belongs to. Open a sport first, then try again.",
+      );
+      return;
+    }
+    Alert.alert(
+      `Start ${partner.name}'s Club Contest?`,
+      `It will be created in ${targetCompetition}.\n\nCheck that competition before continuing — a Contest created in a sandbox competition can't be moved.`,
+      [
+        {text: 'Cancel', style: 'cancel'},
+        {
+          text: 'Start Contest',
+          onPress: () => doCreatePartnerPool(partner, targetCompetition),
+        },
+      ],
+    );
+  };
+
+  const doCreatePartnerPool = async (partner: Partner, competition: string) => {
     setCreatingPoolForPartnerId(partner.id);
     const {data, error} = await supabase.rpc('create_partner_pool', {
       p_partner_id: partner.id,
+      p_competition: competition,
     });
     setCreatingPoolForPartnerId(null);
     if (error) {
-      Alert.alert('Could Not Create Pool', error.message);
+      Alert.alert('Could Not Start Club Contest', error.message);
       return;
     }
     const row = Array.isArray(data) ? data[0] : data;
@@ -443,34 +482,33 @@ export function PartnerAdminScreen() {
         },
       }));
       Alert.alert(
-        'Club Pool Created',
-        `${partner.name}'s Club Pool is live. Invite code: ${row.invite_code ?? '—'} · Signage slug: ${row.invite_slug ?? partner.slug}`,
+        'Club Contest is live',
+        `${partner.name}'s Club Contest is live in ${competition}. Invite code: ${row.invite_code ?? '—'} · Signage slug: ${row.invite_slug ?? partner.slug}`,
       );
     }
   };
 
-  const handleAssignChairman = async (partner: Partner) => {
-    const email = chairmanEmail.trim();
-    if (!email) return;
-    setAssigningChairman(true);
-    const res = await setLeagueChairman(partner.id, email);
-    setAssigningChairman(false);
-    if (!res.success) {
-      Alert.alert(
-        'Could Not Assign Chairman',
-        res.error === 'FORBIDDEN'
-          ? 'Super-admin only.'
-          : res.error ?? 'Something went wrong.',
-      );
+  // Address lives at partners.public_info->'address' — the same field, and the
+  // same RPC, League Tools writes through (ClubAdminScreen's
+  // handleSavePublicInfo). update_partner_public_info shallow-merges
+  // server-side and gates on _caller_can_manage_partner, which admits super
+  // admins; going direct to the table instead would mean a client-side
+  // read-modify-write that can clobber a Director editing hours at the same
+  // moment. Blank saves null — no address is a valid state.
+  const handleSaveAddress = async (partner: Partner) => {
+    setAddressSaving(true);
+    const trimmed = editAddress.trim();
+    const {data, error} = await supabase.rpc('update_partner_public_info', {
+      p_partner_id: partner.id,
+      p_patch: {address: trimmed.length > 0 ? trimmed : null},
+    });
+    setAddressSaving(false);
+    const result = data as {ok?: boolean; error?: string} | null;
+    if (error || result?.error) {
+      Alert.alert('Could Not Save Address', error?.message ?? result?.error ?? 'Something went wrong.');
       return;
     }
-    setChairmanEmail('');
-    Alert.alert(
-      res.pending ? 'Chairman Invited' : 'Chairman Assigned',
-      res.pending
-        ? `${email} isn't on HotPick yet. They'll become Chairman automatically when they create an account with that exact email.`
-        : `${email} is now the Chairman of ${partner.name}.`,
-    );
+    fetchPartners();
   };
 
   const handleAssignGaffer = async (partner: Partner) => {
@@ -483,7 +521,7 @@ export function PartnerAdminScreen() {
       Alert.alert(
         'Could Not Assign Gaffer',
         res.error === 'NO_CLUB_POOL'
-          ? 'Create the Club Pool first, then assign its Gaffer.'
+          ? 'Start the Club Contest first, then assign its Gaffer.'
           : res.error === 'FORBIDDEN'
             ? 'Super-admin only.'
             : res.error ?? 'Something went wrong.',
@@ -1010,12 +1048,13 @@ export function PartnerAdminScreen() {
               )}
             </View>
 
-            {/* Chairman (optional) — assigned right after creation. Works for
-                any partner, Contest-hosting or not. */}
-            <Text style={[styles.colorsHeading, {marginTop: spacing.md}]}>Chairman (optional)</Text>
+            {/* First Director (optional) — seeded right after creation. Works
+                for any partner, Contest-hosting or not. From here the board
+                adds its own; staff only ever seed the first one. */}
+            <Text style={[styles.colorsHeading, {marginTop: spacing.md}]}>First Director (optional)</Text>
             <Text style={styles.colorsDerivedNote}>
-              Email of the person who'll oversee this partner — perk, broadcasts,
-              Directors. Leave blank to assign later.
+              Email of the person who'll run this partner — perk, broadcasts, and
+              adding other Directors. Leave blank to add later.
             </Text>
             <TextInput
               style={{
@@ -1028,9 +1067,9 @@ export function PartnerAdminScreen() {
                 marginTop: spacing.sm,
                 marginBottom: spacing.md,
               }}
-              value={formChairmanEmail}
-              onChangeText={setFormChairmanEmail}
-              placeholder="chairman@email.com"
+              value={formDirectorEmail}
+              onChangeText={setFormDirectorEmail}
+              placeholder="director@email.com"
               placeholderTextColor={colors.textSecondary}
               autoCapitalize="none"
               keyboardType="email-address"
@@ -1223,8 +1262,8 @@ export function PartnerAdminScreen() {
                         </Text>
                         <Text style={styles.colorsDerivedNote}>
                           {editCanRunPools
-                            ? 'Operator: runs their own Club Pool with an invite code. Organizers can also add their pool to this partner’s roster.'
-                            : 'Sponsor-only: no Club Pool. Brand surfaces via perk + broadcasts. Organizers find them in the directory and add the partner to their pool’s roster.'}
+                            ? 'Operator: runs their own Club Contest with an invite code. Organizers can also add their pool to this partner’s roster.'
+                            : 'Sponsor-only: no Club Contest. Brand surfaces via perk + broadcasts. Organizers find them in the directory and add the partner to their pool’s roster.'}
                         </Text>
                       </View>
                       <Switch
@@ -1236,14 +1275,14 @@ export function PartnerAdminScreen() {
                       />
                     </View>
 
-                    {/* Club Pool — only meaningful when can_run_pools. */}
+                    {/* Club Contest — only meaningful when can_run_pools. */}
                     {editCanRunPools && (() => {
                       const existing = partnerPoolByPartnerId[partner.id];
                       if (existing) {
                         return (
                           <View style={styles.partnerPoolCard}>
                             <Text style={styles.classLabel}>
-                              Club Pool: {existing.name}
+                              Club Contest: {existing.name}
                             </Text>
                             <Text style={styles.colorsDerivedNote}>
                               {partner.name}'s own Contest. Members join with invite
@@ -1254,13 +1293,16 @@ export function PartnerAdminScreen() {
                               .
                             </Text>
 
-                            {/* Gaffer — runs this Club Pool (the Contest).
-                                Separate from the Chairman; can be the same
-                                email. Pending until they sign up with it. */}
+                            {/* Gaffer — runs this Club Contest. A pool-level
+                                seat, separate from the board: the Gaffer need
+                                not be a Director, and being a Director does not
+                                make anyone the Gaffer. Pending until they sign
+                                up with this email. */}
                             <Text style={[styles.colorsHeading, {marginTop: spacing.md}]}>Gaffer</Text>
                             <Text style={styles.colorsDerivedNote}>
                               Runs this Contest (picks, members, weekly cycle). May
-                              be the Chairman's email or a different person.
+                              be a Director's email or a different person, and need
+                              not play.
                             </Text>
                             <TextInput
                               style={{
@@ -1314,26 +1356,43 @@ export function PartnerAdminScreen() {
                             onPress={() => handleCreatePartnerPool(partner)}
                             disabled={creatingPoolForPartnerId === partner.id}
                             accessibilityRole="button"
-                            accessibilityLabel={`Create Club Pool for ${partner.name}`}
+                            accessibilityLabel={`Start Club Contest for ${partner.name}`}
                             accessibilityState={{disabled: creatingPoolForPartnerId === partner.id}}>
                             {creatingPoolForPartnerId === partner.id ? (
                               <ActivityIndicator size="small" color={colors.onPrimary} />
                             ) : (
-                              <Text style={styles.createButtonText}>Create Club Pool</Text>
+                              <Text style={styles.createButtonText}>Start Club Contest</Text>
                             )}
                           </TouchableOpacity>
                         </>
                       );
                     })()}
 
-                    {/* Chairman — partner-level overseer, available for EVERY
-                        partner (sponsor-only included). Seeds the partner's
-                        board; the Chairman then manages perk/broadcasts and adds
-                        Directors. Pending until they sign up with this email. */}
-                    <Text style={[styles.colorsHeading, {marginTop: spacing.lg}]}>Chairman</Text>
+                    {/* The board — available for EVERY partner, sponsor-only
+                        included, because it is partner-level and owes nothing
+                        to a Club Contest. Live Directors AND unclaimed pending
+                        grants both list here, which is what answers "who's on
+                        the board, and did they sign up yet." */}
+                    <Text style={[styles.colorsHeading, {marginTop: spacing.lg}]}>Directors</Text>
                     <Text style={styles.colorsDerivedNote}>
-                      Watches over {partner.name}'s presence — perk, broadcasts,
-                      Directors. Enter the email they'll sign in with.
+                      Who runs {partner.name} — perk, broadcasts, and each other.
+                      Add by the email they'll sign in with; it stays pending until
+                      they do. A partner always keeps at least one.
+                    </Text>
+                    <DelegateManager
+                      target={{kind: 'partner', partnerId: partner.id}}
+                      roleNoun="Director"
+                      delegateRole="director"
+                      canManage
+                      showHeader={false}
+                    />
+
+                    {/* Address — partners.public_info->'address', the SAME field
+                        League Tools writes. Blank clears it. */}
+                    <Text style={[styles.colorsHeading, {marginTop: spacing.lg}]}>Address</Text>
+                    <Text style={styles.colorsDerivedNote}>
+                      Shows on the roster page. Same field {partner.name} edits in
+                      League Tools — blank clears it.
                     </Text>
                     <TextInput
                       style={{
@@ -1345,29 +1404,47 @@ export function PartnerAdminScreen() {
                         color: colors.textPrimary,
                         marginTop: spacing.sm,
                       }}
-                      value={chairmanEmail}
-                      onChangeText={setChairmanEmail}
-                      placeholder="chairman@email.com"
+                      value={editAddress}
+                      onChangeText={setEditAddress}
+                      placeholder="123 Hertel Avenue, Buffalo NY"
                       placeholderTextColor={colors.textSecondary}
-                      autoCapitalize="none"
-                      keyboardType="email-address"
+                      autoCapitalize="words"
                       autoCorrect={false}
                     />
                     <TouchableOpacity
                       style={[
                         styles.createButton,
                         {marginTop: spacing.sm, marginBottom: spacing.md},
-                        (assigningChairman || !chairmanEmail.trim()) && styles.buttonDisabled,
+                        (addressSaving ||
+                          editAddress.trim() === (partner.public_info?.address ?? '')) &&
+                          styles.buttonDisabled,
                       ]}
-                      onPress={() => handleAssignChairman(partner)}
-                      disabled={assigningChairman || !chairmanEmail.trim()}
+                      onPress={() => handleSaveAddress(partner)}
+                      disabled={
+                        addressSaving ||
+                        editAddress.trim() === (partner.public_info?.address ?? '')
+                      }
                       accessibilityRole="button"
-                      accessibilityLabel={`Assign Chairman for ${partner.name}`}>
-                      {assigningChairman ? (
+                      accessibilityLabel={`Save address for ${partner.name}`}>
+                      {addressSaving ? (
                         <ActivityIndicator size="small" color={colors.onPrimary} />
                       ) : (
-                        <Text style={styles.createButtonText}>Assign Chairman</Text>
+                        <Text style={styles.createButtonText}>Save Address</Text>
                       )}
+                    </TouchableOpacity>
+
+                    {/* Staff entry into this partner's own League Tools. The
+                        param is honored only for a super admin — see
+                        ClubAdminScreen's header note. This is what replaced
+                        holding a board seat just to look. */}
+                    <TouchableOpacity
+                      style={[styles.createButton, {marginBottom: spacing.md}]}
+                      onPress={() =>
+                        navigation.navigate('ClubAdmin', {partnerId: partner.id})
+                      }
+                      accessibilityRole="button"
+                      accessibilityLabel={`Open League Tools for ${partner.name}`}>
+                      <Text style={styles.createButtonText}>Open League Tools</Text>
                     </TouchableOpacity>
 
                     {/* Participation perk — partner-managed; max 120 chars. */}

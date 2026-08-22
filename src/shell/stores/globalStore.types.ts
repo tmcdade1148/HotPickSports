@@ -53,14 +53,15 @@ export interface GlobalState {
   userProfile: DbProfile | null;
   fetchProfile: (userId: string) => Promise<DbProfile | null>;
   // The League (partner) this user is on the board of — a partner_members row
-  // (Chairman or Director), independent of any Club Pool. Null when neither.
-  // Settings shows a "League Tools" entry + ClubAdminScreen gates on this.
-  // `role` drives who can add Directors (chairman only). `clubPoolId` is the
-  // partner's Club Pool if it runs one (null for sponsor-only). v1: at most
-  // one League per user. (`managedClub` is a frozen legacy identifier for the
-  // partner/League concept — see REFERENCE §22.)
+  // (Director), independent of any Club Pool. Null when neither. Settings
+  // shows a "League Tools" entry + ClubAdminScreen gates on this. Every
+  // Director may add or remove Directors, so `role` no longer gates anything;
+  // it is retained because list_partner_members returns it. `clubPoolId` is
+  // the partner's Club Contest if it runs one (null for sponsor-only). v1: at
+  // most one League per user. (`managedClub` is a frozen legacy identifier for
+  // the partner/League concept — see REFERENCE §22.)
   managedClub:
-    | {id: string; name: string; clubPoolId: string | null; role: 'chairman' | 'director'; logo: string | null}
+    | {id: string; name: string; clubPoolId: string | null; role: 'director'; logo: string | null}
     | null;
   loadManagedClub: (userId: string) => Promise<void>;
 
@@ -195,9 +196,9 @@ export interface GlobalState {
 
   // Email-based role delegation (Gaffer Tools / League Tools / Partner Admin).
   // grantPoolDelegate + revokePoolDelegate are organizer-only (enforced
-  // server-side); listPoolDelegates is viewable by the board; setLeagueChairman
-  // is super-admin only. `pending: true` means the email isn't a user yet and
-  // the role attaches when they sign up with that exact email.
+  // server-side); listPoolDelegates is viewable by the board. `pending: true`
+  // means the email isn't a user yet and the role attaches when they sign up
+  // with that exact email.
   grantPoolDelegate: (
     poolId: string,
     email: string,
@@ -207,19 +208,17 @@ export interface GlobalState {
     target: {userId?: string; email?: string},
   ) => Promise<{success: boolean; error?: string}>;
   listPoolDelegates: (poolId: string) => Promise<PoolDelegate[]>;
-  setLeagueChairman: (
-    partnerId: string,
-    email: string,
-  ) => Promise<{success: boolean; error?: string; pending?: boolean}>;
-  // Assign the Gaffer (organizer) of a partner's Club Pool by email — super
-  // admin only, partner must have a Club Pool. Separate from the Chairman.
+  // Assign the Gaffer (organizer) of a partner's Club Contest by email — super
+  // admin only, partner must have a Club Contest. A pool-level seat, distinct
+  // from the partner board: the Gaffer need not be a Director, and a Director
+  // is not automatically the Gaffer.
   setClubPoolGaffer: (
     partnerId: string,
     email: string,
   ) => Promise<{success: boolean; error?: string; pending?: boolean}>;
-  // Partner-level board (Chairman/Directors), independent of any Club Pool.
-  // grant/revoke are chairman-only (or super-admin); list is viewable by the
-  // board. Same pending-on-signup semantics.
+  // Partner-level board (Directors), independent of any Club Contest.
+  // grant/revoke admit any board member (or super-admin); list is viewable by
+  // the board. Same pending-on-signup semantics.
   grantPartnerDirector: (
     partnerId: string,
     email: string,
@@ -462,8 +461,8 @@ export interface PoolAffiliation {
 export interface PoolDelegate {
   userId: string | null;
   email:  string | null;
-  // Pool board: organizer | admin. Partner board: chairman | director.
-  role:   'organizer' | 'admin' | 'chairman' | 'director';
+  // Pool board: organizer | admin. Partner board: director.
+  role:   'organizer' | 'admin' | 'director';
   status: 'active' | 'pending';
 }
 

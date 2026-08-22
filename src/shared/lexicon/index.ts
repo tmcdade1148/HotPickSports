@@ -42,21 +42,16 @@ export const LEXICON = {
 
   /** "admin" pool_members role in a regular Contest → "Assistant Gaffer".
    *  The Gaffer's delegated helper (the "No. 2"). Short form "AG". Same
-   *  internal role as a League-tier Director — see roleLabel(). */
+   *  label at every tier, Club Contest included — see roleLabel(). */
   assistantGaffer: {
     short: 'AG',
     long:  'Assistant Gaffer',
   },
 
-  /** "organizer" of a League's own Club Pool → "the Chairman". One per
-   *  League (a pool has exactly one organizer). */
-  chairman: {
-    short: 'Chairman',
-    long:  'the Chairman',
-  },
-
-  /** "admin" of a League's own Club Pool → "Director". Multiple allowed;
-   *  same League Tools access as the Chairman today. */
+  /** The League's board seat (`partner_members`, role 'director'). One or
+   *  more per League; every Director has the same League Tools access, and
+   *  any Director may add or remove another. There is no Chairman — the role
+   *  was removed 2026-08-22 (Hard Rule #24, amended). */
   director: {
     short:  'Director',
     plural: 'Directors',
@@ -90,8 +85,8 @@ export const LEXICON = {
 
   /** Management-surface names. "Tools" = what a user operates to run their
    *  own Contest/League; contrast with "Admin" = HotPick behind-the-scenes
-   *  (PartnerAdminScreen, AdminHome). The Gaffer/Chairman and their
-   *  delegates (Assistant Gaffer/Director) use these. */
+   *  (PartnerAdminScreen, AdminHome). The Gaffer and their delegates
+   *  (Assistant Gaffer), and a League's Directors, use these. */
   gafferTools: 'Gaffer Tools',
   leagueTools: 'League Tools',
 
@@ -124,21 +119,26 @@ export function gafferOf(contestName: string): string {
 }
 
 /**
- * Badge label for a `pool_members.role`, resolved per tier. The same three
- * internal roles (member / admin / organizer — these NEVER change) render
- * with Contest-tier or League-tier vocabulary:
- *   organizer → Gaffer            (Chairman in a League's Club Pool)
- *   admin     → Assistant Gaffer  (Director in a League's Club Pool)
+ * Badge label for a `pool_members.role`. The three internal roles (member /
+ * admin / organizer — these NEVER change) render as:
+ *   organizer → Gaffer
+ *   admin     → Assistant Gaffer
  *   member    → Player
- * Pass isLeagueTier=true when the pool is the League's own Club Pool
- * (partners.club_pool_id === pool.id).
+ *
+ * Tier-independent since 2026-08-22. A League's own Club Contest used to
+ * relabel these seats (organizer → "Chairman", admin → "Director"), which is
+ * why this took an isLeagueTier flag. Chairman is gone, and "Director" now
+ * means a seat on the partner board (`partner_members`) — a different table
+ * from `pool_members`. Reusing the word for a pool admin implied a fused
+ * partner-gaffer role that does not exist, so a Club Contest's seats read
+ * exactly like every other Contest's. Hard Rule #24, amended.
  */
-export function roleLabel(role: string, isLeagueTier = false): string {
+export function roleLabel(role: string): string {
   switch (role) {
     case 'organizer':
-      return isLeagueTier ? LEXICON.chairman.short : LEXICON.gaffer.short;
+      return LEXICON.gaffer.short;
     case 'admin':
-      return isLeagueTier ? LEXICON.director.short : LEXICON.assistantGaffer.long;
+      return LEXICON.assistantGaffer.long;
     default:
       return LEXICON.player.singular;
   }

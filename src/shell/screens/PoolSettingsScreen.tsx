@@ -102,11 +102,9 @@ export function PoolSettingsScreen() {
   const myRole = useGlobalStore(s => s.poolRoles[poolId]);
   const isOrganizer = myRole === 'organizer';
   const isAdmin = myRole === 'admin';
-  // League tier when this pool is a League's own Club Pool — drives
-  // Director vs Assistant Gaffer vocabulary in the delegate manager.
-  const managedClub = useGlobalStore(s => s.managedClub);
-  const isLeagueTier = managedClub?.clubPoolId === poolId;
-  const delegateLabel = roleLabel('admin', isLeagueTier); // Assistant Gaffer | Director
+  // Tier-independent since 2026-08-22 — a Club Contest's delegates are
+  // Assistant Gaffers like anywhere else. See roleLabel().
+  const delegateLabel = roleLabel('admin'); // Assistant Gaffer
 
   // One-time intro for a new Admin. Persisted per-Contest in AsyncStorage
   // so we don't pester returning Admins. Default true (shown) until we
@@ -759,7 +757,7 @@ export function PoolSettingsScreen() {
           <Text style={[styles.broadcastText, {color: accentColor}]}>Send Broadcast</Text>
         </TouchableOpacity>
 
-        {/* Assistant Gaffers (Directors on a Club Pool) — the Gaffer adds
+        {/* Assistant Gaffers — the Gaffer adds
             helpers by email; they get the same Gaffer Tools minus this
             control. Assistant Gaffers see the list read-only. Header is
             rendered here so it matches the screen's other section styling. */}
