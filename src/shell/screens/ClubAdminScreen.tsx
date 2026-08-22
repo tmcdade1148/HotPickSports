@@ -9,6 +9,18 @@
 // Identity (logo, name, colors) is read-only — Super Admin owns brand
 // setup. The Partner Admin manages the day-to-day program: perk,
 // broadcasts, hours, link, roster-page message.
+//
+// SUPER ADMIN VIEWING MODE (route param `partnerId`, added 2026-08-22).
+// The screen normally manages "the League the caller sits on the board of"
+// (managedClub). A super admin can instead open ANY partner by passing
+// partnerId from PartnerAdminScreen, which is why staff no longer need a
+// board seat just to see a Club's tools.
+//
+// The param NEVER widens access. It is honored only when the caller is a
+// super admin; for anyone else it is ignored and the screen falls back to
+// their own managedClub. This client check is for display and routing —
+// the server gates (_caller_can_manage_partner, list_partner_members, and
+// send-partner-broadcast's own super-admin branch) remain the enforcement.
 
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {Text, TextInput} from '@shared/components/AppText';
@@ -27,7 +39,7 @@ import {
   View,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useNavigation} from '@react-navigation/native';
+import {useNavigation, useRoute} from '@react-navigation/native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import {
   ChevronLeft,
@@ -86,7 +98,16 @@ function resolveLogo(bc: Record<string, unknown> | null): string | null {
 export function ClubAdminScreen() {
   const {colors} = useTheme();
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const user = useGlobalStore(s => s.user);
+  const isSuperAdmin = useGlobalStore(s => s.userProfile?.is_super_admin === true);
+
+  // Honored only for a super admin — see the header note. A regular user
+  // passing this param gets their own managedClub, exactly as before.
+  const requestedPartnerId: string | null =
+    isSuperAdmin && typeof route.params?.partnerId === 'string'
+      ? route.params.partnerId
+      : null;
 
   const [partner, setPartner] = useState<PartnerRow | null>(null);
   const [roster, setRoster] = useState<RosterEntry[]>([]);
@@ -124,8 +145,15 @@ export function ClubAdminScreen() {
   // partner's full row by id here so we get brand_config + roster
   // pass + public_info that the slice doesn't carry.
   const managedClub = useGlobalStore(s => s.managedClub);
+
+  // The partner actually on screen: the super admin's requested one, else the
+  // caller's own board seat. `viewingAsAdmin` drives the persistent indicator
+  // so it is never ambiguous whose Club this is, or under which hat.
+  const effectivePartnerId = requestedPartnerId ?? managedClub?.id ?? null;
+  const viewingAsAdmin = requestedPartnerId !== null;
+
   const loadPartner = useCallback(async () => {
-    if (!user?.id || !managedClub) {
+    if (!user?.id || !effectivePartnerId) {
       setLoading(false);
       return;
     }
@@ -134,7 +162,7 @@ export function ClubAdminScreen() {
     const {data: partnerRows} = await supabase
       .from('partners')
       .select('id, name, slug, perk_text, perk_icon, brand_config, is_active, roster_pass, club_pool_id, public_info')
-      .eq('id', managedClub.id)
+      .eq('id', effectivePartnerId)
       .eq('is_active', true)
       .limit(1);
 
@@ -210,7 +238,7 @@ export function ClubAdminScreen() {
     }));
     setRoster(entries);
     setLoading(false);
-  }, [user?.id, managedClub]);
+  }, [user?.id, effectivePartnerId]);
 
   useEffect(() => {
     loadPartner();
@@ -371,12 +399,27 @@ export function ClubAdminScreen() {
             <ChevronLeft color={colors.textPrimary} size={24} />
           </Pressable>
           <Text style={[displayType.display, styles.title, {color: colors.textPrimary}]}>
-            {`${LEXICON.league.short} ${
-              managedClub?.role === 'chairman' ? LEXICON.chairman.short : LEXICON.director.short
-            }`.toUpperCase()}
+            {(viewingAsAdmin
+              ? LEXICON.leagueTools
+              : `${LEXICON.league.short} ${LEXICON.director.short}`
+            ).toUpperCase()}
           </Text>
           <View style={{width: 24}} />
         </View>
+
+        {/* Whose Club is on screen, and under which hat. Persistent by
+            design — a staff member editing someone else's perk should never
+            have to infer that from context. */}
+        {viewingAsAdmin && (
+          <View style={[styles.adminViewBanner, {backgroundColor: colors.surfaceElevated, borderColor: colors.border}]}>
+            <Eye color={colors.textSecondary} size={14} />
+            <Text
+              style={[bodyType.regular, {color: colors.textSecondary, fontSize: 12, flex: 1}]}
+              numberOfLines={1}>
+              {`Viewing as HotPick Admin · ${partner.name}`}
+            </Text>
+          </View>
+        )}
 
         <ScrollView contentContainerStyle={styles.scroll}>
           {/* Identity header */}
@@ -710,26 +753,26 @@ export function ClubAdminScreen() {
             </Pressable>
           </View>
 
-          {/* Directors — the Chairman (Club Pool organizer) adds people who
-              help run the League. They get the same League Tools minus this
-              control. Directors (admins) see the list read-only. */}
-          {managedClub && (
-            <View style={[styles.cardBlock, {backgroundColor: colors.surface, borderColor: colors.border, marginTop: spacing.lg}]}>
-              <Text style={[bodyType.bold, {color: colors.textPrimary, marginBottom: 4}]}>
-                Add {LEXICON.director.plural}
-              </Text>
-              <Text style={[bodyType.regular, {color: colors.textSecondary, fontSize: 12, lineHeight: 17, marginBottom: spacing.sm}]}>
-                {LEXICON.director.plural} get the same privileges you do, but can't add new {LEXICON.director.plural}.
-              </Text>
-              <DelegateManager
-                target={{kind: 'partner', partnerId: managedClub.id}}
-                roleNoun={LEXICON.director.short}
-                delegateRole="director"
-                canManage={managedClub.role === 'chairman'}
-                showHeader={false}
-              />
-            </View>
-          )}
+          {/* The board. Flat since 2026-08-22: every Director may add or
+              remove Directors, and the server refuses to remove the last one.
+              A super admin viewing through the partnerId param manages it
+              too — _caller_can_manage_partner admits them. */}
+          <View style={[styles.cardBlock, {backgroundColor: colors.surface, borderColor: colors.border, marginTop: spacing.lg}]}>
+            <Text style={[bodyType.bold, {color: colors.textPrimary, marginBottom: 4}]}>
+              {LEXICON.director.plural}
+            </Text>
+            <Text style={[bodyType.regular, {color: colors.textSecondary, fontSize: 12, lineHeight: 17, marginBottom: spacing.sm}]}>
+              {LEXICON.director.plural} run the {LEXICON.league.short} with you — same tools, including
+              adding and removing other {LEXICON.director.plural}. A {LEXICON.league.short} always keeps at least one.
+            </Text>
+            <DelegateManager
+              target={{kind: 'partner', partnerId: partner.id}}
+              roleNoun={LEXICON.director.short}
+              delegateRole="director"
+              canManage={viewingAsAdmin || managedClub?.id === partner.id}
+              showHeader={false}
+            />
+          </View>
 
           {/* Identity (read-only) + Analytics placeholder */}
           <View style={[styles.cardBlock, {backgroundColor: colors.surface, borderColor: colors.border, marginTop: spacing.lg}]}>
@@ -813,7 +856,7 @@ export function ClubAdminScreen() {
       </Modal>
 
       {/* Perk icon picker — curated lucide glyphs (PerkIcon's set). Replaces
-          free-text icon entry so a Chairman picks from valid options. */}
+          free-text icon entry so a Director picks from valid options. */}
       <Modal
         visible={iconPickerVisible}
         transparent
@@ -874,6 +917,17 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
   },
   title: {fontSize: 16, letterSpacing: 0.5},
+  adminViewBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderRadius: borderRadius.sm,
+  },
   // Section spacing comes from sectionTitle margins (Settings-page model),
   // not a scroll-level gap — a gap here would double the space between
   // every section. Standalone cards without a preceding title set their
