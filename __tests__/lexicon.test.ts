@@ -105,10 +105,32 @@ describe('leaguesContest()', () => {
 });
 
 describe('leagueContestTagline()', () => {
-  it('uses "An Official" so multiple official Contests per League read naturally', () => {
-    expect(leagueContestTagline('ESPN')).toBe('An Official ESPN Contest');
+  it('puts the League name last, after "of"', () => {
+    expect(leagueContestTagline('ESPN')).toBe('Official Contest of ESPN');
     expect(leagueContestTagline("Hammer's Tavern")).toBe(
-      "An Official Hammer's Tavern Contest",
+      "Official Contest of Hammer's Tavern",
+    );
+  });
+
+  it('reads correctly for a League name that starts with an article', () => {
+    // The reason the phrasing moved off "An Official [Name] Contest": with a
+    // name like The Natural that produced "An Official The Natural Contest".
+    expect(leagueContestTagline('The Natural')).toBe(
+      'Official Contest of The Natural',
+    );
+    expect(leagueContestTagline('The Natural').toUpperCase()).toBe(
+      'OFFICIAL CONTEST OF THE NATURAL',
+    );
+  });
+
+  it('still reads as one-of-many for a League running several Contests', () => {
+    // The old "An" carried this; "of" carries it now without the tagline
+    // having to claim the Contest is the League's only one.
+    expect(leagueContestTagline('ESPN Northeast')).toBe(
+      'Official Contest of ESPN Northeast',
+    );
+    expect(leagueContestTagline('ESPN West')).toBe(
+      'Official Contest of ESPN West',
     );
   });
 });

@@ -3,7 +3,7 @@
 //
 //   • Official Club Contest — pool.owning_club_id IS NOT NULL.
 //     A full-bleed branded header band with the Club logo + the tagline
-//     "AN OFFICIAL [CLUB] CONTEST". The Club's brand defines the silhouette
+//     "OFFICIAL CONTEST OF [CLUB]". The Club's brand defines the silhouette
 //     of the card, not just its accent color.
 //
 //   • Affiliated Contest — pool has ≥1 row in pool_partner_affiliations.
@@ -389,11 +389,9 @@ export function PoolModule({pool}: PoolModuleProps) {
             {backgroundColor: officialBrand.primaryColor},
           ]}
           accessible
-          accessibilityLabel={
-            officialBrand.name
-              ? leagueContestTagline(officialBrand.name)
-              : `An Official ${LEXICON.league.short} ${LEXICON.contest.singular}`
-          }>
+          accessibilityLabel={leagueContestTagline(
+            officialBrand.name || LEXICON.league.long,
+          )}>
           {officialBrand.logoUrl ? (
             <Image
               source={{uri: officialBrand.logoUrl}}
@@ -420,9 +418,9 @@ export function PoolModule({pool}: PoolModuleProps) {
                 {color: readableTextOn(officialBrand.primaryColor)},
               ]}
               numberOfLines={1}>
-              {officialBrand.name
-                ? leagueContestTagline(officialBrand.name).toUpperCase()
-                : `AN OFFICIAL ${LEXICON.league.short.toUpperCase()} ${LEXICON.contest.singular.toUpperCase()}`}
+              {leagueContestTagline(
+                officialBrand.name || LEXICON.league.long,
+              ).toUpperCase()}
             </Text>
           </View>
         </View>

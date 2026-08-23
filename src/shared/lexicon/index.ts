@@ -157,13 +157,21 @@ export function leaguesContest(leagueName?: string | null): string {
 }
 
 /**
- * Tagline for an Official League Contest. A League can run more than one
- * (e.g. ESPN Northeast, ESPN West), so the article is "An", not "The".
- *   leagueContestTagline('ESPN') → "An Official ESPN Contest"
- * Rendered inside the branded header band — small caps, body text.
+ * Tagline for an Official League Contest.
+ *   leagueContestTagline('The Natural') → "Official Contest of The Natural"
+ * Renders uppercased on the branded header band: "OFFICIAL CONTEST OF THE
+ * NATURAL". No colon.
+ *
+ * The "of" form carries the League name last, which is what the band is
+ * there to show — and it reads correctly whether or not the name already
+ * starts with an article ("Official Contest of The Natural" vs the older
+ * "An Official The Natural Contest"). It also stays true when a League runs
+ * more than one Contest (ESPN Northeast, ESPN West): each is *an* official
+ * Contest of that League without the tagline having to claim it is the only
+ * one, which is what the earlier "An" was doing the work of.
  */
 export function leagueContestTagline(leagueName: string): string {
-  return `An Official ${leagueName} ${LEXICON.contest.singular}`;
+  return `Official ${LEXICON.contest.singular} of ${leagueName}`;
 }
 
 /**
