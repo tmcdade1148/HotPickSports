@@ -61,6 +61,89 @@ export function wcagContrast(fg: string | null | undefined, bg: string | null | 
   return (hi + 0.05) / (lo + 0.05);
 }
 
+/** sRGB hex → HSL. Returns null for a malformed hex. */
+function hexToHsl(hex: string): {h: number; s: number; l: number} | null {
+  const c = hex.replace('#', '');
+  if (c.length !== 6) return null;
+  const r = parseInt(c.substring(0, 2), 16) / 255;
+  const g = parseInt(c.substring(2, 4), 16) / 255;
+  const b = parseInt(c.substring(4, 6), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return {h: 0, s: 0, l};
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h: number;
+  if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+  else if (max === g) h = ((b - r) / d + 2) / 6;
+  else h = ((r - g) / d + 4) / 6;
+  return {h, s, l};
+}
+
+/** HSL → sRGB hex. */
+function hslToHex(h: number, s: number, l: number): string {
+  const f = (n: number) => {
+    const k = (n + h * 12) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const v = l - a * Math.max(-1, Math.min(k - 3, Math.min(9 - k, 1)));
+    return Math.round(255 * v)
+      .toString(16)
+      .padStart(2, '0');
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
+
+/**
+ * The Club's own color, nudged only as far as it must be to stay readable on
+ * the given background.
+ *
+ * A partner-supplied brand color is applied raw as text and icon color across
+ * the roster page. That works in light mode and fails in dark: The Natural's
+ * #b73138 is a dark red, and dark red on a dark background is unreadable — the
+ * information is there and nobody can see it.
+ *
+ * This keeps the HUE and saturation and moves only lightness, in small steps,
+ * away from the background until WCAG contrast clears `minRatio` (4.5:1, the
+ * AA bar for body text). A brand that is already legible comes back untouched,
+ * so light mode is unaffected. If even pure white/black cannot clear the bar
+ * the closest attempt is returned rather than nothing.
+ *
+ * Hard Rule #9 is intact: the input is the pool/partner brand_config and the
+ * background comes from useTheme(). No color literal is introduced.
+ */
+export function readableOn(
+  brandHex: string | null | undefined,
+  backgroundHex: string,
+  minRatio = 4.5,
+): string {
+  if (!brandHex) return backgroundHex;
+  if (wcagContrast(brandHex, backgroundHex) >= minRatio) return brandHex;
+  const hsl = hexToHsl(brandHex);
+  const bgL = relativeLuminance(backgroundHex);
+  if (!hsl || bgL === null) return brandHex;
+
+  // Move away from the background: lighten on dark, darken on light.
+  const towardLighter = bgL < 0.5;
+  const STEP = 0.04;
+  let best = brandHex;
+  let bestRatio = wcagContrast(brandHex, backgroundHex);
+  for (let i = 1; i <= 25; i++) {
+    const l = towardLighter
+      ? Math.min(1, hsl.l + i * STEP)
+      : Math.max(0, hsl.l - i * STEP);
+    const candidate = hslToHex(hsl.h, hsl.s, l);
+    const ratio = wcagContrast(candidate, backgroundHex);
+    if (ratio >= minRatio) return candidate;
+    if (ratio > bestRatio) {
+      best = candidate;
+      bestRatio = ratio;
+    }
+    if (l === 0 || l === 1) break;
+  }
+  return best;
+}
+
 /**
  * Pick the Club color from a prioritized candidate list with enough
  * contrast against the current surface. Used to keep Club-color

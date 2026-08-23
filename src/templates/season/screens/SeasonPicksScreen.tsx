@@ -55,10 +55,20 @@ function waveBucket(g: DbSeasonGame): {key: string; label: string} {
   const d = new Date(g.kickoff_at);
   const day = d.getUTCDay(); // 0=Sun, 1=Mon, 4=Thu, 5=Fri, 6=Sat
   const hour = d.getUTCHours();
+  // Each night slot needs a wrap-around rule: an ET evening kickoff lands on
+  // the NEXT UTC day. Every wrap-around sits IMMEDIATELY BEFORE its weekday's
+  // catch-all, because it is a subset of it — putting `day === 6 && hour < 4`
+  // after `day === 6` would make it dead code, never reached.
   if (day === 4 && hour >= 17) return {key: 'thu', label: 'THURSDAY NIGHT'};
   if (day === 5 && hour < 4) return {key: 'thu', label: 'THURSDAY NIGHT'};
   if (day === 5) return {key: 'fri', label: 'FRIDAY'};
+  if (day === 6 && hour < 4) return {key: 'fri', label: 'FRIDAY'};
   if (day === 6) return {key: 'sat', label: 'SATURDAY'};
+  // Saturday night ET spills into Sunday UTC. hour < 12 rather than < 4: a
+  // Sat 8pm ET kickoff is 00:00 UTC Sunday, and the window has to reach far
+  // enough to cover the late slots without touching Sunday's own games, whose
+  // earliest is 13:00 UTC (the London window).
+  if (day === 0 && hour < 12) return {key: 'sat', label: 'SATURDAY'};
   if (day === 0 && hour >= 13 && hour < 17) return {key: 'sun_am', label: 'SUNDAY MORNING'};
   if (day === 0 && hour >= 17 && hour < 20) return {key: 'sun1', label: 'SUNDAY 1PM'};
   if (day === 0 && hour >= 20 && hour < 23) return {key: 'sun4', label: 'SUNDAY 4PM'};

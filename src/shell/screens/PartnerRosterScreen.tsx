@@ -39,6 +39,7 @@ import {useGlobalStore} from '@shell/stores/globalStore';
 import {supabase} from '@shared/config/supabase';
 import {PoweredByHotPick} from '@shell/components/PoweredByHotPick';
 import {formatRosterPass} from '@shared/utils/format';
+import {hexToRgba, readableOn} from '@shared/utils/color';
 import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
 import type {DbPool} from '@shared/types/database';
 
@@ -70,7 +71,7 @@ interface BroadcastRow {
 type Params = {PartnerRoster: {slug: string; preview?: boolean}};
 
 export function PartnerRosterScreen() {
-  const {colors} = useTheme();
+  const {colors, isDark} = useTheme();
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<Params, 'PartnerRoster'>>();
   const slug = route.params.slug;
@@ -195,6 +196,25 @@ export function PartnerRosterScreen() {
     ? bc.primary_color
     : colors.primary;
 
+  // Two derived colors, because the brand color has two different jobs here
+  // and only one of them has to be readable.
+  //
+  //   partnerText  — text and icons. These carry information, so they get the
+  //                  brand color only as far as it stays legible against the
+  //                  page. The Natural's #b73138 is a dark red: fine in light
+  //                  mode, invisible in dark, where readableOn lifts its
+  //                  lightness until it clears WCAG AA.
+  //   partnerPrimary — solid fills, borders and logo backgrounds keep the raw
+  //                  brand color. They are decorative, they sit against theme
+  //                  surfaces rather than competing with them, and shifting
+  //                  them would visibly alter the Club's identity.
+  const partnerText = readableOn(partnerPrimary, colors.background);
+  // Translucent tints composite over `surface`, not the page, and need more
+  // alpha in dark mode to stay perceptible at all — '14' over a dark ground
+  // is indistinguishable from the ground.
+  const partnerTintAlpha = isDark ? 0.22 : 0.08;
+  const partnerTintStrong = isDark ? 0.3 : 0.2;
+
   const hours = partner.public_info?.hours?.trim() || null;
   const address = partner.public_info?.address?.trim() || null;
   // Tapping the address opens the platform maps app (Apple Maps on iOS,
@@ -240,7 +260,7 @@ export function PartnerRosterScreen() {
         <View
           style={[
             styles.brandHeader,
-            {backgroundColor: partnerPrimary + '33', borderColor: colors.border},
+            {backgroundColor: hexToRgba(partnerPrimary, partnerTintStrong), borderColor: colors.border},
           ]}>
           {logoUrl ? (
             <Image source={{uri: logoUrl}} style={styles.brandLogo} />
@@ -268,13 +288,13 @@ export function PartnerRosterScreen() {
                   style={({pressed}) => [styles.brandInfoRow, {opacity: pressed ? 0.6 : 1}]}
                   accessibilityRole="link"
                   accessibilityLabel={`Open ${address} in Maps`}>
-                  <MapPin size={13} color={partnerPrimary} />
+                  <MapPin size={13} color={partnerText} />
                   <Text
                     style={[
                       bodyType.regular,
                       styles.brandInfoText,
                       styles.brandAddressLink,
-                      {color: partnerPrimary},
+                      {color: partnerText},
                     ]}>
                     {address}
                   </Text>
@@ -319,17 +339,17 @@ export function PartnerRosterScreen() {
             style={[
               styles.perkHero,
               {
-                backgroundColor: partnerPrimary + '14',
+                backgroundColor: hexToRgba(partnerPrimary, partnerTintAlpha),
                 borderColor: partnerPrimary,
               },
             ]}>
-            <Text style={[bodyType.bold, styles.perkEyebrow, {color: partnerPrimary}]}>
+            <Text style={[bodyType.bold, styles.perkEyebrow, {color: partnerText}]}>
               CLUB PERK
             </Text>
             <PerkIcon
               name={partner.perk_icon}
               size={48}
-              color={partnerPrimary}
+              color={partnerText}
               emojiStyle={styles.perkIcon}
             />
 
@@ -350,7 +370,7 @@ export function PartnerRosterScreen() {
         {/* Broadcast feed — rows use a left accent stripe in partner color
             so the messages read as coming from the partner, not HotPick. */}
         <View style={styles.section}>
-          <Text style={[bodyType.bold, styles.sectionLabel, {color: partnerPrimary}]}>
+          <Text style={[bodyType.bold, styles.sectionLabel, {color: partnerText}]}>
             FROM {partner.name.toUpperCase()}
           </Text>
           {broadcasts.length > 0 ? (
@@ -382,7 +402,7 @@ export function PartnerRosterScreen() {
         {/* Aligned pools — flat list, never ranked. Left accent stripe
             in partner color ties pool rows to the partner brand. */}
         <View style={styles.section}>
-          <Text style={[bodyType.bold, styles.sectionLabel, {color: partnerPrimary}]}>
+          <Text style={[bodyType.bold, styles.sectionLabel, {color: partnerText}]}>
             {partner.name.toUpperCase()}'S CONTESTS
           </Text>
           {alignedPools.map(pool => (
@@ -407,7 +427,7 @@ export function PartnerRosterScreen() {
                 numberOfLines={1}>
                 {pool.name}
               </Text>
-              <Text style={[bodyType.regular, styles.poolCta, {color: partnerPrimary}]}>
+              <Text style={[bodyType.regular, styles.poolCta, {color: partnerText}]}>
                 View Contest ›
               </Text>
             </Pressable>
@@ -428,16 +448,16 @@ export function PartnerRosterScreen() {
             Shown only while the League is active. */}
         {partner.is_active && (
           <View style={styles.section}>
-            <Text style={[bodyType.bold, styles.sectionLabel, {color: partnerPrimary}]}>
+            <Text style={[bodyType.bold, styles.sectionLabel, {color: partnerText}]}>
               RUN A CONTEST ON THIS ROSTER?
             </Text>
             <View
               style={[
                 styles.inviteCard,
-                {backgroundColor: partnerPrimary + '14', borderColor: partnerPrimary},
+                {backgroundColor: hexToRgba(partnerPrimary, partnerTintAlpha), borderColor: partnerPrimary},
               ]}>
               <View style={styles.passRow}>
-                <Ticket size={18} color={partnerPrimary} strokeWidth={2.25} />
+                <Ticket size={18} color={partnerText} strokeWidth={2.25} />
                 <Text style={[displayType.display, styles.passText, {color: colors.textPrimary}]}>
                   {formatRosterPass(partner.roster_pass)}
                 </Text>
@@ -455,8 +475,8 @@ export function PartnerRosterScreen() {
                   style={[styles.inviteBtn, {borderColor: partnerPrimary}]}
                   accessibilityRole="button"
                   accessibilityLabel="Copy Roster Pass">
-                  <Copy size={14} color={partnerPrimary} />
-                  <Text style={[bodyType.bold, styles.inviteBtnText, {color: partnerPrimary}]}>Copy</Text>
+                  <Copy size={14} color={partnerText} />
+                  <Text style={[bodyType.bold, styles.inviteBtnText, {color: partnerText}]}>Copy</Text>
                 </Pressable>
                 <Pressable
                   onPress={() => {
@@ -470,8 +490,8 @@ export function PartnerRosterScreen() {
                   style={[styles.inviteBtn, {borderColor: partnerPrimary}]}
                   accessibilityRole="button"
                   accessibilityLabel="Share Roster Pass">
-                  <Share2 size={14} color={partnerPrimary} />
-                  <Text style={[bodyType.bold, styles.inviteBtnText, {color: partnerPrimary}]}>Share</Text>
+                  <Share2 size={14} color={partnerText} />
+                  <Text style={[bodyType.bold, styles.inviteBtnText, {color: partnerText}]}>Share</Text>
                 </Pressable>
               </View>
             </View>
