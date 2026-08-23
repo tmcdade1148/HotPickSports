@@ -125,6 +125,12 @@ export function ClubAdminScreen() {
   const [addressText, setAddressText] = useState('');
   const [addressSaving, setAddressSaving] = useState(false);
 
+  // The Club Contest's name — editable by any Director. The invite code beside
+  // it is deliberately read-only here: a name is cosmetic, a code is an
+  // identifier printed in the physical world (Decision 5).
+  const [contestName, setContestName] = useState('');
+  const [contestNameSaving, setContestNameSaving] = useState(false);
+
   const [hoursText, setHoursText] = useState('');
   const [hoursSaving, setHoursSaving] = useState(false);
 
@@ -237,8 +243,37 @@ export function ClubAdminScreen() {
       created_at:     a.aff_created_at,
     }));
     setRoster(entries);
+    setContestName(
+      entries.find(e => e.pool_id === row.club_pool_id)?.pool_name ?? '',
+    );
     setLoading(false);
   }, [user?.id, effectivePartnerId]);
+
+  // Any Director may rename the Club Contest; the server gate on set_pool_name
+  // admits super admins and partner_members alike.
+  const handleSaveContestName = async (poolId: string) => {
+    setContestNameSaving(true);
+    const {data, error} = await supabase.rpc('set_pool_name', {
+      p_pool_id: poolId,
+      p_name: contestName.trim(),
+    });
+    setContestNameSaving(false);
+    const result = data as {ok?: boolean; error?: string} | null;
+    if (error || result?.error) {
+      Alert.alert(
+        'Could not rename',
+        result?.error === 'EMPTY_NAME'
+          ? 'Give the Contest a name.'
+          : result?.error === 'NAME_TOO_LONG'
+            ? 'Keep the name to 30 characters or fewer.'
+            : result?.error === 'NOT_AUTHORIZED'
+              ? 'Only this Club’s Directors can rename its Contest.'
+              : error?.message ?? 'Something went wrong.',
+      );
+      return;
+    }
+    loadPartner();
+  };
 
   useEffect(() => {
     loadPartner();
@@ -726,6 +761,60 @@ export function ClubAdminScreen() {
               showHeader={false}
             />
           </View>
+
+          {/* The Club Contest — name editable, code not. Only rendered when the
+              Club actually runs one; sponsor-only partners have no Contest. */}
+          {(() => {
+            const clubContest = roster.find(r => r.pool_id === partner.club_pool_id);
+            if (!clubContest) return null;
+            return (
+              <View style={[styles.cardBlock, {backgroundColor: colors.surface, borderColor: colors.border, marginTop: spacing.lg}]}>
+                <Text style={[bodyType.bold, {color: colors.textPrimary, marginBottom: 4}]}>
+                  {LEXICON.contest.singular} Name
+                </Text>
+                <TextInput
+                  style={[styles.bigTextInput, {color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.background}]}
+                  value={contestName}
+                  onChangeText={setContestName}
+                  maxLength={30}
+                  autoCorrect={false}
+                  placeholder={partner.name}
+                  placeholderTextColor={colors.textTertiary}
+                />
+                <Pressable
+                  onPress={() => handleSaveContestName(clubContest.pool_id)}
+                  disabled={
+                    contestNameSaving ||
+                    contestName.trim() === (clubContest.pool_name ?? '') ||
+                    contestName.trim() === ''
+                  }
+                  style={[
+                    styles.saveBtn,
+                    {backgroundColor: colors.primary},
+                    (contestNameSaving ||
+                      contestName.trim() === (clubContest.pool_name ?? '') ||
+                      contestName.trim() === '') && {opacity: 0.5},
+                  ]}>
+                  {contestNameSaving ? (
+                    <ActivityIndicator size="small" color={colors.onPrimary} />
+                  ) : (
+                    <Text style={[bodyType.bold, {color: colors.onPrimary}]}>Save Name</Text>
+                  )}
+                </Pressable>
+
+                <Text style={[bodyType.bold, {color: colors.textPrimary, marginTop: spacing.md, marginBottom: 4}]}>
+                  Invite Code
+                </Text>
+                <Text style={[displayType.display, styles.passText, {color: colors.textPrimary}]}>
+                  {clubContest.invite_code ?? '—'}
+                </Text>
+                <Text style={[bodyType.regular, styles.helper, {color: colors.textSecondary}]}>
+                  Fixed once players join — it may already be printed on
+                  something. Email support@hotpicksports.com if it has to change.
+                </Text>
+              </View>
+            );
+          })()}
 
           {/* Identity (read-only) + Analytics placeholder */}
           <View style={[styles.cardBlock, {backgroundColor: colors.surface, borderColor: colors.border, marginTop: spacing.lg}]}>

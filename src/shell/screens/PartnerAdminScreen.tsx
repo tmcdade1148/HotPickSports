@@ -29,7 +29,7 @@ import {
 } from 'lucide-react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import QRCode from 'react-native-qrcode-svg';
-import {formatRosterPass} from '@shared/utils/format';
+import {formatRosterPass, normalizeRosterPass} from '@shared/utils/format';
 import {launchImageLibrary} from 'react-native-image-picker';
 import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
@@ -83,6 +83,11 @@ export function PartnerAdminScreen() {
   const [editPartnerType, setEditPartnerType] = useState<PartnerType>('other');
   const [saving, setSaving] = useState(false);
   const [creatingPoolForPartnerId, setCreatingPoolForPartnerId] = useState<string | null>(null);
+  // Optional overrides for the Club Contest at creation. Both blank is the
+  // normal case and must stay obviously safe — the placeholders say what
+  // happens if you leave them alone.
+  const [clubContestName, setClubContestName] = useState('');
+  const [clubContestCode, setClubContestCode] = useState('');
   // Director seeding (partner board) — staff-only on-ramp. The first Director
   // is seeded here by email; from then on the board adds its own.
   const [formDirectorEmail, setFormDirectorEmail] = useState(''); // create form
@@ -447,24 +452,46 @@ export function PartnerAdminScreen() {
       );
       return;
     }
+    const name = clubContestName.trim();
+    const code = normalizeRosterPass(clubContestCode);
+    if (code && (code.length < 6 || code.length > 12)) {
+      Alert.alert(
+        'Invite Code Must Be 6–12 Characters',
+        'Letters and digits only. Leave it blank to auto-generate one.',
+      );
+      return;
+    }
+    // Read back what will actually be created. The code especially — it goes
+    // on printed table tents, and it cannot be changed once players join.
     Alert.alert(
       `Start ${partner.name}'s Club Contest?`,
-      `It will be created in ${targetCompetition}.\n\nCheck that competition before continuing — a Contest created in a sandbox competition can't be moved.`,
+      `Competition: ${targetCompetition}\n` +
+        `Name: ${name || partner.name}\n` +
+        `Invite code: ${code || 'auto-generated'}\n\n` +
+        `Check the competition before continuing — a Contest created in a sandbox competition can't be moved. The invite code is locked as soon as the first player joins.`,
       [
         {text: 'Cancel', style: 'cancel'},
         {
           text: 'Start Contest',
-          onPress: () => doCreatePartnerPool(partner, targetCompetition),
+          onPress: () =>
+            doCreatePartnerPool(partner, targetCompetition, name || null, code || null),
         },
       ],
     );
   };
 
-  const doCreatePartnerPool = async (partner: Partner, competition: string) => {
+  const doCreatePartnerPool = async (
+    partner: Partner,
+    competition: string,
+    name: string | null,
+    code: string | null,
+  ) => {
     setCreatingPoolForPartnerId(partner.id);
     const {data, error} = await supabase.rpc('create_partner_pool', {
       p_partner_id: partner.id,
       p_competition: competition,
+      p_name: name,
+      p_invite_code: code,
     });
     setCreatingPoolForPartnerId(null);
     if (error) {
@@ -1347,6 +1374,50 @@ export function PartnerAdminScreen() {
                             This partner runs its own Contest. (Save the partner if
                             you just switched this on.)
                           </Text>
+
+                          {/* Optional overrides. Blank is the normal case, so
+                              the placeholders state what blank does rather than
+                              leaving the admin to guess. */}
+                          <TextInput
+                            style={{
+                              borderWidth: 1,
+                              borderColor: colors.border,
+                              borderRadius: borderRadius.md,
+                              paddingHorizontal: spacing.md,
+                              paddingVertical: spacing.sm,
+                              color: colors.textPrimary,
+                              marginTop: spacing.sm,
+                            }}
+                            value={clubContestName}
+                            onChangeText={setClubContestName}
+                            placeholder={`Contest name (blank = ${partner.name})`}
+                            placeholderTextColor={colors.textSecondary}
+                            maxLength={30}
+                            autoCorrect={false}
+                          />
+                          <TextInput
+                            style={{
+                              borderWidth: 1,
+                              borderColor: colors.border,
+                              borderRadius: borderRadius.md,
+                              paddingHorizontal: spacing.md,
+                              paddingVertical: spacing.sm,
+                              color: colors.textPrimary,
+                              marginTop: spacing.sm,
+                            }}
+                            value={clubContestCode}
+                            onChangeText={t => setClubContestCode(normalizeRosterPass(t))}
+                            placeholder="Invite code (blank = auto-generated)"
+                            placeholderTextColor={colors.textSecondary}
+                            autoCapitalize="characters"
+                            autoCorrect={false}
+                            maxLength={12}
+                          />
+                          <Text style={styles.colorsDerivedNote}>
+                            6–12 letters or digits. Printed on table tents, so it
+                            locks as soon as the first player joins.
+                          </Text>
+
                           <TouchableOpacity
                             style={[
                               styles.createButton,
