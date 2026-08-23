@@ -439,53 +439,6 @@ export function ClubAdminScreen() {
             </View>
           </View>
 
-          {/* Roster Pass */}
-          <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textSecondary}]}>
-            ROSTER PASS
-          </Text>
-          <View style={[styles.cardBlock, {backgroundColor: colors.surface, borderColor: colors.border}]}>
-            <View style={styles.passRow}>
-              <Ticket size={18} color={colors.primary} strokeWidth={2.25} />
-              <Text style={[displayType.display, styles.passText, {color: colors.textPrimary}]}>
-                {formatRosterPass(partner.roster_pass)}
-              </Text>
-            </View>
-            <Text style={[bodyType.regular, styles.passHint, {color: colors.textSecondary}]}>
-              Share with a Gaffer to add their Contest to {partner.name}'s roster.
-              They paste it in their Contest's Settings → Add/Edit Leagues.
-            </Text>
-            <View style={styles.passActions}>
-              <Pressable
-                onPress={() => {
-                  Clipboard.setString(formatRosterPass(partner.roster_pass));
-                  Alert.alert('Copied', 'Roster Pass copied to clipboard.');
-                }}
-                style={[styles.smallBtn, {borderColor: colors.primary}]}>
-                <Copy size={14} color={colors.primary} />
-                <Text style={[bodyType.bold, styles.smallBtnText, {color: colors.primary}]}>Copy</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => {
-                  Share.share({
-                    message:
-                      `Add your HotPick Contest to ${partner.name}'s roster. ` +
-                      `Open Contest Settings → Add/Edit Leagues and enter pass: ` +
-                      `${formatRosterPass(partner.roster_pass)}`,
-                  }).catch(() => {});
-                }}
-                style={[styles.smallBtn, {borderColor: colors.primary}]}>
-                <Share2 size={14} color={colors.primary} />
-                <Text style={[bodyType.bold, styles.smallBtnText, {color: colors.primary}]}>Share</Text>
-              </Pressable>
-              <Pressable
-                onPress={handleRegenerateRosterPass}
-                style={[styles.smallBtn, {borderColor: colors.error}]}>
-                <RefreshCw size={14} color={colors.error} />
-                <Text style={[bodyType.bold, styles.smallBtnText, {color: colors.error}]}>Regenerate</Text>
-              </Pressable>
-            </View>
-          </View>
-
           {/* Perk editor */}
           <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textSecondary}]}>
             PERK
@@ -787,6 +740,55 @@ export function ClubAdminScreen() {
             <Text style={[bodyType.regular, {color: colors.textSecondary, fontSize: 12, lineHeight: 17}]}>
               Coming soon — perk redemption tracking, broadcast open rates, Player activity.
             </Text>
+          </View>
+
+          {/* Roster Pass — last. It is the one thing here a Director hands to
+              someone else, not a setting they tune, so it sits at the bottom
+              rather than above the day-to-day controls. Moved 2026-08-23. */}
+          <Text style={[bodyType.bold, styles.sectionTitle, {color: colors.textSecondary}]}>
+            ROSTER PASS
+          </Text>
+          <View style={[styles.cardBlock, {backgroundColor: colors.surface, borderColor: colors.border}]}>
+            <View style={styles.passRow}>
+              <Ticket size={18} color={colors.primary} strokeWidth={2.25} />
+              <Text style={[displayType.display, styles.passText, {color: colors.textPrimary}]}>
+                {formatRosterPass(partner.roster_pass)}
+              </Text>
+            </View>
+            <Text style={[bodyType.regular, styles.passHint, {color: colors.textSecondary}]}>
+              Share with a Gaffer to add their Contest to {partner.name}'s roster.
+              They paste it in their Contest's Settings → Add/Edit Leagues.
+            </Text>
+            <View style={styles.passActions}>
+              <Pressable
+                onPress={() => {
+                  Clipboard.setString(formatRosterPass(partner.roster_pass));
+                  Alert.alert('Copied', 'Roster Pass copied to clipboard.');
+                }}
+                style={[styles.smallBtn, {borderColor: colors.primary}]}>
+                <Copy size={14} color={colors.primary} />
+                <Text style={[bodyType.bold, styles.smallBtnText, {color: colors.primary}]}>Copy</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  Share.share({
+                    message:
+                      `Add your HotPick Contest to ${partner.name}'s roster. ` +
+                      `Open Contest Settings → Add/Edit Leagues and enter pass: ` +
+                      `${formatRosterPass(partner.roster_pass)}`,
+                  }).catch(() => {});
+                }}
+                style={[styles.smallBtn, {borderColor: colors.primary}]}>
+                <Share2 size={14} color={colors.primary} />
+                <Text style={[bodyType.bold, styles.smallBtnText, {color: colors.primary}]}>Share</Text>
+              </Pressable>
+              <Pressable
+                onPress={handleRegenerateRosterPass}
+                style={[styles.smallBtn, {borderColor: colors.error}]}>
+                <RefreshCw size={14} color={colors.error} />
+                <Text style={[bodyType.bold, styles.smallBtnText, {color: colors.error}]}>Regenerate</Text>
+              </Pressable>
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
