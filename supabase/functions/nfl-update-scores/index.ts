@@ -45,60 +45,60 @@ const ESPN_HEADERS = {
   "Accept-Language": "en-US,en;q=0.9",
 };
 
-// One retry, fixed delay, fetch only. The 5-minute cron IS the outer retry
-// loop, so more attempts inside one invocation buy latency, not reliability.
-const RETRY_DELAY_MS = 2000;
+// 10s ceiling per request. This is NOT the retry -- the retry is gone; see
+// below. A hang is a separate failure mode from a bad body, and it is the one
+// that produces no response at all: a null-status, null-content row in
+// net._http_response, observed 2026-08-22. Without this the invocation just
+// sits there.
 const ATTEMPT_TIMEOUT_MS = 10000;
 
-// A single bad ESPN response used to kill the whole run: .json() threw, the
-// function returned 500, and no game moved until the next cron tick. Measured
-// 2026-08-22: 16 "Unexpected end of JSON input" failures in a 6-hour window
-// (~8% of ticks), plus one request that never came back at all (a null row in
-// net._http_response) -- which is why the timeout matters as much as the retry.
+// ONE attempt. The in-invocation retry was removed 2026-08-23 after two days
+// of production data: 32 double-failures, 0 rescued by the second attempt.
+// The retry path executed correctly -- the "failed after 2 attempts" message
+// proved it -- but cdn.espn.com's bad periods outlast a 2-second gap, so the
+// retry reliably landed inside the same bad window it was trying to escape.
+// The 5-minute cron IS the retry, and it recovered every one of those 32.
 //
-// Five failure modes funnel through the same retry: non-2xx, timeout, empty
-// body, unparseable JSON, and a parsed body with no events array. An EMPTY
-// events array is accepted -- an offseason scoreboard legitimately has none.
+// What was never in question is the CLASSIFICATION. Five failure modes are
+// still told apart and reported: non-2xx, timeout, empty body, unparseable
+// JSON, and a parsed body with no events array. That is what made the
+// failures legible in the first place; the second attempt was the part that
+// did nothing. An EMPTY events array is still accepted -- an offseason
+// scoreboard legitimately has none.
 //
-// Both attempts failing throws, which the handler's catch turns into
-// success:false / HTTP 500. That is deliberate: a dead fetch must be loudly
-// visible in net._http_response. Reporting success on no data is the exact
-// pattern that hid the Aug 20 blackout for 12 hours.
-async function fetchScoreboard(): Promise<{ data: any; attempts: number }> {
+// Throwing here turns into success:false / HTTP 500 in the handler's catch,
+// and it happens BEFORE the update loop, so a failed fetch writes nothing.
+// Keep that ordering: reporting success on no data is the exact pattern that
+// hid the Aug 20 blackout for 12 hours.
+async function fetchScoreboard(): Promise<any> {
   let lastErr = "";
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    try {
-      const res = await fetch(ESPN_SCOREBOARD_URL, {
-        headers: ESPN_HEADERS,
-        signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),
-      });
-      if (!res.ok) { lastErr = `HTTP ${res.status}`; }
+  try {
+    const res = await fetch(ESPN_SCOREBOARD_URL, {
+      headers: ESPN_HEADERS,
+      signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),
+    });
+    if (!res.ok) { lastErr = `HTTP ${res.status}`; }
+    else {
+      const text = await res.text();
+      if (text.length === 0) { lastErr = "empty body"; }
       else {
-        const text = await res.text();
-        if (text.length === 0) { lastErr = "empty body"; }
-        else {
-          try {
-            const raw = JSON.parse(text);
-            // cdn.espn.com nests the scoreboard under content.sbData; the
-            // `?? raw` fallback keeps us working if ESPN ever flattens it.
-            const sb = raw?.content?.sbData ?? raw;
-            if (!Array.isArray(sb?.events)) {
-              lastErr = `no events array (body ${text.length}b)`;
-            } else {
-              return { data: sb, attempts: attempt };
-            }
-          } catch { lastErr = `unparseable body (${text.length}b)`; }
-        }
+        try {
+          const raw = JSON.parse(text);
+          // cdn.espn.com nests the scoreboard under content.sbData; the
+          // `?? raw` fallback keeps us working if ESPN ever flattens it.
+          const sb = raw?.content?.sbData ?? raw;
+          if (!Array.isArray(sb?.events)) {
+            lastErr = `no events array (body ${text.length}b)`;
+          } else {
+            return sb;
+          }
+        } catch { lastErr = `unparseable body (${text.length}b)`; }
       }
-    } catch (e) {
-      lastErr = e instanceof Error ? e.message : String(e); // incl. timeout
     }
-    if (attempt === 1) {
-      console.warn(`[nfl-update-scores] attempt 1 failed (${lastErr}), retrying`);
-      await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
-    }
+  } catch (e) {
+    lastErr = e instanceof Error ? e.message : String(e); // incl. timeout
   }
-  throw new Error(`ESPN fetch failed after 2 attempts: ${lastErr}`);
+  throw new Error(`ESPN fetch failed: ${lastErr}`);
 }
 
 Deno.serve(async (req) => {
@@ -129,9 +129,9 @@ Deno.serve(async (req) => {
     const espnSeasonType = String(cfg.espn_season_type ?? "").replace(/^\"|\"$/g, "");
     const isPreseason = espnSeasonType === "1";
 
-    // Throws only if BOTH attempts fail, and it throws here -- before the
-    // update loop -- so a failed fetch writes nothing. Keep that ordering.
-    const { data: espnData, attempts } = await fetchScoreboard();
+    // Throws here -- before the update loop -- so a failed fetch writes
+    // nothing. Keep that ordering.
+    const espnData = await fetchScoreboard();
 
     const seasonType = espnData.season?.type ?? 2;
     const isPlayoffs = seasonType === 3;
@@ -258,10 +258,10 @@ Deno.serve(async (req) => {
       console.warn(`[nfl-update-scores] PLAYOFFS: ${skippedCount} game(s) skipped/unmatched for ${competition} ${seasonYear} -- a real game may be un-scored.`);
     }
 
-    // `attempts` is here so every invocation self-reports in net._http_response:
-    // 1 on a clean tick, 2 when the retry saved the run.
+    // No `attempts` field: with one attempt it could only ever report 1, and
+    // a field that can hold one value is noise in every response forever.
     return json({ success: true, competition, updated: updatedCount,
-      skipped: skippedCount, attempts, updates, isPlayoffs, isPreseason,
+      skipped: skippedCount, updates, isPlayoffs, isPreseason,
       espnSeasonType: seasonType }, 200);
   } catch (err) {
     return json({ success: false, error: String(err) }, 500);
