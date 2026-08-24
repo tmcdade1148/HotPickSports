@@ -1,4 +1,9 @@
-import {readableOn, wcagContrast, hexToRgba} from '../src/shared/utils/color';
+import {
+  compositeOver,
+  hexToRgba,
+  readableOn,
+  wcagContrast,
+} from '../src/shared/utils/color';
 
 // The Natural's brand red — the color that started this. Dark enough to read
 // fine on white and to disappear on a dark page.
@@ -59,6 +64,35 @@ describe('readableOn()', () => {
     expect(wcagContrast(best, DARK_BG)).toBeGreaterThan(
       wcagContrast(BRAND_DARK_RED, DARK_BG),
     );
+  });
+});
+
+describe('compositeOver()', () => {
+  it('returns the background at alpha 0 and the brand at alpha 1', () => {
+    expect(compositeOver(BRAND_DARK_RED, DARK_BG, 0)).toBe(DARK_BG.toLowerCase());
+    expect(compositeOver(BRAND_DARK_RED, DARK_BG, 1)).toBe(BRAND_DARK_RED.toLowerCase());
+  });
+
+  it('lands between the two at a partial alpha', () => {
+    const mixed = compositeOver('#FFFFFF', '#000000', 0.5);
+    expect(mixed).toBe('#808080');
+  });
+
+  it('is what makes a tinted surface measurable', () => {
+    // The clubhouse bug: text was lifted against the PAGE while rendering on a
+    // brand tint OVER the page. Those are different colors, so they give
+    // different answers — which is the whole reason this helper exists.
+    const tint = compositeOver(BRAND_DARK_RED, DARK_BG, 0.22);
+    expect(tint).not.toBe(DARK_BG);
+    expect(wcagContrast(BRAND_DARK_RED, tint)).not.toBeCloseTo(
+      wcagContrast(BRAND_DARK_RED, DARK_BG),
+      3,
+    );
+  });
+
+  it('falls back to the background for malformed input', () => {
+    expect(compositeOver(null, DARK_BG, 0.5)).toBe(DARK_BG);
+    expect(compositeOver('nope', DARK_BG, 0.5)).toBe(DARK_BG);
   });
 });
 

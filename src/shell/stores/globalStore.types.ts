@@ -128,6 +128,13 @@ export interface GlobalState {
   poolsByCompetition: Record<string, DbPool[]>;
   isLoadingPools: boolean;
   setActivePoolId: (poolId: string | null) => void;
+  // Open a Contest that may be in a different competition than the active one:
+  // persists the selection, switches the sport when it differs, sets the pool
+  // active and refetches. The app's single cross-competition switch path —
+  // both the invite-join flow and the clubhouse's "View Contest" call it.
+  // Resolves false when the competition has no registry event, i.e. the caller
+  // cannot be landed there.
+  openPoolInCompetition: (poolId: string, competition: string) => Promise<boolean>;
   setDefaultPoolId: (poolId: string) => void;
   loadDefaultPoolId: (competition: string) => Promise<void>;
   // `silent` skips the isLoadingPools spinner — used by background refetch
