@@ -63,7 +63,7 @@ COMMENT ON FUNCTION public.register_device_token(text, text, text) IS
   'Registers/refreshes the caller''s Expo push token. Derives auth.uid() server-side and reassigns the token to the caller (a shared or reinstalled device follows whoever is signed in). Stamps last_used_at on every call — that is a REGISTRATION timestamp, NOT evidence the token can receive: a freshly stamped token can be undeliverable (verified 2026-08-24).';
 
 COMMENT ON COLUMN public.user_devices.last_used_at IS
-  'Last successful registration of this token. Measures app launches, NOT deliverability — a token stamped minutes ago may deliver nowhere (verified 2026-08-24). Never use it as a reachable-device count.';
+  'Last successful registration of this token. Measures app launches, NOT deliverability — and the ordering is the point: ExponentPushToken[pTk_LDMc...] failed to deliver at ~16:20Z on 2026-08-24 and was stamped fresh at 18:34:54Z the SAME DAY. A token can be stamped after it is known dead. Never use this column as a reachable-device count.';
 
 COMMENT ON COLUMN public.user_devices.device_name IS
   'Device.modelName at registration ("iPhone 15 Pro", "MacBook Pro"). The only field that distinguishes an iPhone from an iOS app running on Apple Silicon — platform is the transport and Platform.OS reads "ios" for both. NULL on rows written before 2026-08-24.';

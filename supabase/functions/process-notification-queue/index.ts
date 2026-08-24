@@ -19,12 +19,14 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 //
 // AN OK RECEIPT IS NOT PROOF OF ARRIVAL. This is measured, not theoretical.
 //
-// On 2026-08-24 the token ExponentPushToken[pTk_LDMc...] was sent to three
-// times. All three sends returned ok, all three RECEIPTS returned ok, and
-// nothing arrived on any device — iPhone or Mac — with iOS notification
-// permission confirmed ON. An ok receipt means APNs/FCM accepted the
-// message; Apple reports a dead token later through its feedback channel,
-// which Expo folds into SUBSEQUENT receipts as DeviceNotRegistered.
+// On 2026-08-24 the token ExponentPushToken[pTk_LDMc9bMtBtuBfMlMym] was sent
+// to three times across four hours. All three sends returned ok, all three
+// RECEIPTS returned ok, and nothing arrived on any device — iPhone or Mac —
+// with iOS notification permission confirmed ON at the last two. (Token
+// named so the next reader can re-run the experiment.) An ok receipt means
+// APNs/FCM accepted the message; Apple reports a dead token later through
+// its feedback channel, which Expo folds into SUBSEQUENT receipts as
+// DeviceNotRegistered.
 //
 // So `sent` here means "Expo reported delivery to the provider succeeded",
 // which is a real and large improvement on "the POST returned 200" — the

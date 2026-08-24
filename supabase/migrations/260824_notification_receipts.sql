@@ -17,11 +17,13 @@
 -- `sent` is written ONLY from an ok receipt.
 --
 -- AN OK RECEIPT IS NOT PROOF OF ARRIVAL — measured, not theoretical. On
--- 2026-08-24 ExponentPushToken[pTk_LDMc...] took three sends; all three
--- returned ok, all three RECEIPTS returned ok, and nothing arrived on any
--- device with notification permission confirmed ON. Apple reports a dead
--- token later via its feedback channel, which Expo folds into SUBSEQUENT
--- receipts as DeviceNotRegistered.
+-- 2026-08-24 ExponentPushToken[pTk_LDMc9bMtBtuBfMlMym] took three separate
+-- sends across four hours; all three returned ok, all three RECEIPTS
+-- returned ok, and nothing arrived on any device, with iOS notification
+-- permission confirmed ON at the last two. The token is named so the next
+-- reader can re-run the experiment. Apple reports a dead token later via
+-- its feedback channel, which Expo folds into SUBSEQUENT receipts as
+-- DeviceNotRegistered.
 --
 -- So `sent` means "Expo reported delivery to the provider succeeded" — a real
 -- and large improvement on "the POST returned 200", and still weaker than "a

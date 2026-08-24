@@ -77,6 +77,27 @@ export async function ensurePushRegistered(
 }
 
 /**
+ * Comparison-only fingerprint of a device token: two FNV-1a 32-bit passes with
+ * different seeds, 16 hex chars. Not cryptographic and does not need to be —
+ * the diagnostic compares fingerprints for equality across a handful of
+ * devices; it never inverts one. What matters is that the RAW token (a stable
+ * device identifier for a named user) never lands in a log table that will
+ * outlive the diagnostic.
+ */
+function fingerprint(value: string): string {
+  const pass = (seed: number): string => {
+    let h = seed >>> 0;
+    for (let i = 0; i < value.length; i++) {
+      h ^= value.charCodeAt(i);
+      h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return h.toString(16).padStart(8, '0');
+  };
+  // Standard FNV offset basis, then a second independent seed.
+  return pass(0x811c9dc5) + pass(0x811c9dc5 ^ 0x5bd1e995);
+}
+
+/**
  * Narrow Expo's permission status to the three values the CHECK constraint
  * allows, or null if it is anything else.
  *
@@ -331,25 +352,35 @@ export async function registerForPushNotifications(
       isDevice: Device.isDevice,
     };
 
-    // The RAW APNs/FCM device token, logged alongside the Expo one.
+    // A FINGERPRINT of the APNs/FCM device token, logged alongside the Expo
+    // one. Hashed, never raw: the raw native token is a device identifier for
+    // a named user, written to a table that outlives the diagnostic — and the
+    // question ("do these two Expo tokens sit on the same installation?") is
+    // answered by comparing values, which a hash does identically.
     //
     // This is the diagnostic that settles the open question, because it cannot
     // be confused between devices: the native token is issued by APNs to THIS
-    // installation on THIS device. If two Expo tokens on one account map to
-    // one native token, the Expo layer is handing back a stale mapping; if the
-    // phone reports a native token whose Expo token never reaches
-    // user_devices, the break is in this function; if it reports none at all,
-    // the break is below us in APNs registration.
+    // installation on THIS device, and PushTokenModule.swift calls
+    // registerForRemoteNotifications() fresh on every request — there is no
+    // native-side cache to go stale. If two Expo tokens on one account carry
+    // one fingerprint, the Expo layer is handing back a stale mapping; if the
+    // phone's fingerprint appears under an Expo token that never reaches
+    // user_devices, the break is in this function; if the fetch errors, the
+    // break is below us in APNs registration.
     //
     // Never inferred from the absence of a row: register_device_token is
     // ON CONFLICT (push_token) DO UPDATE, so a device that gets an EXISTING
     // token back updates a row instead of inserting one and adds no new row at
     // all. "No new row" and "did not register" are different claims.
-    let nativeToken: string | null = null;
+    let nativeTokenHash: string | null = null;
+    let nativeTokenLength: number | null = null;
     let nativeTokenError: string | null = null;
     try {
       const native = await Notifications.getDevicePushTokenAsync();
-      nativeToken = typeof native?.data === 'string' ? native.data : JSON.stringify(native?.data);
+      const raw =
+        typeof native?.data === 'string' ? native.data : JSON.stringify(native?.data);
+      nativeTokenHash = fingerprint(raw);
+      nativeTokenLength = raw.length;
     } catch (nativeErr) {
       nativeTokenError = nativeErr instanceof Error ? nativeErr.message : 'unknown';
     }
@@ -372,7 +403,8 @@ export async function registerForPushNotifications(
       userId,
       os: Platform.OS,
       expoToken: token,
-      nativeToken,
+      nativeTokenHash,
+      nativeTokenLength,
       nativeTokenError,
       ...deviceLabel,
     });
