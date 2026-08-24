@@ -1682,19 +1682,36 @@ export function PartnerAdminScreen() {
                     260519 Partner-Pool model rework. */}
                 {isExpanded && (
                   <>
-                    {/* Invite Code for Signage */}
+                    {/* The partner's ROSTER PAGE ADDRESS — the same value the
+                        edit form labels "Roster Page URL" (line ~1045). This
+                        card was still labelled "Invite Code for Signage" after
+                        v1.3 renamed the form field, and it renders partner.slug,
+                        not an invite code. The QR directly below encodes
+                        hotpick.app/{slug}, which is the proof.
+
+                        The old body — "Users type this code to join the pool" —
+                        was technically true, because join_pool_by_invite falls
+                        back to a normalized invite_slug match. But presenting an
+                        address as the invite code is what has confused every
+                        partner setup so far, and the real code now has its own
+                        editor on the Club Contest block. Shown in address form
+                        rather than uppercased for the same reason: THE-NATURAL
+                        reads like a code, hotpick.app/the-natural does not. */}
                     <View style={styles.signageSection}>
-                      <Text style={styles.poolListLabel}>Invite Code for Signage</Text>
-                      <Text style={styles.signageCode}>{partner.slug.toUpperCase()}</Text>
+                      <Text style={styles.poolListLabel}>Roster Page URL</Text>
+                      <Text style={styles.signageCode}>hotpick.app/{partner.slug}</Text>
                       <Text style={styles.signageHint}>
-                        Users type this code to join the pool. Case-insensitive.
+                        The address of this Club's roster page — what the QR code
+                        below opens. Not the invite code.
                       </Text>
                     </View>
 
                     {/* Roster Pass — shared by the Club admin with a Gaffer.
-                        Distinct from the Invite Code above (which lets a
-                        user join the Club's pool). The Roster Pass lets a
-                        Gaffer link THEIR Contest to this Club's roster. */}
+                        Distinct from the roster page URL above (an address a
+                        Player opens) AND from the Club Contest's invite code (a
+                        code a Player types to join). The Roster Pass lets a
+                        Gaffer link THEIR Contest to this Club's roster. Three
+                        different strings, three different jobs. */}
                     <View style={styles.signageSection}>
                       <View style={styles.rosterPassHeaderRow}>
                         <Ticket size={14} color={colors.primary} strokeWidth={2.25} />
