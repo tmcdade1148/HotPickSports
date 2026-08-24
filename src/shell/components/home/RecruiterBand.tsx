@@ -8,24 +8,18 @@
 // who's also a member of another Contest shares their own roster, not
 // the other Gaffer's.
 //
-// Share message includes a Tier 1 deep link
-// (`hotpick://join?code=XXXX`) that the RootNavigator linking config
-// already parses — opens the app directly to PoolWelcomeScreen with
-// the code pre-filled. Recruits installing the app fresh still see
-// the plain invite code in the message text and can paste it
-// manually. (Tier 2 universal-link + web fallback is planned for the
-// marketing-site work.)
+// The share text itself comes from buildInviteMessage (@shared/utils/invite) —
+// the single invite voice, shared with Contest Settings → Share. It leads with
+// the invite code because a code always works; warm deep links on iOS do not
+// (see that file for the why).
 
 import React from 'react';
 import {Text} from '@shared/components/AppText';
 import {Pressable, Share, StyleSheet, View} from 'react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useGlobalStore} from '@shell/stores/globalStore';
+import {buildInviteMessage} from '@shared/utils/invite';
 import {bodyType, spacing, borderRadius} from '@shared/theme';
-
-// Universal-link base — https so the invite linkifies in every messaging app
-// and opens the app directly when installed (custom hotpick:// does neither).
-const INVITE_BASE = 'https://hotpick.app/join';
 
 export function RecruiterBand() {
   const {colors} = useTheme();
@@ -48,16 +42,8 @@ export function RecruiterBand() {
   const memberCount = userRankByPool[pool.id]?.memberCount ?? 0;
   const isGaffer    = !!userId && pool.organizer_id === userId;
 
-  const inviteUrl = `${INVITE_BASE}/${code}`;
-
   const handleShare = async () => {
-    // Unified invite voice — matches PoolSettings → Share. Code on its own line
-    // so it's easy to select in the recipient's messenger.
-    const message =
-      `Hey, I'd love for you to join my HotPick football pool "${poolName}"! ` +
-      `Pick games 🏈, talk smack, and settle who's got bragging rights.\n\n` +
-      `Tap to join 👉 ${inviteUrl}\n\n` +
-      `Invite code:\n${code}`;
+    const message = buildInviteMessage(pool, code);
     try {
       await Share.share({message});
     } catch {
