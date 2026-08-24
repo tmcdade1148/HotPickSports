@@ -88,6 +88,10 @@ export function PartnerAdminScreen() {
   // happens if you leave them alone.
   const [clubContestName, setClubContestName] = useState('');
   const [clubContestCode, setClubContestCode] = useState('');
+  // Changing the code on an EXISTING Contest — the consumer for v1.2's
+  // set_pool_invite_code, which until now had no way to be called.
+  const [newInviteCode, setNewInviteCode] = useState('');
+  const [savingInviteCode, setSavingInviteCode] = useState(false);
   // Director seeding (partner board) — staff-only on-ramp. The first Director
   // is seeded here by email; from then on the board adds its own.
   const [formDirectorEmail, setFormDirectorEmail] = useState(''); // create form
@@ -513,6 +517,54 @@ export function PartnerAdminScreen() {
         `${partner.name}'s Club Contest is live in ${competition}. Invite code: ${row.invite_code ?? '—'} · Signage slug: ${row.invite_slug ?? partner.slug}`,
       );
     }
+  };
+
+  // Change an existing Club Contest's invite code.
+  //
+  // Two things this must get right. Never surface the raw error code — the
+  // server speaks CODE_LOCKED/CODE_TAKEN/BAD_FORMAT and the admin should not
+  // see any of them. And on success, SAY WHICH OLD CODE STILL WORKS: the RPC
+  // returns alias_kept, the retired code stays valid forever, and that is the
+  // entire point of the alias mechanism. Leaving it unsaid is why the feature
+  // was invisible.
+  const handleChangeInviteCode = async (partner: Partner, poolId: string) => {
+    const code = normalizeRosterPass(newInviteCode);
+    setSavingInviteCode(true);
+    const {data, error} = await supabase.rpc('set_pool_invite_code', {
+      p_pool_id: poolId,
+      p_code: code,
+    });
+    setSavingInviteCode(false);
+    const result = data as
+      | {ok?: boolean; error?: string; code?: string; alias_kept?: string; unchanged?: boolean}
+      | null;
+
+    if (error || result?.error) {
+      const friendly =
+        result?.error === 'CODE_LOCKED'
+          ? 'The code is fixed now that players have joined.'
+          : result?.error === 'CODE_TAKEN'
+            ? 'That code is already in use.'
+            : result?.error === 'BAD_FORMAT'
+              ? '6–12 letters or numbers.'
+              : result?.error === 'NOT_AUTHORIZED'
+                ? 'Super-admin only.'
+                : error?.message ?? 'Something went wrong.';
+      Alert.alert('Could Not Change Code', friendly);
+      return;
+    }
+
+    setNewInviteCode('');
+    fetchPartners();
+    Alert.alert(
+      result?.unchanged ? 'Code Unchanged' : 'Invite Code Changed',
+      result?.unchanged
+        ? 'That is already the code.'
+        : `${partner.name}'s Contest now uses ${result?.code ?? code}.` +
+          (result?.alias_kept
+            ? `\n\n${result.alias_kept} will keep working for anyone who already has it — printed table tents and old messages are safe.`
+            : ''),
+    );
   };
 
   // Address lives at partners.public_info->'address' — the same field, and the
@@ -983,9 +1035,14 @@ export function PartnerAdminScreen() {
               autoCorrect={false}
             />
 
-            {/* Custom invite code */}
+            {/* The partner's URL slug — NOT an invite code. It is bound to
+                formSlug, writes partners.slug + brand_config.invite_slug, and
+                only accepts lowercase and hyphens, which no invite code ever
+                is. It was labelled "Invite Code for Signage" and has misled on
+                every Partner created so far. The actual invite code lives on
+                the Club Contest block below. */}
             <View style={styles.slugInputRow}>
-              <Text style={styles.slugLabel}>Invite Code for Signage</Text>
+              <Text style={styles.slugLabel}>Roster Page URL</Text>
               <TextInput
                 style={[styles.slugInput, formSlugError ? {borderColor: colors.error} : null]}
                 placeholder={formName.trim() ? slugify(formName.trim()).toUpperCase() : 'AUTO'}
@@ -1319,6 +1376,53 @@ export function PartnerAdminScreen() {
                               </Text>
                               .
                             </Text>
+
+                            {/* Change the invite code. v1.2 shipped
+                                set_pool_invite_code and the alias retirement
+                                behind it, but wired a code field only at
+                                CREATION — so for an existing Contest there was
+                                no way to reach any of it. A working producer
+                                with no consumer. This is the consumer. */}
+                            <Text style={[styles.colorsHeading, {marginTop: spacing.md}]}>Change Invite Code</Text>
+                            <Text style={styles.colorsDerivedNote}>
+                              6–12 letters or numbers. Locked once players join —
+                              it may already be printed on something. The old code
+                              keeps working forever either way.
+                            </Text>
+                            <TextInput
+                              style={{
+                                borderWidth: 1,
+                                borderColor: colors.border,
+                                borderRadius: borderRadius.md,
+                                paddingHorizontal: spacing.md,
+                                paddingVertical: spacing.sm,
+                                color: colors.textPrimary,
+                                marginTop: spacing.sm,
+                              }}
+                              value={newInviteCode}
+                              onChangeText={t => setNewInviteCode(normalizeRosterPass(t))}
+                              placeholder={existing.invite_code ?? 'NEWCODE'}
+                              placeholderTextColor={colors.textSecondary}
+                              autoCapitalize="characters"
+                              autoCorrect={false}
+                              maxLength={12}
+                            />
+                            <TouchableOpacity
+                              style={[
+                                styles.createButton,
+                                {marginTop: spacing.sm},
+                                (savingInviteCode || !newInviteCode.trim()) && styles.buttonDisabled,
+                              ]}
+                              onPress={() => handleChangeInviteCode(partner, existing.id)}
+                              disabled={savingInviteCode || !newInviteCode.trim()}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Change invite code for ${partner.name}'s Club Contest`}>
+                              {savingInviteCode ? (
+                                <ActivityIndicator size="small" color={colors.onPrimary} />
+                              ) : (
+                                <Text style={styles.createButtonText}>Change Code</Text>
+                              )}
+                            </TouchableOpacity>
 
                             {/* Gaffer — runs this Club Contest. A pool-level
                                 seat, separate from the board: the Gaffer need

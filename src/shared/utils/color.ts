@@ -61,6 +61,32 @@ export function wcagContrast(fg: string | null | undefined, bg: string | null | 
   return (hi + 0.05) / (lo + 0.05);
 }
 
+/**
+ * Flatten a translucent color over an opaque one into the hex a viewer
+ * actually sees. Needed because contrast math takes two opaque colors, but
+ * several surfaces here are a brand tint laid over the page — asking "is this
+ * text readable" against the PAGE when it is rendered on the TINT is how the
+ * clubhouse ended up lifting colors for a background nothing sat on.
+ */
+export function compositeOver(
+  fg: string | null | undefined,
+  bg: string,
+  alpha: number,
+): string {
+  if (!fg) return bg;
+  const f = fg.replace('#', '');
+  const b = bg.replace('#', '');
+  if (f.length !== 6 || b.length !== 6) return bg;
+  const mix = (i: number) => {
+    const fv = parseInt(f.substring(i, i + 2), 16);
+    const bv = parseInt(b.substring(i, i + 2), 16);
+    return Math.round(fv * alpha + bv * (1 - alpha))
+      .toString(16)
+      .padStart(2, '0');
+  };
+  return `#${mix(0)}${mix(2)}${mix(4)}`;
+}
+
 /** sRGB hex → HSL. Returns null for a malformed hex. */
 function hexToHsl(hex: string): {h: number; s: number; l: number} | null {
   const c = hex.replace('#', '');

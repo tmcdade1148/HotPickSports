@@ -215,6 +215,42 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
   poolsByCompetition: {},
   isLoadingPools: false,
 
+  // Open a Contest that may live in a DIFFERENT competition than the one
+  // currently selected. Extracted verbatim from joinPoolByInvite, which has
+  // run this exact sequence in production since the preseason-by-code flow
+  // shipped — it is the app's one proven answer to "switch competition, then
+  // land on this pool", and the ordering is the whole trick:
+  //
+  //   1. Persist the pool for the TARGET competition FIRST. setActiveSport's
+  //      cross-competition branch clears activePoolId and calls
+  //      loadPersistedPoolId(target); if the write has not landed, that
+  //      restores the competition's PREVIOUS pool and the caller ends up on
+  //      the wrong Ladder. Awaited here — joinPoolByInvite fired it without
+  //      awaiting and relied on the write beating the read.
+  //   2. Switch the sport only when the competition actually differs.
+  //   3. Set activePoolId for immediate feedback (the restore in step 1
+  //      converges on the same id).
+  //   4. Refetch for the target competition so userPools/visiblePools match.
+  //
+  // Returns false when the competition has no registry event — a caller
+  // cannot land there, and silently doing nothing would look like a dead tap.
+  openPoolInCompetition: async (poolId, competition) => {
+    await AsyncStorage.setItem(poolStorageKey(competition), poolId).catch(() => {});
+
+    const current = get().activeSport;
+    if (current?.competition !== competition) {
+      const event = getEventByCompetition(competition);
+      if (!event) return false;
+      get().setActiveSport(event);
+    }
+
+    set({activePoolId: poolId});
+
+    const uid = get().user?.id;
+    if (uid) await get().fetchUserPools(uid, competition);
+    return true;
+  },
+
   setActivePoolId: poolId => {
     // Update brand config from the selected pool
     const pool = poolId
@@ -530,28 +566,18 @@ export const useGlobalStore = create<GlobalState>((set, get) => ({
     const typedPool = data.pool as DbPool;
     const competition = typedPool.competition;
 
-    // Persist the selection first so the active-sport switch below (which
-    // restores the persisted pool for the target competition) reads this value.
-    AsyncStorage.setItem(poolStorageKey(competition), typedPool.id);
-
-    // The Contest list is scoped to one active competition at a time. If the
-    // joined Contest belongs to a different competition than the one currently
-    // active, switch the active sport to it — otherwise the new Contest won't
-    // appear in the list and a reopen would default back to the old
-    // competition, hiding it permanently.
-    const current = get().activeSport;
-    if (current?.competition !== competition) {
-      const event = getEventByCompetition(competition);
-      if (event) {
-        get().setActiveSport(event);
-      }
-    }
-
-    // Set active pool immediately for instant UI feedback
-    set({activePoolId: typedPool.id});
-
-    // Re-fetch pools from DB — picks up invite_code_used, manualGlobalJoins, etc.
-    await get().fetchUserPools(userId, competition);
+    // Persist, switch competition if the joined Contest is in another one, set
+    // it active, refetch. This sequence used to live here inline; it now lives
+    // in openPoolInCompetition so the clubhouse's "View Contest" runs the
+    // identical path rather than a second copy that can drift. Behaviour is
+    // unchanged, except the AsyncStorage write is now awaited before the sport
+    // switch reads it instead of racing it.
+    //
+    // Why the switch matters here: the Contest list is scoped to one active
+    // competition at a time, so without it the newly joined Contest wouldn't
+    // appear, and a reopen would default back to the old competition, hiding
+    // it permanently.
+    await get().openPoolInCompetition(typedPool.id, competition);
 
     // A completed join is the other way a connection appears — this is how the
     // switcher's second entry shows up after entering the preseason by code.
