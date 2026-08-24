@@ -93,6 +93,21 @@ export interface ThemeColors {
   hotpickMiss: string;      // HISTORY bar, is_hotpick_correct === false
   onPrimary: string;        // Foreground on `primary` surface (flame CTA)
 
+  // Scrim — a dark wash laid over partner-supplied PHOTOGRAPHY (the Club
+  // roster header's banner) so text stays legible on top of it. Identical in
+  // light and dark mode on purpose, and that is the point rather than an
+  // oversight: the image underneath is the same picture either way, and the
+  // Club's brand colour is not involved at all. Fixed strength, never tuned to
+  // one Partner's upload — the next Partner's photo has to work too.
+  //
+  // Deliberately NOT onPrimary, even though both are white today. onPrimary
+  // means "foreground on the flame CTA"; if it ever moved for a lighter CTA,
+  // scrim text would silently follow it onto an unreadable value.
+  scrim: string;            // Base wash over the whole banner
+  scrimStrong: string;      // Extra weight where text sits
+  onScrim: string;          // Text and icons on the scrim
+  onScrimShadow: string;    // Soft shadow that keeps them legible on a busy photo
+
   // Semantic colors (always HotPick — never overridden by partners)
   success: string;
   warning: string;

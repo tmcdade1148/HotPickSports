@@ -91,6 +91,13 @@ export function PartnerRosterScreen() {
   const [partner, setPartner]      = useState<PartnerRow | null>(null);
   const [broadcasts, setBroadcasts] = useState<BroadcastRow[]>([]);
   const [loading, setLoading]      = useState(true);
+  // Declared HERE, with the other hooks, and not down beside the banner
+  // derivations where it reads more naturally: this screen early-returns three
+  // times (loading, denial, tombstone) before that point, so a hook below them
+  // runs on some renders and not others. React tracks hooks by call order, so
+  // that is a runtime throw, not a lint preference. The plain derivations
+  // (bannerMap / bannerUrl / onBanner) stay put — they are not hooks.
+  const [bannerFailed, setBannerFailed] = useState(false);
 
   // Aligned pools the user actually belongs to with this partner.
   // A pool connects to a Club via ANY of three paths (must match the
@@ -289,10 +296,21 @@ export function PartnerRosterScreen() {
     typeof bannerMap.full === 'string' && bannerMap.full.length > 0
       ? bannerMap.full
       : null;
-  const [bannerFailed, setBannerFailed] = useState(false);
   // Drives every over-the-photo treatment. False whenever there is no banner
   // OR the load failed, which is also what makes the fallback path total.
+  // (`bannerFailed` itself is declared with the hooks at the top — see there.)
   const onBanner = Boolean(bannerUrl) && !bannerFailed;
+
+  // One definition of "text on the scrim", not the same four properties
+  // repeated at the title, the address and the hours. Colours come from theme
+  // tokens (Hard Rule #9) — the scrim set is mode-independent by design, but
+  // it is still the theme's to define, not this screen's.
+  const onScrimText = {
+    color: colors.onScrim,
+    textShadowColor: colors.onScrimShadow,
+    textShadowOffset: {width: 0, height: 1},
+    textShadowRadius: 3,
+  } as const;
 
   const hours = partner.public_info?.hours?.trim() || null;
   const address = partner.public_info?.address?.trim() || null;
@@ -382,8 +400,8 @@ export function PartnerRosterScreen() {
         <View
           style={[
             styles.brandHeader,
-            bannerUrl && !bannerFailed
-              ? {backgroundColor: colors.surface, borderColor: colors.border, overflow: 'hidden'}
+            onBanner
+              ? {backgroundColor: colors.surface, borderColor: colors.border}
               : {backgroundColor: hexToRgba(partnerPrimary, partnerTintStrong), borderColor: colors.border},
           ]}>
           {bannerUrl && !bannerFailed && (
@@ -395,8 +413,8 @@ export function PartnerRosterScreen() {
                 onError={() => setBannerFailed(true)}
                 accessible={false}
               />
-              <View style={[StyleSheet.absoluteFill, styles.scrimBase]} />
-              <View style={styles.scrimBottom} />
+              <View style={[StyleSheet.absoluteFill, {backgroundColor: colors.scrim}]} />
+              <View style={[styles.scrimBottom, {backgroundColor: colors.scrimStrong}]} />
             </>
           )}
           {logoUrl ? (
@@ -413,7 +431,7 @@ export function PartnerRosterScreen() {
               displayType.display,
               styles.brandName,
               onBanner
-                ? {color: '#FFFFFF', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: {width: 0, height: 1}, textShadowRadius: 3}
+                ? onScrimText
                 : {color: colors.textPrimary},
             ]}>
             {partner.name.toUpperCase()}'S LEAGUE ROSTER
@@ -434,15 +452,13 @@ export function PartnerRosterScreen() {
                       which was the least legible thing on the page in both
                       modes precisely because it was lifted for the wrong
                       surface. */}
-                  <MapPin size={13} color={onBanner ? '#FFFFFF' : colors.textSecondary} />
+                  <MapPin size={13} color={onBanner ? colors.onScrim : colors.textSecondary} />
                   <Text
                     style={[
                       bodyType.regular,
                       styles.brandInfoText,
                       styles.brandAddressLink,
-                      onBanner
-                        ? {color: '#FFFFFF', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: {width: 0, height: 1}, textShadowRadius: 3}
-                        : {color: colors.textSecondary},
+                      onBanner ? onScrimText : {color: colors.textSecondary},
                     ]}>
                     {address}
                   </Text>
@@ -454,7 +470,7 @@ export function PartnerRosterScreen() {
                     bodyType.regular,
                     styles.brandInfoText,
                     onBanner
-                      ? {color: '#FFFFFF', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: {width: 0, height: 1}, textShadowRadius: 3}
+                      ? onScrimText
                       : {color: colors.textSecondary},
                   ]}>
                   {hours}
@@ -732,20 +748,22 @@ const styles = StyleSheet.create({
     marginHorizontal:  spacing.lg,
     alignItems:        'center',
     gap:               spacing.md,
+    // Clips the banner image to the rounded corners. Harmless without one —
+    // nothing else in this header overflows.
+    overflow:          'hidden',
   },
   // Fixed-strength scrim, never tuned to one Partner's photo. Two flat bands
   // instead of a gradient component: react-native-linear-gradient is a
   // dependency but has never rendered anywhere in this app, and this ships as
-  // an OTA. A base wash keeps the whole band readable; the bottom band carries
-  // the extra weight where the address sits.
-  scrimBase: {backgroundColor: 'rgba(0,0,0,0.55)'},
+  // an OTA. A base wash keeps the whole band readable; this bottom band carries
+  // the extra weight where text sits. Geometry only — both colours come from
+  // theme tokens at the call site (colors.scrim / colors.scrimStrong).
   scrimBottom: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
     height: '55%',
-    backgroundColor: 'rgba(0,0,0,0.28)',
   },
   brandLogo: {
     width:         72,

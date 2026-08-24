@@ -75,6 +75,11 @@ export function useTheme(): {colors: ThemeColors; isDark: boolean} {
       hotpickMiss: extended.hotpick_miss,
       /** Foreground color for content sitting on `primary` (flame CTA). */
       onPrimary: '#FFFFFF',
+      /** Scrim over partner photography — same in both modes by design. */
+      scrim: 'rgba(0, 0, 0, 0.55)',
+      scrimStrong: 'rgba(0, 0, 0, 0.28)',
+      onScrim: '#FFFFFF',
+      onScrimShadow: 'rgba(0, 0, 0, 0.6)',
       ...semantic,
     },
   };
