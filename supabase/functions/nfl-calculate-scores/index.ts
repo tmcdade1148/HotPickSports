@@ -186,8 +186,41 @@ async function scoreWeek(competition: string, seasonYear: number, week: number) 
         userPools.set(m.user_id, list);
       }
 
-      // Post one message per user per pool
-      const msgs: Promise<any>[] = [];
+      // ONE message per (Contest, game, outcome) — not one per player.
+      //
+      // 2026-08-21 05:22:00 UTC: seven rows landed in smack_messages inside a
+      // 40ms window, same Contest, same game, same outcome, same point value,
+      // seven near-identical sentences. Automated volume scaled with roster
+      // size; now it scales with game count. A 16-game week tops out at 32
+      // auto-posts per Contest whether it has 20 members or 2,000.
+      //
+      // KEY: pool + game + outcome. The picked team is deliberately NOT in the
+      // key: an NFL game has exactly two sides, so within one game the outcome
+      // DETERMINES the team — everyone who hit picked the winner, everyone who
+      // missed picked the loser. The one case that could mix teams under a
+      // shared outcome is a tie, and a tie leaves winner_team NULL, which the
+      // guard below already skips.
+      //
+      // That reasoning is sound TODAY. It is also the kind of thing a future
+      // scoring change could quietly falsify — a push rule, a forfeit, a
+      // partial credit — and the failure would be a message confidently naming
+      // the wrong team. So each entry carries its OWN team and the emit step
+      // checks them; see the mismatch guard below. The guard should never fire.
+      //
+      // `rank` comes from the GAME (frozen_rank ?? rank), not from the first
+      // user's aggregate. One value per game by construction, so "+N each"
+      // cannot be true for one name in the bucket and false for another.
+      type HotPickEntry = { name: string; team: string };
+      type HotPickBucket = {
+        poolId: string;
+        rank: number;
+        hit: boolean;
+        entries: HotPickEntry[];
+      };
+      const buckets = new Map<string, HotPickBucket>();
+
+      // Same picks, same order, same guards, in the same sequence as before —
+      // only the destination changed, from an immediate post to a bucket.
       for (const pick of hotPickPicks) {
         if (!newlyResolved.has(pick.user_id)) continue; // already announced on an earlier run
         if (superAdminIds.has(pick.user_id)) continue; // hidden super-admin
@@ -198,17 +231,58 @@ async function scoreWeek(competition: string, seasonYear: number, week: number) 
 
         const name = nameMap.get(pick.user_id) ?? "Someone";
         const team = pick.picked_team;
-        const rank = agg.hotpick_rank ?? game.effectiveRank;
+        const rank = game.effectiveRank;
         const hit = agg.is_hotpick_correct;
-        const text = hit
-          ? `${name}'s HotPick on ${team} hit ✅ — +${rank} pts`
-          : `${name}'s HotPick on ${team} missed ❌ — −${rank} pts`;
 
+        // A player in three Contests contributes their name to three separate
+        // buckets and appears in three messages. Membership is many-to-many.
         for (const poolId of userPools.get(pick.user_id) ?? []) {
-          msgs.push(supabase.rpc("post_system_message", {
-            p_pool_id: poolId, p_text: text, p_message_type: "score_update"
-          }));
+          const key = `${poolId}|${pick.game_id}|${hit ? "hit" : "miss"}`;
+          const bucket = buckets.get(key);
+          // Insertion order IS the name order. Not sorted.
+          if (bucket) bucket.entries.push({ name, team });
+          else buckets.set(key, { poolId, rank, hit, entries: [{ name, team }] });
         }
+      }
+
+      const msgs: Promise<any>[] = [];
+      const post = (poolId: string, text: string) =>
+        msgs.push(supabase.rpc("post_system_message", {
+          p_pool_id: poolId, p_text: text, p_message_type: "score_update"
+        }));
+
+      // The singular sentence, character for character. The minus in the miss
+      // line is U+2212 MINUS SIGN and the dash is U+2014 EM DASH — both carried
+      // over from the lines this replaced, not retyped, so a grouped and an
+      // ungrouped message render identically.
+      const singular = (e: HotPickEntry, hit: boolean, rank: number) =>
+        hit
+          ? `${e.name}'s HotPick on ${e.team} hit ✅ — +${rank} pts`
+          : `${e.name}'s HotPick on ${e.team} missed ❌ — −${rank} pts`;
+
+      for (const b of buckets.values()) {
+        const n = b.entries.length;
+        const teams = new Set(b.entries.map((e) => e.team));
+
+        // One grouped sentence can name only ONE team, so it may only be used
+        // when the bucket agrees on one. If it ever does not — a scoring change
+        // that lets both sides lose, something unforeseen — fall through to a
+        // singular message per player rather than publish a sentence that names
+        // the wrong team for somebody. Correct, just not collapsed.
+        if (n === 1 || teams.size > 1) {
+          for (const e of b.entries) post(b.poolId, singular(e, b.hit, b.rank));
+          continue;
+        }
+
+        const team = b.entries[0].team;
+        const shown = b.entries.slice(0, 3).map((e) => e.name).join(", ");
+        const more = n > 3 ? `, +${n - 3} more` : "";
+        post(
+          b.poolId,
+          b.hit
+            ? `${n} HotPicks on ${team} hit ✅ +${b.rank} each — ${shown}${more}`
+            : `${n} HotPicks on ${team} missed ❌ −${b.rank} each — ${shown}${more}`,
+        );
       }
       await Promise.allSettled(msgs);
     }
