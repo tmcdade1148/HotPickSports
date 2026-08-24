@@ -317,14 +317,68 @@ export async function registerForPushNotifications(
 
   // Get the Expo push token
   try {
+    // DEVICE identity, resolved BEFORE the token so it is in hand either way.
+    // `platform`/Platform.OS cannot tell a Mac from an iPhone: an iOS app
+    // running on Apple Silicon reports 'ios' and Device.isDevice true on both,
+    // and user_devices.device_name is null on every row — which is precisely
+    // why two tokens on one account were indistinguishable all of 2026-08-24
+    // and each of us guessed a different one for the phone.
+    const deviceLabel = {
+      modelName: Device.modelName ?? null,       // 'iPhone 15 Pro' vs 'MacBook Pro'
+      osName: Device.osName ?? null,             // 'iOS' vs 'macOS' / 'iPadOS'
+      osVersion: Device.osVersion ?? null,
+      deviceType: Device.deviceType ?? null,     // PHONE | TABLET | DESKTOP
+      isDevice: Device.isDevice,
+    };
+
+    // The RAW APNs/FCM device token, logged alongside the Expo one.
+    //
+    // This is the diagnostic that settles the open question, because it cannot
+    // be confused between devices: the native token is issued by APNs to THIS
+    // installation on THIS device. If two Expo tokens on one account map to
+    // one native token, the Expo layer is handing back a stale mapping; if the
+    // phone reports a native token whose Expo token never reaches
+    // user_devices, the break is in this function; if it reports none at all,
+    // the break is below us in APNs registration.
+    //
+    // Never inferred from the absence of a row: register_device_token is
+    // ON CONFLICT (push_token) DO UPDATE, so a device that gets an EXISTING
+    // token back updates a row instead of inserting one and adds no new row at
+    // all. "No new row" and "did not register" are different claims.
+    let nativeToken: string | null = null;
+    let nativeTokenError: string | null = null;
+    try {
+      const native = await Notifications.getDevicePushTokenAsync();
+      nativeToken = typeof native?.data === 'string' ? native.data : JSON.stringify(native?.data);
+    } catch (nativeErr) {
+      nativeTokenError = nativeErr instanceof Error ? nativeErr.message : 'unknown';
+    }
+
     const tokenData = await Notifications.getExpoPushTokenAsync({
       projectId: 'a541257f-7510-4192-ba2f-56996e189b9d', // from app.json
     });
     const token = tokenData.data;
     console.log('[Push] Token:', token);
 
+    // TEMPORARY diagnostic (register item: "does an iPhone on the current
+    // build ever obtain a working token?", 2026-08-24). One launch per
+    // physical device answers it outright, with no inference from absence.
+    // Remove once the question is closed — and when removing it, record in the
+    // commit that its absence then proves nothing, which is the trap that cost
+    // an afternoon when the earlier entry traces were removed in f550652.
+    logError('push-trace: token resolved', {
+      screen: 'pushNotifications',
+      action: 'token-resolved',
+      userId,
+      os: Platform.OS,
+      expoToken: token,
+      nativeToken,
+      nativeTokenError,
+      ...deviceLabel,
+    });
+
     // Register the token (via a SECURITY DEFINER RPC) — safe every app launch.
-    await upsertDeviceToken(token);
+    await upsertDeviceToken(token, deviceLabel.modelName);
 
     // Latch AFTER the write succeeds, so ensurePushRegistered keeps retrying
     // until one attempt actually lands. A launch-time registration therefore
@@ -366,10 +420,18 @@ export async function registerForPushNotifications(
  * TRANSPORT, not the OS; the table CHECK allows only 'expo' | 'apns' | 'fcm', and
  * we always fetch an Expo token here.)
  */
-async function upsertDeviceToken(token: string): Promise<void> {
+async function upsertDeviceToken(
+  token: string,
+  deviceName?: string | null,
+): Promise<void> {
   const {error} = await supabase.rpc('register_device_token', {
     p_push_token: token,
     p_platform: 'expo',
+    // Device.modelName — the only field that separates an iPhone from an iOS
+    // app running on Apple Silicon. `platform` is the token TRANSPORT and is
+    // always 'expo'; Platform.OS reads 'ios' on both. Server-side COALESCE
+    // means a null here never erases a label already written.
+    p_device_name: deviceName ?? null,
   });
 
   if (error) {
