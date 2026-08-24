@@ -37,6 +37,46 @@ export type PushPermissionStatus = 'granted' | 'denied' | 'undetermined';
 let lastReportedStatus: PushPermissionStatus | null = null;
 
 /**
+ * Whether registration has already SUCCEEDED in this app session.
+ *
+ * MODULE-SCOPED, for the same reason as lastReportedStatus above: it must
+ * outlive any one component. The recovery path in NotificationPreferences
+ * previously tracked "have we registered" in a useRef, which a remount reset
+ * to null — and the guard it fed (`prev !== null`) then failed on precisely
+ * the denied → granted transition it existed to catch. A module flag cannot
+ * be reset by a remount and still dies on cold start, which is the correct
+ * lifetime: one successful registration per launch.
+ *
+ * Only set on SUCCESS, so a failed attempt never suppresses the retry.
+ */
+let registeredThisSession = false;
+
+/** True once registration has completed successfully in this session. */
+export function hasRegisteredThisSession(): boolean {
+  return registeredThisSession;
+}
+
+/**
+ * Register only if this session has not already succeeded.
+ *
+ * This is the call the permission-recovery path wants: it can fire on every
+ * observation of 'granted' without adding a network call per screen open,
+ * which is what the old transition-detection guard was trying to buy — and it
+ * buys it without needing to detect a transition at all.
+ *
+ * `userId` is OPTIONAL and used only for log context. The write itself goes
+ * through register_device_token, which derives auth.uid() SERVER-side, so a
+ * null userId in the store is no reason to skip registering. The old guard's
+ * `&& userId` gated the call on a value the write never needed.
+ */
+export async function ensurePushRegistered(
+  userId?: string | null,
+): Promise<string | null> {
+  if (registeredThisSession) return null;
+  return registerForPushNotifications(userId ?? undefined);
+}
+
+/**
  * Narrow Expo's permission status to the three values the CHECK constraint
  * allows, or null if it is anything else.
  *
@@ -172,7 +212,18 @@ async function ensureModules(): Promise<boolean> {
  * or running on simulator (no push tokens on simulator).
  */
 export async function registerForPushNotifications(
-  userId: string,
+  userId?: string,
+  options?: {
+    /**
+     * Show the OS permission prompt when permission is not yet granted.
+     * Defaults to true — the sign-in and onboarding call sites want the ask.
+     *
+     * Pass false for a launch-time token REFRESH: it re-registers a device
+     * that already granted permission and never surprises anyone with a cold
+     * prompt, so it is safe to run before onboarding has had its say.
+     */
+    promptIfNeeded?: boolean;
+  },
 ): Promise<string | null> {
   // The unconditional ENTRY trace that lived here was removed on 2026-08-20
   // once it had done its job: it proved registration DOES run on a
@@ -217,6 +268,15 @@ export async function registerForPushNotifications(
 
   // Request if not already granted
   if (existingStatus !== 'granted') {
+    if (options?.promptIfNeeded === false) {
+      // Deliberate quiet exit, not an abnormal path — so it records the
+      // status but does NOT write a push-trace row. This branch runs on every
+      // launch for every not-yet-granted user; tracing it would bury the real
+      // abnormal-path traces in steady-state noise.
+      const observed = normalizePermissionStatus(existingStatus);
+      if (observed) void recordPushPermission(observed);
+      return null;
+    }
     console.log('[Push] requesting OS permission (existing status:', existingStatus, ')');
     const {status} = await Notifications.requestPermissionsAsync();
     finalStatus = status;
@@ -265,6 +325,12 @@ export async function registerForPushNotifications(
 
     // Register the token (via a SECURITY DEFINER RPC) — safe every app launch.
     await upsertDeviceToken(token);
+
+    // Latch AFTER the write succeeds, so ensurePushRegistered keeps retrying
+    // until one attempt actually lands. A launch-time registration therefore
+    // satisfies the latch and the recovery path stays quiet; if launch-time
+    // registration never succeeded, the recovery path is free to run.
+    registeredThisSession = true;
 
     return token;
   } catch (err) {

@@ -1,4 +1,4 @@
-import React, {useEffect, useRef, useState, useCallback} from 'react';
+import React, {useEffect, useState, useCallback} from 'react';
 import {Text} from '@shared/components/AppText';
 import {
   View,
@@ -20,7 +20,7 @@ import {spacing, borderRadius} from '@shared/theme';
 import {useTheme, useBrand} from '@shell/theme';
 import {
   getPushPermissionStatus,
-  registerForPushNotifications,
+  ensurePushRegistered,
   type PushPermissionStatus,
 } from '@shell/services/pushNotifications';
 
@@ -93,10 +93,6 @@ export function NotificationPreferencesScreen() {
   const [prefs, setPrefs] = useState<PrefMap>({});
   const [loading, setLoading] = useState(true);
   const [permission, setPermission] = useState<PushPermissionStatus | null>(null);
-  // Previous observed permission, for detecting the denied → granted transition.
-  // A ref, not state: reading it inside a state updater would put a side effect
-  // in a function React is allowed to call twice.
-  const lastPermission = useRef<PushPermissionStatus | null>(null);
 
   const fetchPrefs = useCallback(async () => {
     if (!userId) return;
@@ -129,18 +125,30 @@ export function NotificationPreferencesScreen() {
   // to a user whose permission is denied is the defect this repairs.
   const refreshPermission = useCallback(async () => {
     const next = await getPushPermissionStatus();
-    const prev = lastPermission.current;
-    lastPermission.current = next;
     setPermission(next);
 
-    // Only a TRANSITION into 'granted' registers — typically the user coming
-    // back from device Settings having just enabled it, who should get a token
-    // in this session rather than waiting for the next cold start. Not on every
-    // observation: an already-granted permission is registered at sign-in and
-    // on session restore, so firing here too would add a network call every
-    // time this screen opened. prev === null is first mount, not a transition.
-    if (next === 'granted' && prev !== null && prev !== 'granted' && userId) {
-      registerForPushNotifications(userId).catch(() => {});
+    // Register on ANY observation of 'granted' — no transition detection.
+    //
+    // This used to require a denied → granted transition, tracked in a useRef
+    // (`prev !== null && prev !== 'granted'`) and additionally gated on
+    // `userId`. Both parts broke the one path this exists for — the user who
+    // turns notifications on in device Settings and comes back:
+    //
+    //   • the ref is per-MOUNT. If the screen remounts on the way back from
+    //     Settings, prev is null again and `prev !== null` fails on exactly
+    //     the transition it was written to catch. Worse, the banner still
+    //     disappears (setPermission is not gated), so the screen LOOKS like
+    //     it recovered while no token was ever fetched.
+    //   • `userId` comes from the store and can be null/stale — the same
+    //     cause already documented for the toggle-reset bug below. It was
+    //     never needed anyway: register_device_token derives auth.uid()
+    //     server-side.
+    //
+    // ensurePushRegistered is a no-op once registration has succeeded this
+    // session, which is what the transition guard was really buying (no
+    // network call per screen open) — without needing a transition at all.
+    if (next === 'granted') {
+      ensurePushRegistered(userId).catch(() => {});
     }
   }, [userId]);
 
