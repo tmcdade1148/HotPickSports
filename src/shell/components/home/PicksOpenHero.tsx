@@ -92,13 +92,28 @@ export function PicksOpenHero() {
 
     // Progress label (left). The right side is intentionally empty for now — the
     // ambient "n DAYS LEFT" is dropped; a smarter urgency line is a follow-up.
+    // A missing HotPick is called out as soon as there is a pick to tag — not
+    // only once all picks are in. This ALIGNS Home with behaviour that already
+    // ships elsewhere rather than introducing a rule: useSeasonSubmitState
+    // returns 'needs_hotpick' the moment pickCount > 0 (no all-picks gate), and
+    // the Picks screen's Submit button has read "Select your HotPick" from that
+    // point all along. Home was the one surface staying quiet until the end.
+    //
+    // The warning is actionable this early because setHotPick only requires a
+    // pick on that game — tagging with a partial slate is supported. At ZERO
+    // picks it would not be actionable, which is why picksSet > 0 gates it.
     let progressLabel: string;
     let progressLabelColor: string;
+    const needsHotPick = picksSet > 0 && !hotPickDesignated;
+
     if (allPicks && hotPickDesignated) {
       progressLabel = `✓ ALL ${picksTotal} PICKS IN`;
       progressLabelColor = colors.gameWon;
-    } else if (allPicks && !hotPickDesignated) {
-      progressLabel = `${picksTotal} OF ${picksTotal} · HOTPICK NEEDED`;
+    } else if (needsHotPick) {
+      // Math.min keeps today's clamp: allPicks is picksSet >= picksTotal, and
+      // the branch this replaces hardcoded `${picksTotal} OF ${picksTotal}`, so
+      // an extra pick can never render "17 OF 16".
+      progressLabel = `${Math.min(picksSet, picksTotal)} OF ${picksTotal} · HOTPICK NEEDED`;
       progressLabelColor = colors.primary;
     } else {
       progressLabel = `${picksSet} OF ${picksTotal} PICKS`;
