@@ -33,6 +33,7 @@ import {
 import {supabase} from '@shared/config/supabase';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {normalizeRosterPass} from '@shared/utils/format';
+import {buildInviteMessage} from '@shared/utils/invite';
 import {LEXICON, roleLabel} from '@shared/lexicon';
 import {BroadcastComposer} from '@shell/components/BroadcastComposer';
 import {DelegateManager} from '@shell/components/DelegateManager';
@@ -524,21 +525,11 @@ export function PoolSettingsScreen() {
     Alert.alert('Copied', `${code} copied to clipboard.`);
   };
 
-  const buildShareText = (code: string) => {
-    // Universal link (https) linkifies in Messages and opens the app when
-    // installed; the bare code on its own line is an easy-to-copy fallback.
-    const inviteUrl = `https://hotpick.app/join/${code}`;
-    return (
-      `Hey, I'd love for you to join my HotPick football pool "${pool!.name}"! ` +
-      `Pick games 🏈, talk smack, and settle who's got bragging rights.\n\n` +
-      `Tap to join 👉 ${inviteUrl}\n\n` +
-      `Invite code:\n${code}`
-    );
-  };
-
   // Open an editable preview so the Gaffer can tweak the invite before sending.
+  // The starting text is the shared invite voice (@shared/utils/invite) — the
+  // same builder the Home recruiter band uses, so the two are byte-identical.
   const handleShareAnyCode = (code: string) => {
-    setShareEdit({code, text: buildShareText(code)});
+    setShareEdit({code, text: buildInviteMessage(pool!, code)});
   };
 
   const submitShare = async () => {

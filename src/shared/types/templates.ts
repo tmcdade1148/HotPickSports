@@ -54,6 +54,16 @@ export interface BaseEventConfig {
   sport: string; // 'soccer', 'football', 'hockey'
   name: string; // 'FIFA World Cup 2026'
   shortName: string; // 'World Cup'
+  /** How this competition introduces itself to someone who has NEVER opened
+   *  the app — used in the invite share text. shortName is tuned for the
+   *  in-app header chip ('NFL26'), which reads as gibberish in a text
+   *  message. Optional: omit when shortName already reads naturally to an
+   *  outsider (e.g. 'NHL Playoffs'). */
+  inviteName?: string;
+  /** Emoji for the invite share text. Sport-specific, same as inviteName —
+   *  a football on an NHL invite is the bug this field prevents.
+   *  Optional: omit and the phrase renders cleanly without one. */
+  inviteEmoji?: string;
   status: 'upcoming' | 'active' | 'completed';
   startDate: string; // ISO 8601
   endDate: string;

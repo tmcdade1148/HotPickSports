@@ -16,6 +16,12 @@ export const nflSeason: SeasonConfig = {
   sport: 'football',
   name: 'NFL 2026-27 Season',
   shortName: 'NFL26',
+  // Invite-share identity. shortName ('NFL26') is the header chip and reads
+  // as gibberish to someone who has never opened the app. Inherited by every
+  // config below that spreads nflSeason (preseason + the sims), which is
+  // correct — they are all NFL.
+  inviteName: 'NFL',
+  inviteEmoji: '🏈',
   status: 'active',
   startDate: '2026-09-09',
   endDate: '2027-02-08',

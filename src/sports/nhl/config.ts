@@ -6,6 +6,8 @@ export const nhlPlayoffs2027: SeriesConfig = {
   sport: 'hockey',
   name: 'NHL 2027 Playoffs',
   shortName: 'NHL Playoffs',
+  // No inviteName — shortName already reads naturally in a text message.
+  inviteEmoji: '🏒',
   status: 'upcoming',
   startDate: '2027-04-12',
   endDate: '2027-06-20',

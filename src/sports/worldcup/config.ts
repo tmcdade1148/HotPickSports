@@ -6,6 +6,8 @@ export const worldCup2026: TournamentConfig = {
   sport: 'soccer',
   name: 'FIFA World Cup 2026',
   shortName: 'World Cup',
+  // No inviteName — shortName already reads naturally in a text message.
+  inviteEmoji: '⚽',
   status: 'upcoming',
   startDate: '2026-06-11',
   endDate: '2026-07-19',
