@@ -40,6 +40,7 @@ import {supabase} from '@shared/config/supabase';
 import {PoweredByHotPick} from '@shell/components/PoweredByHotPick';
 import {formatRosterPass} from '@shared/utils/format';
 import {compositeOver, hexToRgba, readableOn} from '@shared/utils/color';
+import {ModuleSection} from '@shell/components/home/ModuleSection';
 import {LEXICON} from '@shared/lexicon';
 import {displayType, bodyType, spacing, borderRadius} from '@shared/theme';
 import type {DbPool} from '@shared/types/database';
@@ -260,29 +261,29 @@ export function PartnerRosterScreen() {
   const partnerTintAlpha = isDark ? 0.22 : 0.08;
   const partnerTintStrong = isDark ? 0.3 : 0.2;
 
-  // ONE lifted color per SURFACE. The first pass had a single `partnerText`
-  // computed against colors.background and then used on brand-tinted cards
-  // too — lifting for one surface and rendering on another, which is why the
-  // address was the least legible thing on the page in both modes.
+  // ONE lifted color per SURFACE. Lifting for one surface and rendering on
+  // another is what made the address the least legible thing on this page in
+  // both modes.
   //
   // Raw partnerPrimary still paints solid fills, stripes, borders and the
   // logo background. Those are decorative, sit against theme surfaces, and
   // shifting them would visibly alter the Club's identity.
   //
-  //   partnerText          section labels — these really do sit on the page.
-  //                        7:1, not the 4.5:1 default: small uppercase at 11pt
-  //                        reads dim at AA, and these are the page's structure.
   //   partnerTextOnTint    perk card AND Roster Pass card. Both are
   //                        hexToRgba(brand, partnerTintAlpha) over the page, so
   //                        the contrast target is that COMPOSITE, not the page.
   //   partnerTextOnSurface the "View Contest ›" CTA, which sits on
-  //                        colors.surface — a third surface again, and in dark
-  //                        mode surface is lighter than background, so a color
-  //                        lifted for the page is under-contrasted here.
+  //                        colors.surface — a different surface again, and in
+  //                        dark mode surface is lighter than background, so a
+  //                        color lifted for the page is under-contrasted here.
   //
-  // The address is absent on purpose: it now renders white on the header
-  // scrim, so no lifted brand color is involved at all.
-  const partnerText = readableOn(partnerPrimary, colors.background, 7);
+  // There is deliberately NO on-the-page variant any more. It existed for the
+  // three section labels; those are now ModuleSection, which is grey, so it
+  // had zero consumers left. Its 7:1 tuning went with it rather than sitting
+  // here looking like it still governs something.
+  //
+  // The address is absent for a different reason: it renders white on the
+  // header scrim, so no lifted brand color is involved at all.
   const partnerTextOnTint = readableOn(
     partnerPrimary,
     compositeOver(partnerPrimary, colors.background, partnerTintAlpha),
@@ -348,7 +349,26 @@ export function PartnerRosterScreen() {
       );
       return;
     }
-    navigation.navigate('LeaderboardTab');
+    // NOT navigate('LeaderboardTab'). That works from PoolModule,
+    // RegularCompleteHero and SuperBowlIntroHero because all three render
+    // INSIDE the tab navigator. This screen does not: RootNavigator mounts the
+    // whole MainTabNavigator as one stack screen named "Home"
+    // (RootNavigator.tsx:244) and pushes PartnerRoster on top of it as a
+    // sibling (:255). From up here 'LeaderboardTab' is not a route on this
+    // navigator, so the tab switched underneath while the clubhouse stayed on
+    // screen — the "doesn't take me anywhere" symptom.
+    //
+    // navigate('Home', {screen}) is React Navigation's nested-navigator form:
+    // it targets the tab navigator by its stack route name and passes the tab
+    // through. Because "Home" sits BELOW this screen in the stack, navigating
+    // to it also pops the clubhouse — one call does the dismiss and the tab.
+    //
+    // 'Home' is already proven to resolve from this exact screen: the two
+    // DenialState buttons below call navigate('Home') today. Neither of the
+    // spec's candidates would have worked — getParent() reaches the container
+    // above the root stack, not the tab navigator (which is this stack's
+    // CHILD), and goBack() leaves 'LeaderboardTab' just as unresolvable.
+    navigation.navigate('Home', {screen: 'LeaderboardTab'});
   };
 
   // Editable in League Tools; falls back to the platform default.
@@ -540,10 +560,19 @@ export function PartnerRosterScreen() {
 
         {/* Broadcast feed — rows use a left accent stripe in partner color
             so the messages read as coming from the partner, not HotPick. */}
-        <View style={styles.section}>
-          <Text style={[bodyType.bold, styles.sectionLabel, {color: partnerText}]}>
-            FROM {partner.name.toUpperCase()}
-          </Text>
+        {/* ModuleSection, the same component Home uses for CONTESTS and
+            LEAGUES — not a lookalike. Its label is sectionHeaderType * 2 (22px)
+            against the 11px this screen hand-rolled, which is the difference
+            Tom actually noticed. Grey (its textTertiary), no colour prop: page
+            STRUCTURE is HotPick's, and this component is shared across Home.
+            The Club keeps its colour inside its own card — the CLUB PERK
+            eyebrow below is untouched.
+
+            Note it renders NOTHING without children, so each section's content
+            has to sit INSIDE it rather than beside it, and its own horizontal
+            padding replaces styles.section's. */}
+        <ModuleSection label={`FROM ${partner.name.toUpperCase()}`}>
+          <View style={styles.sectionBody}>
           {broadcasts.length > 0 ? (
             broadcasts.map(b => (
               <View
@@ -568,14 +597,13 @@ export function PartnerRosterScreen() {
               Nothing new right now.
             </Text>
           )}
-        </View>
+          </View>
+        </ModuleSection>
 
         {/* Aligned pools — flat list, never ranked. Left accent stripe
             in partner color ties pool rows to the partner brand. */}
-        <View style={styles.section}>
-          <Text style={[bodyType.bold, styles.sectionLabel, {color: partnerText}]}>
-            ON THIS ROSTER
-          </Text>
+        <ModuleSection label="ON THIS ROSTER">
+          <View style={styles.sectionBody}>
           {alignedPools.map(pool => (
             <Pressable
               key={pool.id}
@@ -617,16 +645,15 @@ export function PartnerRosterScreen() {
             style={[bodyType.regular, styles.smackPlaceholder, {color: colors.textTertiary}]}>
             💬 Cross-Contest chat coming to your roster — stay tuned.
           </Text>
-        </View>
+          </View>
+        </ModuleSection>
 
         {/* Invite a Contest — surfaces the Roster Pass so any Player on this
             page can recruit an organizer to start a Contest under this League.
             Shown only while the League is active. */}
         {partner.is_active && (
-          <View style={styles.section}>
-            <Text style={[bodyType.bold, styles.sectionLabel, {color: partnerText}]}>
-              ADD YOUR CONTEST
-            </Text>
+          <ModuleSection label="ADD YOUR CONTEST">
+            <View style={styles.sectionBody}>
             <View
               style={[
                 styles.inviteCard,
@@ -673,7 +700,8 @@ export function PartnerRosterScreen() {
                 </Pressable>
               </View>
             </View>
-          </View>
+            </View>
+          </ModuleSection>
         )}
 
         <View style={styles.footer}>
@@ -829,18 +857,15 @@ const styles = StyleSheet.create({
   },
   redeemHint: {fontSize: 13, textAlign: 'center'},
 
-  section: {
-    marginTop: spacing.xl,
+  // The body under a ModuleSection label. ModuleSection pads its own label row
+  // but not its children, and it supplies the top margin — so this carries the
+  // horizontal padding and row gap that the old hand-rolled `section` did, and
+  // nothing else. `section` and `sectionLabel` are gone: the labels are
+  // ModuleSection now, which is where the 11px-vs-22px difference was.
+  sectionBody: {
     paddingHorizontal: spacing.lg,
     gap: spacing.sm,
   },
-  // Metrics match Home's eyebrows (fontSize 11, bodyType.bold, letterSpacing
-  // 2). The COLOUR deliberately does not: Home's eyebrows are neutral theme
-  // text, and these stay in the Partner's colour because this is the one screen
-  // that belongs to the Club rather than to HotPick (Tom, 2026-08-23).
-  // Neutralising them later for "consistency" would undo a decision, not fix
-  // drift.
-  sectionLabel: {fontSize: 11, letterSpacing: 2, marginBottom: 2},
   emptyLine: {fontSize: 13, fontStyle: 'italic', paddingVertical: spacing.sm},
 
   broadcastRow: {

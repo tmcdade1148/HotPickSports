@@ -904,9 +904,15 @@ const styles = StyleSheet.create({
   poolNameCol: {
     flex: 1,
   },
+  // WRAPS. Invite codes were 6 hex characters when this row was built; they are
+  // now up to 12 and memorable ("THENATURAL25"), so NFL26 · The Natural ·
+  // Gaffer · THENATURAL25 no longer fits one line and the code pill bled past
+  // the edge. The code is here to be READ and copied, so it must not truncate —
+  // it drops to a second line instead.
   poolMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: spacing.sm,
     marginTop: 2,
   },
@@ -927,6 +933,9 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.sm,
     letterSpacing: 1,
     overflow: 'hidden',
+    // Gives way before the row does, so a long code can never push itself off
+    // the edge even when it is the only thing on its line.
+    flexShrink: 1,
   },
   poolActions: {
     flexDirection: 'row',
