@@ -28,19 +28,30 @@ export function RecruiterBand() {
   const userRankByPool = useGlobalStore(s => s.userRankByPool);
   const userId         = useGlobalStore(s => s.user?.id);
 
-  // Prefer a pool the current user organizes (the Gaffer's primary
-  // share surface). Fall back to any pool they're in with an invite
-  // code so members can still tell-a-friend.
-  const ownedPool = visiblePools.find(p => p.invite_code && p.organizer_id === userId);
-  const anyPool   = visiblePools.find(p => p.invite_code);
-  const pool      = ownedPool ?? anyPool;
+  // Exactly the population this exists for: a Contest the user ORGANIZES that
+  // is still only them. Once somebody joins, the ask is done and a standing
+  // prompt turns into noise, so the band disappears on its own.
+  //
+  // visiblePools has already dropped archived, hidden and demo Contests — that
+  // is what makes it "visible" — so this adds only the two conditions it does
+  // not cover. Restating the whole real-Contest definition here would be a
+  // second copy of it, and a definition kept in several places is what produced
+  // the 77-recipient broadcast on 2026-08-25.
+  //
+  // memberCount defaults to 0 while userRankByPool is still loading, so the
+  // band stays hidden until the count is real rather than flashing an ask at
+  // someone whose Contest is already full.
+  const pool = visiblePools.find(
+    p =>
+      p.invite_code &&
+      p.organizer_id === userId &&
+      (userRankByPool[p.id]?.memberCount ?? 0) === 1,
+  );
 
-  if (!pool || !pool.invite_code) return null;
+  if (!pool?.invite_code) return null;
 
-  const code        = pool.invite_code;
-  const poolName    = pool.name_display || pool.name || 'your Contest';
-  const memberCount = userRankByPool[pool.id]?.memberCount ?? 0;
-  const isGaffer    = !!userId && pool.organizer_id === userId;
+  const code     = pool.invite_code;
+  const poolName = pool.name_display || pool.name || 'your Contest';
 
   const handleShare = async () => {
     const message = buildInviteMessage(pool, code);
@@ -51,18 +62,17 @@ export function RecruiterBand() {
     }
   };
 
-  const rosterLine =
-    memberCount > 0
-      ? `${memberCount} ${memberCount === 1 ? 'player' : 'players'} in ${poolName} · code ${code}`
-      : `${poolName} · code ${code}`;
-
+  // The non-Gaffer and multi-member variants that used to live here are gone
+  // with the branch that could reach them: the band now renders only for a
+  // Gaffer whose Contest has exactly one member, so every "if they are not the
+  // organizer" and "if the count is more than one" arm was unreachable.
   return (
     <View style={styles.wrap}>
       <Text style={[bodyType.bold, styles.eyebrow, {color: colors.textTertiary}]}>
-        {isGaffer ? 'BRING YOUR GROUP IN' : 'INVITE A FRIEND'}
+        BRING YOUR GROUP IN
       </Text>
       <Text style={[bodyType.regular, styles.roster, {color: colors.textSecondary}]}>
-        {rosterLine}
+        {`Just you in ${poolName} so far · code ${code}`}
       </Text>
       <Pressable
         onPress={handleShare}
@@ -71,13 +81,9 @@ export function RecruiterBand() {
           {backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1},
         ]}
         accessibilityRole="button"
-        accessibilityLabel={
-          isGaffer
-            ? `Share invite link to ${poolName}`
-            : `Invite a friend to ${poolName}`
-        }>
+        accessibilityLabel={`Share invite link to ${poolName}`}>
         <Text style={[bodyType.bold, styles.primaryBtnText, {color: colors.onPrimary}]}>
-          {isGaffer ? 'Share Invite Link' : 'Share to a Friend'}
+          Share Invite Link
         </Text>
       </Pressable>
     </View>

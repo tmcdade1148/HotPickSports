@@ -16,6 +16,7 @@ import {getEventByCompetition} from '@sports/registry';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 import {FoundingWall} from '@shell/paywall';
+import {ContestHandoff} from '@shell/components/ContestHandoff';
 import {organizerMoneyAcknowledgment} from '@shared/lexicon';
 
 /**
@@ -55,6 +56,10 @@ export function CreatePoolScreen({navigation}: any) {
   // reasonably assume it failed and tap again.
   const [showSeasonConfirm, setShowSeasonConfirm] = useState(false);
   const [createdPoolId, setCreatedPoolId] = useState<string | null>(null);
+  // The Handoff: the ask, in the one moment the organizer is guaranteed to be
+  // paying attention. Holds the pool and code createPool returned; null until
+  // a Contest is actually created down the normal path.
+  const [handoff, setHandoff] = useState<{pool: any; code: string} | null>(null);
 
   // A time-boxed event can redirect Contest creation to the season it leads
   // into, so a Contest started during the preseason is a regular-season
@@ -62,6 +67,16 @@ export function CreatePoolScreen({navigation}: any) {
   const targetCompetition =
     activeSport?.contestsCreateIn ?? activeSport?.competition;
   const isRedirected = Boolean(activeSport?.contestsCreateIn);
+
+  // The one way this screen closes after a successful create. The 100ms delay
+  // lets the store update + HomeScreen re-render settle: without it the
+  // JoinPoolModule unmount collides with the navigation transition in Fabric's
+  // ShadowView diffing and the app takes a SIGSEGV. It is load-bearing, not
+  // decoration — do not shorten or remove it. Previously copied at three call
+  // sites with the reason written at only one of them.
+  const dismissToHome = () => {
+    setTimeout(() => navigation.goBack(), 100);
+  };
 
   const doCreate = async () => {
     if (!user?.id || !activeSport?.competition || !targetCompetition) return;
@@ -95,10 +110,20 @@ export function CreatePoolScreen({navigation}: any) {
         setShowSeasonConfirm(true);
         return;
       }
-      // Delay navigation to let the store update + HomeScreen re-render settle.
-      // Without this, the JoinPoolModule unmount collides with the navigation
-      // transition in Fabric's ShadowView diffing, causing a SIGSEGV.
-      setTimeout(() => navigation.goBack(), 100);
+      // THE HANDOFF replaces the bare goBack here, and only here. The two
+      // branches above return before this and keep their own modals untouched:
+      // both already interrupt with something, and stacking a second modal on
+      // top is worse than skipping it. A Contest created down either path still
+      // gets the ask from RecruiterBand on Home.
+      //
+      // create_pool always generates an invite code, but if one somehow did not
+      // come back there is nothing to share, and a Handoff with an empty code is
+      // worse than the old silence — so that case falls through unchanged.
+      if (result.pool.invite_code) {
+        setHandoff({pool: result.pool, code: result.pool.invite_code});
+        return;
+      }
+      dismissToHome();
     } else if (result.upgradeRequired) {
       setError(
         'You have reached the maximum number of Contests for your plan. Upgrade to create more Contests.',
@@ -125,12 +150,12 @@ export function CreatePoolScreen({navigation}: any) {
       if (createdPoolId) setActivePoolId(createdPoolId);
     }
     setShowSeasonConfirm(false);
-    setTimeout(() => navigation.goBack(), 100);
+    dismissToHome();
   };
 
   const stayInCurrentCompetition = () => {
     setShowSeasonConfirm(false);
-    setTimeout(() => navigation.goBack(), 100);
+    dismissToHome();
   };
 
   const handleCreate = () => {
@@ -216,6 +241,18 @@ export function CreatePoolScreen({navigation}: any) {
           </TouchableOpacity>
         </View>
       </View>
+
+      {handoff && (
+        <ContestHandoff
+          visible
+          pool={handoff.pool}
+          code={handoff.code}
+          onDismiss={() => {
+            setHandoff(null);
+            dismissToHome();
+          }}
+        />
+      )}
 
       <FoundingWall
         visible={showFoundingWall}
