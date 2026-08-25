@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {Text, TextInput} from '@shared/components/AppText';
 import {
   View,
@@ -12,7 +12,8 @@ import {useGlobalStore} from '@shell/stores/globalStore';
 import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 import {normalizeRosterPass} from '@shared/utils/format';
-import {applicationPendingMessage} from '@shared/lexicon';
+import {applicationPendingMessage, houseContestPrompt} from '@shared/lexicon';
+import {supabase} from '@shared/config/supabase';
 
 /**
  * JoinPoolScreen — Enter a pool invite code (6–12 alphanumeric chars).
@@ -47,6 +48,55 @@ export function JoinPoolScreen({navigation, route}: any) {
   // PartnerDirectory's Roster Pass field uses — same character set,
   // same forgiveness for pasted dashes / whitespace / punctuation.
   const normalizeCode = normalizeRosterPass;
+
+  // THE OPEN DOOR — the house Contest code, for a download that arrives with no
+  // invite code and would otherwise land on a form it cannot fill in.
+  //
+  // Read from competition_config.global.house_contest_code, never hardcoded: it
+  // rolls to 26B/26C as cohorts fill, and an EMPTY value is the kill switch that
+  // hides this line instantly with no deploy. Null here means render nothing —
+  // no placeholder, no empty state.
+  //
+  // Also null when the user is ALREADY in that Contest. Resolved through their
+  // own memberships rather than by looking the pool up: it reads only rows the
+  // user owns, and it stays correct regardless of which competition the store
+  // happens to be scoped to.
+  const [houseCode, setHouseCode] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const {data: cfg} = await supabase
+        .from('competition_config')
+        .select('value')
+        .eq('competition', 'global')
+        .eq('key', 'house_contest_code')
+        .maybeSingle();
+
+      const code =
+        typeof cfg?.value === 'string' ? cfg.value.replace(/^"|"$/g, '').trim() : '';
+      if (!code) {
+        if (!cancelled) setHouseCode(null);
+        return;
+      }
+      if (!user?.id) {
+        if (!cancelled) setHouseCode(code);
+        return;
+      }
+
+      const {data: mine} = await supabase
+        .from('pool_members')
+        .select('pool_id, pools!inner(invite_code)')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .eq('pools.invite_code', code);
+
+      if (!cancelled) setHouseCode((mine?.length ?? 0) > 0 ? null : code);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   // Detect when the user has pasted a Roster Pass into the invite-code
   // field. Roster Passes are 8 chars formatted XXXX-XXXX. Require the
@@ -136,6 +186,23 @@ export function JoinPoolScreen({navigation, route}: any) {
             Ask the Gaffer, or anyone already in it.
           </Text>
 
+          {/* Display-only. Deliberately NOT a second join path or a checkbox —
+              it points at the input directly above it, which the user is
+              already looking at. The code is emphasised so it reads as
+              something to type rather than decoration; the sentence itself
+              lives in the lexicon and contains the code exactly once, so the
+              split is deterministic. */}
+          {houseCode !== null && (() => {
+            const [before, after] = houseContestPrompt(houseCode).split(houseCode);
+            return (
+              <Text style={styles.houseLine}>
+                {before}
+                <Text style={styles.houseCode}>{houseCode}</Text>
+                {after}
+              </Text>
+            );
+          })()}
+
           {looksLikeRosterPass && !error && (
             <View style={styles.rescueBox}>
               <Text style={styles.rescueText}>
@@ -218,6 +285,19 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: spacing.lg,
+  },
+  houseLine: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: -spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  houseCode: {
+    fontWeight: '700',
+    letterSpacing: 1,
+    color: colors.primary,
   },
   rescueBox: {
     backgroundColor: colors.surface,

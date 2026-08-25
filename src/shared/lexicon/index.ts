@@ -277,6 +277,41 @@ export function independentContestLabel(gafferDisplayName?: string | null): stri
 }
 
 /**
+ * The Open Door — house Contest prompt under the invite-code field, for a
+ * download that arrives without a code.
+ *
+ * `code` comes from the competition_config global key `house_contest_code` and
+ * is NEVER hardcoded: it rolls to 26B/26C as cohorts fill, and an empty value
+ * hides the line entirely (the kill switch). Display-only copy pointing at the
+ * input already on screen, deliberately not a second join path.
+ *   houseContestPrompt('HOTPICK26A')
+ *     → "No code yet? Use HOTPICK26A. You'll be picking against a room of
+ *        Players you haven't met yet."
+ */
+export function houseContestPrompt(code: string): string {
+  return `No code yet? Use ${code}. You'll be picking against a room of ${LEXICON.player.plural} you haven't met yet.`;
+}
+
+/**
+ * Chirps-off explainer, rendered where the composer would be in a Contest with
+ * `pools.chirps_enabled = false` (today: the open house Contest only).
+ *
+ * Written as a reason to start or join a private Contest, never as a
+ * disabled-feature notice. The feed keeps rendering above it — system messages
+ * (score updates, pick locks, week results) still land and still show, which is
+ * the whole reason the tab stays put.
+ */
+export const chirpsOffHeading =
+  `${LEXICON.chirps.plural} live in private ${LEXICON.contest.plural}`;
+
+export const chirpsOffBody =
+  `This one's open to anyone with the code, so it's ${LEXICON.picks} and ${LEXICON.ladder.long} here. ` +
+  `${LEXICON.chirps.plural} land differently when you know exactly who just called you out.`;
+
+export const chirpsOffStartCta = `Start a ${LEXICON.contest.singular}`;
+export const chirpsOffJoinCta = 'Enter a code';
+
+/**
  * Build a "X Contests" / "1 Contest" count phrase. Use when a count is
  * dynamic and the noun must pluralize correctly.
  *   countLabel('contest', 5) → "5 Contests"
