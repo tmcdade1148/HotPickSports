@@ -9,6 +9,13 @@
 // number is the one admin-broadcast returns AFTER sending. (An earlier version
 // of this comment claimed the send button showed a count. It never did.)
 //
+// That AFTER-sending number is QUEUED, not delivered, and until 2026-08-25 this
+// screen announced it as "Sent — Reached N recipients." That send reported 77;
+// 20 were actually pushed and 57 were skipped (56 with no active device, 1
+// opted out). The result alert now reports queued and push-ELIGIBLE separately
+// and says outright that neither is a delivered count — delivery is resolved by
+// process-notification-queue up to a minute later, from an Expo receipt.
+//
 // Rate limit is enforced SERVER-SIDE and the server is the SOLE gate. The
 // admin-broadcast Edge Function reads the cadence from the competition_config
 // global key `admin_broadcast_rate_limit_hours` (0 = no limit) and answers 429
@@ -146,7 +153,15 @@ function AdminBroadcastScreenImpl() {
               return;
             }
 
-            const result = data as {error?: string; recipients?: number; wait_hours?: number; next_available_at?: string};
+            const result = data as {
+              error?: string;
+              queued?: number;
+              push_eligible?: number;
+              /** Deprecated alias for `queued`; only an older deployed function still sends it. */
+              recipients?: number;
+              wait_hours?: number;
+              next_available_at?: string;
+            };
             // Fallback only — reachable if the function ever answers 200 with a
             // RATE_LIMITED body instead of 429.
             if (result?.error === 'RATE_LIMITED') {
@@ -161,7 +176,21 @@ function AdminBroadcastScreenImpl() {
               return;
             }
             setRateLimit(null);
-            Alert.alert('Sent', `Reached ${result.recipients ?? 0} recipients.`);
+            // "Sent"/"Reached N" was the queued count wearing a delivered
+            // count's clothes. The 2026-08-25 send reported 77; 20 were pushed
+            // and 57 were skipped. Say what is actually known at this moment.
+            const queued = result.queued ?? result.recipients ?? 0;
+            const eligible = result.push_eligible;
+            const plural = queued === 1 ? '' : 's';
+            Alert.alert(
+              'Broadcast queued',
+              eligible == null
+                ? `Queued for ${queued} recipient${plural}.`
+                : `Queued for ${queued} recipient${plural}.\n\n` +
+                  `${eligible} can receive a push right now. ` +
+                  `${queued - eligible} have no active device, or have broadcasts switched off.\n\n` +
+                  'Delivery is confirmed a minute or two after sending, so this is an eligibility count — not a delivered count.',
+            );
             setSubject('');
             setBody('');
           },
