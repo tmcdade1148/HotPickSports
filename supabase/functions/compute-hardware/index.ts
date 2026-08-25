@@ -32,12 +32,19 @@ async function fetchAll<T = any>(
  * compute-hardware — Award computation engine.
  *
  * Computes weekly and season-end awards, writes to user_hardware.
- * All writes use ON CONFLICT DO NOTHING — idempotent and safe to re-run.
+ *
+ * All writes use ON CONFLICT DO NOTHING. That makes re-running SAFE — it can
+ * never double-award — but it does NOT make it self-correcting: the first row
+ * written for a given (user, slug, competition, week, pool) is the one that
+ * stands forever, and a later run computed from better data is discarded
+ * without a word. Awards are append-only and effectively permanent, so the
+ * guards on WHEN each block may run are the real protection, not the re-run.
  *
  * Triggers:
  * - weekly_settle: after all games in a week reach status = complete
  * - season_settle: after is_season_complete = true
- * - manual_override: Tom triggers from admin panel
+ * - manual_override: Tom triggers from admin panel. Runs the weekly block, and
+ *   the season block ONLY when is_season_complete — see the guard below.
  */
 Deno.serve(async (req) => {
   // Auth gate (verify_jwt=false). compute-hardware is invoked two ways, so allow
@@ -84,9 +91,27 @@ Deno.serve(async (req) => {
       results.perfect = await computePerfectWeek(competition, seasonYear, targetWeek);
     }
 
+    // SEASON AWARDS NEED A COMPLETE SEASON — for EVERY trigger.
+    //
+    // This guard used to read `trigger === "season_settle" && !is_season_complete`,
+    // so manual_override walked straight past it and computed pool_champion and
+    // podium off whatever partial standings existed at the time.
+    //
+    // That is not a re-runnable mistake. user_hardware_unique_instance is
+    // UNIQUE on (user_id, hardware_slug, competition, week, pool_id) NULLS NOT
+    // DISTINCT, and every write is ON CONFLICT DO NOTHING, so the FIRST champion
+    // row wins permanently — a later, correct run is silently discarded. One
+    // stray admin tap at Week 9 crowns the Week 9 leader for the season and
+    // there is no code path that takes it back.
+    //
+    // The weekly block above has already run and written its awards, so the
+    // season slice is SKIPPED and reported rather than early-returned: an early
+    // return would answer "season_not_complete" and hide the weekly results the
+    // operator just triggered, which reads as "nothing happened".
     if (trigger === "season_settle" || trigger === "manual_override") {
-      if (trigger === "season_settle" && !cfg.is_season_complete) {
-        return json({ success: true, reason: "season_not_complete" }, 200);
+      if (!cfg.is_season_complete) {
+        results.season_awards = "skipped: season_not_complete";
+        return json({ success: true, trigger, competition, week, results }, 200);
       }
       results.champion = await computePoolChampion(competition, seasonYear);
       results.podium = await computePodium(competition, seasonYear);
