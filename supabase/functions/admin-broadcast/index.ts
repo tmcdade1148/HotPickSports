@@ -159,6 +159,22 @@ Deno.serve(async (req: Request) => {
         .eq('pools.is_archived', false);
       const seen = new Set<string>();
       for (const r of (rows ?? []) as {user_id: string}[]) seen.add(r.user_id);
+
+      // A platform-suspended user is not an audience either. The `all` branch
+      // above has always filtered them server-side; this branch never did, and
+      // an asymmetry between two halves of one recipient query is a bug waiting
+      // for its first suspended user (there are zero today, so this changes
+      // nothing yet — which is the moment to close it).
+      //
+      // Fetched as its own small set rather than joined or passed through .in():
+      // the suspended list is tiny by nature, so there is nothing to chunk and
+      // no embed FK to depend on.
+      const {data: suspended} = await admin
+        .from('profiles')
+        .select('id')
+        .eq('is_platform_suspended', true);
+      for (const s of (suspended ?? []) as {id: string}[]) seen.delete(s.id);
+
       userIds = Array.from(seen);
     }
 
