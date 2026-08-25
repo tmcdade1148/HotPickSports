@@ -6,6 +6,50 @@ const supabase = createClient(
   { auth: { persistSession: false } }
 );
 
+// ============================================================================
+// ESPN HOSTS (v29, 2026-08-25) — read this before changing a URL.
+//
+// site.api.espn.com is DEAD to us. Akamai returns a hard 403 "Access Denied"
+// from BOTH Supabase networks: the Edge runtime (two invocations, 500 "ESPN API
+// error 403") and the Postgres network (net.http_get -> 403, a 447-byte Access
+// Denied page). Verified 2026-08-25 — the same block that moved
+// nfl-update-scores off that host on 2026-08-21, which this function was never
+// updated for. Any code path that names that host again is a defect, not a
+// fallback.
+//
+// PRIMARY — site.web.api.espn.com. The only unblocked host that serves an
+// EXPLICITLY specified (seasontype, week, dates) triple. Probed 2026-08-25 from
+// the Postgres network: 200, 249KB, 16 events, flat payload (events at the top
+// level), echoing season.type=2 season.year=2026 week.number=1 exactly as
+// asked. That echo is what makes the identity check below possible.
+//
+// FALLBACK — cdn.espn.com. 200 with full data, nested one level under
+// content.sbData, and — critically — IT CANNOT BE TARGETED. It serves whatever
+// ESPN considers the current horizon and nothing else. Probed 2026-08-25: plain
+// ?xhr=1 returned PRESEASON week 3 (season.type=1); adding &week=1&year=2026
+// returned a 202 with an EMPTY body — the same tarpit v28 hit when it tried
+// &seasontype=1. So the fallback is a second chance, not a second way to ask.
+// It helps when the current horizon happens to BE the week we want, and the
+// identity check turns every other case into a clean refusal instead of a
+// wrong-week import.
+//
+// Bursts get tarpitted (empty 202s). Attempts are SPACED, never stacked, and
+// the real retry loop is the hourly Tuesday cron — not this function.
+// ============================================================================
+
+type EspnHost = "site.web.api" | "cdn";
+
+const ESPN_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Accept": "application/json, text/plain, */*",
+  "Accept-Language": "en-US,en;q=0.9",
+};
+
+const ATTEMPT_TIMEOUT_MS = 10000;
+const ATTEMPT_SPACING_MS = 5000;
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 const WEEK_TO_ESPN: Record<number, { seasonType: number; espnWeek: number; phase: string }> = {
   19: { seasonType: 3, espnWeek: 1, phase: "WILDCARD" },
   20: { seasonType: 3, espnWeek: 2, phase: "DIVISIONAL" },
@@ -29,6 +73,89 @@ function espnSpread(odds: any): number | null {
   // matching probFromSpread. odds.details is a display label, not data.
   return typeof odds?.spread === "number" && Number.isFinite(odds.spread)
     ? odds.spread : null;
+}
+
+// One attempt against one host. Returns the slate or the reason it isn't one.
+// Five failure modes are told apart and reported by name — non-2xx, timeout,
+// empty body, unparseable JSON, no events array — plus the wrong-week case
+// below. That classification is what made the Aug 2026 failures legible; keep
+// it. A 202, an empty body or a missing events array is a FAILURE of this
+// attempt, never a slate.
+async function attemptSlate(
+  url: string, seasonType: number, espnWeek: number, seasonYear: number,
+): Promise<{ events: any[] } | { error: string }> {
+  try {
+    const res = await fetch(url, {
+      headers: ESPN_HEADERS,
+      signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),
+    });
+    if (!res.ok) return { error: `HTTP ${res.status}` };
+
+    const text = await res.text();
+    if (text.length === 0) return { error: "empty body (the 202 tarpit looks like this)" };
+
+    let raw: any;
+    try { raw = JSON.parse(text); } catch { return { error: `unparseable body (${text.length}b)` }; }
+
+    // cdn nests the scoreboard under content.sbData; site.web.api is flat.
+    // `?? raw` covers both shapes with one code path.
+    const sb = raw?.content?.sbData ?? raw;
+    if (!Array.isArray(sb?.events)) return { error: `no events array (body ${text.length}b)` };
+
+    // IDENTITY CHECK — this is what makes an untargetable fallback safe.
+    //
+    // The fallback serves the current horizon, not the week we asked for, and
+    // the week it actually served is stated only inside the payload. Without
+    // this check a Tuesday fallback could hand back week N's games while we are
+    // prepping week N+1, and the importer would cheerfully delete N+1's rows
+    // and re-insert N's games stamped `week: N+1`. The stale-id guards below do
+    // NOT catch that: with equal game counts nothing looks like a shrink, and
+    // before picks open there are no picks to conflict with. Wrong slate, clean
+    // bill of health, silent corruption of a week nobody has looked at yet.
+    //
+    // Checked only when there is something to write. An empty events array
+    // writes nothing and so cannot corrupt anything, and a not-yet-published
+    // future week legitimately returns one — it takes the zero-events early
+    // return in the handler.
+    if (sb.events.length > 0) {
+      const gotType = sb.season?.type, gotYear = sb.season?.year, gotWeek = sb.week?.number;
+      if (gotType !== seasonType || gotYear !== seasonYear || gotWeek !== espnWeek) {
+        return { error: `wrong slate — wanted seasontype=${seasonType} year=${seasonYear} week=${espnWeek}, got seasontype=${gotType} year=${gotYear} week=${gotWeek}` };
+      }
+    }
+
+    return { events: sb.events };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) }; // incl. timeout
+  }
+}
+
+// Attempt ladder: primary, primary, fallback, fallback — spaced, never burst.
+// The HOST SWITCH is the point of the ladder; the duplicate attempt per host
+// only covers a single flaky response. Throws when all four fail, which the
+// handler turns into a loud 500 plus a 'failed' readiness row.
+async function fetchSlate(
+  seasonType: number, espnWeek: number, seasonYear: number,
+): Promise<{ events: any[]; host: EspnHost; url: string }> {
+  const primaryUrl = `https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=${seasonType}&week=${espnWeek}&dates=${seasonYear}`;
+  const fallbackUrl = "https://cdn.espn.com/core/nfl/scoreboard?xhr=1";
+  const ladder: Array<{ host: EspnHost; url: string }> = [
+    { host: "site.web.api", url: primaryUrl },
+    { host: "site.web.api", url: primaryUrl },
+    { host: "cdn", url: fallbackUrl },
+    { host: "cdn", url: fallbackUrl },
+  ];
+
+  const failures: string[] = [];
+  for (let i = 0; i < ladder.length; i++) {
+    if (i > 0) await sleep(ATTEMPT_SPACING_MS);
+    const { host, url } = ladder[i];
+    const outcome = await attemptSlate(url, seasonType, espnWeek, seasonYear);
+    if ("events" in outcome) return { events: outcome.events, host, url };
+    console.warn(`[nfl-import-schedule] attempt ${i + 1}/${ladder.length} ${host}: ${outcome.error}`);
+    failures.push(`${host}: ${outcome.error}`);
+  }
+  throw new Error(`ESPN fetch failed after ${ladder.length} attempts — ${failures.join(" | ")}`);
 }
 
 Deno.serve(async (req) => {
@@ -90,23 +217,54 @@ Deno.serve(async (req) => {
     else if (WEEK_TO_ESPN[week]) { ({ seasonType, espnWeek, phase } = WEEK_TO_ESPN[week]); }
     else return json({ error: `Invalid week: ${week}` }, 400);
 
-    // `dates` pins the season. Without it ESPN returns whatever season it
-    // considers current, which in July 2026 was still 2025.
-    const espnUrl = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=${seasonType}&week=${espnWeek}&dates=${seasonYear}`;
-    const espnRes = await fetch(espnUrl);
-    if (!espnRes.ok) throw new Error(`ESPN API error ${espnRes.status}`);
-    const espnData = await espnRes.json();
-    const events = espnData.events ?? [];
+    // Throws on total failure — before any write, so a failed fetch changes
+    // nothing. Keep that ordering: reporting success on no data is the pattern
+    // that hid the Aug 20 blackout for 12 hours.
+    const slate = await fetchSlate(seasonType, espnWeek, seasonYear);
+
+    // PER-EVENT CONTAMINATION FILTER. The identity check proves the payload is
+    // LABELLED as our week; it does not prove every event inside it belongs to
+    // that week. v28's header records that the scoreboard can span weeks, and
+    // one straggler is enough to do real damage: it would be upserted with OUR
+    // week stamp, relocating a live — possibly FINAL, possibly picked — week-N
+    // game into week N+1, where neither delete guard would ever see it because
+    // it arrives as an addition, not a removal.
+    //
+    // season.type is checked alongside week.number because week numbers are NOT
+    // unique across season types: our preseason competition maps week 3 to
+    // espnWeek 4, so a regular-season week-4 straggler would sail straight
+    // through a week-only test. Both fields are present on every event on both
+    // hosts (16/16 on each, verified 2026-08-25); the ?? defaults only matter if
+    // ESPN ever drops them, and they default to "keep" — the pre-v29 behaviour.
+    const fetched = slate.events;
+    const events = fetched.filter((e: any) =>
+      (e?.week?.number ?? espnWeek) === espnWeek &&
+      (e?.season?.type ?? seasonType) === seasonType);
+    const droppedForeign = fetched.length - events.length;
+    if (droppedForeign > 0) {
+      console.warn(`[nfl-import-schedule] dropped ${droppedForeign} foreign event(s) from the ${slate.host} slate for ${competition} wk${week} (wanted espn seasontype=${seasonType} week=${espnWeek})`);
+    }
+
+    // Games arrived, but none of them were ours. That is contamination, not an
+    // empty week — it must never take the zero-events "ok" path below, which
+    // would write games_status='ok' with games_count=0 for a week that has a
+    // real slate somewhere.
+    if (fetched.length > 0 && events.length === 0) {
+      await markGamesFailed(competition, week);
+      console.error(`[nfl-import-schedule] SLATE_FOREIGN ${competition} wk${week}: all ${fetched.length} events belonged elsewhere`);
+      return json({ success: false, competition, week, espnHost: slate.host,
+        error: `SLATE_FOREIGN: all ${fetched.length} fetched event(s) belong to another week or season type; wanted seasontype=${seasonType} week=${espnWeek}` }, 500);
+    }
 
     if (events.length === 0) {
       await markReadiness(competition, week, { games_status: "ok", games_count: 0, games_at: new Date().toISOString() });
-      return json({ success: true, competition, season_year: seasonYear, week, imported: 0, warning: "No games found" }, 200);
+      return json({ success: true, competition, season_year: seasonYear, week, imported: 0, espnHost: slate.host, warning: "No games found" }, 200);
     }
 
     // Read existing odds BEFORE the mapping so the coalesce below can preserve
     // them. nfl-fetch-odds is the primary odds source; a re-import must never
     // blank a value it wrote (same discipline as frozen_rank, Hard Rule #6).
-    // Cron ordering (import 05:00, odds 10:00) hides this — it is not a guarantee.
+    // Cron ordering (import :05, odds :10) hides this — it is not a guarantee.
     const { data: existing } = await supabase
       .from("season_games").select("game_id, spread, home_moneyline, away_moneyline")
       .eq("competition", competition).eq("season_year", seasonYear).eq("week", week);
@@ -147,9 +305,37 @@ Deno.serve(async (req) => {
     });
 
     if (existing && existing.length > 0) {
-      const newIds = rows.map((r: any) => r.game_id);
-      const toDelete = existing.filter((g) => !newIds.includes(g.game_id)).map((g) => g.game_id);
+      const newIds = new Set(rows.map((r: any) => r.game_id));
+      const toDelete = existing.filter((g) => !newIds.has(g.game_id)).map((g) => g.game_id);
+
       if (toDelete.length > 0) {
+        // GUARD 1 — a game somebody has picked never disappears on a robot's
+        // say-so. Matched on game_id + competition only: game_id is the
+        // season_games PRIMARY KEY, so it is already week-unique, and this
+        // guard is only ever allowed to be more protective, never less.
+        const { data: picked, error: picksError } = await supabase
+          .from("season_picks").select("game_id")
+          .eq("competition", competition).in("game_id", toDelete);
+        if (picksError) throw new Error(`pick-conflict check failed: ${picksError.message}`);
+
+        if (picked && picked.length > 0) {
+          const ids = [...new Set(picked.map((p: any) => p.game_id))];
+          await markGamesFailed(competition, week);
+          console.error(`[nfl-import-schedule] SLATE_CONFLICT ${competition} wk${week}: ${ids.join(", ")}`);
+          return json({ success: false, competition, week, espnHost: slate.host, deleted: 0,
+            error: `SLATE_CONFLICT: fetched slate drops game(s) that have picks: ${ids.join(", ")}` }, 500);
+        }
+
+        // GUARD 2 — refuse a wholesale shrink. A real schedule change moves a
+        // game or two; it does not remove a third of a week. A slate that
+        // arrives short is a partial page, not news.
+        if (rows.length < existing.length && toDelete.length > 2) {
+          await markGamesFailed(competition, week);
+          console.error(`[nfl-import-schedule] SLATE_SHRUNK ${competition} wk${week}: ${rows.length} fetched vs ${existing.length} stored`);
+          return json({ success: false, competition, week, espnHost: slate.host, deleted: 0,
+            error: `SLATE_SHRUNK: fetched ${rows.length} games vs ${existing.length} stored, dropping ${toDelete.length}; treating the response as a partial page` }, 500);
+        }
+
         await supabase.from("season_games").delete()
           .eq("competition", competition).eq("season_year", seasonYear).eq("week", week).in("game_id", toDelete);
       }
@@ -157,7 +343,7 @@ Deno.serve(async (req) => {
 
     const { error } = await supabase.from("season_games").upsert(rows, { onConflict: "game_id" });
     if (error) {
-      await markReadiness(competition, week, { games_status: "failed", games_at: new Date().toISOString() });
+      await markGamesFailed(competition, week);
       return json({ error: error.message }, 500);
     }
 
@@ -169,7 +355,7 @@ Deno.serve(async (req) => {
         .update({ rank: 16, frozen_rank: 16 })
         .eq("competition", competition).eq("season_year", seasonYear).eq("week", week);
       if (sbRankError) {
-        await markReadiness(competition, week, { games_status: "failed", games_at: new Date().toISOString() });
+        await markGamesFailed(competition, week);
         return json({ error: sbRankError.message }, 500);
       }
     }
@@ -177,21 +363,23 @@ Deno.serve(async (req) => {
     // §5b — games loaded OK.
     await markReadiness(competition, week, { games_status: "ok", games_count: rows.length, games_at: new Date().toISOString() });
 
-    console.log(`[nfl-import-schedule] Imported ${rows.length} games`);
+    console.log(`[nfl-import-schedule] Imported ${rows.length} games from ${slate.host}`);
 
     // Ranking is intentionally NOT done here (weeks 1–21). frozen_rank is set by
-    // nfl-rank-games AFTER nfl-fetch-odds runs (REFERENCE.md §7), so ranks are
-    // computed from the Odds-API numbers — not ESPN's import-time scoreboard
-    // odds. The rank columns are omitted from the upsert payload entirely:
-    // PostgREST only updates columns present in the body, so a re-import of an
-    // already-ranked week can no longer overwrite frozen_rank (Hard Rule #6 —
-    // 260611 FrozenRankImmutability spec). New games get the column default
-    // (null) until nfl-rank-games freezes them. The Tuesday cron (odds 10:00,
-    // rank 10:15) and nfl-weekly-transition both run rank after odds.
+    // open_week_picks when picks open (REFERENCE.md §7); nfl-rank-games writes
+    // the provisional `rank` AFTER nfl-fetch-odds runs, so ranks are computed
+    // from the Odds-API numbers — not ESPN's import-time scoreboard odds. The
+    // rank columns are omitted from the upsert payload entirely: PostgREST only
+    // updates columns present in the body, so a re-import of an already-ranked
+    // week can no longer overwrite frozen_rank (Hard Rule #6 — 260611
+    // FrozenRankImmutability spec). New games get the column default (null)
+    // until the week opens. This is also what makes the hourly Tuesday
+    // reconciliation safe to repeat.
 
-    return json({ success: true, competition, season_year: seasonYear, week, phase, imported: rows.length, espnUrl }, 200);
+    return json({ success: true, competition, season_year: seasonYear, week, phase,
+      imported: rows.length, droppedForeign, espnHost: slate.host, espnUrl: slate.url }, 200);
   } catch (err) {
-    if (week) await markReadiness(competition, week, { games_status: "failed", games_at: new Date().toISOString() });
+    if (week) await markGamesFailed(competition, week);
     return json({ success: false, error: String(err) }, 500);
   }
 });
@@ -226,4 +414,25 @@ async function markReadiness(competition: string, week: number, fields: Record<s
       { onConflict: "competition,week_number" },
     );
   } catch (_e) { /* best-effort */ }
+}
+
+// Every failure path writes the SAME row. Two columns matter beyond the status:
+//
+//   games_count: null       — the 2026-08-25 failure left a stale `16` sitting
+//                             next to games_status='failed', so the readiness
+//                             row reported a plausible slate it did not have.
+//                             A row that says nothing beats a row that lies.
+//
+//   ready_notified_at: null — notify_week_ready fires once per row and never
+//                             again while this column is set. Nulling it
+//                             re-arms the "week is ready to open" push to super
+//                             admins, so the RECOVERY announces itself instead
+//                             of landing silently an hour later.
+async function markGamesFailed(competition: string, week: number) {
+  await markReadiness(competition, week, {
+    games_status: "failed",
+    games_count: null,
+    games_at: new Date().toISOString(),
+    ready_notified_at: null,
+  });
 }
