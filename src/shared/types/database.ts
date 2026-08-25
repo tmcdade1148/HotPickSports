@@ -92,6 +92,13 @@ export interface DbPool {
   // Hidden from Player UIs (e.g., the analytics Platform Pool). Staff
   // can still see them via super-admin Pool Management.
   is_hidden_from_users: boolean;
+  // Per-Contest Chirps posting switch. False hides the composer AND is enforced
+  // in the smack_messages INSERT policy — the client hide is presentation, the
+  // policy is the lock. Reads stay open and system messages
+  // (post_system_message, SECURITY DEFINER) are unaffected either way.
+  // Defaults true in the database; optional here because join_pool_by_invite's
+  // older cached shapes may predate it, and absent must read as enabled.
+  chirps_enabled?: boolean;
   created_at: string;
   updated_at: string;
 }

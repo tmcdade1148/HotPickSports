@@ -15,14 +15,20 @@ import {
   RefreshControl,
   StyleSheet,
 } from 'react-native';
-import {useFocusEffect} from '@react-navigation/native';
+import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import {supabase} from '@shared/config/supabase';
 import {logError} from '@shared/logging/logError';
 import {useAuth} from '@shared/hooks/useAuth';
 import {useGlobalStore} from '@shell/stores/globalStore';
 import {getDisplayName} from '@shared/utils/displayName';
 import {SMACK_REACTIONS} from '@shared/config/smackTalk';
-import {LEXICON} from '@shared/lexicon';
+import {
+  LEXICON,
+  chirpsOffHeading,
+  chirpsOffBody,
+  chirpsOffStartCta,
+  chirpsOffJoinCta,
+} from '@shared/lexicon';
 import {spacing, borderRadius} from '@shared/theme';
 
 import type {DbSmackMessage, DbSmackReaction} from '@shared/types/database';
@@ -153,6 +159,22 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
       (s.userPools.find(p => p.id === poolId) ??
         s.visiblePools.find(p => p.id === poolId))?.organizer_id ?? null,
   );
+
+  // Per-Contest Chirps posting switch (pools.chirps_enabled). Selected the same
+  // primitive-only way as organizerId above.
+  //
+  // Default TRUE for anything but an explicit false: the column defaults true in
+  // the database, so undefined here can only mean "not loaded yet" or an older
+  // cached shape, and in both cases the existing behaviour is the safe answer.
+  // Nothing is riding on this being right — RLS is the enforcement (a client
+  // hide is a curtain, not a lock). This only decides what the user is offered.
+  const chirpsEnabled = useGlobalStore(
+    s =>
+      (s.userPools.find(p => p.id === poolId) ??
+        s.visiblePools.find(p => p.id === poolId))?.chirps_enabled !== false,
+  );
+
+  const navigation = useNavigation<any>();
 
   // Bumped on every optimistic reaction change. fetchReactions captures it and
   // discards its result if it changed mid-flight — so a stale full-replace
@@ -936,6 +958,15 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
         />
       )}
 
+      {/* POSTING SURFACE. When this Contest's Chirps switch is off, the whole
+          composer goes — input, send, mention autocomplete and reply chip — and
+          the explainer takes its place. The FEED above is untouched: system
+          messages (score updates, pick locks, week results) keep landing and
+          keep rendering, which is why the tab itself stays put. A missing tab
+          reads as a broken build; a present tab with clean system posts and a
+          reason reads as intentional. */}
+      {chirpsEnabled ? (
+      <>
       {/* Mention autocomplete — above input */}
       {(() => {
         const atIdx = newMessage.lastIndexOf('@');
@@ -998,6 +1029,25 @@ export function SmackTalkScreen({poolId}: SmackTalkScreenProps) {
           <Text style={styles.sendText}>Send</Text>
         </TouchableOpacity>
       </View>
+      </>
+      ) : (
+        <View style={[styles.chirpsOffBox, {paddingBottom: navReserve}]}>
+          <Text style={styles.chirpsOffHeading}>{chirpsOffHeading}</Text>
+          <Text style={styles.chirpsOffBodyText}>{chirpsOffBody}</Text>
+          <View style={styles.chirpsOffActions}>
+            <TouchableOpacity
+              style={styles.chirpsOffPrimary}
+              onPress={() => navigation.navigate('CreatePool')}>
+              <Text style={styles.chirpsOffPrimaryText}>{chirpsOffStartCta}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.chirpsOffSecondary}
+              onPress={() => navigation.navigate('JoinPool')}>
+              <Text style={styles.chirpsOffSecondaryText}>{chirpsOffJoinCta}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {/* Reaction Picker Modal — appears on long-press */}
       <Modal
@@ -1313,6 +1363,54 @@ const createStyles = (colors: any) => StyleSheet.create({
   reactorName: {
     fontSize: 16,
     paddingVertical: 4,
+  },
+  // ── Chirps-off explainer (replaces the composer) ─────────────────
+  chirpsOffBox: {
+    padding: spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  chirpsOffHeading: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  chirpsOffBodyText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.textSecondary,
+    marginBottom: spacing.md,
+  },
+  chirpsOffActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  chirpsOffPrimary: {
+    flex: 1,
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+  },
+  chirpsOffPrimaryText: {
+    color: colors.onPrimary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  chirpsOffSecondary: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+  },
+  chirpsOffSecondaryText: {
+    color: colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '600',
   },
   // ── Input row ────────────────────────────────────────────────────
   inputRow: {
