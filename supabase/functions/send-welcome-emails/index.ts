@@ -43,47 +43,48 @@ interface Candidate {
   unsub_token: string | null;
 }
 
-const SUBJECT = "You're in.";
-
-// The letter. Plain text on purpose — it reads like a note from a person, which
-// is the entire point of it. No HTML, no tracking pixel, no open/click tracking.
+// THE LETTER LIVES IN CONFIG, NOT HERE.
 //
-// The house-code paragraph renders ONLY when the reader is in zero real Contests
-// AND a house code is actually open. The code comes from the SAME config key the
-// Join screen reads (house_contest_code) rather than being written into this
-// template: it rolls to 26B/26C as cohorts fill, and an empty value is the kill
-// switch. A hardcoded code here would keep pointing at a full or closed Contest
-// after the roll, and an email cannot be edited once it is sent.
-function renderBody(c: Candidate, houseCode: string, unsubUrl: string): string {
-  const name = (c.first_name ?? "").trim() || "there";
+// competition_config.global.welcome_email_subject / welcome_email_body. Tom can
+// rewrite the note, dry-run it, read it back, and only then let it send — with
+// no developer round-trip and no redeploy. Edits take effect on the next hourly
+// tick. Plain text on purpose: it should read like a note from a person, which
+// is the entire point of it.
+//
+// This file owns the SUBSTITUTION, never the words.
 
-  const houseParagraph =
-    c.real_contests === 0 && houseCode
-      ? `\nAnd if you're just here to play while you figure that out, use the code ${houseCode}. That'll get you in a game.\n`
-      : "";
+/**
+ * Fill a template. Conditional block first, because it can contain scalars.
+ *
+ * Both steps avoid String.replace's replacement-string syntax: a `$&` or `$1`
+ * inside a person's name or inside Tom's copy would otherwise be interpreted
+ * rather than printed. The block uses a function replacement; the scalars use
+ * split/join, which treats the value as literal text by construction.
+ */
+function renderTemplate(
+  template: string,
+  vars: Record<string, string>,
+  showHouseParagraph: boolean,
+): string {
+  let out = template.replace(
+    /\{\{IF_NO_CONTEST\}\}([\s\S]*?)\{\{\/IF_NO_CONTEST\}\}\n?/g,
+    (_match, inner: string) => (showHouseParagraph ? inner : ""),
+  );
+  for (const [key, value] of Object.entries(vars)) {
+    out = out.split(`{{${key}}}`).join(value);
+  }
+  return out;
+}
 
-  return `Hi ${name},
-
-Tom here. I built HotPick.
-
-Quick version of what you're in for: you make your picks, they lock at the first kickoff, and that's that. No changing your mind Sunday morning when the injury report lands. You said what you said on Thursday, and everybody can see it.
-
-That's the whole idea. Anybody can be right on Monday.
-
-It works best with people you actually know. The guys from work. Your brother-in-law who won't stop talking. The four people in a text thread that goes quiet every February. If you've got a group like that, start a Contest and pull them in. Takes about a minute.
-
-Or if somebody you know already runs one of these every year, send them this. They're the person I'd most like to meet.
-${houseParagraph}
-Anything not working right, or just want to tell me something's dumb? Reply here, or write ${REPLY_TO}. It's a short list of people reading it.
-
-Glad you're here.
-
-Tom
-Founder, HotPick Sports
-
----
-Don't want these? Unsubscribe: ${unsubUrl}
-`;
+/**
+ * Any {{...}} left after rendering is a typo in the copy ({{first_nme}}), an
+ * unclosed IF block, or a placeholder this function does not know about. All
+ * three must refuse rather than ship: a raw handlebar in a founder's email is
+ * the single most obviously-automated thing that could arrive in someone's
+ * inbox, and it cannot be taken back.
+ */
+function unresolvedPlaceholder(rendered: string): string | null {
+  return rendered.match(/\{\{[^{}]*\}\}/)?.[0] ?? null;
 }
 
 Deno.serve(async (req) => {
@@ -102,31 +103,82 @@ Deno.serve(async (req) => {
 
     const list = (candidates ?? []) as Candidate[];
 
-    // Same key the Join screen reads. Empty string = the door is shut, so the
-    // house paragraph simply does not render.
-    const { data: cfg } = await supabase
-      .from("competition_config").select("value")
-      .eq("competition", "global").eq("key", "house_contest_code").maybeSingle();
-    const houseCode =
-      typeof cfg?.value === "string" ? cfg.value.replace(/^"|"$/g, "").trim() : "";
+    // The letter and the house code, in one read. All three are global keys.
+    const { data: cfgRows } = await supabase
+      .from("competition_config").select("key, value")
+      .eq("competition", "global")
+      .in("key", ["welcome_email_subject", "welcome_email_body", "house_contest_code"]);
+    const cfg: Record<string, string> = {};
+    for (const r of (cfgRows ?? []) as { key: string; value: unknown }[]) {
+      if (typeof r.value === "string") cfg[r.key] = r.value;
+    }
+
+    const subjectTemplate = (cfg.welcome_email_subject ?? "").trim();
+    const bodyTemplate = cfg.welcome_email_body ?? "";
+    // Only the CODE gets quote-stripping. A code cannot legitimately contain a
+    // quote character; Tom's copy can, and stripping there would eat a real one.
+    const houseCode = (cfg.house_contest_code ?? "").replace(/^"|"$/g, "").trim();
+
+    // FAIL CLOSED on unsendable copy. Blanking welcome_email_body is therefore a
+    // second kill switch alongside pausing the cron: nothing sends, no deploy.
+    const copyProblems: string[] = [];
+    if (!subjectTemplate) copyProblems.push("welcome_email_subject is missing or empty");
+    if (!bodyTemplate.trim()) copyProblems.push("welcome_email_body is missing or empty");
+    else if (!bodyTemplate.includes("{{unsubscribe_url}}")) {
+      copyProblems.push(
+        "welcome_email_body has no {{unsubscribe_url}} placeholder — refusing to send an email with no way to opt out",
+      );
+    }
+
+    // Render EVERYONE before sending ANYONE. A typo in the copy is a property of
+    // the template, not of one recipient, so it must surface before the first
+    // send rather than halfway through a loop that has already emailed half the
+    // list. The token here is the one the candidate query returned; the send
+    // loop re-renders the body against the token it has actually confirmed.
+    type Rendered = Candidate & { subject: string; body: string; shows_house_code: boolean };
+    const rendered: Rendered[] = [];
+    if (copyProblems.length === 0) {
+      for (const c of list) {
+        const shows_house_code = c.real_contests === 0 && !!houseCode;
+        const vars = {
+          first_name: (c.first_name ?? "").trim() || "there",
+          unsubscribe_url: `${UNSUB_BASE}?t=${c.unsub_token ?? "<generated at send>"}`,
+          house_code: houseCode,
+        };
+        const subject = renderTemplate(subjectTemplate, vars, shows_house_code);
+        const body = renderTemplate(bodyTemplate, vars, shows_house_code);
+        const stray = unresolvedPlaceholder(subject) ?? unresolvedPlaceholder(body);
+        if (stray) {
+          copyProblems.push(`unresolved placeholder ${stray} after rendering — check the copy`);
+          break;
+        }
+        rendered.push({ ...c, subject, body, shows_house_code });
+      }
+    }
 
     if (dryRun) {
       // Renders everything, sends nothing, writes nothing. This is the only
-      // chance to see the recipient list before it becomes an outbox.
+      // chance to see the recipient list before it becomes an outbox — and, now
+      // that the copy is editable, the only chance to read the words back.
       return json({
-        success: true,
+        success: copyProblems.length === 0,
         dry_run: true,
+        copy_problems: copyProblems,
         house_code: houseCode || null,
         attempted: list.length,
-        recipients: list.map((c) => ({
-          user_id: c.user_id,
-          email: c.email,
-          real_contests: c.real_contests,
-          shows_house_code: c.real_contests === 0 && !!houseCode,
-          subject: SUBJECT,
-          body: renderBody(c, houseCode, `${UNSUB_BASE}?t=${c.unsub_token ?? "<generated at send>"}`),
+        recipients: rendered.map((r) => ({
+          user_id: r.user_id,
+          email: r.email,
+          real_contests: r.real_contests,
+          shows_house_code: r.shows_house_code,
+          subject: r.subject,
+          body: r.body,
         })),
       }, 200);
+    }
+
+    if (copyProblems.length > 0) {
+      return json({ success: false, error: "copy_not_sendable", copy_problems: copyProblems }, 500);
     }
 
     if (!RESEND_API_KEY) {
@@ -136,7 +188,7 @@ Deno.serve(async (req) => {
     let sent = 0, failed = 0, skipped = 0;
     const outcomes: unknown[] = [];
 
-    for (const c of list) {
+    for (const c of rendered) {
       // Guarantee a preferences row (and therefore a token) before the link is
       // rendered. 17 of 151 accounts had no row at all, so a missing one is a
       // normal case, not an anomaly — and an unsubscribe link that 404s is worse
@@ -183,7 +235,20 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      const text = renderBody(c, houseCode, `${UNSUB_BASE}?t=${token}`);
+      // Re-render the body against the token actually confirmed a few lines up,
+      // rather than the one the candidate query returned. They are the same for
+      // anyone who already had a preferences row, and this is the only way the
+      // link is right for anyone who did not. The subject carries no token, so
+      // the pre-rendered one stands.
+      const text = renderTemplate(
+        bodyTemplate,
+        {
+          first_name: (c.first_name ?? "").trim() || "there",
+          unsubscribe_url: `${UNSUB_BASE}?t=${token}`,
+          house_code: houseCode,
+        },
+        c.shows_house_code,
+      );
 
       let status = "failed";
       let detail = "";
@@ -198,7 +263,7 @@ Deno.serve(async (req) => {
             from: FROM_EMAIL,
             to: [c.email],
             reply_to: REPLY_TO,
-            subject: SUBJECT,
+            subject: c.subject,
             text,
           }),
         });

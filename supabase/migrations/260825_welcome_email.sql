@@ -212,7 +212,76 @@ $$;
 REVOKE EXECUTE ON FUNCTION welcome_email_candidates() FROM PUBLIC, anon, authenticated;
 
 -- ---------------------------------------------------------------------------
--- 7. Hourly, and PAUSED.
+-- 7. The letter itself, in config.
+--
+-- Subject and body live here, NOT in the Edge Function, so Tom can rewrite the
+-- note and dry-run it without a developer round-trip or a redeploy. Edits take
+-- effect on the next hourly tick.
+--
+-- PLACEHOLDERS the sender substitutes:
+--   {{first_name}}        the recipient's first name, or "there" when absent.
+--                         30 of 143 profiles have no first name, so the fallback
+--                         is the normal path, not an edge case.
+--   {{unsubscribe_url}}   REQUIRED. The sender refuses to send a body that does
+--                         not contain it — see the guard in the function. Tom
+--                         controls the wording and placement; he cannot
+--                         accidentally delete the opt-out and put the first
+--                         email HotPick ever sends out of compliance.
+--   {{house_code}}        the CURRENT house Contest code, read from
+--                         house_contest_code — the same key the Join screen
+--                         reads. Not written into the copy as a literal: it
+--                         rolls to 26B/26C as cohorts fill, and an email cannot
+--                         be edited once it is sent. Write {{house_code}} and it
+--                         is always right; type HOTPICK26A and it is right until
+--                         the roll.
+--   {{IF_NO_CONTEST}}…{{/IF_NO_CONTEST}}
+--                         renders ONLY when the reader is in zero real Contests
+--                         AND a house code is actually open. Blank the house
+--                         code and the paragraph disappears rather than pointing
+--                         at a closed door.
+--
+-- FAIL CLOSED: an empty or missing subject or body sends NOTHING and reports
+-- why. Blanking welcome_email_body is therefore a second kill switch, alongside
+-- pausing the cron. A leftover {{placeholder}} after rendering also refuses —
+-- a typo like {{first_nme}} must never ship in a founder's email.
+--
+-- No em dashes in the copy: hotpick-brand-voice treats them as the clearest
+-- fingerprint of machine-written text, which is the last thing a personal note
+-- from the founder should read as. Keep it that way when editing.
+-- ---------------------------------------------------------------------------
+INSERT INTO competition_config (competition, key, value, description)
+VALUES
+  ('global', 'welcome_email_subject', to_jsonb($subj$You're in.$subj$::text),
+   'Subject line of the welcome email. Supports {{first_name}}. Empty = nothing sends.'),
+  ('global', 'welcome_email_body', to_jsonb($body$Hi {{first_name}},
+
+Tom here. I built HotPick.
+
+Quick version of what you're in for: you make your picks, they lock at the first kickoff, and that's that. No changing your mind Sunday morning when the injury report lands. You said what you said on Thursday, and everybody can see it.
+
+That's the whole idea. Anybody can be right on Monday.
+
+It works best with people you actually know. The guys from work. Your brother-in-law who won't stop talking. The four people in a text thread that goes quiet every February. If you've got a group like that, start a Contest and pull them in. Takes about a minute.
+
+Or if somebody you know already runs one of these every year, send them this. They're the person I'd most like to meet.
+{{IF_NO_CONTEST}}
+And if you're just here to play while you figure that out, use the code {{house_code}}. That'll get you in a game.
+{{/IF_NO_CONTEST}}
+Anything not working right, or just want to tell me something's dumb? Reply here, or write support@hotpicksports.com. It's a short list of people reading it.
+
+Glad you're here.
+
+Tom
+Founder, HotPick Sports
+
+---
+Don't want these? Unsubscribe: {{unsubscribe_url}}
+$body$::text),
+   'Body of the welcome email, plain text. Placeholders: {{first_name}} (falls back to "there"), {{unsubscribe_url}} (REQUIRED, the send refuses without it), {{house_code}}, and the {{IF_NO_CONTEST}}...{{/IF_NO_CONTEST}} block. Edits take effect on the next hourly tick. Empty = nothing sends. Dry-run after editing to read it back before anyone receives it.')
+ON CONFLICT (competition, key) DO NOTHING;
+
+-- ---------------------------------------------------------------------------
+-- 8. Hourly, and PAUSED.
 --
 -- Hourly rather than daily so the note lands 24–25 hours after signup instead of
 -- up to 48. Created inactive on purpose: dry-run, review the recipient list, send
