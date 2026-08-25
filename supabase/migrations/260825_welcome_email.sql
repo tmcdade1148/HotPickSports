@@ -227,18 +227,23 @@ REVOKE EXECUTE ON FUNCTION welcome_email_candidates() FROM PUBLIC, anon, authent
 --                         controls the wording and placement; he cannot
 --                         accidentally delete the opt-out and put the first
 --                         email HotPick ever sends out of compliance.
---   {{house_code}}        the CURRENT house Contest code, read from
---                         house_contest_code — the same key the Join screen
---                         reads. Not written into the copy as a literal: it
---                         rolls to 26B/26C as cohorts fill, and an email cannot
---                         be edited once it is sent. Write {{house_code}} and it
---                         is always right; type HOTPICK26A and it is right until
---                         the roll.
+--   {{house_code}}        AVAILABLE BUT UNUSED. The seeded copy names HOTPICK26A
+--                         literally, because Tom wrote it that way and the
+--                         wording is his. The trade-off is real and worth
+--                         knowing: when the cohort rolls to 26B, house_contest_code
+--                         changes and this letter does not, so it keeps naming a
+--                         full Contest until someone edits it too. Two places to
+--                         remember instead of one. Swapping HOTPICK26A for
+--                         {{house_code}} in this key is a one-line config edit,
+--                         no deploy, and the letter then always names the current
+--                         code. Tom's call, not the developer's.
 --   {{IF_NO_CONTEST}}…{{/IF_NO_CONTEST}}
 --                         renders ONLY when the reader is in zero real Contests
---                         AND a house code is actually open. Blank the house
---                         code and the paragraph disappears rather than pointing
---                         at a closed door.
+--                         (section 6 definition, demo pool excluded). The sender
+--                         collapses any run of blank lines left behind, so the
+--                         block can be laid out readably here and "Your Picks. On
+--                         the record." still follows the Contest paragraph
+--                         cleanly when the block does not render.
 --
 -- FAIL CLOSED: an empty or missing subject or body sends NOTHING and reports
 -- why. Blanking welcome_email_body is therefore a second kill switch, alongside
@@ -249,27 +254,39 @@ REVOKE EXECUTE ON FUNCTION welcome_email_candidates() FROM PUBLIC, anon, authent
 -- fingerprint of machine-written text, which is the last thing a personal note
 -- from the founder should read as. Keep it that way when editing.
 -- ---------------------------------------------------------------------------
+-- TOM'S WORDS, SEEDED VERBATIM. This went through hotpick-brand-voice and
+-- hotpick-legal-guardrails (zero Tier 1 terms) and Tom rewrote it himself.
+-- Nobody edits the wording in code. If it ever needs to change, Tom edits the
+-- config key.
+--
+-- Two claims in the copy were checked against the live database before seeding,
+-- so nobody has to re-derive them if the wording is questioned:
+--   "One login. Not many places do that." — join_pool_by_invite has NO per-user
+--   cap; it only checks the per-pool member_limit. Being in many Contests is
+--   true. CAUTION for any future rewrite: create_pool DOES cap at
+--   free_tier_max_pools, so the copy deliberately says "be in" rather than
+--   "start". Do not reword toward starting Contests without re-checking that cap.
+--   "Bragging rights TBD" is already running on hotpicksports.com. It is a brand
+--   asset, matched exactly, not a draft.
 INSERT INTO competition_config (competition, key, value, description)
 VALUES
-  ('global', 'welcome_email_subject', to_jsonb($subj$You're in.$subj$::text),
+  ('global', 'welcome_email_subject', to_jsonb($subj$Welcome to HotPick Sports$subj$::text),
    'Subject line of the welcome email. Supports {{first_name}}. Empty = nothing sends.'),
-  ('global', 'welcome_email_body', to_jsonb($body$Hi {{first_name}},
+  ('global', 'welcome_email_body', to_jsonb($body$Hey {{first_name}},
 
-Tom here. I built HotPick.
+We're glad you're here.
 
-Quick version of what you're in for: you make your picks, they lock at the first kickoff, and that's that. No changing your mind Sunday morning when the injury report lands. You said what you said on Thursday, and everybody can see it.
+These are the early days and I don't take you being here for granted. I hope you and your friends keep playing with us for years to come.
 
-That's the whole idea. Anybody can be right on Monday.
+Starting a Contest takes less than a minute, then you share the invite code with friends, family or co-workers. The more the merrier. And if someone else starts one, you can be in theirs too. One login. Not many places do that.
 
-It works best with people you actually know. The guys from work. Your brother-in-law who won't stop talking. The four people in a text thread that goes quiet every February. If you've got a group like that, start a Contest and pull them in. Takes about a minute.
-
-Or if somebody you know already runs one of these every year, send them this. They're the person I'd most like to meet.
 {{IF_NO_CONTEST}}
-And if you're just here to play while you figure that out, use the code {{house_code}}. That'll get you in a game.
+If you're just here to play while you gather your Players, use the code HOTPICK26A. That'll get you into the public Contest.
 {{/IF_NO_CONTEST}}
-Anything not working right, or just want to tell me something's dumb? Reply here, or write support@hotpicksports.com. It's a short list of people reading it.
 
-Glad you're here.
+Your Picks. On the record. Bragging rights TBD.
+
+Anything not working right, or you just want to tell me something's dumb, reply here or write support@hotpicksports.com. It's a short list of people reading it.
 
 Tom
 Founder, HotPick Sports

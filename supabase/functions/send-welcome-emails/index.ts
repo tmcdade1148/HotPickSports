@@ -73,6 +73,16 @@ function renderTemplate(
   for (const [key, value] of Object.entries(vars)) {
     out = out.split(`{{${key}}}`).join(value);
   }
+  // Collapse the hole the conditional leaves behind. Removing a block that was
+  // written on its own lines otherwise strands the blank line above it next to
+  // the blank line below it, and "Your Picks. On the record." arrives after a
+  // double gap that looks like a rendering bug rather than a paragraph break.
+  //
+  // Done as a normalisation rather than by making the regex count newlines,
+  // because it is correct however the block is laid out — and the copy lives in
+  // config now, so the layout is Tom's to change without touching this file. In
+  // plain-text email a run of three or more newlines is never intentional.
+  out = out.replace(/\n{3,}/g, "\n\n");
   return out;
 }
 
