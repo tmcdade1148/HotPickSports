@@ -37,6 +37,67 @@ export type PushPermissionStatus = 'granted' | 'denied' | 'undetermined';
 let lastReportedStatus: PushPermissionStatus | null = null;
 
 /**
+ * Whether registration has already SUCCEEDED in this app session.
+ *
+ * MODULE-SCOPED, for the same reason as lastReportedStatus above: it must
+ * outlive any one component. The recovery path in NotificationPreferences
+ * previously tracked "have we registered" in a useRef, which a remount reset
+ * to null — and the guard it fed (`prev !== null`) then failed on precisely
+ * the denied → granted transition it existed to catch. A module flag cannot
+ * be reset by a remount and still dies on cold start, which is the correct
+ * lifetime: one successful registration per launch.
+ *
+ * Only set on SUCCESS, so a failed attempt never suppresses the retry.
+ */
+let registeredThisSession = false;
+
+/** True once registration has completed successfully in this session. */
+export function hasRegisteredThisSession(): boolean {
+  return registeredThisSession;
+}
+
+/**
+ * Register only if this session has not already succeeded.
+ *
+ * This is the call the permission-recovery path wants: it can fire on every
+ * observation of 'granted' without adding a network call per screen open,
+ * which is what the old transition-detection guard was trying to buy — and it
+ * buys it without needing to detect a transition at all.
+ *
+ * `userId` is OPTIONAL and used only for log context. The write itself goes
+ * through register_device_token, which derives auth.uid() SERVER-side, so a
+ * null userId in the store is no reason to skip registering. The old guard's
+ * `&& userId` gated the call on a value the write never needed.
+ */
+export async function ensurePushRegistered(
+  userId?: string | null,
+): Promise<string | null> {
+  if (registeredThisSession) return null;
+  return registerForPushNotifications(userId ?? undefined);
+}
+
+/**
+ * Comparison-only fingerprint of a device token: two FNV-1a 32-bit passes with
+ * different seeds, 16 hex chars. Not cryptographic and does not need to be —
+ * the diagnostic compares fingerprints for equality across a handful of
+ * devices; it never inverts one. What matters is that the RAW token (a stable
+ * device identifier for a named user) never lands in a log table that will
+ * outlive the diagnostic.
+ */
+function fingerprint(value: string): string {
+  const pass = (seed: number): string => {
+    let h = seed >>> 0;
+    for (let i = 0; i < value.length; i++) {
+      h ^= value.charCodeAt(i);
+      h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return h.toString(16).padStart(8, '0');
+  };
+  // Standard FNV offset basis, then a second independent seed.
+  return pass(0x811c9dc5) + pass(0x811c9dc5 ^ 0x5bd1e995);
+}
+
+/**
  * Narrow Expo's permission status to the three values the CHECK constraint
  * allows, or null if it is anything else.
  *
@@ -172,7 +233,18 @@ async function ensureModules(): Promise<boolean> {
  * or running on simulator (no push tokens on simulator).
  */
 export async function registerForPushNotifications(
-  userId: string,
+  userId?: string,
+  options?: {
+    /**
+     * Show the OS permission prompt when permission is not yet granted.
+     * Defaults to true — the sign-in and onboarding call sites want the ask.
+     *
+     * Pass false for a launch-time token REFRESH: it re-registers a device
+     * that already granted permission and never surprises anyone with a cold
+     * prompt, so it is safe to run before onboarding has had its say.
+     */
+    promptIfNeeded?: boolean;
+  },
 ): Promise<string | null> {
   // The unconditional ENTRY trace that lived here was removed on 2026-08-20
   // once it had done its job: it proved registration DOES run on a
@@ -217,6 +289,15 @@ export async function registerForPushNotifications(
 
   // Request if not already granted
   if (existingStatus !== 'granted') {
+    if (options?.promptIfNeeded === false) {
+      // Deliberate quiet exit, not an abnormal path — so it records the
+      // status but does NOT write a push-trace row. This branch runs on every
+      // launch for every not-yet-granted user; tracing it would bury the real
+      // abnormal-path traces in steady-state noise.
+      const observed = normalizePermissionStatus(existingStatus);
+      if (observed) void recordPushPermission(observed);
+      return null;
+    }
     console.log('[Push] requesting OS permission (existing status:', existingStatus, ')');
     const {status} = await Notifications.requestPermissionsAsync();
     finalStatus = status;
@@ -257,14 +338,85 @@ export async function registerForPushNotifications(
 
   // Get the Expo push token
   try {
+    // DEVICE identity, resolved BEFORE the token so it is in hand either way.
+    // `platform`/Platform.OS cannot tell a Mac from an iPhone: an iOS app
+    // running on Apple Silicon reports 'ios' and Device.isDevice true on both,
+    // and user_devices.device_name is null on every row — which is precisely
+    // why two tokens on one account were indistinguishable all of 2026-08-24
+    // and each of us guessed a different one for the phone.
+    const deviceLabel = {
+      modelName: Device.modelName ?? null,       // 'iPhone 15 Pro' vs 'MacBook Pro'
+      osName: Device.osName ?? null,             // 'iOS' vs 'macOS' / 'iPadOS'
+      osVersion: Device.osVersion ?? null,
+      deviceType: Device.deviceType ?? null,     // PHONE | TABLET | DESKTOP
+      isDevice: Device.isDevice,
+    };
+
+    // A FINGERPRINT of the APNs/FCM device token, logged alongside the Expo
+    // one. Hashed, never raw: the raw native token is a device identifier for
+    // a named user, written to a table that outlives the diagnostic — and the
+    // question ("do these two Expo tokens sit on the same installation?") is
+    // answered by comparing values, which a hash does identically.
+    //
+    // This is the diagnostic that settles the open question, because it cannot
+    // be confused between devices: the native token is issued by APNs to THIS
+    // installation on THIS device, and PushTokenModule.swift calls
+    // registerForRemoteNotifications() fresh on every request — there is no
+    // native-side cache to go stale. If two Expo tokens on one account carry
+    // one fingerprint, the Expo layer is handing back a stale mapping; if the
+    // phone's fingerprint appears under an Expo token that never reaches
+    // user_devices, the break is in this function; if the fetch errors, the
+    // break is below us in APNs registration.
+    //
+    // Never inferred from the absence of a row: register_device_token is
+    // ON CONFLICT (push_token) DO UPDATE, so a device that gets an EXISTING
+    // token back updates a row instead of inserting one and adds no new row at
+    // all. "No new row" and "did not register" are different claims.
+    let nativeTokenHash: string | null = null;
+    let nativeTokenLength: number | null = null;
+    let nativeTokenError: string | null = null;
+    try {
+      const native = await Notifications.getDevicePushTokenAsync();
+      const raw =
+        typeof native?.data === 'string' ? native.data : JSON.stringify(native?.data);
+      nativeTokenHash = fingerprint(raw);
+      nativeTokenLength = raw.length;
+    } catch (nativeErr) {
+      nativeTokenError = nativeErr instanceof Error ? nativeErr.message : 'unknown';
+    }
+
     const tokenData = await Notifications.getExpoPushTokenAsync({
       projectId: 'a541257f-7510-4192-ba2f-56996e189b9d', // from app.json
     });
     const token = tokenData.data;
     console.log('[Push] Token:', token);
 
+    // TEMPORARY diagnostic (register item: "does an iPhone on the current
+    // build ever obtain a working token?", 2026-08-24). One launch per
+    // physical device answers it outright, with no inference from absence.
+    // Remove once the question is closed — and when removing it, record in the
+    // commit that its absence then proves nothing, which is the trap that cost
+    // an afternoon when the earlier entry traces were removed in f550652.
+    logError('push-trace: token resolved', {
+      screen: 'pushNotifications',
+      action: 'token-resolved',
+      userId,
+      os: Platform.OS,
+      expoToken: token,
+      nativeTokenHash,
+      nativeTokenLength,
+      nativeTokenError,
+      ...deviceLabel,
+    });
+
     // Register the token (via a SECURITY DEFINER RPC) — safe every app launch.
-    await upsertDeviceToken(token);
+    await upsertDeviceToken(token, deviceLabel.modelName);
+
+    // Latch AFTER the write succeeds, so ensurePushRegistered keeps retrying
+    // until one attempt actually lands. A launch-time registration therefore
+    // satisfies the latch and the recovery path stays quiet; if launch-time
+    // registration never succeeded, the recovery path is free to run.
+    registeredThisSession = true;
 
     return token;
   } catch (err) {
@@ -300,10 +452,18 @@ export async function registerForPushNotifications(
  * TRANSPORT, not the OS; the table CHECK allows only 'expo' | 'apns' | 'fcm', and
  * we always fetch an Expo token here.)
  */
-async function upsertDeviceToken(token: string): Promise<void> {
+async function upsertDeviceToken(
+  token: string,
+  deviceName?: string | null,
+): Promise<void> {
   const {error} = await supabase.rpc('register_device_token', {
     p_push_token: token,
     p_platform: 'expo',
+    // Device.modelName — the only field that separates an iPhone from an iOS
+    // app running on Apple Silicon. `platform` is the token TRANSPORT and is
+    // always 'expo'; Platform.OS reads 'ios' on both. Server-side COALESCE
+    // means a null here never erases a label already written.
+    p_device_name: deviceName ?? null,
   });
 
   if (error) {

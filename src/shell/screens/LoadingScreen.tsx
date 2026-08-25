@@ -13,7 +13,10 @@ import {
 } from '@shell/stores/persistedCompetition';
 import {getDefaultEvent, getEventByCompetition} from '@sports/registry';
 import {resolvePendingInviteCodeOnLaunch} from '@shell/services/pendingInvite';
-import {registerForPushNotifications} from '@shell/services/pushNotifications';
+import {
+  registerForPushNotifications,
+  ensurePushRegistered,
+} from '@shell/services/pushNotifications';
 import {reportClientInfo} from '@shell/services/reportClientInfo';
 import {logError} from '@shared/logging/logError';
 
@@ -93,6 +96,29 @@ export function LoadingScreen({navigation}: any) {
         // bails they would stay invisible, which is the failure that made the
         // failed-signup investigation inferential in the first place.
         reportClientInfo();
+
+        // Launch-time token REFRESH, hoisted above every bail below.
+        //
+        // The registration call further down sits after the ProfileSetup and
+        // TosVersionGate bails, both of which `return`. Anyone landing on
+        // either screen therefore never refreshes their token — no rejection
+        // involved, just an early return, and it leaves no trace of any kind.
+        // That is a standing candidate for the members who have no
+        // user_devices row at all.
+        //
+        // promptIfNeeded: false is what makes this safe to run this early: it
+        // re-registers a device that ALREADY granted permission and never
+        // raises a cold OS prompt, so onboarding keeps sole ownership of the
+        // ask. A user who has not granted yet falls through to the prompting
+        // call below, exactly as before.
+        registerForPushNotifications(session.user.id, {promptIfNeeded: false})
+          .catch(err => {
+            logError(err, {
+              screen: 'LoadingScreen',
+              action: 'registerForPushNotifications-refresh',
+              userId: session.user.id,
+            });
+          });
 
         // Restore the last-selected competition (REGISTRY-03 Part B). This is
         // what makes an invite code a durable door: switched once, it stays
@@ -207,13 +233,33 @@ export function LoadingScreen({navigation}: any) {
         // outward to here: getPermissionsAsync, requestPermissionsAsync and
         // (Android) setNotificationChannelAsync. An empty catch made those
         // vanish entirely — no row, no console line, nothing. This is the
-        // restored-session launch path, the one that has not stamped
-        // user_devices.last_used_at on Tom's device since 2026-07-30.
+        // restored-session launch path. (An older note here said it had not
+        // stamped last_used_at on the live device since 2026-07-30; that is
+        // no longer true — it stamped 2026-08-24 16:48:07Z.)
         // The pre-call trace here was removed 2026-08-20 having served its
-        // purpose: it confirmed this restored-session site is reached on every
-        // cold start, and that registration then enters and completes. The
-        // failure-path logError below stays.
-        registerForPushNotifications(session.user.id).catch(err => {
+        // purpose. READ THIS BEFORE REASONING FROM ITS ABSENCE (2026-08-24):
+        // because the trace is gone from the bundle, a launch that produces no
+        // "call site REACHED" row proves NOTHING about whether this line ran —
+        // and devices on older OTA bundles still emit it, so the same day can
+        // show the row for one user and not another purely by bundle age. A
+        // whole afternoon was lost to reading that as a per-device fault.
+        //
+        // What IS durable evidence that registration succeeded, no trace
+        // required: user_devices.last_used_at, stamped by register_device_token
+        // (reachable only after a granted permission AND a successful
+        // getExpoPushTokenAsync), and notification_preferences
+        // .push_permission_checked_at. Read those, not the log's absence.
+        // Note last_used_at, never created_at — a reinstall usually re-issues
+        // the SAME Expo token, so a genuinely fresh registration leaves
+        // created_at untouched and only moves last_used_at.
+        //
+        // The failure-path logError below stays.
+        // ensurePushRegistered, not registerForPushNotifications: the hoisted
+        // refresh above may already have succeeded this session, in which case
+        // this is a no-op. When it did not — permission was not yet granted —
+        // this call prompts, which is exactly the behaviour that was here
+        // before.
+        ensurePushRegistered(session.user.id).catch(err => {
           logError(err, {
             screen: 'LoadingScreen',
             action: 'registerForPushNotifications',
