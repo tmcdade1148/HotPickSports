@@ -221,7 +221,40 @@ Deno.serve(async (req) => {
     // nothing. Keep that ordering: reporting success on no data is the pattern
     // that hid the Aug 20 blackout for 12 hours.
     const slate = await fetchSlate(seasonType, espnWeek, seasonYear);
-    const events = slate.events;
+
+    // PER-EVENT CONTAMINATION FILTER. The identity check proves the payload is
+    // LABELLED as our week; it does not prove every event inside it belongs to
+    // that week. v28's header records that the scoreboard can span weeks, and
+    // one straggler is enough to do real damage: it would be upserted with OUR
+    // week stamp, relocating a live — possibly FINAL, possibly picked — week-N
+    // game into week N+1, where neither delete guard would ever see it because
+    // it arrives as an addition, not a removal.
+    //
+    // season.type is checked alongside week.number because week numbers are NOT
+    // unique across season types: our preseason competition maps week 3 to
+    // espnWeek 4, so a regular-season week-4 straggler would sail straight
+    // through a week-only test. Both fields are present on every event on both
+    // hosts (16/16 on each, verified 2026-08-25); the ?? defaults only matter if
+    // ESPN ever drops them, and they default to "keep" — the pre-v29 behaviour.
+    const fetched = slate.events;
+    const events = fetched.filter((e: any) =>
+      (e?.week?.number ?? espnWeek) === espnWeek &&
+      (e?.season?.type ?? seasonType) === seasonType);
+    const droppedForeign = fetched.length - events.length;
+    if (droppedForeign > 0) {
+      console.warn(`[nfl-import-schedule] dropped ${droppedForeign} foreign event(s) from the ${slate.host} slate for ${competition} wk${week} (wanted espn seasontype=${seasonType} week=${espnWeek})`);
+    }
+
+    // Games arrived, but none of them were ours. That is contamination, not an
+    // empty week — it must never take the zero-events "ok" path below, which
+    // would write games_status='ok' with games_count=0 for a week that has a
+    // real slate somewhere.
+    if (fetched.length > 0 && events.length === 0) {
+      await markGamesFailed(competition, week);
+      console.error(`[nfl-import-schedule] SLATE_FOREIGN ${competition} wk${week}: all ${fetched.length} events belonged elsewhere`);
+      return json({ success: false, competition, week, espnHost: slate.host,
+        error: `SLATE_FOREIGN: all ${fetched.length} fetched event(s) belong to another week or season type; wanted seasontype=${seasonType} week=${espnWeek}` }, 500);
+    }
 
     if (events.length === 0) {
       await markReadiness(competition, week, { games_status: "ok", games_count: 0, games_at: new Date().toISOString() });
@@ -344,7 +377,7 @@ Deno.serve(async (req) => {
     // reconciliation safe to repeat.
 
     return json({ success: true, competition, season_year: seasonYear, week, phase,
-      imported: rows.length, espnHost: slate.host, espnUrl: slate.url }, 200);
+      imported: rows.length, droppedForeign, espnHost: slate.host, espnUrl: slate.url }, 200);
   } catch (err) {
     if (week) await markGamesFailed(competition, week);
     return json({ success: false, error: String(err) }, 500);
