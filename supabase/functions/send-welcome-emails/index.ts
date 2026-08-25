@@ -87,6 +87,29 @@ function renderTemplate(
 }
 
 /**
+ * The scalars a template can reference. One builder, so the pre-render pass and
+ * the send loop cannot drift apart on what a placeholder means.
+ *
+ * house_code is OMITTED when the code is empty, deliberately. The conditional
+ * block is already suppressed in that case, so the only way {{house_code}} can
+ * still be in the text is if a later edit moved it OUTSIDE the block. Leaving it
+ * unresolved makes unresolvedPlaceholder() refuse the send, and a refusal beats
+ * mailing "use the code ." with a blank where a code should be.
+ */
+function templateVars(
+  firstName: string | null,
+  unsubUrl: string,
+  houseCode: string,
+): Record<string, string> {
+  const vars: Record<string, string> = {
+    first_name: (firstName ?? "").trim() || "there",
+    unsubscribe_url: unsubUrl,
+  };
+  if (houseCode) vars.house_code = houseCode;
+  return vars;
+}
+
+/**
  * Any {{...}} left after rendering is a typo in the copy ({{first_nme}}), an
  * unclosed IF block, or a placeholder this function does not know about. All
  * three must refuse rather than ship: a raw handlebar in a founder's email is
@@ -149,12 +172,19 @@ Deno.serve(async (req) => {
     const rendered: Rendered[] = [];
     if (copyProblems.length === 0) {
       for (const c of list) {
+        // BOTH conditions. Zero real Contests is who the paragraph is for; a
+        // non-empty house code is whether there is a door to point them at.
+        // Blanking house_contest_code is the ten-second close for a full Contest
+        // or a moderation incident, and it has to shut this letter too — the
+        // Join screen line going quiet while the email keeps handing out the
+        // code is half a kill switch, which is worse than none because you
+        // believe you have pulled it.
         const shows_house_code = c.real_contests === 0 && !!houseCode;
-        const vars = {
-          first_name: (c.first_name ?? "").trim() || "there",
-          unsubscribe_url: `${UNSUB_BASE}?t=${c.unsub_token ?? "<generated at send>"}`,
-          house_code: houseCode,
-        };
+        const vars = templateVars(
+          c.first_name,
+          `${UNSUB_BASE}?t=${c.unsub_token ?? "<generated at send>"}`,
+          houseCode,
+        );
         const subject = renderTemplate(subjectTemplate, vars, shows_house_code);
         const body = renderTemplate(bodyTemplate, vars, shows_house_code);
         const stray = unresolvedPlaceholder(subject) ?? unresolvedPlaceholder(body);
@@ -252,11 +282,7 @@ Deno.serve(async (req) => {
       // the pre-rendered one stands.
       const text = renderTemplate(
         bodyTemplate,
-        {
-          first_name: (c.first_name ?? "").trim() || "there",
-          unsubscribe_url: `${UNSUB_BASE}?t=${token}`,
-          house_code: houseCode,
-        },
+        templateVars(c.first_name, `${UNSUB_BASE}?t=${token}`, houseCode),
         c.shows_house_code,
       );
 

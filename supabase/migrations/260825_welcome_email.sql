@@ -227,23 +227,32 @@ REVOKE EXECUTE ON FUNCTION welcome_email_candidates() FROM PUBLIC, anon, authent
 --                         controls the wording and placement; he cannot
 --                         accidentally delete the opt-out and put the first
 --                         email HotPick ever sends out of compliance.
---   {{house_code}}        AVAILABLE BUT UNUSED. The seeded copy names HOTPICK26A
---                         literally, because Tom wrote it that way and the
---                         wording is his. The trade-off is real and worth
---                         knowing: when the cohort rolls to 26B, house_contest_code
---                         changes and this letter does not, so it keeps naming a
---                         full Contest until someone edits it too. Two places to
---                         remember instead of one. Swapping HOTPICK26A for
---                         {{house_code}} in this key is a one-line config edit,
---                         no deploy, and the letter then always names the current
---                         code. Tom's call, not the developer's.
+--   {{house_code}}        the CURRENT house Contest code, read at send time from
+--                         house_contest_code — the same key the Join screen
+--                         reads. Never write the code as a literal here.
+--
+--                         THIS IS THE KILL SWITCH, not a convenience. Setting
+--                         house_contest_code = "" is the ten-second door-close
+--                         for a full Contest or a moderation incident. With a
+--                         literal in this copy that switch would only be HALF
+--                         closed: the Join screen line would vanish while this
+--                         email kept mailing new signups a code to a Contest that
+--                         was believed shut, and an email cannot be recalled.
+--                         Half a kill switch is worse than a manual one, because
+--                         you think you have pulled it.
+--
+--                         Cohort rolling is the same mechanism doing its lesser
+--                         job: roll to 26B and the letter follows on its own.
 --   {{IF_NO_CONTEST}}…{{/IF_NO_CONTEST}}
---                         renders ONLY when the reader is in zero real Contests
---                         (section 6 definition, demo pool excluded). The sender
---                         collapses any run of blank lines left behind, so the
---                         block can be laid out readably here and "Your Picks. On
---                         the record." still follows the Contest paragraph
---                         cleanly when the block does not render.
+--                         renders ONLY when BOTH hold: the reader is in zero real
+--                         Contests (section 6 definition, demo pool excluded) AND
+--                         house_contest_code is non-empty. An empty code
+--                         suppresses the WHOLE block — the letter must never read
+--                         "use the code ." with a blank where a code should be.
+--                         The sender collapses any run of blank lines left
+--                         behind, so the block can be laid out readably here and
+--                         "Your Picks. On the record." still follows the Contest
+--                         paragraph cleanly when the block does not render.
 --
 -- FAIL CLOSED: an empty or missing subject or body sends NOTHING and reports
 -- why. Blanking welcome_email_body is therefore a second kill switch, alongside
@@ -281,7 +290,7 @@ These are the early days and I don't take you being here for granted. I hope you
 Starting a Contest takes less than a minute, then you share the invite code with friends, family or co-workers. The more the merrier. And if someone else starts one, you can be in theirs too. One login. Not many places do that.
 
 {{IF_NO_CONTEST}}
-If you're just here to play while you gather your Players, use the code HOTPICK26A. That'll get you into the public Contest.
+If you're just here to play while you gather your Players, use the code {{house_code}}. That'll get you into the public Contest.
 {{/IF_NO_CONTEST}}
 
 Your Picks. On the record. Bragging rights TBD.
