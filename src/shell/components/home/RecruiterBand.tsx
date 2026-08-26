@@ -1,54 +1,91 @@
 // src/shell/components/home/RecruiterBand.tsx
-// Off-cycle recruiter section that surfaces the most important
-// preseason / off-season action: getting more people into the user's
-// Contest. Shows roster count + invite code + a prominent share CTA.
+// The standing ask: getting somebody into a Contest that is still just its
+// Gaffer. Roster line + invite code + a share CTA.
 //
-// Detects organizer (Gaffer) status by comparing pool.organizer_id to
-// the current user — picks one of their owned pools first so a Gaffer
-// who's also a member of another Contest shares their own roster, not
-// the other Gaffer's.
+// Renders for ONE population and self-hides for everyone else: the current user
+// organizes this Contest (pool.organizer_id === their id) and its roster is
+// exactly them. Once anybody joins it disappears, because a repeated ask after
+// the ask has been answered is just noise.
+//
+// It was written for the off-cycle layout, dropped from it, and then imported
+// by nothing at all until 2026-08-25 — a complete component that made the one
+// request the app never made anywhere. It now sits with the in-cycle Contests.
 //
 // The share text itself comes from buildInviteMessage (@shared/utils/invite) —
 // the single invite voice, shared with Contest Settings → Share. It leads with
 // the invite code because a code always works; warm deep links on iOS do not
 // (see that file for the why).
 
-import React from 'react';
+import React, {useEffect, useState} from 'react';
 import {Text} from '@shared/components/AppText';
 import {Pressable, Share, StyleSheet, View} from 'react-native';
 import {useTheme} from '@shell/theme/hooks';
 import {useGlobalStore} from '@shell/stores/globalStore';
+import {supabase} from '@shared/config/supabase';
 import {buildInviteMessage} from '@shared/utils/invite';
 import {bodyType, spacing, borderRadius} from '@shared/theme';
 
 export function RecruiterBand() {
   const {colors} = useTheme();
 
-  const visiblePools   = useGlobalStore(s => s.visiblePools);
-  const userRankByPool = useGlobalStore(s => s.userRankByPool);
-  const userId         = useGlobalStore(s => s.user?.id);
+  const visiblePools = useGlobalStore(s => s.visiblePools);
+  const userId       = useGlobalStore(s => s.user?.id);
 
   // Exactly the population this exists for: a Contest the user ORGANIZES that
   // is still only them. Once somebody joins, the ask is done and a standing
   // prompt turns into noise, so the band disappears on its own.
   //
   // visiblePools has already dropped archived, hidden and demo Contests — that
-  // is what makes it "visible" — so this adds only the two conditions it does
-  // not cover. Restating the whole real-Contest definition here would be a
-  // second copy of it, and a definition kept in several places is what produced
-  // the 77-recipient broadcast on 2026-08-25.
+  // is what makes it "visible" — so this picks the candidate on the one
+  // condition it does not cover. Restating the whole real-Contest definition
+  // here would be a second copy of it, and a definition kept in several places
+  // is what produced the 77-recipient broadcast on 2026-08-25.
+  const pool = visiblePools.find(p => p.invite_code && p.organizer_id === userId);
+
+  // THE COUNT HAS TO BE THE ROSTER, NOT THE RANK RPC.
   //
-  // memberCount defaults to 0 while userRankByPool is still loading, so the
-  // band stays hidden until the count is real rather than flashing an ask at
-  // someone whose Contest is already full.
-  const pool = visiblePools.find(
-    p =>
-      p.invite_code &&
-      p.organizer_id === userId &&
-      (userRankByPool[p.id]?.memberCount ?? 0) === 1,
-  );
+  // userRankByPool.memberCount comes from get_user_ranks_in_pools, whose
+  // active_members CTE filters `NOT is_super_admin` — it is the STANDINGS
+  // population, sized to rank against, not the number of people in the Contest.
+  // Verified 2026-08-25: NFL HotPick 26A has 2 active members and the RPC
+  // reports 1; The Natural NFL26 is 3 and reports 2. Gating `=== 1` on that
+  // number showed the band on a Contest that already had somebody in it.
+  //
+  // get_pool_member_counts is NOT the fix either, despite the name: it carries
+  // the identical super-admin filter. Checked before reaching for it.
+  //
+  // This is the same population mismatch that parked the PoolModule rank chip
+  // ("12 of 11"), surfacing in a second place. Counting the roster directly is
+  // what removes it; loosening the gate to `<= 1` would only hide it.
+  //
+  // A handful of rows, only for a Gaffer, only when there is a candidate.
+  const [rosterCount, setRosterCount] = useState<number | null>(null);
+  const poolId = pool?.id;
+
+  useEffect(() => {
+    if (!poolId) {
+      setRosterCount(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const {count, error} = await supabase
+        .from('pool_members')
+        .select('user_id', {count: 'exact', head: true})
+        .eq('pool_id', poolId)
+        .eq('status', 'active');
+      if (!cancelled) setRosterCount(error ? null : count ?? null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [poolId]);
 
   if (!pool?.invite_code) return null;
+  // null covers both "still counting" and "the count failed", and both mean the
+  // same thing here: say nothing rather than flash an ask at somebody whose
+  // Contest already has people in it.
+  if (rosterCount !== 1) return null;
 
   const code     = pool.invite_code;
   const poolName = pool.name_display || pool.name || 'your Contest';
