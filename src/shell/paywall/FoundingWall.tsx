@@ -48,12 +48,38 @@ export function FoundingWall({
   const Contest = LEXICON.contest.singular;
   const contestLabel = contestName ?? `your ${Contest}`;
 
-  const tiers = [
-    {price: null, label: `up to ${freeTierMaxMembers} ${Players}`, here: trigger === 'member_cap'},
+  const paidTiers = [
     {price: prices.small, label: `up to ${smallMaxMembers} ${Players}`, here: false},
     {price: prices.medium, label: `up to ${mediumMaxMembers} ${Players}`, here: false},
     {price: prices.large, label: `${mediumMaxMembers + 1}+ ${Players}`, here: false},
   ];
+
+  // THE FREE ROW BELONGS ON THE MEMBER_CAP WALL ONLY.
+  //
+  // The two numbers measure different things. free_tier_max_members sizes the
+  // organizer's FIRST Contest; the paid tiers price ADDITIONAL ones. Listing
+  // them as one ladder with no label makes the prices read as worse value the
+  // more you pay — at the live config (free 50, small $19/25, medium $39/50) it
+  // says $19 buys HALF of free and $39 buys EXACTLY free. Both are nonsense, and
+  // both come from that one row.
+  //
+  // On the pool_cap wall the free row is also just the tier they already have,
+  // on a screen about creating a SECOND Contest. Removing it leaves a ladder
+  // that climbs: $19/25, $39/50, $69/51+.
+  //
+  // On the member_cap wall it stays and it means something — it is marked
+  // "you're here" and names the cap they just crossed.
+  //
+  // NOT struck through (considered, dropped): these prices have never been
+  // charged, and the whole job of this card is "paid is coming, you are exempt".
+  // Crossing them out would say "these prices are dead", which is the opposite.
+  const tiers =
+    trigger === 'member_cap'
+      ? [
+          {price: null, label: `up to ${freeTierMaxMembers} ${Players}`, here: true},
+          ...paidTiers,
+        ]
+      : paidTiers;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -96,10 +122,19 @@ export function FoundingWall({
             ))}
           </View>
 
-          <Text style={styles.founding}>
-            But you got in early — your founding season is on us, every tier, all
-            the way through the Super Bowl. Keep building.
-          </Text>
+          {/* THE PAYOFF, not a footnote. This was a trailing paragraph at 15pt
+              regular, lighter than the 16/700 tier prices above it — so the eye
+              stopped on the numbers and never reached the one sentence on the
+              card that changes what the organizer does next.
+              Tinted block reuses colors.surface, the same token tierRowHere
+              uses, so it reads as a pattern the card already has rather than a
+              new device. Split in two so the claim lands before the detail. */}
+          <View style={styles.foundingBlock}>
+            <Text style={styles.foundingLead}>Your founding season is on us.</Text>
+            <Text style={styles.foundingDetail}>
+              Every tier, all the way through the Super Bowl. Keep building.
+            </Text>
+          </View>
 
           <TouchableOpacity style={styles.cta} onPress={onClose}>
             <Text style={styles.ctaText}>
@@ -171,11 +206,26 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: '600',
     color: colors.primary,
   },
-  founding: {
+  foundingBlock: {
+    // Same token as tierRowHere — the card's existing way of marking the row
+    // that matters, reused rather than a second treatment invented for this.
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  foundingLead: {
+    // 17/700 against the tier prices' 16/700: the payoff outweighs the numbers
+    // it is answering, which is the whole point of the change.
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.primary,
+    marginBottom: 2,
+  },
+  foundingDetail: {
     fontSize: 15,
     lineHeight: 21,
     color: colors.textPrimary,
-    marginBottom: spacing.lg,
   },
   cta: {
     backgroundColor: colors.primary,
