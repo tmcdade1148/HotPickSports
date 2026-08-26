@@ -32,6 +32,7 @@ import {RecapModule} from '@shell/components/home/RecapModule';
 import {HistoryModule} from '@shell/components/home/HistoryModule';
 import {ModuleSection} from '@shell/components/home/ModuleSection';
 import {ContestCarousel} from '@shell/components/home/ContestCarousel';
+import {RecruiterBand} from '@shell/components/home/RecruiterBand';
 import {ContestActions} from '@shell/components/ContestActions';
 import {PartnerModule} from '@shell/components/home/PartnerModule';
 import {resolveHomeRow, isWeekRunningRow} from '@shell/components/home/homeRows';
@@ -638,6 +639,18 @@ export function HomeScreen() {
                 Be in as many Contests as you want. They'll all live right here. You can also make picks on your own and join a Contest later. It's just more fun with someone keeping score.
               </Text>
             )}
+            {/* The standing ask, for an organizer whose Contest is still just
+                them. Self-hiding: it renders nothing unless the user organizes
+                a Contest with exactly one member, and it disappears the moment
+                somebody joins. Sits with the Contests because a Contest of one
+                is the thing it is talking about.
+
+                Deliberately INSIDE the in-cycle block. The off-cycle layouts
+                above dropped this band on purpose (see the note at the top of
+                that section); reinstating it there would undo a considered
+                decision rather than make one. The creation moment itself is
+                covered everywhere by the Handoff. */}
+            <RecruiterBand />
           </>
         )}
 
