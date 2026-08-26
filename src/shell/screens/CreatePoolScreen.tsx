@@ -28,6 +28,13 @@ import {organizerMoneyAcknowledgment} from '@shared/lexicon';
 const ORGANIZER_ACK_VERSION = '2.0';
 
 /**
+ * Pause between the founding wall closing and the Handoff opening. Covers React
+ * Native's modal fade (~300ms) so the two presentations never overlap on iOS.
+ * See closeFoundingWall().
+ */
+const WALL_TO_HANDOFF_MS = 320;
+
+/**
  * CreatePoolScreen — Form to create a new pool for the active event.
  * Generates an invite code automatically. Sets the new pool as active.
  * All Contests are private (invite-only). The public-Contest switch was
@@ -57,9 +64,11 @@ export function CreatePoolScreen({navigation}: any) {
   const [showSeasonConfirm, setShowSeasonConfirm] = useState(false);
   const [createdPoolId, setCreatedPoolId] = useState<string | null>(null);
   // The Handoff: the ask, in the one moment the organizer is guaranteed to be
-  // paying attention. Holds the pool and code createPool returned; null until
-  // a Contest is actually created down the normal path.
+  // paying attention. Two pieces of state, because priming and presenting are
+  // different moments on the pool_cap path — the Contest exists as soon as
+  // create_pool returns, but the founding wall has to have its say first.
   const [handoff, setHandoff] = useState<{pool: any; code: string} | null>(null);
+  const [handoffVisible, setHandoffVisible] = useState(false);
 
   // A time-boxed event can redirect Contest creation to the season it leads
   // into, so a Contest started during the preseason is a regular-season
@@ -76,6 +85,27 @@ export function CreatePoolScreen({navigation}: any) {
   // sites with the reason written at only one of them.
   const dismissToHome = () => {
     setTimeout(() => navigation.goBack(), 100);
+  };
+
+  // Closing the founding wall hands over to the Handoff rather than leaving.
+  //
+  // The gap is not decoration. FoundingWall and ContestHandoff are both
+  // transparent fade <Modal>s, which on iOS are two separate presentations, and
+  // starting the second while the first is still dismissing is the same class of
+  // conflict PoolSettingsScreen documents for the share sheet — the one where
+  // the thing silently never appears. Let the wall finish before the ask starts.
+  //
+  // Nothing primed means no invite code came back, so there is nothing to hand
+  // off to and this behaves as it always did: home. Note it now routes through
+  // dismissToHome(), so this path finally gets the 100ms Fabric settle the other
+  // exits have always had — it was calling navigation.goBack() bare.
+  const closeFoundingWall = () => {
+    setShowFoundingWall(false);
+    if (!handoff) {
+      dismissToHome();
+      return;
+    }
+    setTimeout(() => setHandoffVisible(true), WALL_TO_HANDOFF_MS);
   };
 
   const doCreate = async () => {
@@ -100,27 +130,46 @@ export function CreatePoolScreen({navigation}: any) {
     setCreating(false);
 
     if (result.pool) {
+      // The Contest EXISTS on every branch below — create_pool has already
+      // written it. So prime the ask on every branch that ends on this screen,
+      // and let each branch decide WHEN to present it.
+      const primed = result.pool.invite_code
+        ? {pool: result.pool, code: result.pool.invite_code}
+        : null;
+      if (primed) setHandoff(primed);
+
       if (result.showWall === 'pool_cap') {
-        // Contest is created; prime with the founding wall, then return on close.
+        // NOT an exceptional path. free_tier_max_pools is 1 and the founding
+        // season is active, so EVERY second-or-later Contest lands here — a
+        // large share of exactly the organizers the Handoff exists for. Two
+        // Contests created 2026-08-26 12:31 took this branch and got no ask.
+        //
+        // Sequence, don't skip: the wall is the constraint, the Handoff is the
+        // next step, and both belong. The wall goes first and closeFoundingWall
+        // presents the Handoff after it, instead of returning to Home.
         setShowFoundingWall(true);
         return;
       }
+
       if (isRedirected) {
+        // Left alone deliberately. "Take me to it" navigates INTO the new
+        // Contest, so a Handoff layered on top of that is genuinely wrong: the
+        // organizer is already looking at the thing. They share from Contest
+        // Settings. RecruiterBand MAY also catch them, but it surfaces one
+        // Contest at a time, so it is not a guarantee and is not the reason
+        // this branch is skipped.
         setCreatedPoolId(result.pool.id);
         setShowSeasonConfirm(true);
         return;
       }
-      // THE HANDOFF replaces the bare goBack here, and only here. The two
-      // branches above return before this and keep their own modals untouched:
-      // both already interrupt with something, and stacking a second modal on
-      // top is worse than skipping it. A Contest created down either path still
-      // gets the ask from RecruiterBand on Home.
+
+      // Normal path: straight to the ask.
       //
       // create_pool always generates an invite code, but if one somehow did not
       // come back there is nothing to share, and a Handoff with an empty code is
       // worse than the old silence — so that case falls through unchanged.
-      if (result.pool.invite_code) {
-        setHandoff({pool: result.pool, code: result.pool.invite_code});
+      if (primed) {
+        setHandoffVisible(true);
         return;
       }
       dismissToHome();
@@ -242,12 +291,16 @@ export function CreatePoolScreen({navigation}: any) {
         </View>
       </View>
 
+      {/* Mounted as soon as a Contest exists, but presents nothing until
+          handoffVisible flips — which is immediate on the normal path and
+          deferred until the founding wall has faded on the pool_cap path. */}
       {handoff && (
         <ContestHandoff
-          visible
+          visible={handoffVisible}
           pool={handoff.pool}
           code={handoff.code}
           onDismiss={() => {
+            setHandoffVisible(false);
             setHandoff(null);
             dismissToHome();
           }}
@@ -257,7 +310,7 @@ export function CreatePoolScreen({navigation}: any) {
       <FoundingWall
         visible={showFoundingWall}
         trigger="pool_cap"
-        onClose={() => navigation.goBack()}
+        onClose={closeFoundingWall}
       />
 
       {/* REGISTRY-03 §5 Part C specifies THAT this confirmation exists and
