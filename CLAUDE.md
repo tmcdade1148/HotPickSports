@@ -2,7 +2,7 @@
 
 Read this file before writing any code. Full architecture context is in `REFERENCE.md`.
 
-Session start: before your first response, also read the "Working With Tom & How This Project Operates" section at the top of REFERENCE.md. It covers how to collaborate, the document hierarchy (CLAUDE.md → REFERENCE.md → LAUNCH_READINESS.md), how to approach problems, and what NFL Season 2 is validating. LAUNCH_READINESS.md is the source of truth for current state — never trust a frozen snapshot
+Session start: before your first response, also read the "Working With Tom & How This Project Operates" section at the top of REFERENCE.md. It covers how to collaborate, the document hierarchy (CLAUDE.md → REFERENCE.md → docs/LAUNCH_READINESS.md), how to approach problems, and what NFL Season 2 is validating. docs/LAUNCH_READINESS.md is the source of truth for current state — never trust a frozen snapshot
 
 ---
 
@@ -83,6 +83,22 @@ than the moment to report it.
 
 **Scope numbers in specs are hypotheses until traced.** Mark them as such, and
 expect them to be checked.
+
+**A register row is a claim.** LAUNCH_READINESS.md rows assert current state,
+and a change made anywhere else can turn one false without anybody touching
+it. On 25 August 2026 retiring the global pools made row 1.9 the exact
+opposite of the truth while it still read as verified — the worst state a row
+can be in, because a stale row that looks checked is trusted.
+
+**The rule:** when a change makes a LAUNCH_READINESS.md row false, correct
+that row in the same pass as the change. Not later, not in a sweep. The
+obligation is one row you just invalidated — not an audit of the file — and
+it is scoped that small deliberately, because a rule that costs an afternoon
+gets skipped.
+
+**Verified means checked live, this session.** Never mark a row verified from
+a commit message, a spec, a previous session, or "Code says it's done."
+Rows without a dated verification mark are unchecked, not confirmed.
 
 ## Critical Red Flags
 
