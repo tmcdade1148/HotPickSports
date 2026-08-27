@@ -17,6 +17,7 @@ import {spacing, borderRadius} from '@shared/theme';
 import {useTheme} from '@shell/theme';
 import {FoundingWall} from '@shell/paywall';
 import {ContestHandoff} from '@shell/components/ContestHandoff';
+import {enterAppFromOnboarding} from '@shell/services/enterApp';
 import {organizerMoneyAcknowledgment} from '@shared/lexicon';
 
 /**
@@ -41,7 +42,11 @@ const WALL_TO_HANDOFF_MS = 320;
  * removed per the 2026-05-27 product call — HotPick is for groups who
  * already know each other; there's no public matchmaking.
  */
-export function CreatePoolScreen({navigation}: any) {
+export function CreatePoolScreen({navigation, route}: any) {
+  // Set only by PoolWelcomeScreen's "start your own Contest" link. Every other
+  // entry point (Home footer, Settings, Chirps, Pool Selection) leaves it
+  // undefined and keeps the goBack() exit, which is correct for them.
+  const fromOnboarding = route?.params?.fromOnboarding === true;
   const {colors} = useTheme();
   const styles = createStyles(colors);
   const user = useGlobalStore(s => s.user);
@@ -84,7 +89,20 @@ export function CreatePoolScreen({navigation}: any) {
   // decoration — do not shorten or remove it. Previously copied at three call
   // sites with the reason written at only one of them.
   const dismissToHome = () => {
-    setTimeout(() => navigation.goBack(), 100);
+    setTimeout(() => {
+      // A create that began during onboarding exits FORWARD into the app.
+      // goBack() would return the new Gaffer to PoolWelcome — the screen that
+      // just told them to "start your own Contest" — which reads as the create
+      // having failed. That is the duplicate-Contest loop this branch closes.
+      // All four post-create paths (normal, pool_cap, redirected, and the
+      // no-invite-code fallback) route through here, so this is the only place
+      // the branch is needed.
+      if (fromOnboarding) {
+        enterAppFromOnboarding(navigation);
+        return;
+      }
+      navigation.goBack();
+    }, 100);
   };
 
   // Closing the founding wall hands over to the Handoff rather than leaving.

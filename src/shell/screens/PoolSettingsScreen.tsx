@@ -5,7 +5,9 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -1007,17 +1009,27 @@ export function PoolSettingsScreen() {
         transparent
         animationType="fade"
         onRequestClose={() => setPartnerBroadcastVisible(false)}>
-        <Pressable
+        {/* The input has autoFocus, so the keyboard is up before a single
+            character is typed and Send/Cancel were covered from the moment the
+            dialog opened. A broadcast can't be handed to the OS the way an
+            invite can — it's authored here and sent by send-partner-broadcast —
+            so the editor gets the fix rather than the axe.
+
+            Pattern copied from PoolMembersScreen's note editor, not invented:
+            the backdrop becomes an absolutely positioned SIBLING of the card
+            rather than a parent wrapping it, which removes the need for the
+            empty-onPress tap-swallow the card used to carry. */}
+        <KeyboardAvoidingView
           style={styles.modalBackdrop}
-          onPress={() => {
-            if (!partnerBroadcastSending) setPartnerBroadcastVisible(false);
-          }}
-          accessibilityLabel="Dismiss broadcast dialog">
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <Pressable
-            style={styles.modalCard}
+            style={styles.modalBackdropPress}
             onPress={() => {
-              /* swallow taps inside the card so backdrop dismiss doesn't fire */
-            }}>
+              if (!partnerBroadcastSending) setPartnerBroadcastVisible(false);
+            }}
+            accessibilityLabel="Dismiss broadcast dialog"
+          />
+          <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>
               Broadcast from {partnerRow?.name ?? 'League'}
             </Text>
@@ -1072,8 +1084,8 @@ export function PoolSettingsScreen() {
                 )}
               </TouchableOpacity>
             </View>
-          </Pressable>
-        </Pressable>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Edit-before-share: the Gaffer can tweak the invite copy, or copy just
@@ -1594,6 +1606,16 @@ const createStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
+  },
+  // Copied verbatim from PoolMembersScreen rather than approximated. Fills the
+  // backdrop as an absolute sibling behind the card, so a tap outside the card
+  // dismisses without the card needing an empty-onPress swallow.
+  modalBackdropPress: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   modalCard: {
     width: '100%',

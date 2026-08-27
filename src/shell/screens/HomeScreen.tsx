@@ -570,10 +570,12 @@ export function HomeScreen() {
           ))}
 
         {/* Off-cycle layout (Slice 7c): picks-open line → demo button →
-            Contests → cross-Contest strip → Clubs teaser. Join/Start now live
-            in the docked footer below (shared with regular season), not an
-            inline action stack. The Clubs teaser shrinks to one line;
-            RecruiterBand is dropped from these states. */}
+            Contests → recruiter band → cross-Contest strip → Clubs teaser.
+            Join/Start now live in the docked footer below (shared with regular
+            season), not an inline action stack. The Clubs teaser shrinks to one
+            line. RecruiterBand USED to be dropped from these states; that was
+            reversed on evidence 2026-08-27 — see the note at its in-cycle
+            render site below for why. */}
         {configLoaded && (homeRow === 'off_far' || homeRow === 'off_near') && (
           <>
             {/* Config-driven "Week 1 picks go LIVE …" line, under the hero's
@@ -583,6 +585,8 @@ export function HomeScreen() {
                 Join/Start moved to the docked footer below. */}
             <DemoButton />
             {offCycleContests}
+            {/* Same placement as in-cycle: right after the Contest cards. */}
+            <RecruiterBand />
             <CrossContestStrip />
             {offCycleClubs ?? <ClubsTeaser />}
           </>
@@ -595,6 +599,9 @@ export function HomeScreen() {
                 Join/Start moved to the docked footer below. */}
             <DemoButton />
             {offCycleContests}
+            {/* pre_bridge is where nfl_2026 sits for the ENTIRE recruiting
+                window, so this is the row that matters most. */}
+            <RecruiterBand />
             <CrossContestStrip />
             {offCycleClubs ?? <ClubsTeaser />}
           </>
@@ -645,11 +652,28 @@ export function HomeScreen() {
                 somebody joins. Sits with the Contests because a Contest of one
                 is the thing it is talking about.
 
-                Deliberately INSIDE the in-cycle block. The off-cycle layouts
-                above dropped this band on purpose (see the note at the top of
-                that section); reinstating it there would undo a considered
-                decision rather than make one. The creation moment itself is
-                covered everywhere by the Handoff. */}
+                REVERSED 2026-08-27 — the band now ALSO renders in the three
+                off-cycle rows (off_far, off_near, pre_bridge).
+
+                The original reasoning is kept rather than deleted, because it
+                was reconsidered on evidence, not overlooked: "Deliberately
+                INSIDE the in-cycle block. The off-cycle layouts above dropped
+                this band on purpose; reinstating it there would undo a
+                considered decision rather than make one. The creation moment
+                itself is covered everywhere by the Handoff."
+
+                That rested on the Handoff always firing, and it does not.
+                ContestHandoff landed 2026-08-25, eleven days after the store
+                binary was cut, and a launch wait of zero means a new install
+                runs the embedded bundle for its whole first session — so the
+                organizer in the 2026-08-27 evidence saw no Handoff at all.
+                Meanwhile nfl_2026 sits in PRE_SEASON → pre_bridge for the
+                entire recruiting window, so an organizer on Home could not see
+                their invite code anywhere: it lives behind the gear icon, and
+                the only element on screen mentioning invites was the Start a
+                Contest pill's "and invite friends" — which creates ANOTHER
+                Contest. That is how the duplicate got made. Premise false,
+                conclusion withdrawn. */}
             <RecruiterBand />
           </>
         )}
