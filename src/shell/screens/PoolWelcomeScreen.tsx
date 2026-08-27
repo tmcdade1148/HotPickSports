@@ -12,12 +12,11 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useGlobalStore} from '@shell/stores/globalStore';
-import {resolveDefaultPoolId} from '@shell/stores/selectors/defaultPool';
 import {
   resolvePendingInviteCodeOnLaunch,
   consumePendingInviteCode,
 } from '@shell/services/pendingInvite';
-import {getDefaultEvent} from '@sports/registry';
+import {enterAppFromOnboarding} from '@shell/services/enterApp';
 import {getDisplayName} from '@shared/utils/displayName';
 import {supabase} from '@shared/config/supabase';
 import type {DbProfile} from '@shared/types/database';
@@ -32,16 +31,6 @@ export function PoolWelcomeScreen({navigation}: any) {
   const managedClub = useGlobalStore(s => s.managedClub);
   const pendingInviteCode = useGlobalStore(s => s.pendingInviteCode);
   const joinPool = useGlobalStore(s => s.joinPool);
-  const setActiveSport = useGlobalStore(s => s.setActiveSport);
-  const refreshAvailableEvents = useGlobalStore(
-    s => s.refreshAvailableEvents,
-  );
-  const fetchUserPools = useGlobalStore(s => s.fetchUserPools);
-  const setActivePoolId = useGlobalStore(s => s.setActivePoolId);
-  const subscribeSmackUnread = useGlobalStore(s => s.subscribeSmackUnread);
-  const fetchSmackUnreadCounts = useGlobalStore(
-    s => s.fetchSmackUnreadCounts,
-  );
 
   const [inviteCode, setInviteCode] = useState('');
   const [joinedPool, setJoinedPool] = useState<{
@@ -179,34 +168,12 @@ export function PoolWelcomeScreen({navigation}: any) {
     handleJoinWithCode(inviteCode);
   };
 
-  const initializeAndNavigate = async () => {
-    if (!user?.id) return;
-
-    const visibleCompetitions = useGlobalStore.getState().visibleCompetitions;
-    const defaultEvent = getDefaultEvent(visibleCompetitions);
-    refreshAvailableEvents();
-    setActiveSport(defaultEvent);
-
-    await fetchUserPools(user.id, defaultEvent.competition);
-    const pools = useGlobalStore.getState().userPools;
-
-    if (pools.length > 0) {
-      // Seed the viewed contest from the star resolver (manual star → first
-      // created → first partner → first joined) instead of blindly taking the
-      // global pool. Same rule that paints the Settings star; never persists.
-      const {poolRoles, defaultPoolId} = useGlobalStore.getState();
-      setActivePoolId(
-        resolveDefaultPoolId(pools, poolRoles, defaultPoolId) ?? pools[0].id,
-      );
-      const poolIds = pools.map(p => p.id);
-      await fetchSmackUnreadCounts(user.id, poolIds);
-    }
-    subscribeSmackUnread();
-
-    // reset, not replace — clears the onboarding/Welcome screens beneath Home so
-    // a back-gesture/swipe can't pop back to the login screen (looked like sign-out).
-    navigation.reset({index: 0, routes: [{name: 'Home'}]});
-  };
+  // The onboarding completion sequence moved to @shell/services/enterApp so that
+  // CreatePoolScreen can finish onboarding the same way this screen does — a
+  // Contest created from the link below used to exit via goBack() and land the
+  // new Gaffer right back here. The body moved verbatim; behavior is unchanged,
+  // and all five call sites on this screen still work as they did.
+  const initializeAndNavigate = () => enterAppFromOnboarding(navigation);
 
   // Deep-link joining, successful join, or a League manager being forwarded
   // to Home — show a loading/confirmation state instead of the player page.
@@ -238,7 +205,10 @@ export function PoolWelcomeScreen({navigation}: any) {
               <TouchableOpacity
                 style={styles.secondaryButton}
                 onPress={initializeAndNavigate}>
-                <Text style={styles.secondaryButtonText}>I'll do this later</Text>
+                {/* Deferral IS correct here — they're skipping the CODE, not
+                    the app. Distinct from the primary button below, which now
+                    describes arrival. */}
+                <Text style={styles.secondaryButtonText}>Skip for now</Text>
               </TouchableOpacity>
             </>
           ) : joinedPool ? (
@@ -373,7 +343,9 @@ export function PoolWelcomeScreen({navigation}: any) {
             Don't have an invite code? Then you should be the Gaffer and{' '}
             <Text
               style={styles.gafferPitchLink}
-              onPress={() => navigation.navigate('CreatePool')}>
+              onPress={() =>
+                navigation.navigate('CreatePool', {fromOnboarding: true})
+              }>
               start your own Contest.
             </Text>
           </Text>
@@ -381,7 +353,12 @@ export function PoolWelcomeScreen({navigation}: any) {
           <TouchableOpacity
             style={styles.primaryButton}
             onPress={initializeAndNavigate}>
-            <Text style={styles.primaryButtonText}>I'll do this later</Text>
+            {/* Describes arrival, not deferral. ContestHandoff's dismiss also
+                reads "I'll do this later" and means something different (skip
+                inviting); an organizer who dismissed the Handoff and landed
+                here on the identical words had no way to tell their tap had
+                registered. Two consecutive screens never share a label. */}
+            <Text style={styles.primaryButtonText}>Take me in</Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>

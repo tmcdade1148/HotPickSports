@@ -5,7 +5,9 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -208,8 +210,6 @@ export function PoolSettingsScreen() {
   const [newLabel, setNewLabel] = useState('');
   const [addingCode, setAddingCode] = useState(false);
   const [codeError, setCodeError] = useState<string | null>(null);
-  // Edit-before-share: holds the code being shared + the (editable) message.
-  const [shareEdit, setShareEdit] = useState<{code: string; text: string} | null>(null);
   // Tracks which Club is being removed from the roster. Must live with the
   // other hooks (above the `if (!pool)` early return) — never below it.
   const [removingPartnerId, setRemovingPartnerId] = useState<string | null>(null);
@@ -525,27 +525,28 @@ export function PoolSettingsScreen() {
     Alert.alert('Copied', `${code} copied to clipboard.`);
   };
 
-  // Open an editable preview so the Gaffer can tweak the invite before sending.
-  // The starting text is the shared invite voice (@shared/utils/invite) — the
-  // same builder the Home recruiter band uses, so the two are byte-identical.
-  const handleShareAnyCode = (code: string) => {
-    setShareEdit({code, text: buildInviteMessage(pool!, code)});
-  };
-
-  const submitShare = async () => {
-    if (!shareEdit) return;
-    const {text} = shareEdit;
-    // Present the share sheet BEFORE closing the modal. Closing first
-    // unmounts the <Modal>, and on iOS presenting the native share sheet
-    // while that modal is animating out is a presentation conflict — the
-    // sheet has no stable view controller to present from and silently
-    // never appears. Share first, then dismiss in `finally`.
+  // Straight to the native share sheet — no intermediate dialog. The sheet
+  // hands Messages/Mail/WhatsApp the message as an editable draft with the
+  // cursor already in it (confirmed on device 2026-08-27), so the in-app editor
+  // was duplicating the operating system and doing it worse: no keyboard
+  // avoidance, so the keyboard covered Share; a card whose onPress was an empty
+  // function; and an unguarded backdrop that discarded the edit with no warning.
+  // Copy already sits on the code row beside Share, so the dialog's Copy button
+  // duplicated a control one tap away. ContestHandoff and RecruiterBand already
+  // share this way — this makes all three consistent.
+  //
+  // The deleted submitShare had to present the sheet BEFORE closing the modal:
+  // on iOS, presenting while a modal animates out is a conflict and the sheet
+  // silently never appears. With no modal there is no conflict to sequence
+  // around, which is why that ordering comment is gone rather than relocated.
+  //
+  // Text comes from buildInviteMessage — never build the invite string locally.
+  // One invite voice, shared with Home; it carries the code-first decision.
+  const handleShareAnyCode = async (code: string) => {
     try {
-      await Share.share({message: text});
+      await Share.share({message: buildInviteMessage(pool!, code)});
     } catch {
-      // user cancelled or the share sheet failed to present
-    } finally {
-      setShareEdit(null);
+      // user cancelled, or the sheet failed to present
     }
   };
 
@@ -1007,17 +1008,27 @@ export function PoolSettingsScreen() {
         transparent
         animationType="fade"
         onRequestClose={() => setPartnerBroadcastVisible(false)}>
-        <Pressable
+        {/* The input has autoFocus, so the keyboard is up before a single
+            character is typed and Send/Cancel were covered from the moment the
+            dialog opened. A broadcast can't be handed to the OS the way an
+            invite can — it's authored here and sent by send-partner-broadcast —
+            so the editor gets the fix rather than the axe.
+
+            Pattern copied from PoolMembersScreen's note editor, not invented:
+            the backdrop becomes an absolutely positioned SIBLING of the card
+            rather than a parent wrapping it, which removes the need for the
+            empty-onPress tap-swallow the card used to carry. */}
+        <KeyboardAvoidingView
           style={styles.modalBackdrop}
-          onPress={() => {
-            if (!partnerBroadcastSending) setPartnerBroadcastVisible(false);
-          }}
-          accessibilityLabel="Dismiss broadcast dialog">
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <Pressable
-            style={styles.modalCard}
+            style={styles.modalBackdropPress}
             onPress={() => {
-              /* swallow taps inside the card so backdrop dismiss doesn't fire */
-            }}>
+              if (!partnerBroadcastSending) setPartnerBroadcastVisible(false);
+            }}
+            accessibilityLabel="Dismiss broadcast dialog"
+          />
+          <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>
               Broadcast from {partnerRow?.name ?? 'League'}
             </Text>
@@ -1072,69 +1083,10 @@ export function PoolSettingsScreen() {
                 )}
               </TouchableOpacity>
             </View>
-          </Pressable>
-        </Pressable>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
-      {/* Edit-before-share: the Gaffer can tweak the invite copy, or copy just
-          the bare invite code (separated from the message). */}
-      <Modal
-        visible={shareEdit !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShareEdit(null)}>
-        <Pressable
-          style={styles.modalBackdrop}
-          onPress={() => setShareEdit(null)}
-          accessibilityLabel="Dismiss share dialog">
-          <Pressable style={styles.modalCard} onPress={() => {}}>
-            <Text style={styles.modalTitle}>Share invite</Text>
-            <Text style={styles.modalHint}>
-              Edit the message if you like, then tap Share — or copy just the
-              invite code.
-            </Text>
-            <TextInput
-              style={[styles.modalInput, styles.shareInput]}
-              value={shareEdit?.text ?? ''}
-              onChangeText={text =>
-                setShareEdit(prev => (prev ? {...prev, text} : prev))
-              }
-              placeholderTextColor={colors.textSecondary}
-              multiline
-              textAlignVertical="top"
-            />
-            <TouchableOpacity
-              style={[styles.codeButton, styles.shareCopyBtn, {borderColor: accentColor}]}
-              onPress={() => {
-                if (!shareEdit) return;
-                Clipboard.setString(shareEdit.code);
-                Alert.alert('Copied', `${shareEdit.code} copied to clipboard.`);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Copy invite code">
-              <Copy size={14} color={accentColor} />
-              <Text style={[styles.codeButtonText, {color: accentColor}]}>
-                Copy invite code{shareEdit ? ` (${shareEdit.code})` : ''}
-              </Text>
-            </TouchableOpacity>
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                onPress={() => setShareEdit(null)}
-                accessibilityRole="button"
-                accessibilityLabel="Cancel">
-                <Text style={styles.modalCancel}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalSubmit}
-                onPress={submitShare}
-                accessibilityRole="button"
-                accessibilityLabel="Share invite">
-                <Text style={styles.modalSubmitText}>Share</Text>
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -1595,6 +1547,16 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
   },
+  // Copied verbatim from PoolMembersScreen rather than approximated. Fills the
+  // backdrop as an absolute sibling behind the card, so a tap outside the card
+  // dismisses without the card needing an empty-onPress swallow.
+  modalBackdropPress: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
   modalCard: {
     width: '100%',
     maxWidth: 380,
@@ -1627,13 +1589,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     textAlignVertical: 'top',
-  },
-  shareInput: {
-    minHeight: 150,
-  },
-  shareCopyBtn: {
-    alignSelf: 'flex-start',
-    marginTop: spacing.sm,
   },
   modalActions: {
     flexDirection: 'row',

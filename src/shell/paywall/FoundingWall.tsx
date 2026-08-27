@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useEffect} from 'react';
 import {Text} from '@shared/components/AppText';
 import {Modal, View, TouchableOpacity, StyleSheet} from 'react-native';
 import {spacing, borderRadius} from '@shared/theme';
@@ -38,7 +38,23 @@ export function FoundingWall({
 }: FoundingWallProps) {
   const {colors} = useTheme();
   const styles = createStyles(colors);
-  const {config} = usePaywallConfig();
+  const {config, loading} = usePaywallConfig();
+
+  // No config → nothing to display, but the PARENT still has to be told.
+  //
+  // CreatePoolScreen sets showFoundingWall and returns, so on the pool_cap
+  // branch closeFoundingWall() is what presents the Handoff and calls
+  // dismissToHome(). Rendering null without closing means neither ever runs:
+  // the Gaffer is left on the create form with a Contest that exists and
+  // nothing on screen acknowledging it — a silent dead end on the exact branch
+  // this wall's parent exists to fix.
+  //
+  // All seven global config keys are present in production, so this only fires
+  // on a slow or failed fetch. Gated on `loading` so a legitimate first-render
+  // fetch isn't closed out from under itself.
+  useEffect(() => {
+    if (visible && !config && !loading) onClose();
+  }, [visible, config, loading, onClose]);
 
   // No config → nothing to display. The server already allowed the action.
   if (!config) return null;
@@ -136,9 +152,18 @@ export function FoundingWall({
             </Text>
           </View>
 
+          {/* The CTA *is* the exit. On pool_cap it no longer reads "Start the
+              {Contest} →": the Contest already exists by the time this card
+              renders, so that string read as an invitation to create another
+              one — which is how a duplicate got made.
+
+              A separate quiet dismiss below this button was specced and then
+              CUT. Both it and the CTA called onClose, so it was two controls
+              doing one thing — the same duplicate-label problem Fix 2 exists to
+              remove. Don't re-add it. */}
           <TouchableOpacity style={styles.cta} onPress={onClose}>
             <Text style={styles.ctaText}>
-              {trigger === 'member_cap' ? 'Keep going →' : `Start the ${Contest} →`}
+              {trigger === 'member_cap' ? 'Keep going →' : 'Got it →'}
             </Text>
           </TouchableOpacity>
         </View>
