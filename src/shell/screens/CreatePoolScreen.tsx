@@ -318,6 +318,24 @@ export function CreatePoolScreen({navigation, route}: any) {
           pool={handoff.pool}
           code={handoff.code}
           onDismiss={() => {
+            // TEMPORARY GUARD — removed by the Contest Invite Row build
+            // (260828_HotPick_ContestInviteRow_Spec, Item 4), which presents
+            // the Handoff from Home after navigation instead of from inside
+            // this screen, so there is one transition rather than two.
+            //
+            // ContestHandoff is a Modal with animationType="fade" mounted
+            // INSIDE CreatePoolScreen, and poolName is never cleared. So the
+            // fade-out reveals the still-mounted create form holding the
+            // Contest name: the TextInput regains focus, the keyboard rises,
+            // and "Start Contest" sits armed for roughly 500ms before the
+            // navigator transition runs. Measured at 20fps from the 2026-08-28
+            // device recording — form exposed t=31.90s to t=32.40s.
+            //
+            // That is a duplicate-creation path the Handoff itself introduced.
+            // Clearing the name first means the revealed form flashes EMPTY
+            // instead of armed. It must be the FIRST statement — the three
+            // calls below begin the dismissal.
+            setPoolName('');
             setHandoffVisible(false);
             setHandoff(null);
             dismissToHome();
