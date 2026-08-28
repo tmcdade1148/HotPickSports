@@ -40,7 +40,33 @@ export function RecruiterBand() {
   // condition it does not cover. Restating the whole real-Contest definition
   // here would be a second copy of it, and a definition kept in several places
   // is what produced the 77-recipient broadcast on 2026-08-25.
-  const pool = visiblePools.find(p => p.invite_code && p.organizer_id === userId);
+  // TEMPORARY GUARD — removed by the Contest Invite Row build
+  // (260828_HotPick_ContestInviteRow_Spec), which deletes this component
+  // outright and moves the invite code into the Contest card itself, where it
+  // reads from that card's own props and the mismatch below becomes
+  // structurally impossible rather than merely narrowed.
+  //
+  // This used to be a bare .find(). That returns the FIRST Contest the user
+  // organizes that carries a code, and it never looks at which card the
+  // carousel is showing — the band has no connection to carousel position at
+  // all. Device evidence 2026-08-28: with TestContestA / B / C all solo, the
+  // band read "TestContestB · code 6JV6HR" while the carousel displayed A, and
+  // again while it displayed C. Wrong code under the wrong Contest, on two of
+  // three cards, and tapping Share would have sent players to the wrong place.
+  //
+  // Narrowing to EXACTLY ONE candidate makes that unreachable: with a single
+  // candidate there is nothing for the pick to get wrong. Organizers holding
+  // two or more coded Contests lose the band entirely — that is the intended
+  // trade, not a regression. They still reach the code via the gear icon on
+  // each card, and via the Handoff at creation.
+  //
+  // Do NOT "fix" this by loosening the comparison, reading a carousel index,
+  // or reaching for the globally selected pool. Any of those reintroduces the
+  // bug this guard exists to remove.
+  const candidates = visiblePools.filter(
+    p => p.invite_code && p.organizer_id === userId,
+  );
+  const pool = candidates.length === 1 ? candidates[0] : undefined;
 
   // THE COUNT HAS TO BE THE ROSTER, NOT THE RANK RPC.
   //
