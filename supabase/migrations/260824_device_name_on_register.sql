@@ -67,3 +67,31 @@ COMMENT ON COLUMN public.user_devices.last_used_at IS
 
 COMMENT ON COLUMN public.user_devices.device_name IS
   'Device.modelName at registration ("iPhone 15 Pro", "MacBook Pro"). The only field that distinguishes an iPhone from an iOS app running on Apple Silicon — platform is the transport and Platform.OS reads "ios" for both. NULL on rows written before 2026-08-24.';
+
+-- RE-GRANT: these four lines are NOT redundant. Do not remove them.
+--
+-- The DROP FUNCTION at the top of this file discards the function's ACL along
+-- with the function. The CREATE that follows it does NOT inherit the old
+-- privileges — it takes the Postgres defaults, which are EXECUTE to PUBLIC,
+-- and in Supabase that includes anon. CREATE OR REPLACE preserves an ACL;
+-- DROP-then-CREATE cannot, because there is nothing left to preserve.
+--
+-- Without these lines this file silently reverts two hardening migrations:
+--   20260605023229_revoke_anon_execute_on_auth_rpcs
+--   20260609141233_revoke_anon_execute_and_pin_search_path
+--
+-- Observed live on 2026-08-28, immediately after this file was applied:
+--   register_device_token  =X | postgres=X | anon=X | authenticated=X | service_role=X
+-- anon had EXECUTE on a SECURITY DEFINER function — the exact class those two
+-- migrations closed. Exposure was limited only because the body raises
+-- not_authenticated when auth.uid() is null; that is a second line of defence,
+-- not a reason to leave the first one open.
+--
+-- Production was corrected separately by
+-- 260828_restore_register_device_token_grants_after_drop. These lines exist so
+-- a replay onto a fresh environment (branch, staging, rebuild) does not reopen
+-- it.
+REVOKE ALL ON FUNCTION public.register_device_token(text, text, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.register_device_token(text, text, text) FROM anon;
+GRANT EXECUTE ON FUNCTION public.register_device_token(text, text, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.register_device_token(text, text, text) TO service_role;
