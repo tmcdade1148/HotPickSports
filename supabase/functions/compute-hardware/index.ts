@@ -164,13 +164,24 @@ Deno.serve(async (req) => {
  *
  * CASE-INSENSITIVE ON PURPOSE — this is not defensive tidiness, it is the whole
  * correctness of the check. season_games.status is written in different cases by
- * different producers, and BOTH are live in production today (verified
- * 2026-08-31): the ESPN importer writes uppercase (nfl_2026 'SCHEDULED',
- * nfl_2026_pre 'FINAL'), the simulator writes lowercase (nfl_2025_sim 'final',
- * 'scheduled'). A `status === "FINAL"` comparison would therefore match ZERO
- * sim games and block weekly awards on nfl_2025_sim — the App Review
- * competition — permanently and silently. A lowercase-only comparison would do
- * the same to the live season. Normalise, always.
+ * different producers, and both are live in production today (verified
+ * 2026-08-31 across all seven competitions): the ESPN importer writes uppercase
+ * (nfl_2026 'SCHEDULED', nfl_2026_pre 'FINAL', nfl_2025 'FINAL'), the simulator
+ * writes lowercase (nfl_2025_sim 'final' / 'scheduled').
+ *
+ * A `status === "FINAL"` comparison would therefore match ZERO sim games and
+ * block weekly awards on nfl_2025_sim — the App Review competition —
+ * permanently and silently. A lowercase-only comparison would do the same to
+ * the live season.
+ *
+ * AND IT IS NOT ONLY A CROSS-COMPETITION PROBLEM. nfl_2025_simA and
+ * nfl_2025_simG each hold BOTH casings inside one competition: 164 'scheduled'
+ * alongside 13 'SCHEDULED'. Two producers write status into the same
+ * competition, so a single week can carry mixed casing. Today that split sits
+ * in the scheduled value and no week mixes 'final' with 'FINAL' — checked, zero
+ * rows — but nothing prevents the same split reaching FINAL, and on the day it
+ * does a case-sensitive check would silently judge a finished week unfinished
+ * and withhold every weekly award for it. Normalise, always.
  *
  * A week with no games returns NOT settled. "Every game is final" is vacuously
  * true over an empty set, and that is exactly the wrong answer here: no rows
