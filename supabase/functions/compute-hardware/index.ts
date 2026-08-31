@@ -41,7 +41,8 @@ async function fetchAll<T = any>(
  * guards on WHEN each block may run are the real protection, not the re-run.
  *
  * Triggers:
- * - weekly_settle: after all games in a week reach status = complete
+ * - weekly_settle: after EVERY game in the week is FINAL. This line used to be
+ *   an assumption; weekIsSettled() below now enforces it.
  * - season_settle: after is_season_complete = true
  * - manual_override: Tom triggers from admin panel. Runs the weekly block, and
  *   the season block ONLY when is_season_complete — see the guard below.
@@ -85,10 +86,36 @@ Deno.serve(async (req) => {
 
     if (trigger === "weekly_settle" || trigger === "manual_override") {
       const targetWeek = week ?? Number(cfg.current_week ?? 1);
-      results.sharpshooter = await computeSharpshooterWeek(competition, seasonYear, targetWeek);
-      results.gunslinger = await computeGunslingerWeek(competition, seasonYear, targetWeek);
-      results.contrarian = await computeContrarianWeek(competition, seasonYear, targetWeek);
-      results.perfect = await computePerfectWeek(competition, seasonYear, targetWeek);
+
+      // WEEKLY AWARDS NEED A FINISHED WEEK — for EVERY trigger.
+      //
+      // All four awards below are computed from season_picks.is_correct, which
+      // is written progressively as games go FINAL. Run mid-week and the math
+      // is not wrong-ish, it is wrong: Sharpshooter's rate is over whatever
+      // subset happened to be scored, and its 10-pick minimum is met by anyone
+      // whose earliest games kicked off first.
+      //
+      // Same permanence as the season block below — see the header comment.
+      // ON CONFLICT DO NOTHING plus user_hardware_unique_instance means the
+      // FIRST row for (user, slug, competition, week, pool) stands forever, and
+      // a later run off complete data is silently discarded. There is no code
+      // path that takes an award back (Hard Rule: never DELETE FROM
+      // user_hardware). So the gate on WHEN this may run is the only
+      // protection there is — a re-run cannot repair it.
+      //
+      // Skipped and reported rather than early-returned, matching the season
+      // block: an early return would hide any season results from an operator
+      // who just triggered a manual_override.
+      const gate = await weekIsSettled(competition, targetWeek);
+      if (!gate.ok) {
+        results.weekly_awards =
+          `skipped: ${gate.reason} (${gate.finalCount}/${gate.total} games FINAL)`;
+      } else {
+        results.sharpshooter = await computeSharpshooterWeek(competition, seasonYear, targetWeek);
+        results.gunslinger = await computeGunslingerWeek(competition, seasonYear, targetWeek);
+        results.contrarian = await computeContrarianWeek(competition, seasonYear, targetWeek);
+        results.perfect = await computePerfectWeek(competition, seasonYear, targetWeek);
+      }
     }
 
     // SEASON AWARDS NEED A COMPLETE SEASON — for EVERY trigger.
@@ -131,6 +158,46 @@ Deno.serve(async (req) => {
 // ---------------------------------------------------------------------------
 // WEEKLY AWARDS
 // ---------------------------------------------------------------------------
+
+/**
+ * Is every game in this week actually finished?
+ *
+ * CASE-INSENSITIVE ON PURPOSE — this is not defensive tidiness, it is the whole
+ * correctness of the check. season_games.status is written in different cases by
+ * different producers, and BOTH are live in production today (verified
+ * 2026-08-31): the ESPN importer writes uppercase (nfl_2026 'SCHEDULED',
+ * nfl_2026_pre 'FINAL'), the simulator writes lowercase (nfl_2025_sim 'final',
+ * 'scheduled'). A `status === "FINAL"` comparison would therefore match ZERO
+ * sim games and block weekly awards on nfl_2025_sim — the App Review
+ * competition — permanently and silently. A lowercase-only comparison would do
+ * the same to the live season. Normalise, always.
+ *
+ * A week with no games returns NOT settled. "Every game is final" is vacuously
+ * true over an empty set, and that is exactly the wrong answer here: no rows
+ * means the schedule has not been imported, not that the week is over.
+ */
+async function weekIsSettled(competition: string, week: number) {
+  const games = await fetchAll<{ game_id: string; status: string | null }>(
+    "season_games",
+    q => q.select("game_id, status").eq("competition", competition).eq("week", week),
+  );
+
+  const total = games.length;
+  if (total === 0) {
+    return { ok: false, reason: "no_games_for_week", total: 0, finalCount: 0 };
+  }
+
+  const finalCount = games.filter(
+    g => (g.status ?? "").trim().toUpperCase() === "FINAL",
+  ).length;
+
+  return {
+    ok: finalCount === total,
+    reason: finalCount === total ? "" : "week_not_final",
+    total,
+    finalCount,
+  };
+}
 
 async function computeSharpshooterWeek(competition: string, seasonYear: number, week: number) {
   // Highest regular pick win rate per pool. Min 10 picks. Ties: both awarded.
